@@ -16,4 +16,13 @@ router.get('/', (req, res) => {
   });
 });
 
+// Health check 엔드포인트
+router.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: '서버가 정상적으로 실행 중입니다.',
+    timestamp: new Date().toISOString()
+  });
+});
+
 export default router;

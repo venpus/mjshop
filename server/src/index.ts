@@ -20,22 +20,9 @@ app.use(morgan('dev')); // 로깅
 app.use(express.json()); // JSON 파싱
 app.use(express.urlencoded({ extended: true })); // URL 인코딩된 본문 파싱
 
-// 기본 라우트
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    message: '서버가 정상적으로 실행 중입니다.',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// API 라우트 (추후 확장)
-app.get('/api', (req, res) => {
-  res.json({ 
-    message: '쇼핑몰 관리자 API',
-    version: '1.0.0'
-  });
-});
+// API 라우트 등록
+import apiRoutes from './routes/index.js';
+app.use('/api', apiRoutes);
 
 // 404 핸들러
 app.use((req, res) => {
