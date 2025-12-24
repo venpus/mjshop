@@ -21,6 +21,7 @@ export interface Product {
     name: string;
     url: string;
   };
+  createdAt?: string | Date;
 }
 
 export interface ProductTableRowProps {
@@ -55,48 +56,74 @@ export function ProductTableRow({
   onEdit,
   onDelete,
 }: ProductTableRowProps) {
+  const handleRowClick = () => {
+    onViewDetail(product);
+  };
+
+  const handleActionsClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // 관리 열 클릭 시 상세 화면으로 이동하지 않도록
+  };
+
+  // 날짜 포맷팅 함수
+  const formatDate = (date: string | Date | undefined): string => {
+    if (!date) return '-';
+    try {
+      const dateObj = typeof date === 'string' ? new Date(date) : date;
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch (error) {
+      return '-';
+    }
+  };
+
   return (
-    <tr className="hover:bg-gray-50">
-      <td className="px-4 py-2 text-gray-900">
+    <tr 
+      className="hover:bg-gray-50 cursor-pointer"
+      onClick={handleRowClick}
+    >
+      <td className="px-4 py-3 text-base font-semibold text-gray-600">
+        {formatDate(product.createdAt)}
+      </td>
+      <td className="px-4 py-3 text-base font-semibold text-gray-900">
         {product.id}
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-3">
         <ProductImageCell
           imageUrl={product.mainImage}
           productName={product.name}
           onMouseEnter={() => onImageHoverEnter(product.id)}
           onMouseLeave={onImageHoverLeave}
           onMouseMove={onMouseMove}
+          size="w-20 h-20"
         />
       </td>
-      <td className="px-4 py-2">
-        <button
-          onClick={() => onViewDetail(product)}
-          className="text-gray-900 text-left cursor-pointer"
-        >
+      <td className="px-4 py-3">
+        <div className="text-base font-semibold text-gray-900">
           {product.name}
           {product.nameChinese && (
             <span className="text-gray-600"> ({product.nameChinese})</span>
           )}
-        </button>
+        </div>
       </td>
-      <td className="px-4 py-2 text-gray-600">
+      <td className="px-4 py-3 text-base font-semibold text-gray-600">
         {product.category}
       </td>
-      <td className="px-4 py-2 text-gray-900">
+      <td className="px-4 py-3 text-base font-semibold text-gray-900">
         ¥{product.price.toLocaleString()}
       </td>
-      <td className="px-4 py-2 text-gray-600">
+      <td className="px-4 py-3 text-base font-semibold text-gray-600">
         {product.size}
         {product.size ? "cm" : ""}
       </td>
-      <td className="px-4 py-2 text-gray-600">
+      <td className="px-4 py-3 text-base font-semibold text-gray-600">
         {product.setCount}개
       </td>
-      <td className="px-4 py-2 text-gray-600">
+      <td className="px-4 py-3 text-base font-semibold text-gray-600">
         {product.supplier.name}
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-3" onClick={handleActionsClick}>
         <ProductActions
           product={product}
           onOrder={onOrder}

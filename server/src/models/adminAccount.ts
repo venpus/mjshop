@@ -36,7 +36,7 @@ export interface CreateAdminAccountDTO {
   phone: string;
   email: string;
   password: string;
-  level: AdminLevel;
+  level?: AdminLevel; // 가입 신청 시 선택적
   created_by?: string;
 }
 

@@ -109,11 +109,38 @@ export class AdminAccountRepository {
   async create(data: CreateAdminAccountDTO, passwordHash: string): Promise<AdminAccount> {
     const { id, name, phone, email, level, created_by } = data;
 
+    // level이 없으면 기본값 설정
+    const accountLevel = level || 'C0: 한국Admin';
+
     await pool.execute<ResultSetHeader>(
       `INSERT INTO admin_accounts 
        (id, name, phone, email, password_hash, level, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, name, phone, email, passwordHash, level, created_by || null]
+      [id, name, phone, email, passwordHash, accountLevel, created_by || null]
+    );
+
+    const account = await this.findById(id);
+    if (!account) {
+      throw new Error('계정 생성 후 조회 실패');
+    }
+
+    return account;
+  }
+
+  /**
+   * 관리자 가입 신청 (승인 대기 상태로 생성, is_active = false)
+   */
+  async createSignupRequest(data: CreateAdminAccountDTO, passwordHash: string): Promise<AdminAccount> {
+    const { id, name, phone, email, level } = data;
+
+    // level이 없으면 기본값 설정
+    const accountLevel = level || 'C0: 한국Admin';
+
+    await pool.execute<ResultSetHeader>(
+      `INSERT INTO admin_accounts 
+       (id, name, phone, email, password_hash, level, is_active, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, name, phone, email, passwordHash, accountLevel, 0, null] // is_active = false (0)
     );
 
     const account = await this.findById(id);

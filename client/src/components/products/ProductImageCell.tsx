@@ -30,6 +30,8 @@ export function ProductImageCell({
   className = '',
   size = 'w-10 h-10',
 }: ProductImageCellProps) {
+  console.log('ProductImageCell 렌더링 - imageUrl:', imageUrl);
+  
   return (
     <div
       className={`${size} bg-gray-100 rounded overflow-hidden flex items-center justify-center cursor-pointer ${className}`}
@@ -41,10 +43,27 @@ export function ProductImageCell({
         <img
           src={imageUrl}
           alt={productName}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
+          style={{ 
+            display: 'block',
+            maxWidth: '100%',
+            maxHeight: '100%'
+          }}
+          onError={(e) => {
+            console.error('❌ 이미지 로딩 실패:', imageUrl);
+            console.error('이미지 요소:', e.currentTarget);
+            console.error('에러 상세:', e);
+            // 이미지 로딩 실패 시 아이콘 표시
+            e.currentTarget.style.display = 'none';
+          }}
+          onLoad={(e) => {
+            console.log('✅ 이미지 로딩 성공:', imageUrl);
+            console.log('이미지 크기:', e.currentTarget.naturalWidth, 'x', e.currentTarget.naturalHeight);
+            console.log('표시 크기:', e.currentTarget.width, 'x', e.currentTarget.height);
+          }}
         />
       ) : (
-        <Image className="w-5 h-5 text-gray-400" />
+        <Image className="w-8 h-8 text-gray-400" />
       )}
     </div>
   );

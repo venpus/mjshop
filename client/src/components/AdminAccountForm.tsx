@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export interface AdminAccountFormData {
   id: string;
@@ -7,11 +8,12 @@ export interface AdminAccountFormData {
   phone: string;
   email: string;
   level: 'A-SuperAdmin' | 'B0: 중국Admin' | 'C0: 한국Admin';
+  password?: string; // 계정 생성 시 필수, 수정 시 선택
 }
 
 interface AdminAccountFormProps {
   onClose: () => void;
-  onSave: (account: AdminAccountFormData) => void;
+  onSave: (account: AdminAccountFormData) => void | Promise<void>;
   initialData?: AdminAccountFormData;
   mode?: 'create' | 'edit';
 }
@@ -22,6 +24,9 @@ export function AdminAccountForm({
   initialData,
   mode = 'create',
 }: AdminAccountFormProps) {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.level === 'A-SuperAdmin';
+
   const [formData, setFormData] = useState<AdminAccountFormData>(
     initialData || {
       id: '',
@@ -29,12 +34,15 @@ export function AdminAccountForm({
       phone: '',
       email: '',
       level: 'C0: 한국Admin',
+      password: '',
     }
   );
 
   const [errors, setErrors] = useState<Partial<Record<keyof AdminAccountFormData, string>>>({});
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // 유효성 검사
@@ -48,13 +56,24 @@ export function AdminAccountForm({
     }
     if (!formData.phone.trim()) {
       newErrors.phone = '연락처를 입력해주세요';
-    } else if (!/^010-\d{4}-\d{4}$/.test(formData.phone)) {
-      newErrors.phone = '올바른 전화번호 형식이 아닙니다 (예: 010-1234-5678)';
+    } else {
+      // xxx-xxxx-xxxx 형식 또는 xxxxxxxxxxx 형식 (11자리 숫자) 허용
+      const phonePattern = /^(\d{3}-\d{4}-\d{4}|\d{11})$/;
+      if (!phonePattern.test(formData.phone)) {
+        newErrors.phone = '올바른 전화번호 형식이 아닙니다 (예: 010-1234-5678 또는 01012345678)';
+      }
     }
     if (!formData.email.trim()) {
       newErrors.email = '이메일을 입력해주세요';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = '올바른 이메일 형식이 아닙니다';
+    }
+
+    // 계정 생성 시 비밀번호 필수
+    if (mode === 'create' && !formData.password?.trim()) {
+      newErrors.password = '비밀번호를 입력해주세요';
+    } else if (mode === 'create' && formData.password && formData.password.length < 6) {
+      newErrors.password = '비밀번호는 6자 이상이어야 합니다';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -63,8 +82,17 @@ export function AdminAccountForm({
     }
 
     setErrors({});
-    onSave(formData);
-    onClose();
+    setIsSubmitting(true);
+    
+    try {
+      await onSave(formData);
+      onClose();
+    } catch (error) {
+      // 에러는 상위 컴포넌트에서 처리
+      console.error('계정 저장 오류:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (field: keyof AdminAccountFormData, value: string) => {
@@ -171,21 +199,44 @@ export function AdminAccountForm({
               )}
             </div>
 
-            {/* 레벨 */}
-            <div>
-              <label className="block text-gray-700 mb-2">
-                레벨 <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={formData.level}
-                onChange={(e) => handleChange('level', e.target.value as AdminAccountFormData['level'])}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="A-SuperAdmin">A-SuperAdmin</option>
-                <option value="B0: 중국Admin">B0: 중국Admin</option>
-                <option value="C0: 한국Admin">C0: 한국Admin</option>
-              </select>
-            </div>
+            {/* 비밀번호 (계정 생성 시에만 필수) */}
+            {mode === 'create' && (
+              <div>
+                <label className="block text-gray-700 mb-2">
+                  비밀번호 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  value={formData.password || ''}
+                  onChange={(e) => handleChange('password', e.target.value)}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                    errors.password ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="6자 이상 입력하세요"
+                />
+                {errors.password && (
+                  <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+                )}
+              </div>
+            )}
+
+            {/* 레벨 (A-SuperAdmin만 표시) */}
+            {isSuperAdmin && (
+              <div>
+                <label className="block text-gray-700 mb-2">
+                  레벨 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.level}
+                  onChange={(e) => handleChange('level', e.target.value as AdminAccountFormData['level'])}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="A-SuperAdmin">A-SuperAdmin</option>
+                  <option value="B0: 중국Admin">B0: 중국Admin</option>
+                  <option value="C0: 한국Admin">C0: 한국Admin</option>
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
@@ -199,9 +250,17 @@ export function AdminAccountForm({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isSubmitting}
             >
-              {mode === 'edit' ? '수정하기' : '추가하기'}
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  {mode === 'edit' ? '수정 중...' : '추가 중...'}
+                </span>
+              ) : (
+                mode === 'edit' ? '수정하기' : '추가하기'
+              )}
             </button>
           </div>
         </form>

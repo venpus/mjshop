@@ -66,11 +66,46 @@ export class AdminAccountService {
     // 비밀번호 해싱
     const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
 
+    // level이 없으면 기본값 설정
+    const accountData: CreateAdminAccountDTO = {
+      ...data,
+      level: data.level || 'C0: 한국Admin',
+      created_by: createdBy,
+    };
+
     // 계정 생성
-    const account = await this.repository.create(
-      { ...data, created_by: createdBy },
-      passwordHash
-    );
+    const account = await this.repository.create(accountData, passwordHash);
+
+    return this.toPublicAccount(account);
+  }
+
+  /**
+   * 관리자 가입 신청 (승인 대기 상태로 생성)
+   */
+  async signupRequest(data: CreateAdminAccountDTO): Promise<AdminAccountPublic> {
+    // ID 중복 확인
+    const idExists = await this.repository.existsById(data.id);
+    if (idExists) {
+      throw new Error('이미 사용 중인 ID입니다.');
+    }
+
+    // 이메일 중복 확인
+    const emailExists = await this.repository.existsByEmail(data.email);
+    if (emailExists) {
+      throw new Error('이미 사용 중인 이메일입니다.');
+    }
+
+    // 비밀번호 해싱
+    const passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
+
+    // 가입 신청 시 기본 레벨 설정 (level이 없으면 'C0: 한국Admin'으로 설정)
+    const signupData: CreateAdminAccountDTO = {
+      ...data,
+      level: data.level || 'C0: 한국Admin',
+    };
+
+    // 가입 신청 계정 생성 (is_active = false로 설정)
+    const account = await this.repository.createSignupRequest(signupData, passwordHash);
 
     return this.toPublicAccount(account);
   }
@@ -140,6 +175,30 @@ export class AdminAccountService {
     }
 
     return await bcrypt.compare(password, passwordHash);
+  }
+
+  /**
+   * 로그인 처리
+   */
+  async login(id: string, password: string): Promise<AdminAccountPublic> {
+    const account = await this.repository.findById(id);
+    if (!account) {
+      throw new Error('ID 또는 비밀번호가 올바르지 않습니다.');
+    }
+
+    if (!account.is_active) {
+      throw new Error('비활성화된 계정입니다. 관리자에게 문의하세요.');
+    }
+
+    const isValid = await this.verifyPassword(id, password);
+    if (!isValid) {
+      throw new Error('ID 또는 비밀번호가 올바르지 않습니다.');
+    }
+
+    // 마지막 로그인 시간 업데이트
+    await this.repository.updateLastLogin(id);
+
+    return this.toPublicAccount(account);
   }
 
   /**

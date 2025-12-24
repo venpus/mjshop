@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard,
   Package,
@@ -45,6 +46,8 @@ export function Sidebar({
   currentPage,
   onPageChange,
 }: SidebarProps) {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.level === 'A-SuperAdmin';
   const [isChinaExpanded, setIsChinaExpanded] = useState(true);
   const [isShopExpanded, setIsShopExpanded] = useState(true);
 
@@ -67,18 +70,20 @@ export function Sidebar({
           <span>대시보드</span>
         </button>
 
-        {/* 상품 관리 */}
-        <button
-          onClick={() => onPageChange("products")}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-            currentPage === "products"
-              ? "bg-purple-50 text-purple-600"
-              : "text-gray-700 hover:bg-gray-50"
-          }`}
-        >
-          <Package className="w-5 h-5" />
-          <span>상품 관리</span>
-        </button>
+        {/* 상품 관리 (레벨 A만 표시) */}
+        {isSuperAdmin && (
+          <button
+            onClick={() => onPageChange("products")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              currentPage === "products"
+                ? "bg-purple-50 text-purple-600"
+                : "text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            <Package className="w-5 h-5" />
+            <span>상품 관리</span>
+          </button>
+        )}
 
         {/* 중국협업 메뉴 */}
         <div className="mt-1">

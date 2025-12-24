@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, X, Globe } from 'lucide-react';
+import { Menu, X, Globe, LogOut, User } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { Products } from './components/Products';
@@ -16,12 +16,17 @@ import { Gallery } from './components/Gallery';
 import { ChinaWarehouse } from './components/ChinaWarehouse';
 import { Invoice } from './components/Invoice';
 import { AdminAccount } from './components/AdminAccount';
+import { Login } from './components/Login';
+import { useAuth } from './contexts/AuthContext';
 
 type PageType = 'dashboard' | 'products' | 'orders' | 'shipping' | 'payment' | 'inventory' | 'purchase-orders' | 'purchase-order-detail' | 'shipping-history' | 'china-payment' | 'members' | 'gallery' | 'china-warehouse' | 'invoice' | 'admin-account';
 
 type Language = 'ko' | 'en' | 'zh';
 
 export default function App() {
+  const { isAuthenticated, isLoading, login, logout, user } = useAuth();
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<'cost' | 'factory' | 'work' | 'delivery' | undefined>(undefined);
@@ -47,6 +52,43 @@ export default function App() {
     setCurrentPage('purchase-orders');
   };
 
+  const handleLogin = async (id: string, password: string) => {
+    setIsLoggingIn(true);
+    setLoginError(null);
+    try {
+      await login(id, password);
+    } catch (error: any) {
+      setLoginError(error.message || '로그인에 실패했습니다.');
+      throw error;
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  // 로딩 중
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 로그인하지 않은 경우 로그인 페이지 표시
+  if (!isAuthenticated) {
+    return (
+      <Login 
+        onLogin={handleLogin} 
+        isLoading={isLoggingIn}
+        error={loginError}
+      />
+    );
+  }
+
+  // 로그인된 경우 메인 애플리케이션 표시
   return (
     <div className="flex h-screen min-h-[1080px] bg-gray-50">
       {/* Overlay */}
@@ -82,6 +124,25 @@ export default function App() {
           </button>
 
           <div className="flex-1"></div>
+
+          {/* User Info and Logout */}
+          <div className="flex items-center gap-4 mr-4">
+            {user && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg">
+                <User className="w-4 h-4 text-gray-600" />
+                <span className="text-sm text-gray-700 font-medium">{user.name}</span>
+                <span className="text-xs text-gray-500">({user.id})</span>
+              </div>
+            )}
+            <button
+              onClick={logout}
+              className="flex items-center gap-2 px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="로그아웃"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="text-sm font-medium">로그아웃</span>
+            </button>
+          </div>
 
           {/* Language Dropdown */}
           <div className="relative">
@@ -124,7 +185,7 @@ export default function App() {
         </div>
 
         {currentPage === 'dashboard' && <Dashboard />}
-        {currentPage === 'products' && <Products />}
+        {currentPage === 'products' && user?.level === 'A-SuperAdmin' && <Products />}
         {currentPage === 'orders' && <Orders />}
         {currentPage === 'shipping' && <Shipping />}
         {currentPage === 'payment' && <Payment />}

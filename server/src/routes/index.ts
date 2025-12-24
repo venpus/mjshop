@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import adminAccountRoutes from './adminAccounts.js';
+import productRoutes from './products.js';
 
 const router = Router();
 
 // API 라우트들을 여기에 추가
 router.use('/admin-accounts', adminAccountRoutes);
+router.use('/products', productRoutes);
 
 router.get('/', (req, res) => {
   res.json({ 
@@ -13,7 +15,8 @@ router.get('/', (req, res) => {
     endpoints: {
       health: '/api/health',
       api: '/api',
-      adminAccounts: '/api/admin-accounts'
+      adminAccounts: '/api/admin-accounts',
+      products: '/api/products'
     }
   });
 });
