@@ -51,7 +51,7 @@ const categoryData = [
 
 export function Dashboard() {
   return (
-    <div className="p-8">
+    <div className="p-8 min-h-[1080px] max-w-[1664px]">
       <div className="mb-8">
         <h2 className="text-gray-900 mb-2">대시보드</h2>
         <p className="text-gray-600">쇼핑몰 운영 현황을 한눈에 확인하세요</p>

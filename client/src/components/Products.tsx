@@ -1,21 +1,19 @@
 import { useState } from "react";
 import {
-  Search,
   Plus,
-  Edit,
-  Trash2,
-  Eye,
-  Image,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { ProductForm, ProductFormData } from "./ProductForm";
 import { ProductDetailModal } from "./ProductDetailModal";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
+import { ProductImagePreview } from "./ui/product-image-preview";
+import { SearchBar } from "./ui/search-bar";
+import { TablePagination } from "./ui/table-pagination";
+import { ProductTableRow } from "./products/ProductTableRow";
 
 interface Product {
   id: string;
   name: string;
+  nameChinese?: string;
   category: string;
   price: number;
   stock: number;
@@ -28,6 +26,10 @@ interface Product {
   boxCount: number;
   mainImage: string;
   images: string[];
+  supplier: {
+    name: string;
+    url: string;
+  };
 }
 
 const initialProducts: Product[] = [
@@ -51,6 +53,10 @@ const initialProducts: Product[] = [
       "https://images.unsplash.com/photo-1567169866456-a0759b6bb0c8?w=400",
       "https://images.unsplash.com/photo-1517686748843-bb360cfc62b3?w=400",
     ],
+    supplier: {
+      name: "Supplier A",
+      url: "https://www.suppliera.com",
+    },
   },
   {
     id: "P002",
@@ -71,6 +77,10 @@ const initialProducts: Product[] = [
       "https://images.unsplash.com/photo-1567169866456-a0759b6bb0c8?w=400",
       "https://images.unsplash.com/photo-1602734846297-9299fc2d4703?w=400",
     ],
+    supplier: {
+      name: "Supplier B",
+      url: "https://www.supplierb.com",
+    },
   },
   {
     id: "P003",
@@ -91,6 +101,10 @@ const initialProducts: Product[] = [
       "https://images.unsplash.com/photo-1727154085760-134cc942246e?w=400",
       "https://images.unsplash.com/photo-1635696860867-238c2fa072bb?w=400",
     ],
+    supplier: {
+      name: "Supplier C",
+      url: "https://www.supplierc.com",
+    },
   },
   {
     id: "P004",
@@ -111,6 +125,10 @@ const initialProducts: Product[] = [
       "https://images.unsplash.com/photo-1517686748843-bb360cfc62b3?w=400",
       "https://images.unsplash.com/photo-1567169866456-a0759b6bb0c8?w=400",
     ],
+    supplier: {
+      name: "Supplier D",
+      url: "https://www.supplierd.com",
+    },
   },
   {
     id: "P005",
@@ -130,6 +148,10 @@ const initialProducts: Product[] = [
     images: [
       "https://images.unsplash.com/photo-1671490289892-502ca32a3a2a?w=400",
     ],
+    supplier: {
+      name: "Supplier E",
+      url: "https://www.suppliere.com",
+    },
   },
   {
     id: "P006",
@@ -150,6 +172,10 @@ const initialProducts: Product[] = [
       "https://images.unsplash.com/photo-1635696860867-238c2fa072bb?w=400",
       "https://images.unsplash.com/photo-1727154085760-134cc942246e?w=400",
     ],
+    supplier: {
+      name: "Supplier F",
+      url: "https://www.supplierf.com",
+    },
   },
   {
     id: "P007",
@@ -171,6 +197,10 @@ const initialProducts: Product[] = [
       "https://images.unsplash.com/photo-1567169866456-a0759b6bb0c8?w=400",
       "https://images.unsplash.com/photo-1517686748843-bb360cfc62b3?w=400",
     ],
+    supplier: {
+      name: "Supplier G",
+      url: "https://www.supplierg.com",
+    },
   },
   {
     id: "P008",
@@ -191,6 +221,10 @@ const initialProducts: Product[] = [
       "https://images.unsplash.com/photo-1567169866456-a0759b6bb0c8?w=400",
       "https://images.unsplash.com/photo-1602734846297-9299fc2d4703?w=400",
     ],
+    supplier: {
+      name: "Supplier H",
+      url: "https://www.supplierh.com",
+    },
   },
 
   // ==================== DUMMY DATA START (실제 개발시 아래 데이터 삭제) ====================
@@ -209,6 +243,10 @@ const initialProducts: Product[] = [
     boxCount: 80,
     mainImage: "fox.jpg",
     images: ["fox.jpg"],
+    supplier: {
+      name: "Supplier I",
+      url: "https://www.supplieri.com",
+    },
   },
   {
     id: "P010",
@@ -225,6 +263,10 @@ const initialProducts: Product[] = [
     boxCount: 150,
     mainImage: "squirrelkeyring.jpg",
     images: ["squirrelkeyring.jpg"],
+    supplier: {
+      name: "Supplier J",
+      url: "https://www.supplierj.com",
+    },
   },
   {
     id: "P011",
@@ -241,6 +283,10 @@ const initialProducts: Product[] = [
     boxCount: 48,
     mainImage: "elephant.jpg",
     images: ["elephant.jpg"],
+    supplier: {
+      name: "Supplier K",
+      url: "https://www.supplierk.com",
+    },
   },
   {
     id: "P012",
@@ -257,6 +303,10 @@ const initialProducts: Product[] = [
     boxCount: 200,
     mainImage: "hamsterfigure.jpg",
     images: ["hamsterfigure.jpg"],
+    supplier: {
+      name: "Supplier L",
+      url: "https://www.supplierl.com",
+    },
   },
   {
     id: "P013",
@@ -273,6 +323,10 @@ const initialProducts: Product[] = [
     boxCount: 60,
     mainImage: "monkey.jpg",
     images: ["monkey.jpg"],
+    supplier: {
+      name: "Supplier M",
+      url: "https://www.supplierm.com",
+    },
   },
   {
     id: "P014",
@@ -289,6 +343,10 @@ const initialProducts: Product[] = [
     boxCount: 36,
     mainImage: "sheep.jpg",
     images: ["sheep.jpg"],
+    supplier: {
+      name: "Supplier N",
+      url: "https://www.suppliern.com",
+    },
   },
   {
     id: "P015",
@@ -305,6 +363,10 @@ const initialProducts: Product[] = [
     boxCount: 120,
     mainImage: "pigmini.jpg",
     images: ["pigmini.jpg"],
+    supplier: {
+      name: "Supplier O",
+      url: "https://www.suppliero.com",
+    },
   },
   {
     id: "P016",
@@ -321,6 +383,10 @@ const initialProducts: Product[] = [
     boxCount: 32,
     mainImage: "giraffe.jpg",
     images: ["giraffe.jpg"],
+    supplier: {
+      name: "Supplier P",
+      url: "https://www.supplierp.com",
+    },
   },
   {
     id: "P017",
@@ -337,6 +403,10 @@ const initialProducts: Product[] = [
     boxCount: 12,
     mainImage: "dinosaurset.jpg",
     images: ["dinosaurset.jpg"],
+    supplier: {
+      name: "Supplier Q",
+      url: "https://www.supplierq.com",
+    },
   },
   {
     id: "P018",
@@ -353,6 +423,10 @@ const initialProducts: Product[] = [
     boxCount: 60,
     mainImage: "lion.jpg",
     images: ["lion.jpg"],
+    supplier: {
+      name: "Supplier R",
+      url: "https://www.supplierr.com",
+    },
   },
   {
     id: "P019",
@@ -369,6 +443,10 @@ const initialProducts: Product[] = [
     boxCount: 120,
     mainImage: "tiger.jpg",
     images: ["tiger.jpg"],
+    supplier: {
+      name: "Supplier S",
+      url: "https://www.suppliers.com",
+    },
   },
   {
     id: "P020",
@@ -385,6 +463,10 @@ const initialProducts: Product[] = [
     boxCount: 160,
     mainImage: "wolfkeyring.jpg",
     images: ["wolfkeyring.jpg"],
+    supplier: {
+      name: "Supplier T",
+      url: "https://www.suppliert.com",
+    },
   },
   {
     id: "P021",
@@ -401,6 +483,10 @@ const initialProducts: Product[] = [
     boxCount: 36,
     mainImage: "unicorn.jpg",
     images: ["unicorn.jpg"],
+    supplier: {
+      name: "Supplier U",
+      url: "https://www.supplieru.com",
+    },
   },
   {
     id: "P022",
@@ -417,6 +503,10 @@ const initialProducts: Product[] = [
     boxCount: 24,
     mainImage: "dragonfigure.jpg",
     images: ["dragonfigure.jpg"],
+    supplier: {
+      name: "Supplier V",
+      url: "https://www.supplierv.com",
+    },
   },
   {
     id: "P023",
@@ -433,6 +523,10 @@ const initialProducts: Product[] = [
     boxCount: 48,
     mainImage: "crocodile.jpg",
     images: ["crocodile.jpg"],
+    supplier: {
+      name: "Supplier W",
+      url: "https://www.supplierw.com",
+    },
   },
   {
     id: "P024",
@@ -449,6 +543,10 @@ const initialProducts: Product[] = [
     boxCount: 72,
     mainImage: "turtle.jpg",
     images: ["turtle.jpg"],
+    supplier: {
+      name: "Supplier X",
+      url: "https://www.supplierx.com",
+    },
   },
   {
     id: "P025",
@@ -465,6 +563,10 @@ const initialProducts: Product[] = [
     boxCount: 50,
     mainImage: "whale.jpg",
     images: ["whale.jpg"],
+    supplier: {
+      name: "Supplier Y",
+      url: "https://www.suppliery.com",
+    },
   },
   {
     id: "P026",
@@ -481,6 +583,10 @@ const initialProducts: Product[] = [
     boxCount: 160,
     mainImage: "dolphinfigure.jpg",
     images: ["dolphinfigure.jpg"],
+    supplier: {
+      name: "Supplier Z",
+      url: "https://www.supplierz.com",
+    },
   },
   {
     id: "P027",
@@ -497,6 +603,10 @@ const initialProducts: Product[] = [
     boxCount: 200,
     mainImage: "shark.jpg",
     images: ["shark.jpg"],
+    supplier: {
+      name: "Supplier AA",
+      url: "https://www.supplieraa.com",
+    },
   },
   {
     id: "P028",
@@ -513,6 +623,10 @@ const initialProducts: Product[] = [
     boxCount: 120,
     mainImage: "octopus.jpg",
     images: ["octopus.jpg"],
+    supplier: {
+      name: "Supplier AB",
+      url: "https://www.supplierab.com",
+    },
   },
   {
     id: "P029",
@@ -529,6 +643,10 @@ const initialProducts: Product[] = [
     boxCount: 60,
     mainImage: "duckkeyringset.jpg",
     images: ["duckkeyringset.jpg"],
+    supplier: {
+      name: "Supplier AC",
+      url: "https://www.supplierac.com",
+    },
   },
   {
     id: "P030",
@@ -545,6 +663,10 @@ const initialProducts: Product[] = [
     boxCount: 48,
     mainImage: "chicken.jpg",
     images: ["chicken.jpg"],
+    supplier: {
+      name: "Supplier AD",
+      url: "https://www.supplierad.com",
+    },
   },
   {
     id: "P031",
@@ -561,6 +683,10 @@ const initialProducts: Product[] = [
     boxCount: 160,
     mainImage: "parrotfigure.jpg",
     images: ["parrotfigure.jpg"],
+    supplier: {
+      name: "Supplier AE",
+      url: "https://www.supplierae.com",
+    },
   },
   {
     id: "P032",
@@ -577,6 +703,10 @@ const initialProducts: Product[] = [
     boxCount: 48,
     mainImage: "owl.jpg",
     images: ["owl.jpg"],
+    supplier: {
+      name: "Supplier AF",
+      url: "https://www.supplieraf.com",
+    },
   },
   {
     id: "P033",
@@ -593,6 +723,10 @@ const initialProducts: Product[] = [
     boxCount: 60,
     mainImage: "eagle.jpg",
     images: ["eagle.jpg"],
+    supplier: {
+      name: "Supplier AG",
+      url: "https://www.supplierag.com",
+    },
   },
   {
     id: "P034",
@@ -609,6 +743,10 @@ const initialProducts: Product[] = [
     boxCount: 72,
     mainImage: "swankeyring.jpg",
     images: ["swankeyring.jpg"],
+    supplier: {
+      name: "Supplier AH",
+      url: "https://www.supplierah.com",
+    },
   },
   {
     id: "P035",
@@ -625,6 +763,10 @@ const initialProducts: Product[] = [
     boxCount: 60,
     mainImage: "kangaroo.jpg",
     images: ["kangaroo.jpg"],
+    supplier: {
+      name: "Supplier AI",
+      url: "https://www.supplierai.com",
+    },
   },
   {
     id: "P036",
@@ -641,6 +783,10 @@ const initialProducts: Product[] = [
     boxCount: 72,
     mainImage: "koala.jpg",
     images: ["koala.jpg"],
+    supplier: {
+      name: "Supplier AJ",
+      url: "https://www.supplieraj.com",
+    },
   },
   {
     id: "P037",
@@ -657,6 +803,10 @@ const initialProducts: Product[] = [
     boxCount: 60,
     mainImage: "camelfigure.jpg",
     images: ["camelfigure.jpg"],
+    supplier: {
+      name: "Supplier AK",
+      url: "https://www.supplierak.com",
+    },
   },
   {
     id: "P038",
@@ -673,6 +823,10 @@ const initialProducts: Product[] = [
     boxCount: 24,
     mainImage: "zebra.jpg",
     images: ["zebra.jpg"],
+    supplier: {
+      name: "Supplier AL",
+      url: "https://www.supplieral.com",
+    },
   },
   {
     id: "P039",
@@ -689,6 +843,10 @@ const initialProducts: Product[] = [
     boxCount: 240,
     mainImage: "dollcase.jpg",
     images: ["dollcase.jpg"],
+    supplier: {
+      name: "Supplier AM",
+      url: "https://www.supplieram.com",
+    },
   },
   {
     id: "P040",
@@ -705,6 +863,10 @@ const initialProducts: Product[] = [
     boxCount: 24,
     mainImage: "dollclotheset.jpg",
     images: ["dollclotheset.jpg"],
+    supplier: {
+      name: "Supplier AN",
+      url: "https://www.supplieran.com",
+    },
   },
   {
     id: "P041",
@@ -721,6 +883,10 @@ const initialProducts: Product[] = [
     boxCount: 120,
     mainImage: "minibearkeyring.jpg",
     images: ["minibearkeyring.jpg"],
+    supplier: {
+      name: "Supplier AO",
+      url: "https://www.supplierao.com",
+    },
   },
   {
     id: "P042",
@@ -737,6 +903,10 @@ const initialProducts: Product[] = [
     boxCount: 160,
     mainImage: "dollstand.jpg",
     images: ["dollstand.jpg"],
+    supplier: {
+      name: "Supplier AP",
+      url: "https://www.supplierap.com",
+    },
   },
   {
     id: "P043",
@@ -753,6 +923,10 @@ const initialProducts: Product[] = [
     boxCount: 96,
     mainImage: "chameleonfigure.jpg",
     images: ["chameleonfigure.jpg"],
+    supplier: {
+      name: "Supplier AQ",
+      url: "https://www.supplieraq.com",
+    },
   },
   {
     id: "P044",
@@ -769,6 +943,10 @@ const initialProducts: Product[] = [
     boxCount: 200,
     mainImage: "beaver.jpg",
     images: ["beaver.jpg"],
+    supplier: {
+      name: "Supplier AR",
+      url: "https://www.supplierar.com",
+    },
   },
   {
     id: "P045",
@@ -785,6 +963,10 @@ const initialProducts: Product[] = [
     boxCount: 30,
     mainImage: "raccoon.jpg",
     images: ["raccoon.jpg"],
+    supplier: {
+      name: "Supplier AS",
+      url: "https://www.supplieras.com",
+    },
   },
   // ==================== DUMMY DATA END ====================
 ];
@@ -858,14 +1040,12 @@ export function Products() {
             ? {
                 ...product,
                 name: formData.name,
+                nameChinese: formData.nameChinese,
                 category: formData.category,
                 price: formData.price,
                 size: formData.size,
-                packagingSize: formData.packagingSize,
-                weight: formData.weight,
                 setCount: formData.setCount,
-                smallPackCount: formData.smallPackCount,
-                boxCount: formData.boxCount,
+                supplier: formData.supplier || product.supplier,
               }
             : product,
         ),
@@ -878,18 +1058,23 @@ export function Products() {
       const newProduct: Product = {
         id: newId,
         name: formData.name,
+        nameChinese: formData.nameChinese,
         category: formData.category,
         price: formData.price,
         stock: 0,
         status: "판매중",
         size: formData.size,
-        packagingSize: formData.packagingSize,
-        weight: formData.weight,
+        packagingSize: "",
+        weight: "",
         setCount: formData.setCount,
-        smallPackCount: formData.smallPackCount,
-        boxCount: formData.boxCount,
+        smallPackCount: 0,
+        boxCount: 0,
         mainImage: "default.jpg",
         images: ["default.jpg"],
+        supplier: formData.supplier || {
+          name: "",
+          url: "",
+        },
       };
 
       setProducts([newProduct, ...products]);
@@ -931,7 +1116,7 @@ export function Products() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-8 min-h-[1080px]">
       <div className="mb-6">
         <h2 className="text-gray-900 mb-2">상품 관리</h2>
         <p className="text-gray-600">
@@ -941,16 +1126,11 @@ export function Products() {
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-4 mb-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="상품명 또는 카테고리로 검색..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-          />
-        </div>
+        <SearchBar
+          value={searchTerm}
+          onChange={setSearchTerm}
+          placeholder="상품명 또는 카테고리로 검색..."
+        />
         <button
           onClick={handleOpenCreateForm}
           className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
@@ -985,19 +1165,10 @@ export function Products() {
                   사이즈
                 </th>
                 <th className="px-4 py-2 text-left text-gray-600 whitespace-nowrap">
-                  포장 사이즈
-                </th>
-                <th className="px-4 py-2 text-left text-gray-600 whitespace-nowrap">
-                  제품 무게
-                </th>
-                <th className="px-4 py-2 text-left text-gray-600 whitespace-nowrap">
                   세트 모델수
                 </th>
                 <th className="px-4 py-2 text-left text-gray-600 whitespace-nowrap">
-                  소포장 입수
-                </th>
-                <th className="px-4 py-2 text-left text-gray-600 whitespace-nowrap">
-                  한박스 입수
+                  공급상
                 </th>
                 <th className="px-4 py-2 text-left text-gray-600 whitespace-nowrap">
                   관리
@@ -1006,210 +1177,47 @@ export function Products() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {currentProducts.map((product) => (
-                <tr
+                <ProductTableRow
                   key={product.id}
-                  className="hover:bg-gray-50"
-                >
-                  <td className="px-4 py-2 text-gray-900">
-                    {product.id}
-                  </td>
-                  <td className="px-4 py-2">
-                    <div
-                      className="w-10 h-10 bg-gray-100 rounded overflow-hidden flex items-center justify-center cursor-pointer"
-                      onMouseEnter={() =>
-                        setHoveredProduct(product.id)
-                      }
-                      onMouseLeave={() =>
-                        setHoveredProduct(null)
-                      }
-                      onMouseMove={handleMouseMove}
-                    >
-                      {product.mainImage ? (
-                        <img
-                          src={product.mainImage}
-                          alt={product.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Image className="w-5 h-5 text-gray-400" />
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2">
-                    <button
-                      onClick={() => setDetailProduct(product)}
-                      className="text-gray-900 text-left cursor-pointer"
-                    >
-                      {product.name}
-                    </button>
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {product.category}
-                  </td>
-                  <td className="px-4 py-2 text-gray-900">
-                    ¥{product.price.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {product.size}
-                    {product.size ? "cm" : ""}
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {product.packagingSize}
-                    {product.packagingSize ? "cm" : ""}
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {product.weight}
-                    {product.weight ? "g" : ""}
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {product.setCount}개
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {product.smallPackCount}개
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {product.boxCount}개
-                  </td>
-                  <td className="px-4 py-2">
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() =>
-                          handleEditProduct(product)
-                        }
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleDeleteProduct(product)
-                        }
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                  product={product}
+                  onImageHoverEnter={(id) => setHoveredProduct(id)}
+                  onImageHoverLeave={() => setHoveredProduct(null)}
+                  onMouseMove={handleMouseMove}
+                  onViewDetail={setDetailProduct}
+                  onOrder={(p) => console.log('주문하기:', p.id)}
+                  onEdit={handleEditProduct}
+                  onDelete={handleDeleteProduct}
+                />
               ))}
             </tbody>
           </table>
         </div>
 
         {/* Pagination */}
-        <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-600 text-sm">
-              페이지당 표시:
-            </span>
-            <select
-              value={itemsPerPage}
-              onChange={(e) =>
-                handleItemsPerPageChange(Number(e.target.value))
-              }
-              className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-            >
-              <option value={15}>15개</option>
-              <option value={20}>20개</option>
-              <option value={25}>25개</option>
-              <option value={30}>30개</option>
-            </select>
-            <span className="text-gray-600 text-sm ml-4">
-              전체 {filteredProducts.length}개 중{" "}
-              {startIndex + 1}-
-              {Math.min(endIndex, filteredProducts.length)}개
-              표시
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            <div className="flex items-center gap-1">
-              {Array.from(
-                { length: totalPages },
-                (_, i) => i + 1,
-              ).map((page) => {
-                // Show first page, last page, current page, and pages around current
-                if (
-                  page === 1 ||
-                  page === totalPages ||
-                  (page >= currentPage - 1 &&
-                    page <= currentPage + 1)
-                ) {
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => handlePageChange(page)}
-                      className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                        currentPage === page
-                          ? "bg-purple-600 text-white"
-                          : "border border-gray-300 hover:bg-gray-50"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  );
-                } else if (
-                  page === currentPage - 2 ||
-                  page === currentPage + 2
-                ) {
-                  return (
-                    <span
-                      key={page}
-                      className="px-2 text-gray-400"
-                    >
-                      ...
-                    </span>
-                  );
-                }
-                return null;
-              })}
-            </div>
-
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          itemsPerPage={itemsPerPage}
+          totalItems={filteredProducts.length}
+          startIndex={startIndex}
+          endIndex={endIndex}
+          onPageChange={handlePageChange}
+          onItemsPerPageChange={handleItemsPerPageChange}
+        />
       </div>
 
       {/* Image Preview Overlay */}
-      {hoveredProduct &&
-        (() => {
-          const product = products.find(
-            (p) => p.id === hoveredProduct,
-          );
-          return (
-            <div
-              className="fixed w-64 h-64 bg-white border-2 border-gray-300 rounded-lg shadow-xl overflow-hidden flex items-center justify-center pointer-events-none z-50"
-              style={{
-                left: `${mousePosition.x + 20}px`,
-                top: `${mousePosition.y + 20}px`,
-              }}
-            >
-              {product?.mainImage ? (
-                <img
-                  src={product.mainImage}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <Image className="w-16 h-16 text-gray-400" />
-              )}
-            </div>
-          );
-        })()}
+      {hoveredProduct && (() => {
+        const product = products.find((p) => p.id === hoveredProduct);
+        return (
+          <ProductImagePreview
+            imageUrl={product?.mainImage}
+            productName={product?.name}
+            mousePosition={mousePosition}
+            isVisible={!!hoveredProduct}
+          />
+        );
+      })()}
 
       {/* Product Form Modal */}
       {isFormOpen && (
@@ -1221,14 +1229,12 @@ export function Products() {
             editingProduct
               ? {
                   name: editingProduct.name,
+                  nameChinese: editingProduct.nameChinese,
                   category: editingProduct.category,
                   price: editingProduct.price,
                   size: editingProduct.size,
-                  packagingSize: editingProduct.packagingSize,
-                  weight: editingProduct.weight,
                   setCount: editingProduct.setCount,
-                  smallPackCount: editingProduct.smallPackCount,
-                  boxCount: editingProduct.boxCount,
+                  supplier: editingProduct.supplier,
                 }
               : undefined
           }
@@ -1247,7 +1253,7 @@ export function Products() {
       {deleteProduct && (
         <DeleteConfirmDialog
           product={deleteProduct}
-          onClose={() => setDeleteProduct(null)}
+          onCancel={() => setDeleteProduct(null)}
           onConfirm={handleConfirmDelete}
         />
       )}

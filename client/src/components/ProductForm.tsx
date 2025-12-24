@@ -10,15 +10,15 @@ interface ProductFormProps {
 
 export interface ProductFormData {
   name: string;
+  nameChinese?: string;
   category: string;
   price: number;
   size: string;
-  packagingSize: string;
-  weight: string;
   setCount: number;
-  smallPackCount: number;
-  boxCount: number;
-  options?: { name: string; price: number }[];
+  supplier?: {
+    name: string;
+    url: string;
+  };
 }
 
 export function ProductForm({
@@ -33,12 +33,7 @@ export function ProductForm({
       category: "봉제",
       price: 0,
       size: "",
-      packagingSize: "",
-      weight: "",
       setCount: 1,
-      smallPackCount: 0,
-      boxCount: 0,
-      options: [],
     },
   );
 
@@ -145,7 +140,7 @@ export function ProductForm({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
@@ -248,23 +243,6 @@ export function ProductForm({
               </div>
             </div>
 
-            {/* Product Name */}
-            <div>
-              <label className="block text-gray-700 mb-2">
-                상품명 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) =>
-                  handleChange("name", e.target.value)
-                }
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                placeholder="상품명을 입력하세요"
-              />
-            </div>
-
             {/* Category */}
             <div>
               <label className="block text-gray-700 mb-2">
@@ -285,137 +263,61 @@ export function ProductForm({
               </select>
             </div>
 
-            {/* Cost Section */}
-            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-              <div className="flex items-start justify-between gap-6">
-                <div className="flex-1">
-                  <h4 className="text-gray-700 mb-3">비용</h4>
-                  <div className="flex items-center gap-4 mb-3">
-                    <label className="text-gray-700 whitespace-nowrap">
-                      단가 (¥){" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      step="0.01"
-                      value={formData.price}
-                      onChange={(e) =>
-                        handleChange(
-                          "price",
-                          Number(e.target.value),
-                        )
-                      }
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-white"
-                      placeholder="0"
-                    />
-                  </div>
-
-                  {/* Options */}
-                  {formData.options &&
-                    formData.options.length > 0 && (
-                      <div className="space-y-2 mb-3">
-                        {formData.options.map(
-                          (option, index) => (
-                            <div
-                              key={index}
-                              className="grid grid-cols-2 gap-2"
-                            >
-                              <select
-                                value={option.name}
-                                onChange={(e) =>
-                                  updateOption(
-                                    index,
-                                    "name",
-                                    e.target.value,
-                                  )
-                                }
-                                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-                              >
-                                <option value="">
-                                  옵션 선택
-                                </option>
-                                <option value="택">택</option>
-                                <option value="고리">
-                                  고리
-                                </option>
-                                <option value="포장-봉지">
-                                  포장-봉지
-                                </option>
-                                <option value="포장-파우치">
-                                  포장-파우치
-                                </option>
-                                <option value="포장-박스">
-                                  포장-박스
-                                </option>
-                                <option value="인건비">
-                                  인건비
-                                </option>
-                              </select>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={option.price}
-                                  onChange={(e) =>
-                                    updateOption(
-                                      index,
-                                      "price",
-                                      Number(e.target.value),
-                                    )
-                                  }
-                                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-white"
-                                  placeholder="비용"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    removeOption(index)
-                                  }
-                                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    )}
-
-                  <button
-                    type="button"
-                    onClick={addOption}
-                    className="flex items-center gap-2 px-4 py-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>옵션 추가</span>
-                  </button>
-                </div>
-
-                {/* Total Price */}
-                <div className="bg-white border border-gray-300 rounded-lg p-4 min-w-[160px]">
-                  <div className="text-gray-600 text-sm mb-2">
-                    총 금액
-                  </div>
-                  <div className="text-purple-600 text-2xl">
-                    ¥
-                    {(
-                      formData.price +
-                      (formData.options?.reduce(
-                        (sum, opt) => sum + opt.price,
-                        0,
-                      ) || 0)
-                    ).toLocaleString()}
-                  </div>
-                </div>
-              </div>
+            {/* Product Name */}
+            <div>
+              <label className="block text-gray-700 mb-2">
+                상품명 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.name}
+                onChange={(e) =>
+                  handleChange("name", e.target.value)
+                }
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="상품명을 입력하세요"
+              />
             </div>
 
-            {/* Size, Packaging Size, and Weight */}
+            {/* Chinese Product Name (Optional) */}
+            <div>
+              <label className="block text-gray-700 mb-2">
+                중문 상품명
+              </label>
+              <input
+                type="text"
+                value={formData.nameChinese || ""}
+                onChange={(e) =>
+                  handleChange("nameChinese", e.target.value)
+                }
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="중문 상품명을 입력하세요 (선택사항)"
+              />
+            </div>
+
+            {/* Price, Size, Set Count in one row */}
             <div className="grid grid-cols-3 gap-4">
+              {/* Cost Section */}
+              <div>
+                <label className="block text-gray-700 mb-2">
+                  단가 (¥) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e) =>
+                    handleChange("price", Number(e.target.value))
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="0"
+                />
+              </div>
+
+              {/* Size */}
               <div>
                 <label className="block text-gray-700 mb-2">
                   사이즈(cm)
@@ -423,52 +325,16 @@ export function ProductForm({
                 <input
                   type="text"
                   value={formData.size}
-                  onChange={(e) =>
-                    handleChange("size", e.target.value)
-                  }
+                  onChange={(e) => handleChange("size", e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="예: 30x20x15cm"
                 />
               </div>
-              <div>
-                <label className="block text-gray-700 mb-2">
-                  포장 사이즈(cm)
-                </label>
-                <input
-                  type="text"
-                  value={formData.packagingSize}
-                  onChange={(e) =>
-                    handleChange(
-                      "packagingSize",
-                      e.target.value,
-                    )
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="예: 35x25x20cm"
-                />
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-2">
-                  제품 무게(cm)
-                </label>
-                <input
-                  type="text"
-                  value={formData.weight}
-                  onChange={(e) =>
-                    handleChange("weight", e.target.value)
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="예: 500g"
-                />
-              </div>
-            </div>
 
-            {/* Set Count, Small Pack Count, Box Count */}
-            <div className="grid grid-cols-3 gap-4">
+              {/* Set Count */}
               <div>
                 <label className="block text-gray-700 mb-2">
-                  세트 모델수(개){" "}
-                  <span className="text-red-500">*</span>
+                  세트 모델수(개) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -476,50 +342,60 @@ export function ProductForm({
                   min="1"
                   value={formData.setCount}
                   onChange={(e) =>
-                    handleChange(
-                      "setCount",
-                      Number(e.target.value),
-                    )
+                    handleChange("setCount", Number(e.target.value))
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="1"
                 />
               </div>
-              <div>
-                <label className="block text-gray-700 mb-2">
-                  소포장 입수(개)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.smallPackCount}
-                  onChange={(e) =>
-                    handleChange(
-                      "smallPackCount",
-                      Number(e.target.value),
-                    )
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-2">
-                  한박스 입수(개)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.boxCount}
-                  onChange={(e) =>
-                    handleChange(
-                      "boxCount",
-                      Number(e.target.value),
-                    )
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="0"
-                />
+            </div>
+
+            {/* Supplier Section */}
+            <div className="border-t border-gray-200 pt-4">
+              <label className="block text-gray-700 mb-2">
+                공급상 정보
+              </label>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-gray-600 text-sm mb-1">
+                    공급상 이름
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.supplier?.name || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        supplier: {
+                          name: e.target.value,
+                          url: prev.supplier?.url || "",
+                        },
+                      }))
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="공급상 이름"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-600 text-sm mb-1">
+                    공급상 URL
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.supplier?.url || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        supplier: {
+                          name: prev.supplier?.name || "",
+                          url: e.target.value,
+                        },
+                      }))
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="https://example.com"
+                  />
+                </div>
               </div>
             </div>
           </div>

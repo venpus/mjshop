@@ -22,3 +22,4 @@ module.exports = {
     node_args: '--max-old-space-size=1024'
   }]
 };
+

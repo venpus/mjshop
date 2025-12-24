@@ -11,3 +11,4 @@ export const dbConfig = {
   charset: 'utf8mb4',
   connectionLimit: 10,
 };
+

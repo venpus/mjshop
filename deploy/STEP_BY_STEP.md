@@ -286,3 +286,4 @@ free -h
 # 네트워크 연결 확인
 netstat -tulpn
 ```
+

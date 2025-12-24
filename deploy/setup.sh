@@ -69,3 +69,4 @@ echo "1. MariaDB 데이터베이스 및 사용자 생성"
 echo "2. 프로젝트 파일을 /var/www/wkshop에 업로드"
 echo "3. Nginx 설정 파일 복사 및 활성화"
 echo "4. ./deploy.sh 실행하여 배포"
+

@@ -44,3 +44,4 @@ echo -e "${GREEN}📍 API Health: http://wkshop.kr/api/health${NC}"
 
 # PM2 상태 확인
 pm2 status
+

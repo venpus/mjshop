@@ -26,23 +26,16 @@ const initialOrders: Order[] = [
 export function Orders() {
   const [orders] = useState<Order[]>(initialOrders);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('전체');
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = 
-      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredOrders = orders.filter(
+    (order) =>
+      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.product.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === '전체' || order.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
-
-  const statusOptions = ['전체', '결제완료', '배송준비', '배송중', '배송완료', '취소'];
+      order.product.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div className="p-8">
+    <div className="p-8 min-h-[1080px]">
       <div className="mb-8">
         <h2 className="text-gray-900 mb-2">주문 관리</h2>
         <p className="text-gray-600">고객 주문을 확인하고 배송 상태를 관리할 수 있습니다</p>

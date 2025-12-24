@@ -1,21 +1,5 @@
-import { X, Image, Download } from 'lucide-react';
-
-interface Product {
-  id: string;
-  name: string;
-  category: string;
-  price: number;
-  stock: number;
-  status: '판매중' | '품절' | '숨김';
-  size: string;
-  packagingSize: string;
-  weight: string;
-  setCount: number;
-  smallPackCount: number;
-  boxCount: number;
-  mainImage: string;
-  images: string[];
-}
+import { X, Image, Download, ExternalLink } from 'lucide-react';
+import type { Product } from '../types/product';
 
 interface ProductDetailModalProps {
   product: Product;
@@ -49,8 +33,8 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
           <h3 className="text-gray-900">상품 상세 정보</h3>
@@ -86,54 +70,36 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
               <p className="text-gray-900">{product.id}</p>
             </div>
 
+            {/* Category */}
+            <div>
+              <p className="text-sm text-gray-600 mb-1">카테고리</p>
+              <p className="text-gray-900">{product.category}</p>
+            </div>
+
             {/* Product Name */}
             <div>
               <p className="text-sm text-gray-600 mb-1">상품명</p>
-              <p className="text-gray-900">{product.name}</p>
+              <p className="text-gray-900">
+                {product.name}
+                {product.nameChinese && (
+                  <span className="text-gray-600"> ({product.nameChinese})</span>
+                )}
+              </p>
             </div>
 
-            {/* Two Columns Layout */}
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">카테고리</p>
-                <p className="text-gray-900">{product.category}</p>
-              </div>
+            {/* Three Columns Layout - Price, Size, Set Count */}
+            <div className="grid grid-cols-3 gap-6">
               <div>
                 <p className="text-sm text-gray-600 mb-1">단가</p>
                 <p className="text-gray-900">¥{product.price.toLocaleString()}</p>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-6">
               <div>
                 <p className="text-sm text-gray-600 mb-1">사이즈</p>
                 <p className="text-gray-900">{product.size}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 mb-1">포장 사이즈</p>
-                <p className="text-gray-900">{product.packagingSize}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">제품 무게</p>
-                <p className="text-gray-900">{product.weight}</p>
-              </div>
-              <div>
                 <p className="text-sm text-gray-600 mb-1">세트 모델수</p>
                 <p className="text-gray-900">{product.setCount}개</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">소포장 입수</p>
-                <p className="text-gray-900">{product.smallPackCount}개</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">한박스 입수</p>
-                <p className="text-gray-900">{product.boxCount}개</p>
               </div>
             </div>
 
@@ -174,6 +140,27 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
                 })}
               </div>
             </div>
+
+            {/* Supplier Information */}
+            {product.supplier.name && (
+              <div className="border-t border-gray-200 pt-4">
+                <p className="text-sm text-gray-600 mb-2">공급상 정보</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-900">{product.supplier.name}</span>
+                  {product.supplier.url && (
+                    <a
+                      href={product.supplier.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-purple-600 hover:text-purple-700 flex items-center gap-1"
+                      title="공급상 웹사이트 방문"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

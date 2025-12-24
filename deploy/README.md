@@ -144,3 +144,4 @@ sudo nginx -t         # 설정 파일 검증
 sudo systemctl restart mariadb
 sudo mysql -u wkshop_user -p wkshop_db
 ```
+

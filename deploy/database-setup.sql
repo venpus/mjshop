@@ -17,3 +17,4 @@ FLUSH PRIVILEGES;
 -- 확인
 SHOW DATABASES;
 SELECT User, Host FROM mysql.user WHERE User = 'wkshop_user';
+

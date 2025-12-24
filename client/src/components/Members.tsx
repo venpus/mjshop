@@ -129,55 +129,18 @@ const initialMemberData: Member[] = [
 export function Members() {
   const [memberData] = useState<Member[]>(initialMemberData);
   const [searchTerm, setSearchTerm] = useState('');
+  const [gradeFilter, setGradeFilter] = useState<string>('전체');
 
-  const filteredData = memberData.filter(
+  const filteredMembers = memberData.filter(
     (member) =>
-      member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.phone.includes(searchTerm) ||
-      member.id.toLowerCase().includes(searchTerm.toLowerCase())
+      (gradeFilter === '전체' || member.grade === gradeFilter) &&
+      (member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const getGradeColor = (grade: Member['grade']) => {
-    switch (grade) {
-      case 'VIP':
-        return 'bg-purple-100 text-purple-800';
-      case '골드':
-        return 'bg-yellow-100 text-yellow-800';
-      case '실버':
-        return 'bg-gray-100 text-gray-800';
-      case '일반':
-        return 'bg-blue-100 text-blue-800';
-    }
-  };
-
-  const getStatusColor = (status: Member['status']) => {
-    switch (status) {
-      case '활동중':
-        return 'bg-green-100 text-green-800';
-      case '휴면':
-        return 'bg-orange-100 text-orange-800';
-      case '탈퇴':
-        return 'bg-red-100 text-red-800';
-    }
-  };
-
-  const statusCounts = {
-    활동중: memberData.filter((m) => m.status === '활동중').length,
-    휴면: memberData.filter((m) => m.status === '휴면').length,
-    탈퇴: memberData.filter((m) => m.status === '탈퇴').length,
-  };
-
-  const gradeCounts = {
-    VIP: memberData.filter((m) => m.grade === 'VIP').length,
-    골드: memberData.filter((m) => m.grade === '골드').length,
-    실버: memberData.filter((m) => m.grade === '실버').length,
-    일반: memberData.filter((m) => m.grade === '일반').length,
-  };
-
   return (
-    <div className="p-8">
-      <div className="mb-6">
+    <div className="p-8 min-w-[1920px] min-h-[1080px]">
+      <div className="mb-8">
         <h2 className="text-gray-900 mb-2">회원 관리</h2>
         <p className="text-gray-600">회원 정보를 확인하고 관리할 수 있습니다</p>
       </div>
@@ -200,7 +163,9 @@ export function Members() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">활동중</p>
-              <p className="text-gray-900 mt-1">{statusCounts.활동중}명</p>
+              <p className="text-gray-900 mt-1">
+                {memberData.filter((m) => m.status === '활동중').length}명
+              </p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
               <UserCheck className="w-6 h-6 text-green-600" />
@@ -212,7 +177,9 @@ export function Members() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">VIP 회원</p>
-              <p className="text-gray-900 mt-1">{gradeCounts.VIP}명</p>
+              <p className="text-gray-900 mt-1">
+                {memberData.filter((m) => m.grade === 'VIP').length}명
+              </p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
               <Crown className="w-6 h-6 text-purple-600" />
@@ -224,7 +191,9 @@ export function Members() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">휴면/탈퇴</p>
-              <p className="text-gray-900 mt-1">{statusCounts.휴면 + statusCounts.탈퇴}명</p>
+              <p className="text-gray-900 mt-1">
+                {memberData.filter((m) => m.status === '휴면' || m.status === '탈퇴').length}명
+              </p>
             </div>
             <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
               <UserX className="w-6 h-6 text-orange-600" />
@@ -265,7 +234,7 @@ export function Members() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredData.map((member) => (
+              {filteredMembers.map((member) => (
                 <tr key={member.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-900">{member.id}</td>
                   <td className="px-4 py-3 text-gray-900">{member.name}</td>
@@ -301,3 +270,27 @@ export function Members() {
     </div>
   );
 }
+
+const getGradeColor = (grade: Member['grade']) => {
+  switch (grade) {
+    case 'VIP':
+      return 'bg-purple-100 text-purple-800';
+    case '골드':
+      return 'bg-yellow-100 text-yellow-800';
+    case '실버':
+      return 'bg-gray-100 text-gray-800';
+    case '일반':
+      return 'bg-blue-100 text-blue-800';
+  }
+};
+
+const getStatusColor = (status: Member['status']) => {
+  switch (status) {
+    case '활동중':
+      return 'bg-green-100 text-green-800';
+    case '휴면':
+      return 'bg-orange-100 text-orange-800';
+    case '탈퇴':
+      return 'bg-red-100 text-red-800';
+  }
+};

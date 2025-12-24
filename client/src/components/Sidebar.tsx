@@ -1,14 +1,50 @@
-import { useState } from 'react';
-import { LayoutDashboard, Package, ShoppingCart, Truck, CreditCard, Warehouse, Globe, ChevronDown, ChevronRight, Store, FileText, PackageSearch, DollarSign, Users } from 'lucide-react';
+import { useState } from "react";
+import {
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
+  Truck,
+  CreditCard,
+  Warehouse,
+  Globe,
+  ChevronDown,
+  ChevronRight,
+  Store,
+  FileText,
+  PackageSearch,
+  DollarSign,
+  Users,
+  Image as ImageIcon,
+  ClipboardList,
+  FileSpreadsheet,
+  UserCog,
+} from "lucide-react";
 
-type PageType = 'dashboard' | 'products' | 'orders' | 'shipping' | 'payment' | 'inventory' | 'purchase-orders' | 'shipping-history' | 'china-payment' | 'members';
+type PageType =
+  | "dashboard"
+  | "products"
+  | "orders"
+  | "shipping"
+  | "payment"
+  | "inventory"
+  | "purchase-orders"
+  | "shipping-history"
+  | "china-payment"
+  | "members"
+  | "gallery"
+  | "china-warehouse"
+  | "invoice"
+  | "admin-account";
 
 interface SidebarProps {
   currentPage: PageType;
   onPageChange: (page: PageType) => void;
 }
 
-export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
+export function Sidebar({
+  currentPage,
+  onPageChange,
+}: SidebarProps) {
   const [isChinaExpanded, setIsChinaExpanded] = useState(true);
   const [isShopExpanded, setIsShopExpanded] = useState(true);
 
@@ -20,11 +56,11 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       <nav className="px-4 space-y-1">
         {/* 대시보드 */}
         <button
-          onClick={() => onPageChange('dashboard')}
+          onClick={() => onPageChange("dashboard")}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-            currentPage === 'dashboard'
-              ? 'bg-purple-50 text-purple-600'
-              : 'text-gray-700 hover:bg-gray-50'
+            currentPage === "dashboard"
+              ? "bg-purple-50 text-purple-600"
+              : "text-gray-700 hover:bg-gray-50"
           }`}
         >
           <LayoutDashboard className="w-5 h-5" />
@@ -33,11 +69,11 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
 
         {/* 상품 관리 */}
         <button
-          onClick={() => onPageChange('products')}
+          onClick={() => onPageChange("products")}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-            currentPage === 'products'
-              ? 'bg-purple-50 text-purple-600'
-              : 'text-gray-700 hover:bg-gray-50'
+            currentPage === "products"
+              ? "bg-purple-50 text-purple-600"
+              : "text-gray-700 hover:bg-gray-50"
           }`}
         >
           <Package className="w-5 h-5" />
@@ -63,37 +99,70 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
           {isChinaExpanded && (
             <div className="ml-4 mt-1 space-y-1">
               <button
-                onClick={() => onPageChange('purchase-orders')}
+                onClick={() => onPageChange("purchase-orders")}
                 className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === 'purchase-orders'
-                    ? 'bg-purple-50 text-purple-600'
-                    : 'text-gray-600 hover:bg-gray-50'
+                  currentPage === "purchase-orders"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 <FileText className="w-4 h-4" />
                 <span>발주 관리</span>
               </button>
               <button
-                onClick={() => onPageChange('shipping-history')}
+                onClick={() => onPageChange("shipping-history")}
                 className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === 'shipping-history'
-                    ? 'bg-purple-50 text-purple-600'
-                    : 'text-gray-600 hover:bg-gray-50'
+                  currentPage === "shipping-history"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 <PackageSearch className="w-4 h-4" />
-                <span>발송 내역</span>
+                <span>패킹리스트</span>
               </button>
               <button
-                onClick={() => onPageChange('china-payment')}
+                onClick={() => onPageChange("china-payment")}
                 className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === 'china-payment'
-                    ? 'bg-purple-50 text-purple-600'
-                    : 'text-gray-600 hover:bg-gray-50'
+                  currentPage === "china-payment"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 <DollarSign className="w-4 h-4" />
-                <span>결제</span>
+                <span>결제 내역</span>
+              </button>
+              <button
+                onClick={() => onPageChange("gallery")}
+                className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+                  currentPage === "gallery"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                <ImageIcon className="w-4 h-4" />
+                <span>갤러리</span>
+              </button>
+              <button
+                onClick={() => onPageChange("china-warehouse")}
+                className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+                  currentPage === "china-warehouse"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                <ClipboardList className="w-4 h-4" />
+                <span>중국 입출고 현황</span>
+              </button>
+              <button
+                onClick={() => onPageChange("invoice")}
+                className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+                  currentPage === "invoice"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>정산 인보이스</span>
               </button>
             </div>
           )}
@@ -106,7 +175,9 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-gray-700 hover:bg-gray-50"
           >
             <Store className="w-5 h-5" />
-            <span className="flex-1 text-left">쇼핑몰 관리</span>
+            <span className="flex-1 text-left">
+              쇼핑몰 관리
+            </span>
             {isShopExpanded ? (
               <ChevronDown className="w-4 h-4" />
             ) : (
@@ -118,44 +189,44 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
           {isShopExpanded && (
             <div className="ml-4 mt-1 space-y-1">
               <button
-                onClick={() => onPageChange('orders')}
+                onClick={() => onPageChange("orders")}
                 className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === 'orders'
-                    ? 'bg-purple-50 text-purple-600'
-                    : 'text-gray-600 hover:bg-gray-50'
+                  currentPage === "orders"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 <ShoppingCart className="w-4 h-4" />
                 <span>주문 관리</span>
               </button>
               <button
-                onClick={() => onPageChange('shipping')}
+                onClick={() => onPageChange("shipping")}
                 className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === 'shipping'
-                    ? 'bg-purple-50 text-purple-600'
-                    : 'text-gray-600 hover:bg-gray-50'
+                  currentPage === "shipping"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 <Truck className="w-4 h-4" />
                 <span>배송 관리</span>
               </button>
               <button
-                onClick={() => onPageChange('payment')}
+                onClick={() => onPageChange("payment")}
                 className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === 'payment'
-                    ? 'bg-purple-50 text-purple-600'
-                    : 'text-gray-600 hover:bg-gray-50'
+                  currentPage === "payment"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 <CreditCard className="w-4 h-4" />
                 <span>결제 관리</span>
               </button>
               <button
-                onClick={() => onPageChange('inventory')}
+                onClick={() => onPageChange("inventory")}
                 className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === 'inventory'
-                    ? 'bg-purple-50 text-purple-600'
-                    : 'text-gray-600 hover:bg-gray-50'
+                  currentPage === "inventory"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 <Warehouse className="w-4 h-4" />
@@ -167,15 +238,28 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
 
         {/* 회원 관리 */}
         <button
-          onClick={() => onPageChange('members')}
+          onClick={() => onPageChange("members")}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-            currentPage === 'members'
-              ? 'bg-purple-50 text-purple-600'
-              : 'text-gray-700 hover:bg-gray-50'
+            currentPage === "members"
+              ? "bg-purple-50 text-purple-600"
+              : "text-gray-700 hover:bg-gray-50"
           }`}
         >
           <Users className="w-5 h-5" />
           <span>회원 관리</span>
+        </button>
+
+        {/* 관리자 계정 관리 */}
+        <button
+          onClick={() => onPageChange("admin-account")}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+            currentPage === "admin-account"
+              ? "bg-purple-50 text-purple-600"
+              : "text-gray-700 hover:bg-gray-50"
+          }`}
+        >
+          <UserCog className="w-5 h-5" />
+          <span>관리자 계정 관리</span>
         </button>
       </nav>
     </aside>

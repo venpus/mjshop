@@ -47,3 +47,4 @@ curl -s http://localhost:3000/api/health | jq . || curl -s http://localhost:3000
 echo ""
 
 echo -e "${GREEN}✅ 확인 완료${NC}"
+

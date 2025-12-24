@@ -1,7 +1,3 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -125,14 +121,11 @@
 
 @layer base {
   * {
-    border-color: var(--color-border);
-    outline-color: var(--color-ring);
-    outline-opacity: 0.5;
+    @apply border-border outline-ring/50;
   }
 
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    @apply bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -195,4 +188,15 @@
 
 html {
   font-size: var(--font-size);
+}
+
+/* Remove spinner buttons from number inputs */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
 }
