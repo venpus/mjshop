@@ -43,6 +43,10 @@ server/
 │   ├── controllers/     # 컨트롤러
 │   ├── services/        # 비즈니스 로직
 │   ├── models/          # 데이터 모델
+│   ├── database/        # 데이터베이스 관련
+│   │   ├── migrations/  # 마이그레이션 SQL 파일
+│   │   ├── migrator.ts  # 마이그레이션 엔진
+│   │   └── migrate.ts   # CLI 실행 스크립트
 │   ├── middleware/      # 커스텀 미들웨어
 │   └── utils/           # 유틸리티 함수
 ├── dist/                # 빌드 출력
@@ -79,3 +83,33 @@ app.use('/api/products', productRoutes);
 ### 서비스 추가
 
 비즈니스 로직은 서비스 레이어에서 처리합니다.
+
+## 데이터베이스 마이그레이션
+
+이 프로젝트는 **자동 마이그레이션 시스템**을 사용합니다. 서버 시작 시 데이터베이스 스키마 변경사항이 자동으로 적용됩니다.
+
+### 빠른 시작
+
+1. **마이그레이션 파일 생성**: `src/database/migrations/` 디렉토리에 `{순번}_{설명}.sql` 형식으로 파일 생성
+2. **서버 시작**: `npm run dev` - 자동으로 마이그레이션 실행
+3. **상태 확인**: `npm run migrate:status` - 마이그레이션 상태 확인
+
+### 마이그레이션 파일 예시
+
+```sql
+-- 파일: src/database/migrations/002_create_products.sql
+CREATE TABLE IF NOT EXISTS products (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+### 주요 특징
+
+- ✅ 서버 시작 시 자동 실행
+- ✅ 순차 실행 (파일명 숫자 순서)
+- ✅ 중복 실행 방지 (migrations 테이블로 관리)
+- ✅ 트랜잭션 지원 (실패 시 롤백)
+
+**자세한 내용**: `src/database/MIGRATION_SYSTEM.md` 참고

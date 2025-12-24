@@ -42,7 +42,31 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 });
 
 // 서버 시작
-app.listen(PORT, () => {
-  console.log(`🚀 서버가 포트 ${PORT}에서 실행 중입니다.`);
-  console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
-});
+async function startServer() {
+  try {
+    // 데이터베이스 연결 테스트
+    const { testConnection } = await import('./config/database.js');
+    const connected = await testConnection();
+    
+    if (!connected) {
+      console.error('❌ 데이터베이스 연결에 실패했습니다. 서버를 시작할 수 없습니다.');
+      process.exit(1);
+    }
+
+    // 마이그레이션 실행
+    const { Migrator } = await import('./database/migrator.js');
+    const migrator = new Migrator();
+    await migrator.migrate();
+
+    // 서버 시작
+    app.listen(PORT, () => {
+      console.log(`🚀 서버가 포트 ${PORT}에서 실행 중입니다.`);
+      console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
+    });
+  } catch (error) {
+    console.error('서버 시작 실패:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
