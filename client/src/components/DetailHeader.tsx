@@ -3,9 +3,14 @@ import { ArrowLeft, Edit } from "lucide-react";
 interface DetailHeaderProps {
   onBack: () => void;
   onEdit?: () => void;
+  title?: string;
 }
 
-export function DetailHeader({ onBack, onEdit }: DetailHeaderProps) {
+export function DetailHeader({ 
+  onBack, 
+  onEdit,
+  title = "발주 상세",
+}: DetailHeaderProps) {
   return (
     <div className="mb-6">
       <button
@@ -16,18 +21,20 @@ export function DetailHeader({ onBack, onEdit }: DetailHeaderProps) {
         <span>목록으로 돌아가기</span>
       </button>
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-gray-900 mb-2">발주 상세</h2>
+        <div className="flex-1">
+          <h2 className="text-gray-900">{title}</h2>
         </div>
-        {onEdit && (
-          <button
-            onClick={onEdit}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            <Edit className="w-5 h-5" />
-            <span>수정</span>
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              <Edit className="w-5 h-5" />
+              <span>수정</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

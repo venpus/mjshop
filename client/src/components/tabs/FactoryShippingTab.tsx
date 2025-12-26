@@ -7,6 +7,7 @@ export interface FactoryShipment {
   trackingNumber: string;
   receiveDate: string;
   images: string[];
+  pendingImages?: File[]; // 아직 업로드되지 않은 이미지 파일들
 }
 
 export interface ReturnExchangeItem {
@@ -16,6 +17,7 @@ export interface ReturnExchangeItem {
   trackingNumber: string;
   receiveDate: string;
   images: string[];
+  pendingImages?: File[]; // 아직 업로드되지 않은 이미지 파일들
 }
 
 interface FactoryShippingTabProps {
@@ -26,13 +28,13 @@ interface FactoryShippingTabProps {
   onRemoveFactoryShipment: (id: string) => void;
   onUpdateFactoryShipment: (id: string, field: keyof FactoryShipment, value: any) => void;
   onHandleFactoryImageUpload: (id: string, e: React.ChangeEvent<HTMLInputElement>) => void;
-  onRemoveFactoryImage: (shipmentId: string, imageIndex: number) => void;
+  onRemoveFactoryImage: (shipmentId: string, imageIndex: number, imageUrl: string) => void;
   onSetSelectedFactoryImage: (image: string) => void;
   onAddReturnExchangeItem: () => void;
   onRemoveReturnExchangeItem: (id: string) => void;
   onUpdateReturnExchangeItem: (id: string, field: keyof ReturnExchangeItem, value: any) => void;
   onHandleReturnImageUpload: (id: string, e: React.ChangeEvent<HTMLInputElement>) => void;
-  onRemoveReturnImage: (itemId: string, imageIndex: number) => void;
+  onRemoveReturnImage: (itemId: string, imageIndex: number, imageUrl: string) => void;
 }
 
 export function FactoryShippingTab({
@@ -177,12 +179,12 @@ export function FactoryShippingTab({
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
-                        value={shipment.quantity}
+                        value={shipment.quantity || ""}
                         onChange={(e) =>
                           onUpdateFactoryShipment(
                             shipment.id,
                             "quantity",
-                            parseInt(
+                            e.target.value === "" ? 0 : parseInt(
                               e.target.value,
                             ) || 0,
                           )
@@ -298,6 +300,7 @@ export function FactoryShippingTab({
                                 onRemoveFactoryImage(
                                   shipment.id,
                                   index,
+                                  image,
                                 );
                               }}
                               className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-10"
@@ -401,12 +404,12 @@ export function FactoryShippingTab({
                       <div className="flex items-center gap-1">
                         <input
                           type="number"
-                          value={item.quantity}
+                          value={item.quantity || ""}
                           onChange={(e) =>
                             onUpdateReturnExchangeItem(
                               item.id,
                               "quantity",
-                              parseInt(
+                              e.target.value === "" ? 0 : parseInt(
                                 e.target.value,
                               ) || 0,
                             )
@@ -522,6 +525,7 @@ export function FactoryShippingTab({
                                   onRemoveReturnImage(
                                     item.id,
                                     index,
+                                    image,
                                   );
                                 }}
                                 className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 z-10"

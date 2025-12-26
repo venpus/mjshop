@@ -1,23 +1,28 @@
 import { Router } from 'express';
 import adminAccountRoutes from './adminAccounts.js';
 import productRoutes from './products.js';
+import purchaseOrderRoutes from './purchaseOrders.js';
+import logisticsOptionsRoutes from './logisticsOptions.js';
 
 const router = Router();
 
 // API 라우트들을 여기에 추가
 router.use('/admin-accounts', adminAccountRoutes);
 router.use('/products', productRoutes);
+router.use('/purchase-orders', purchaseOrderRoutes);
+router.use('/logistics-options', logisticsOptionsRoutes);
 
 router.get('/', (req, res) => {
   res.json({ 
     message: '쇼핑몰 관리자 API',
     version: '1.0.0',
-    endpoints: {
-      health: '/api/health',
-      api: '/api',
-      adminAccounts: '/api/admin-accounts',
-      products: '/api/products'
-    }
+      endpoints: {
+        health: '/api/health',
+        api: '/api',
+        adminAccounts: '/api/admin-accounts',
+        products: '/api/products',
+        purchaseOrders: '/api/purchase-orders'
+      }
   });
 });
 

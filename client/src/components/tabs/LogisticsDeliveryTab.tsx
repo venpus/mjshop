@@ -1,4 +1,5 @@
 import { Plus, Trash2, Truck, X } from "lucide-react";
+import { useLogisticsOptions } from "../../hooks/useLogisticsOptions";
 
 export interface PackageInfo {
   id: string;
@@ -7,14 +8,19 @@ export interface PackageInfo {
   sets: string;
   total: string;
   method: "박스" | "마대";
+  count: number | null; // 건수 (몇 박스/마대)
   weight: string;
 }
 
 export interface LogisticsInfo {
   id: string;
   trackingNumber: string;
-  company: string;
+  inlandCompanyId: number | null; // 내륙운송회사 ID
+  inlandCompanyName?: string; // 내륙운송회사명 (표시용)
+  warehouseId: number | null; // 도착 창고 ID
+  warehouseName?: string; // 도착 창고명 (표시용)
   imageUrls: string[];
+  pendingImages?: File[]; // 새로 선택한 이미지 파일들 (저장 전까지 보관)
 }
 
 export interface DeliverySet {
@@ -66,6 +72,8 @@ export function LogisticsDeliveryTab({
   onSetSelectedImage,
   onSetHoveredImage,
 }: LogisticsDeliveryTabProps) {
+  const { inlandCompanies, warehouses, isLoading: optionsLoading } = useLogisticsOptions();
+
   return (
     <div className="space-y-6">
       {/* 포장 코드 및 날짜 입력 */}
@@ -108,7 +116,7 @@ export function LogisticsDeliveryTab({
 
       {/* 배송 세트 목록 */}
       <div className="space-y-6">
-        {deliverySets.map((set) => (
+        {(deliverySets || []).map((set) => (
           <div key={set.id} className="bg-white border-2 border-orange-200 rounded-lg p-5">
             {/* 헤더: 포장 코드와 날짜 */}
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-orange-200">
@@ -163,14 +171,13 @@ export function LogisticsDeliveryTab({
                   </tr>
                 </thead>
                 <tbody>
-                  {set.packageInfoList.map((pkg) => (
+                  {(set.packageInfoList || []).map((pkg) => (
                     <tr key={pkg.id} className="hover:bg-gray-50">
                       <td className="border border-gray-300 p-0">
                         <input
                           type="text"
                           value={pkg.types}
                           onChange={(e) => onUpdatePackageInfo(set.id, pkg.id, "types", e.target.value)}
-                          placeholder="0"
                           className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-orange-500"
                         />
                       </td>
@@ -180,7 +187,6 @@ export function LogisticsDeliveryTab({
                           type="text"
                           value={pkg.pieces}
                           onChange={(e) => onUpdatePackageInfo(set.id, pkg.id, "pieces", e.target.value)}
-                          placeholder="0"
                           className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-orange-500"
                         />
                       </td>
@@ -190,7 +196,6 @@ export function LogisticsDeliveryTab({
                           type="text"
                           value={pkg.sets}
                           onChange={(e) => onUpdatePackageInfo(set.id, pkg.id, "sets", e.target.value)}
-                          placeholder="0"
                           className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-orange-500"
                         />
                       </td>
@@ -200,7 +205,6 @@ export function LogisticsDeliveryTab({
                           type="text"
                           value={pkg.total}
                           readOnly
-                          placeholder="0"
                           className="w-full px-2 py-1 border-0 bg-gray-50 text-gray-700 cursor-default"
                         />
                       </td>
@@ -216,19 +220,27 @@ export function LogisticsDeliveryTab({
                       </td>
                       <td className="border border-gray-300 p-0">
                         <input
+                          type="number"
+                          value={pkg.count || ""}
+                          onChange={(e) => onUpdatePackageInfo(set.id, pkg.id, "count", e.target.value === "" ? null : parseInt(e.target.value) || null)}
+                          className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                          min="0"
+                        />
+                      </td>
+                      <td className="border border-gray-300 p-0">
+                        <input
                           type="text"
                           value={pkg.weight}
                           onChange={(e) => onUpdatePackageInfo(set.id, pkg.id, "weight", e.target.value)}
-                          placeholder="0"
                           className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-orange-500"
                         />
                       </td>
                       <td className="border border-gray-300 px-1 py-1 text-center">
                         <button
                           onClick={() => onRemovePackageInfo(set.id, pkg.id)}
-                          disabled={set.packageInfoList.length === 1}
+                          disabled={!set.packageInfoList || set.packageInfoList.length === 1}
                           className={`p-0.5 rounded transition-colors ${
-                            set.packageInfoList.length === 1
+                            !set.packageInfoList || set.packageInfoList.length === 1
                               ? "text-gray-300 cursor-not-allowed"
                               : "text-red-600 hover:bg-red-100"
                           }`}
@@ -259,13 +271,14 @@ export function LogisticsDeliveryTab({
                 <thead className="bg-gray-100">
                   <tr>
                     <th className="border border-gray-300 px-2 py-1.5 text-left">송장번호</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left">물류회사</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left">내륙운송회사</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left">도착 창고</th>
                     <th className="border border-gray-300 px-2 py-1.5 text-left">사진</th>
                     <th className="border border-gray-300 px-2 py-1.5 w-8"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {set.logisticsInfoList.map((logistics) => (
+                  {(set.logisticsInfoList || []).map((logistics) => (
                     <tr key={logistics.id} className="hover:bg-gray-50">
                       <td className="border border-gray-300 p-0">
                         <input
@@ -277,13 +290,34 @@ export function LogisticsDeliveryTab({
                         />
                       </td>
                       <td className="border border-gray-300 p-0">
-                        <input
-                          type="text"
-                          value={logistics.company}
-                          onChange={(e) => onUpdateLogisticsInfo(set.id, logistics.id, "company", e.target.value)}
-                          placeholder="물류회사명"
-                          className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                        />
+                        <select
+                          value={logistics.inlandCompanyId || ""}
+                          onChange={(e) => onUpdateLogisticsInfo(set.id, logistics.id, "inlandCompanyId", e.target.value === "" ? null : parseInt(e.target.value))}
+                          className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white"
+                          disabled={optionsLoading}
+                        >
+                          <option value="">선택하세요</option>
+                          {inlandCompanies.map((company) => (
+                            <option key={company.id} value={company.id}>
+                              {company.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="border border-gray-300 p-0">
+                        <select
+                          value={logistics.warehouseId || ""}
+                          onChange={(e) => onUpdateLogisticsInfo(set.id, logistics.id, "warehouseId", e.target.value === "" ? null : parseInt(e.target.value))}
+                          className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white"
+                          disabled={optionsLoading}
+                        >
+                          <option value="">선택하세요</option>
+                          {warehouses.map((warehouse) => (
+                            <option key={warehouse.id} value={warehouse.id}>
+                              {warehouse.name}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td className="border border-gray-300 p-1">
                         <div className="flex items-center gap-1 flex-wrap">
@@ -342,9 +376,9 @@ export function LogisticsDeliveryTab({
                       <td className="border border-gray-300 px-1 py-1 text-center">
                         <button
                           onClick={() => onRemoveLogisticsInfo(set.id, logistics.id)}
-                          disabled={set.logisticsInfoList.length === 1}
+                          disabled={!set.logisticsInfoList || set.logisticsInfoList.length === 1}
                           className={`p-0.5 rounded transition-colors ${
-                            set.logisticsInfoList.length === 1
+                            !set.logisticsInfoList || set.logisticsInfoList.length === 1
                               ? "text-gray-300 cursor-not-allowed"
                               : "text-red-600 hover:bg-red-100"
                           }`}
@@ -362,7 +396,7 @@ export function LogisticsDeliveryTab({
       </div>
 
       {/* 배송 세트가 없을 때 안내 메시지 */}
-      {deliverySets.length === 0 && (
+      {(!deliverySets || deliverySets.length === 0) && (
         <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
           <Truck className="w-12 h-12 mx-auto mb-3 text-gray-400" />
           <p className="text-gray-500">

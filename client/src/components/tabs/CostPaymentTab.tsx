@@ -9,11 +9,14 @@ export interface LaborCostItem {
 interface CostPaymentTabProps {
   // 기본 비용
   unitPrice: number;
+  backMargin: number;
   quantity: number;
   commissionType: string;
   commissionAmount: number;
   basicCostTotal: number;
+  isSuperAdmin: boolean; // A 레벨 관리자 여부
   onSetUnitPrice: (value: number) => void;
+  onSetBackMargin: (value: number) => void;
   onSetQuantity: (value: number) => void;
   onHandleCommissionTypeChange: (value: string) => void;
   commissionOptions: Array<{ label: string; rate: number }>;
@@ -55,11 +58,14 @@ interface CostPaymentTabProps {
 
 export function CostPaymentTab({
   unitPrice,
+  backMargin,
   quantity,
   commissionType,
   commissionAmount,
   basicCostTotal,
+  isSuperAdmin,
   onSetUnitPrice,
+  onSetBackMargin,
   onSetQuantity,
   onHandleCommissionTypeChange,
   commissionOptions,
@@ -103,23 +109,58 @@ export function CostPaymentTab({
             </span>
           </h4>
           <div className="space-y-2">
+            {/* 발주 단가 (모두 볼 수 있음) */}
             <div className="flex items-center gap-2">
               <span className="text-purple-700 bg-purple-100 px-2 py-1 rounded text-xs whitespace-nowrap min-w-[72px] font-semibold text-center">
-                기본 단가
+                발주 단가
               </span>
               <div className="flex items-center gap-1 flex-1 min-w-0">
                 <span className="text-gray-500 text-sm">¥</span>
-                <input
-                  type="number"
-                  value={unitPrice}
-                  onChange={(e) =>
-                    onSetUnitPrice(parseFloat(e.target.value) || 0)
-                  }
-                  step="0.01"
-                  className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
+                <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-right text-sm text-gray-700">
+                  {(unitPrice + backMargin).toFixed(2)}
+                </div>
               </div>
             </div>
+            {/* 기본 단가 (A 레벨 관리자만) */}
+            {isSuperAdmin && (
+              <div className="flex items-center gap-2">
+                <span className="text-purple-700 bg-purple-100 px-2 py-1 rounded text-xs whitespace-nowrap min-w-[72px] font-semibold text-center">
+                  기본 단가
+                </span>
+                <div className="flex items-center gap-1 flex-1 min-w-0">
+                  <span className="text-gray-500 text-sm">¥</span>
+                  <input
+                    type="number"
+                    value={unitPrice || ""}
+                    onChange={(e) =>
+                      onSetUnitPrice(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)
+                    }
+                    step="0.01"
+                    className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+            )}
+            {/* 추가 단가 (A 레벨 관리자만) */}
+            {isSuperAdmin && (
+              <div className="flex items-center gap-2">
+                <span className="text-purple-700 bg-purple-100 px-2 py-1 rounded text-xs whitespace-nowrap min-w-[72px] font-semibold text-center">
+                  추가 단가
+                </span>
+                <div className="flex items-center gap-1 flex-1 min-w-0">
+                  <span className="text-gray-500 text-sm">¥</span>
+                  <input
+                    type="number"
+                    value={backMargin || ""}
+                    onChange={(e) =>
+                      onSetBackMargin(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)
+                    }
+                    step="0.01"
+                    className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <span className="text-purple-700 bg-purple-100 px-2 py-1 rounded text-xs whitespace-nowrap min-w-[72px] font-semibold text-center">
                 수량
@@ -127,9 +168,9 @@ export function CostPaymentTab({
               <div className="flex items-center gap-1 flex-1 min-w-0">
                 <input
                   type="number"
-                  value={quantity}
+                  value={quantity || ""}
                   onChange={(e) =>
-                    onSetQuantity(parseInt(e.target.value) || 0)
+                    onSetQuantity(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)
                   }
                   className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
@@ -187,9 +228,9 @@ export function CostPaymentTab({
                 <span className="text-gray-500 text-sm">¥</span>
                 <input
                   type="number"
-                  value={shippingCost}
+                  value={shippingCost || ""}
                   onChange={(e) =>
-                    onSetShippingCost(parseFloat(e.target.value) || 0)
+                    onSetShippingCost(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)
                   }
                   step="0.01"
                   className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -204,10 +245,10 @@ export function CostPaymentTab({
                 <span className="text-gray-500 text-sm">¥</span>
                 <input
                   type="number"
-                  value={warehouseShippingCost}
+                  value={warehouseShippingCost || ""}
                   onChange={(e) =>
                     onSetWarehouseShippingCost(
-                      parseFloat(e.target.value) || 0,
+                      e.target.value === "" ? 0 : parseFloat(e.target.value) || 0,
                     )
                   }
                   step="0.01"
@@ -241,11 +282,11 @@ export function CostPaymentTab({
                 <span className="text-gray-500 text-xs">¥</span>
                 <input
                   type="number"
-                  value={item.cost}
+                  value={item.cost || ""}
                   onChange={(e) =>
                     onUpdateOptionItemCost(
                       item.id,
-                      parseFloat(e.target.value) || 0,
+                      e.target.value === "" ? 0 : parseFloat(e.target.value) || 0,
                     )
                   }
                   step="0.01"
@@ -292,11 +333,11 @@ export function CostPaymentTab({
                 <span className="text-gray-500 text-xs">¥</span>
                 <input
                   type="number"
-                  value={item.cost}
+                  value={item.cost || ""}
                   onChange={(e) =>
                     onUpdateLaborCostItemCost(
                       item.id,
-                      parseFloat(e.target.value) || 0,
+                      e.target.value === "" ? 0 : parseFloat(e.target.value) || 0,
                     )
                   }
                   step="0.01"
@@ -335,10 +376,10 @@ export function CostPaymentTab({
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
-                        value={advancePaymentRate}
+                        value={advancePaymentRate || ""}
                         onChange={(e) =>
                           onSetAdvancePaymentRate(
-                            parseFloat(e.target.value) || 0,
+                            e.target.value === "" ? 0 : parseFloat(e.target.value) || 0,
                           )
                         }
                         min="0"

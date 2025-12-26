@@ -7,7 +7,7 @@ export interface AdminAccountFormData {
   name: string;
   phone: string;
   email: string;
-  level: 'A-SuperAdmin' | 'B0: 중국Admin' | 'C0: 한국Admin';
+  level: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
   password?: string; // 계정 생성 시 필수, 수정 시 선택
 }
 
@@ -232,6 +232,7 @@ export function AdminAccountForm({
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="A-SuperAdmin">A-SuperAdmin</option>
+                  <option value="S: Admin">S: Admin</option>
                   <option value="B0: 중국Admin">B0: 중국Admin</option>
                   <option value="C0: 한국Admin">C0: 한국Admin</option>
                 </select>

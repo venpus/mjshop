@@ -1,11 +1,12 @@
 import { Wrench, Plus, Trash2, Image } from "lucide-react";
 
 export interface WorkItem {
-  id: string;
-  image: string;
+  id: string; // DB ID (number를 string으로 변환) 또는 임시 ID (Date.now())
+  images: string[]; // 서버 이미지 URL 배열 (작업 항목당 1장)
   descriptionKo: string;
   descriptionZh: string;
   isCompleted?: boolean;
+  pendingImages?: File[]; // 새로 선택한 이미지 파일들 (저장 전까지 보관)
 }
 
 interface ProcessingPackagingTabProps {
@@ -171,31 +172,33 @@ export function ProcessingPackagingTab({
 
               <div className="space-y-3">
                 {/* 썸네일 이미지 */}
-                <div className="relative group mx-auto w-1/2">
-                  <div
-                    className="w-full aspect-square rounded-lg border-2 border-purple-300 overflow-hidden cursor-pointer hover:border-purple-500 transition-all"
-                    onClick={() =>
-                      onSetSelectedFactoryImage(
-                        item.image,
-                      )
-                    }
-                  >
-                    <img
-                      src={item.image}
-                      alt={`작업 사진 ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                {item.images && item.images.length > 0 && (
+                  <div className="relative group mx-auto w-1/2">
+                    <div
+                      className="w-full aspect-square rounded-lg border-2 border-purple-300 overflow-hidden cursor-pointer hover:border-purple-500 transition-all"
+                      onClick={() =>
+                        onSetSelectedFactoryImage(
+                          item.images[0],
+                        )
+                      }
+                    >
+                      <img
+                        src={item.images[0]}
+                        alt={`작업 사진 ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
 
-                  {/* 호버 시 크게 보기 */}
-                  <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[100]">
-                    <img
-                      src={item.image}
-                      alt={`작업 사진 ${index + 1} 미리보기`}
-                      className="w-80 h-80 object-contain rounded-lg shadow-2xl border-4 border-white bg-white"
-                    />
+                    {/* 호버 시 크게 보기 */}
+                    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[100]">
+                      <img
+                        src={item.images[0]}
+                        alt={`작업 사진 ${index + 1} 미리보기`}
+                        className="w-80 h-80 object-contain rounded-lg shadow-2xl border-4 border-white bg-white"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* 설명 입력 영역 */}
                 <div className="space-y-2">

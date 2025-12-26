@@ -1,10 +1,5 @@
 import { Factory, Wrench, Truck, CreditCard } from "lucide-react";
-
-interface WorkItem {
-  id: string;
-  name: string;
-  isCompleted: boolean;
-}
+import { type WorkItem } from "./tabs/ProcessingPackagingTab";
 
 interface ProgressStatusSectionProps {
   // 업체 출고 관련
@@ -39,7 +34,7 @@ export function ProgressStatusSection({
   paymentStatus,
 }: ProgressStatusSectionProps) {
   // 작업 완료 개수 계산
-  const completedWorkCount = workItems.filter(item => item.isCompleted).length;
+  const completedWorkCount = workItems.filter(item => item.isCompleted === true).length;
   const totalWorkCount = workItems.length;
   
   return (

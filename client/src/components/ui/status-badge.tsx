@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type StatusBadgeType = 'factory' | 'work' | 'delivery' | 'payment';
+export type StatusBadgeType = 'factory' | 'work' | 'delivery' | 'payment' | 'order';
 
 export interface StatusBadgeProps {
   /** 표시할 상태 텍스트 */
@@ -50,6 +50,13 @@ function getStatusColor(status: string, type: StatusBadgeType): string {
       if (status === '완료') return 'bg-green-100 text-green-800';
       if (status === '선금결제') return 'bg-yellow-100 text-yellow-800';
       if (status === '미결제') return 'bg-red-100 text-red-800';
+      return 'bg-gray-100 text-gray-800';
+
+    case 'order':
+      // 발주 상태
+      if (status === '발주확인') return 'bg-green-100 text-green-800';
+      if (status === '발주 대기') return 'bg-yellow-100 text-yellow-800';
+      if (status === '취소됨') return 'bg-red-100 text-red-800';
       return 'bg-gray-100 text-gray-800';
 
     default:

@@ -11,6 +11,7 @@ import { SearchBar } from "./ui/search-bar";
 import { TablePagination } from "./ui/table-pagination";
 import { ProductTableRow } from "./products/ProductTableRow";
 import { ProductFilter, ProductFilterData } from "./ui/ProductFilter";
+import { PurchaseOrderForm, PurchaseOrderFormData } from "./PurchaseOrderForm";
 import { useAuth } from "../contexts/AuthContext";
 
 interface Product {
@@ -36,7 +37,11 @@ interface Product {
   createdAt?: string | Date;
 }
 
-export function Products() {
+interface ProductsProps {
+  onNavigateToPurchaseOrder?: (orderId: string) => void;
+}
+
+export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
   const { user } = useAuth();
   const isSuperAdmin = user?.level === 'A-SuperAdmin';
   
@@ -68,6 +73,9 @@ export function Products() {
   const [detailProduct, setDetailProduct] =
     useState<Product | null>(null);
   const [deleteProduct, setDeleteProduct] =
+    useState<Product | null>(null);
+  const [isPurchaseOrderFormOpen, setIsPurchaseOrderFormOpen] = useState(false);
+  const [selectedProductForOrder, setSelectedProductForOrder] =
     useState<Product | null>(null);
 
   const filteredProducts = products.filter(
@@ -434,6 +442,51 @@ export function Products() {
     setFormMode("create");
   };
 
+  const handleCreatePurchaseOrder = (product: Product) => {
+    setSelectedProductForOrder(product);
+    setIsPurchaseOrderFormOpen(true);
+  };
+
+  const handleClosePurchaseOrderForm = () => {
+    setIsPurchaseOrderFormOpen(false);
+    setSelectedProductForOrder(null);
+  };
+
+  const handleSavePurchaseOrder = async (formData: PurchaseOrderFormData) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/purchase-orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          ...formData,
+          supplier_name: selectedProductForOrder?.supplier.name, // supplier_id 조회를 위해 이름 전달
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "발주 생성에 실패했습니다.");
+      }
+
+      const data = await response.json();
+      if (data.success && data.data) {
+        alert("발주가 성공적으로 생성되었습니다.");
+        setIsPurchaseOrderFormOpen(false);
+        setSelectedProductForOrder(null);
+        // 발주 상세 페이지로 이동
+        if (onNavigateToPurchaseOrder && data.data.id) {
+          onNavigateToPurchaseOrder(data.data.id);
+        }
+      }
+    } catch (err: any) {
+      alert(err.message || "발주 생성 중 오류가 발생했습니다.");
+      console.error("발주 생성 오류:", err);
+    }
+  };
+
   return (
     <div className="p-8 min-h-[1080px]">
       <div className="mb-6">
@@ -515,7 +568,7 @@ export function Products() {
                   onImageHoverLeave={() => setHoveredProduct(null)}
                   onMouseMove={handleMouseMove}
                   onViewDetail={setDetailProduct}
-                  onOrder={(p) => console.log('주문하기:', p.id)}
+                  onOrder={handleCreatePurchaseOrder}
                   onEdit={handleEditProduct}
                   onDelete={handleDeleteProduct}
                 />
@@ -587,14 +640,23 @@ export function Products() {
         />
       )}
 
-      {/* Delete Confirm Dialog */}
-      {deleteProduct && (
-        <DeleteConfirmDialog
-          product={deleteProduct}
-          onCancel={() => setDeleteProduct(null)}
-          onConfirm={handleConfirmDelete}
-        />
-      )}
-    </div>
-  );
-}
+          {/* Delete Confirm Dialog */}
+          {deleteProduct && (
+            <DeleteConfirmDialog
+              product={deleteProduct}
+              onCancel={() => setDeleteProduct(null)}
+              onConfirm={handleConfirmDelete}
+            />
+          )}
+
+          {/* Purchase Order Form Modal */}
+          {isPurchaseOrderFormOpen && selectedProductForOrder && (
+            <PurchaseOrderForm
+              product={selectedProductForOrder}
+              onClose={handleClosePurchaseOrderForm}
+              onSave={handleSavePurchaseOrder}
+            />
+          )}
+        </div>
+      );
+    }

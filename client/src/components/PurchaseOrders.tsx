@@ -1,11 +1,22 @@
-import { useState } from 'react';
-import { Filter, Download, Eye, Package, Plus, Image, Edit, Trash2, CheckSquare, X, RotateCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Filter, Download, Eye, Package, Plus, Image, Edit, X, CheckSquare, RotateCw, Trash2 } from 'lucide-react';
 import { TablePagination } from './ui/table-pagination';
 import { StatusBadge } from './ui/status-badge';
 import { SearchBar } from './ui/search-bar';
+import { ReorderPurchaseOrderModal } from './ReorderPurchaseOrderModal';
+import { useReorderPurchaseOrder } from '../hooks/useReorderPurchaseOrder';
+import { PurchaseOrderDeleteDialog } from './PurchaseOrderDeleteDialog';
+import { useAuth } from '../contexts/AuthContext';
+import { useDeletePurchaseOrder } from '../hooks/useDeletePurchaseOrder';
+import { formatDateForInput } from '../utils/dateUtils';
+import { 
+  calculateBasicCostTotal, 
+  calculateShippingCostTotal, 
+  calculateFinalPaymentAmount 
+} from '../utils/purchaseOrderCalculations';
 
 interface PurchaseOrdersProps {
-  onViewDetail: (orderId: string, tab?: 'cost' | 'factory' | 'work' | 'delivery') => void;
+  onViewDetail: (orderId: string, tab?: 'cost' | 'factory' | 'work' | 'delivery', autoSave?: boolean) => void;
 }
 
 interface PurchaseOrder {
@@ -15,33 +26,32 @@ interface PurchaseOrder {
   product: string;
   productImage?: string;
   unitPrice: number;
+  backMargin: number; // 추가 단가
   optionCost: number;
+  laborCost: number; // 인건비 총액
   quantity: number;
   amount: number;
   size: string;
   weight: string;
   packaging: number;
+  commissionRate: number; // 수수료율
+  shippingCost: number; // 배송비
+  warehouseShippingCost: number; // 창고 배송비
   factoryStatus: '출고대기' | '배송중' | '수령완료';
   workStatus: '작업대기' | '작업중' | '완료';
   deliveryStatus: '대기중' | '내륙운송중' | '항공운송중' | '해운운송중' | '통관및 배달' | '한국도착';
   paymentStatus: '미결제' | '선금결제' | '완료';
+  orderStatus: '발주확인' | '발주 대기' | '취소됨';
   date: string;
   isOrderConfirmed?: boolean;
 }
 
-const initialPurchaseOrders: PurchaseOrder[] = [
-  { id: '1', poNumber: 'PO-001', supplier: '광저우 제조사', product: '테디베어 봉제인형', productImage: 'https://images.unsplash.com/photo-1602734846297-9299fc2d4703?w=400', unitPrice: 70.50, optionCost: 5.25, quantity: 500, amount: 0, size: '5x3x2cm', weight: '50g', packaging: 10, factoryStatus: '출고대기', workStatus: '작업중', deliveryStatus: '대기중', paymentStatus: '미결제', date: '2024-12-08' },
-  { id: '2', poNumber: 'PO-002', supplier: '선전 공장', product: '고양이 피규어', productImage: 'https://images.unsplash.com/photo-1671490289892-502ca32a3a2a?w=400', unitPrice: 52.00, optionCost: 3.80, quantity: 1000, amount: 0, size: '8x6x4cm', weight: '120g', packaging: 12, factoryStatus: '배송중', workStatus: '완료', deliveryStatus: '항공운송중', paymentStatus: '선금결제', date: '2024-12-08' },
-  { id: '3', poNumber: 'PO-003', supplier: '상하이 제조사', product: '토끼 인형 키링', productImage: 'https://images.unsplash.com/photo-1727154085760-134cc942246e?w=400', unitPrice: 9.00, optionCost: 1.50, quantity: 2000, amount: 0, size: '40x30x10mm', weight: '800g', packaging: 20, factoryStatus: '수령완료', workStatus: '완료', deliveryStatus: '한국도착', paymentStatus: '완료', date: '2024-12-07' },
-  { id: '4', poNumber: 'PO-004', supplier: '베이징 공장', product: '판다 봉제인형', productImage: 'https://images.unsplash.com/photo-1517686748843-bb360cfc62b3?w=400', unitPrice: 30.00, optionCost: 0, quantity: 800, amount: 0, size: '6x4x3cm', weight: '80g', packaging: 15, factoryStatus: '출고대기', workStatus: '작업중', deliveryStatus: '내륙운송중', paymentStatus: '미결제', date: '2024-12-07' },
-  { id: '5', poNumber: 'PO-005', supplier: '광저우 제조사', product: '브라운 곰돌이 인형', productImage: 'https://images.unsplash.com/photo-1567169866456-a0759b6bb0c8?w=400', unitPrice: 70.00, optionCost: 8.75, quantity: 300, amount: 0, size: '4.5x4.5x1.5cm', weight: '120g', packaging: 5, factoryStatus: '배송중', workStatus: '완료', deliveryStatus: '해운운송중', paymentStatus: '선금결제', date: '2024-12-07' },
-  { id: '6', poNumber: 'PO-006', supplier: '선전 공장', product: '강아지 미니 인형', productImage: 'https://images.unsplash.com/photo-1635696860867-238c2fa072bb?w=400', unitPrice: 52.00, optionCost: 2.50, quantity: 1500, amount: 0, size: '3x2x2cm', weight: '30g', packaging: 25, factoryStatus: '출고대기', workStatus: '작업대기', deliveryStatus: '대기중', paymentStatus: '미결제', date: '2024-12-06' },
-  { id: '7', poNumber: 'PO-007', supplier: '상하이 제조사', product: '토끼 인형 키링', productImage: 'https://images.unsplash.com/photo-1727154085760-134cc942246e?w=400', unitPrice: 19.00, optionCost: 1.50, quantity: 500, amount: 0, size: '40x30x10mm', weight: '800g', packaging: 20, factoryStatus: '출고대기', workStatus: '작업중', deliveryStatus: '통관및 배달', paymentStatus: '선금결제', date: '2024-12-06' },
-  { id: '8', poNumber: 'PO-008', supplier: '베이징 공장', product: '펭귄 봉제인형', productImage: 'https://images.unsplash.com/photo-1602734846297-9299fc2d4703?w=400', unitPrice: 60.00, optionCost: 4.00, quantity: 200, amount: 0, size: '7x5x4cm', weight: '100g', packaging: 8, factoryStatus: '출고대기', workStatus: '작업대기', deliveryStatus: '내륙운송중', paymentStatus: '미결제', date: '2024-12-05' },
-];
-
 export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(initialPurchaseOrders);
+  const { user } = useAuth();
+  const isSuperAdmin = user?.level === 'A-SuperAdmin';
+  
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('전체');
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
@@ -55,6 +65,103 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     workStatus: [] as string[],
     deliveryStatus: [] as string[],
     paymentStatus: [] as string[],
+    orderStatus: [] as string[],
+  });
+
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+
+  // 이미지 URL을 전체 URL로 변환하는 헬퍼 함수
+  const getFullImageUrl = (imageUrl: string | null | undefined): string => {
+    if (!imageUrl) return '';
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl;
+    }
+    return `${SERVER_BASE_URL}${imageUrl}`;
+  };
+
+  // 발주 목록 로드
+  const loadPurchaseOrders = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${API_BASE_URL}/purchase-orders`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || '발주 목록을 불러오는데 실패했습니다.');
+      }
+
+      const data = await response.json();
+      if (data.success && data.data) {
+        // 서버 응답을 클라이언트 PurchaseOrder 인터페이스로 변환
+        const convertedOrders: PurchaseOrder[] = data.data.map((po: any) => {
+          return {
+            id: po.id,
+            poNumber: po.po_number,
+            supplier: po.supplier?.name || '',
+            product: po.product?.name || '',
+            productImage: po.product?.main_image ? getFullImageUrl(po.product.main_image) : undefined,
+            unitPrice: po.unit_price || 0,
+            backMargin: po.back_margin || 0,
+            optionCost: 0, // 옵션 비용은 별도로 계산 필요 (목록에서는 0으로 설정)
+            laborCost: 0, // 인건비는 별도로 계산 필요 (목록에서는 0으로 설정)
+            quantity: po.quantity || 0,
+            amount: 0, // 최종 결제 금액은 별도로 계산
+            commissionRate: po.commission_rate || 0,
+            shippingCost: po.shipping_cost || 0,
+            warehouseShippingCost: po.warehouse_shipping_cost || 0,
+            size: po.size || '',
+            weight: po.weight || '',
+            packaging: po.packaging || 0,
+            factoryStatus: '출고대기', // VIEW에서 가져오거나 별도 계산 필요
+            workStatus: '작업대기', // VIEW에서 가져오거나 별도 계산 필요
+            deliveryStatus: po.delivery_status || '대기중',
+            paymentStatus: po.payment_status || '미결제',
+            // order_status가 있으면 사용, 없으면 is_confirmed 기반으로 계산 (기존 데이터 호환성)
+            orderStatus: po.order_status || (po.is_confirmed ? '발주확인' : '발주 대기'),
+            date: formatDateForInput(po.order_date),
+            isOrderConfirmed: po.is_confirmed || false,
+          };
+        });
+        setPurchaseOrders(convertedOrders);
+      }
+    } catch (err: any) {
+      console.error('발주 로드 오류:', err);
+      alert(err.message || '발주 목록을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 재주문 훅 사용 (loadPurchaseOrders 선언 후에 위치)
+  const {
+    reorderOrder,
+    openReorder,
+    closeReorder,
+    handleConfirmReorder,
+  } = useReorderPurchaseOrder({
+    onSuccess: (newOrderId) => {
+      // 목록 새로고침
+      loadPurchaseOrders();
+      // 새로 생성된 발주의 상세 페이지로 이동 (자동 저장 옵션 포함)
+      onViewDetail(newOrderId, 'work', true); // true = autoSave
+    },
+  });
+
+  // 삭제 훅 사용 (A 레벨 관리자만 사용)
+  const {
+    deleteOrder,
+    openDelete,
+    closeDelete,
+    handleConfirmDelete,
+  } = useDeletePurchaseOrder({
+    onSuccess: loadPurchaseOrders,
   });
 
   const filteredPurchaseOrders = purchaseOrders.filter(po => {
@@ -67,8 +174,9 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     const matchesWorkStatus = filters.workStatus.length === 0 || filters.workStatus.includes(po.workStatus);
     const matchesDeliveryStatus = filters.deliveryStatus.length === 0 || filters.deliveryStatus.includes(po.deliveryStatus);
     const matchesPaymentStatus = filters.paymentStatus.length === 0 || filters.paymentStatus.includes(po.paymentStatus);
+    const matchesOrderStatus = filters.orderStatus.length === 0 || filters.orderStatus.includes(po.orderStatus);
     
-    return matchesSearch && matchesFactoryStatus && matchesWorkStatus && matchesDeliveryStatus && matchesPaymentStatus;
+    return matchesSearch && matchesFactoryStatus && matchesWorkStatus && matchesDeliveryStatus && matchesPaymentStatus && matchesOrderStatus;
   });
 
   const statusOptions = ['전체', '출고대기', '배송중', '수령완료', '작업대기', '작업중', '완료', '공장출고', '중국운송중', '항공운송중', '해운운송중', '통관및 배달', '한국도착'];
@@ -87,6 +195,10 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     setItemsPerPage(value);
     setCurrentPage(1); // Reset to first page when changing items per page
   };
+
+  useEffect(() => {
+    loadPurchaseOrders();
+  }, []);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
@@ -112,16 +224,109 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     }
   };
   
-  // 발주 컨펌 처리
-  const handleConfirmOrders = () => {
-    setPurchaseOrders(prevOrders =>
-      prevOrders.map(po =>
-        selectedOrders.has(po.id)
-          ? { ...po, isOrderConfirmed: true }
-          : po
-      )
-    );
-    setSelectedOrders(new Set());
+  // 발주 취소 핸들러
+  const handleCancelOrder = async (order: PurchaseOrder) => {
+    // 이미 취소된 발주는 처리하지 않음
+    if (order.orderStatus === '취소됨') {
+      return;
+    }
+
+    if (!confirm(`발주번호 ${order.poNumber}를 취소하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/purchase-orders/${order.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          order_status: '취소됨',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || '발주 취소에 실패했습니다.');
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || '발주 취소에 실패했습니다.');
+      }
+
+      // 성공 메시지 표시
+      alert('발주가 성공적으로 취소되었습니다.');
+
+      // 목록 새로고침
+      await loadPurchaseOrders();
+    } catch (err: any) {
+      alert(err.message || '발주 취소 중 오류가 발생했습니다.');
+      console.error('발주 취소 오류:', err);
+    }
+  };
+
+  // 발주 컨펌 처리 (DB에 저장)
+  const handleConfirmOrders = async () => {
+    if (selectedOrders.size === 0) return;
+
+    const selectedOrderIds = Array.from(selectedOrders);
+    
+    try {
+      // 선택된 모든 발주에 대해 is_confirmed를 true로 업데이트
+      const updatePromises = selectedOrderIds.map(orderId =>
+        fetch(`${API_BASE_URL}/purchase-orders/${orderId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            is_confirmed: true,
+          }),
+        })
+      );
+
+      const responses = await Promise.all(updatePromises);
+      
+      // 모든 응답 확인
+      const errors: string[] = [];
+      for (let i = 0; i < responses.length; i++) {
+        if (!responses[i].ok) {
+          const errorData = await responses[i].json().catch(() => ({}));
+          errors.push(`${selectedOrderIds[i]}: ${errorData.error || '업데이트 실패'}`);
+        } else {
+          const data = await responses[i].json();
+          if (!data.success) {
+            errors.push(`${selectedOrderIds[i]}: ${data.error || '업데이트 실패'}`);
+          }
+        }
+      }
+
+      if (errors.length > 0) {
+        throw new Error(`일부 발주 컨펌에 실패했습니다:\n${errors.join('\n')}`);
+      }
+
+      // 성공 메시지
+      alert(`${selectedOrderIds.length}개의 발주가 성공적으로 컨펌되었습니다.`);
+
+      // 로컬 상태 업데이트
+      setPurchaseOrders(prevOrders =>
+        prevOrders.map(po =>
+          selectedOrders.has(po.id)
+            ? { ...po, isOrderConfirmed: true }
+            : po
+        )
+      );
+      
+      // 선택 초기화
+      setSelectedOrders(new Set());
+    } catch (err: any) {
+      console.error('발주 컨펌 오류:', err);
+      alert(err.message || '발주 컨펌 중 오류가 발생했습니다.');
+    }
   };
 
   // 필터 토글 함수
@@ -142,11 +347,23 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       workStatus: [],
       deliveryStatus: [],
       paymentStatus: [],
+      orderStatus: [],
     });
   };
 
   // 활성 필터 개수
   const activeFilterCount = Object.values(filters).reduce((sum, arr) => sum + arr.length, 0);
+
+  if (isLoading) {
+    return (
+      <div className="p-8 min-h-[1080px] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">발주 목록을 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 min-h-[1080px]">
@@ -178,7 +395,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
             {/* Filter Dropdown Panel */}
             {isFilterOpen && (
-              <div className="absolute top-full right-0 mt-2 w-[680px] bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+              <div className="absolute top-full right-0 mt-2 w-[850px] bg-white rounded-lg shadow-xl border border-gray-200 z-50">
                 <div className="p-3">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-gray-900 text-sm">필터 옵션</h3>
@@ -201,7 +418,25 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                   </div>
 
                   {/* Filter Groups - Grid Layout */}
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-5 gap-3">
+                    {/* 발주 상태 */}
+                    <div className="bg-indigo-50 rounded-lg p-2.5 border border-indigo-200">
+                      <h4 className="text-xs text-indigo-900 mb-2 pb-1.5 border-b border-indigo-300">발주 상태</h4>
+                      <div className="space-y-1.5">
+                        {['발주 대기', '발주확인', '취소됨'].map(status => (
+                          <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-indigo-100 p-1 rounded">
+                            <input
+                              type="checkbox"
+                              checked={filters.orderStatus.includes(status)}
+                              onChange={() => toggleFilter('orderStatus', status)}
+                              className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer"
+                            />
+                            <span className="text-xs text-gray-700">{status}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* 업체출고 상태 */}
                     <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-200">
                       <h4 className="text-xs text-blue-900 mb-2 pb-1.5 border-b border-blue-300">업체출고 상태</h4>
@@ -317,6 +552,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                 </th>
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">발주정보</th>
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">상품정보</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">발주 상태</th>
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">단가</th>
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">수량</th>
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">발주금액</th>
@@ -331,8 +567,30 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {currentPurchaseOrders.map((po) => {
-                const finalUnitPrice = po.unitPrice + po.optionCost;
-                const totalAmount = finalUnitPrice * po.quantity;
+                // 발주 단가 = 기본 단가 + 추가 단가
+                const orderUnitPrice = po.unitPrice + po.backMargin;
+                
+                // 최종 결제 금액 계산
+                const basicCostTotal = calculateBasicCostTotal(
+                  po.unitPrice,
+                  po.quantity,
+                  po.commissionRate,
+                  po.backMargin
+                );
+                const shippingCostTotal = calculateShippingCostTotal(
+                  po.shippingCost,
+                  po.warehouseShippingCost
+                );
+                const finalPaymentAmount = calculateFinalPaymentAmount(
+                  basicCostTotal,
+                  shippingCostTotal,
+                  po.optionCost,
+                  po.laborCost
+                );
+                
+                // 예상최종단가 = 최종 결제 금액 / 수량
+                const finalUnitPrice = po.quantity > 0 ? finalPaymentAmount / po.quantity : 0;
+                
                 return (
                   <tr key={po.id} className={`hover:bg-gray-50 ${po.isOrderConfirmed ? 'bg-green-50' : ''}`}>
                     <td className="px-4 py-2 text-center">
@@ -365,7 +623,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                               alt={po.product}
                               className="w-full h-full object-cover"
                               onMouseMove={handleMouseMove}
-                              onMouseEnter={() => setHoveredProduct(po.productImage)}
+                              onMouseEnter={() => setHoveredProduct(po.productImage || null)}
                               onMouseLeave={() => setHoveredProduct(null)}
                             />
                           ) : (
@@ -376,17 +634,17 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                       </div>
                     </td>
                     <td className="px-4 py-2 text-center">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-gray-900">¥{po.unitPrice.toFixed(2)}</span>
-                        {po.optionCost > 0 && (
-                          <span className="text-gray-600 text-xs">
-                            옵션비용: ¥{po.optionCost.toFixed(2)}
-                          </span>
-                        )}
-                      </div>
+                      <StatusBadge 
+                        status={po.orderStatus} 
+                        type="order" 
+                        size="sm"
+                      />
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <span className="text-gray-900">¥{orderUnitPrice.toFixed(2)}</span>
                     </td>
                     <td className="px-4 py-2 text-center text-gray-600">{po.quantity}개</td>
-                    <td className="px-4 py-2 text-center text-gray-900">¥{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-4 py-2 text-center text-gray-900">¥{finalPaymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="px-4 py-2 text-center text-gray-900 bg-yellow-100">¥{finalUnitPrice.toFixed(2)}</td>
                     <td className="px-4 py-2 text-center text-gray-600">{po.size}</td>
                     <td className="px-4 py-2 text-center text-gray-600">{po.weight}</td>
@@ -443,17 +701,41 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                           <Edit className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => console.log('재주문:', po.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openReorder(po);
+                          }}
                           className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                           title="재주문"
                         >
                           <RotateCw className="w-4 h-4" />
                         </button>
+                        {isSuperAdmin && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDelete(po);
+                            }}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="삭제"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                         <button 
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="삭제"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCancelOrder(po);
+                          }}
+                          disabled={po.orderStatus === '취소됨'}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            po.orderStatus === '취소됨'
+                              ? 'text-gray-400 cursor-not-allowed'
+                              : 'text-red-600 hover:bg-red-50'
+                          }`}
+                          title={po.orderStatus === '취소됨' ? '이미 취소된 발주' : '취소'}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -483,9 +765,24 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
           <span className="text-gray-600">총 발주 금액</span>
           <span className="text-gray-900">
             ¥{filteredPurchaseOrders.reduce((sum, po) => {
-              const finalUnitPrice = po.unitPrice + po.optionCost;
-              const totalAmount = finalUnitPrice * po.quantity;
-              return sum + totalAmount;
+              // 최종 결제 금액 계산
+              const basicCostTotal = calculateBasicCostTotal(
+                po.unitPrice,
+                po.quantity,
+                po.commissionRate,
+                po.backMargin
+              );
+              const shippingCostTotal = calculateShippingCostTotal(
+                po.shippingCost,
+                po.warehouseShippingCost
+              );
+              const finalPaymentAmount = calculateFinalPaymentAmount(
+                basicCostTotal,
+                shippingCostTotal,
+                po.optionCost,
+                po.laborCost
+              );
+              return sum + finalPaymentAmount;
             }, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
@@ -506,6 +803,24 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             className="w-full h-full object-cover"
           />
         </div>
+      )}
+
+      {/* Reorder Modal */}
+      {reorderOrder && (
+        <ReorderPurchaseOrderModal
+          purchaseOrder={reorderOrder}
+          onConfirm={handleConfirmReorder}
+          onCancel={closeReorder}
+        />
+      )}
+
+      {/* Delete Dialog */}
+      {deleteOrder && (
+        <PurchaseOrderDeleteDialog
+          purchaseOrder={deleteOrder}
+          onConfirm={handleConfirmDelete}
+          onCancel={closeDelete}
+        />
       )}
     </div>
   );

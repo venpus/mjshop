@@ -38,7 +38,7 @@ type PageType =
   | "admin-account";
 
 interface SidebarProps {
-  currentPage: PageType;
+  currentPage: PageType | 'purchase-order-detail';
   onPageChange: (page: PageType) => void;
 }
 
@@ -47,7 +47,8 @@ export function Sidebar({
   onPageChange,
 }: SidebarProps) {
   const { user } = useAuth();
-  const isSuperAdmin = user?.level === 'A-SuperAdmin';
+  // A, S 등급 관리자만 표시
+  const isAdminLevelA = user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin';
   const [isChinaExpanded, setIsChinaExpanded] = useState(true);
   const [isShopExpanded, setIsShopExpanded] = useState(true);
 
@@ -70,21 +71,6 @@ export function Sidebar({
           <span>대시보드</span>
         </button>
 
-        {/* 상품 관리 (레벨 A만 표시) */}
-        {isSuperAdmin && (
-          <button
-            onClick={() => onPageChange("products")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              currentPage === "products"
-                ? "bg-purple-50 text-purple-600"
-                : "text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            <Package className="w-5 h-5" />
-            <span>상품 관리</span>
-          </button>
-        )}
-
         {/* 중국협업 메뉴 */}
         <div className="mt-1">
           <button
@@ -103,17 +89,34 @@ export function Sidebar({
           {/* 하위 메뉴 */}
           {isChinaExpanded && (
             <div className="ml-4 mt-1 space-y-1">
-              <button
-                onClick={() => onPageChange("purchase-orders")}
-                className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === "purchase-orders"
-                    ? "bg-purple-50 text-purple-600"
-                    : "text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                <FileText className="w-4 h-4" />
-                <span>발주 관리</span>
-              </button>
+              {/* 상품 관리 (A, S 등급 관리자만 표시) */}
+              {isAdminLevelA && (
+                <button
+                  onClick={() => onPageChange("products")}
+                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+                    currentPage === "products"
+                      ? "bg-purple-50 text-purple-600"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <Package className="w-4 h-4" />
+                  <span>상품 관리</span>
+                </button>
+              )}
+              {/* 발주 관리 (A, S 등급 관리자만 표시) */}
+              {isAdminLevelA && (
+                <button
+                  onClick={() => onPageChange("purchase-orders")}
+                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+                    currentPage === "purchase-orders"
+                      ? "bg-purple-50 text-purple-600"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>발주 관리</span>
+                </button>
+              )}
               <button
                 onClick={() => onPageChange("shipping-history")}
                 className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
@@ -134,7 +137,7 @@ export function Sidebar({
                 }`}
               >
                 <DollarSign className="w-4 h-4" />
-                <span>결제 내역</span>
+                <span>결제 내역(구현중)</span>
               </button>
               <button
                 onClick={() => onPageChange("gallery")}
@@ -145,7 +148,7 @@ export function Sidebar({
                 }`}
               >
                 <ImageIcon className="w-4 h-4" />
-                <span>갤러리</span>
+                <span>갤러리(구현중)</span>
               </button>
               <button
                 onClick={() => onPageChange("china-warehouse")}
@@ -156,7 +159,7 @@ export function Sidebar({
                 }`}
               >
                 <ClipboardList className="w-4 h-4" />
-                <span>중국 입출고 현황</span>
+                <span>중국 입출고 현황(구현중)</span>
               </button>
               <button
                 onClick={() => onPageChange("invoice")}
@@ -167,7 +170,7 @@ export function Sidebar({
                 }`}
               >
                 <FileSpreadsheet className="w-4 h-4" />
-                <span>정산 인보이스</span>
+                <span>정상 인보이스(구현중)</span>
               </button>
             </div>
           )}

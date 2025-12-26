@@ -2,7 +2,7 @@ import { X, Download, Images } from "lucide-react";
 
 interface ProductImageModalProps {
   isOpen: boolean;
-  imageUrl: string;
+  imageUrl: string | undefined;
   productName: string;
   poNumber: string;
   onClose: () => void;

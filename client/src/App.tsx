@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Menu, X, Globe, LogOut, User } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
@@ -19,17 +20,13 @@ import { AdminAccount } from './components/AdminAccount';
 import { Login } from './components/Login';
 import { useAuth } from './contexts/AuthContext';
 
-type PageType = 'dashboard' | 'products' | 'orders' | 'shipping' | 'payment' | 'inventory' | 'purchase-orders' | 'purchase-order-detail' | 'shipping-history' | 'china-payment' | 'members' | 'gallery' | 'china-warehouse' | 'invoice' | 'admin-account';
-
 type Language = 'ko' | 'en' | 'zh';
 
-export default function App() {
-  const { isAuthenticated, isLoading, login, logout, user } = useAuth();
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState<'cost' | 'factory' | 'work' | 'delivery' | undefined>(undefined);
+// 메인 레이아웃 컴포넌트
+function AdminLayout() {
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [language, setLanguage] = useState<Language>('ko');
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
@@ -40,55 +37,48 @@ export default function App() {
     zh: { name: '中文', flag: '🇨🇳' },
   };
 
-  const handleViewOrderDetail = (orderId: string, tab?: 'cost' | 'factory' | 'work' | 'delivery') => {
-    setSelectedOrderId(orderId);
-    setSelectedTab(tab);
-    setCurrentPage('purchase-order-detail');
+  // 현재 페이지 경로를 PageType으로 변환
+  const getCurrentPage = (): string => {
+    const path = location.pathname;
+    // /admin 접두사 제거
+    const adminPath = path.replace(/^\/admin\/?/, '') || 'dashboard';
+    
+    // purchase-orders 상세 페이지인 경우
+    if (adminPath.startsWith('purchase-orders/') && adminPath !== 'purchase-orders') {
+      return 'purchase-order-detail';
+    }
+    
+    // 루트 경로는 dashboard
+    if (adminPath === '' || adminPath === '/') {
+      return 'dashboard';
+    }
+    
+    // 그 외의 경우 경로 그대로 반환
+    return adminPath;
+  };
+
+  const currentPage = getCurrentPage();
+
+  const handleViewOrderDetail = (orderId: string, tab?: 'cost' | 'factory' | 'work' | 'delivery', autoSave?: boolean) => {
+    let url = `/admin/purchase-orders/${orderId}`;
+    const params = new URLSearchParams();
+    if (tab) {
+      params.append('tab', tab);
+    }
+    if (autoSave) {
+      params.append('autoSave', 'true');
+    }
+    const queryString = params.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+    navigate(url);
   };
 
   const handleBackToPurchaseOrders = () => {
-    setSelectedOrderId(null);
-    setSelectedTab(undefined);
-    setCurrentPage('purchase-orders');
+    navigate('/admin/purchase-orders');
   };
 
-  const handleLogin = async (id: string, password: string) => {
-    setIsLoggingIn(true);
-    setLoginError(null);
-    try {
-      await login(id, password);
-    } catch (error: any) {
-      setLoginError(error.message || '로그인에 실패했습니다.');
-      throw error;
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
-  // 로딩 중
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">로딩 중...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // 로그인하지 않은 경우 로그인 페이지 표시
-  if (!isAuthenticated) {
-    return (
-      <Login 
-        onLogin={handleLogin} 
-        isLoading={isLoggingIn}
-        error={loginError}
-      />
-    );
-  }
-
-  // 로그인된 경우 메인 애플리케이션 표시
   return (
     <div className="flex h-screen min-h-[1080px] bg-gray-50">
       {/* Overlay */}
@@ -105,12 +95,18 @@ export default function App() {
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
+        <Sidebar currentPage={currentPage as any} onPageChange={(page) => {
+          if (page === 'purchase-order-detail') {
+            // purchase-order-detail은 직접 이동할 수 없음
+            return;
+          }
+          navigate(`/admin/${page}`);
+        }} />
       </div>
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto min-h-[1080px]">
-        {/* Header with Menu Toggle */}
+        {/* Header */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 lg:px-8 lg:py-4 flex items-center justify-between">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -184,22 +180,137 @@ export default function App() {
           </div>
         </div>
 
-        {currentPage === 'dashboard' && <Dashboard />}
-        {currentPage === 'products' && user?.level === 'A-SuperAdmin' && <Products />}
-        {currentPage === 'orders' && <Orders />}
-        {currentPage === 'shipping' && <Shipping />}
-        {currentPage === 'payment' && <Payment />}
-        {currentPage === 'inventory' && <Inventory />}
-        {currentPage === 'purchase-orders' && <PurchaseOrders onViewDetail={handleViewOrderDetail} />}
-        {currentPage === 'purchase-order-detail' && selectedOrderId && <PurchaseOrderDetail orderId={selectedOrderId} onBack={handleBackToPurchaseOrders} initialTab={selectedTab} />}
-        {currentPage === 'shipping-history' && <ShippingHistory />}
-        {currentPage === 'china-payment' && <ChinaPayment />}
-        {currentPage === 'members' && <Members />}
-        {currentPage === 'gallery' && <Gallery />}
-        {currentPage === 'china-warehouse' && <ChinaWarehouse />}
-        {currentPage === 'invoice' && <Invoice />}
-        {currentPage === 'admin-account' && <AdminAccount />}
+        {/* Routes */}
+        <Routes>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/products" element={
+            (user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin') ? (
+              <Products onNavigateToPurchaseOrder={handleViewOrderDetail} />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
+          <Route path="/orders" element={<Orders />} />
+          <Route path="/shipping" element={<Shipping />} />
+          <Route path="/payment" element={<Payment />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/purchase-orders" element={
+            (user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin') ? (
+              <PurchaseOrders onViewDetail={handleViewOrderDetail} />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
+          <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailWrapper onBack={handleBackToPurchaseOrders} />} />
+          <Route path="/shipping-history" element={<ShippingHistory />} />
+          <Route path="/china-payment" element={<ChinaPayment />} />
+          <Route path="/members" element={<Members />} />
+          <Route path="/gallery" element={<Gallery />} />
+          <Route path="/china-warehouse" element={<ChinaWarehouse />} />
+          <Route path="/invoice" element={<Invoice />} />
+          <Route path="/admin-account" element={<AdminAccount />} />
+        </Routes>
       </main>
     </div>
+  );
+}
+
+// PurchaseOrderDetail 래퍼 (URL 파라미터 처리)
+function PurchaseOrderDetailWrapper({ onBack }: { onBack: () => void }) {
+  const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const tabParam = searchParams.get('tab') as 'cost' | 'factory' | 'work' | 'delivery' | undefined;
+  const autoSaveParam = searchParams.get('autoSave') === 'true';
+
+  if (!id) {
+    return <Navigate to="/admin/purchase-orders" replace />;
+  }
+
+  return <PurchaseOrderDetail orderId={id} onBack={onBack} initialTab={tabParam} autoSave={autoSaveParam} />;
+}
+
+// Protected Route 컴포넌트
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+export default function App() {
+  const { isAuthenticated, isLoading, login } = useAuth();
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleLogin = async (id: string, password: string) => {
+    setIsLoggingIn(true);
+    setLoginError(null);
+    try {
+      await login(id, password);
+    } catch (error: any) {
+      setLoginError(error.message || '로그인에 실패했습니다.');
+      throw error;
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  // 로딩 중
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Routes>
+      {/* 로그인 페이지 */}
+      <Route
+        path="/login"
+        element={
+          isAuthenticated ? (
+            <Navigate to="/admin/dashboard" replace />
+          ) : (
+            <Login onLogin={handleLogin} isLoading={isLoggingIn} error={loginError} />
+          )
+        }
+      />
+
+      {/* 관리자 영역 */}
+      <Route
+        path="/admin/*"
+        element={
+          <ProtectedRoute>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* 루트 경로 리다이렉트 */}
+      <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+
+      {/* 404 - 존재하지 않는 경로 */}
+      <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+    </Routes>
   );
 }
