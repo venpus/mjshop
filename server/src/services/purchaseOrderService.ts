@@ -458,7 +458,17 @@ export class PurchaseOrderService {
       display_order: number;
     }>;
   }>> {
-    return this.repository.findDeliverySetsByPoId(purchaseOrderId);
+    const result = await this.repository.findDeliverySetsByPoId(purchaseOrderId);
+    // logistics_info 구조 변환: inland_company_name을 company로 매핑
+    return result.map(set => ({
+      ...set,
+      logistics_info: set.logistics_info.map(log => ({
+        id: log.id,
+        tracking_number: log.tracking_number,
+        company: log.inland_company_name || null,
+        display_order: log.display_order,
+      })),
+    }));
   }
 
   /**

@@ -44,16 +44,17 @@ export class AdminAccountController {
    * ID로 관리자 계정 조회
    * GET /api/admin-accounts/:id
    */
-  getAccountById = async (req: Request, res: Response) => {
+  getAccountById = async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
       const account = await this.service.getAccountById(id);
 
       if (!account) {
-        return res.status(404).json({
+        res.status(404).json({
           success: false,
           error: '관리자 계정을 찾을 수 없습니다.',
         });
+        return;
       }
 
       res.json({

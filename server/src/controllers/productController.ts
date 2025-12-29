@@ -321,6 +321,12 @@ export class ProductController {
       // 2. 기존 이미지 관리
       // 기존 상품 정보 가져오기 (이미지 포함) - 업데이트 전 상태
       const existingProductBeforeUpdate = await this.service.getProductById(id);
+      if (!existingProductBeforeUpdate) {
+        return res.status(404).json({
+          success: false,
+          error: '상품을 찾을 수 없습니다.'
+        });
+      }
       const existingImages = existingProductBeforeUpdate.images || [];
       
       // 유지할 기존 이미지 URL 목록 (클라이언트에서 전송한 것)

@@ -256,10 +256,11 @@ export class ProjectController {
       }
 
       // 프로젝트 다시 조회
-      project = await this.service.getProjectById(projectId);
-      if (!project) {
+      const updatedProject = await this.service.getProjectById(projectId);
+      if (!updatedProject) {
         throw new Error('프로젝트를 찾을 수 없습니다.');
       }
+      project = updatedProject;
 
       res.status(201).json({
         success: true,

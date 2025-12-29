@@ -106,8 +106,8 @@ sudo mysql -u root -p
 CREATE DATABASE wk_megafactory CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 # wkadmin 사용자 생성 (localhost 및 외부 접속 모두 허용)
-CREATE USER 'wkadmin'@'localhost' IDENTIFIED BY '강력한_비밀번호_입력';
-CREATE USER 'wkadmin'@'%' IDENTIFIED BY '강력한_비밀번호_입력';
+CREATE USER 'wkadmin'@'localhost' IDENTIFIED BY 'TianXian007!';
+CREATE USER 'wkadmin'@'%' IDENTIFIED BY 'TianXian007!';
 GRANT ALL PRIVILEGES ON wk_megafactory.* TO 'wkadmin'@'localhost';
 GRANT ALL PRIVILEGES ON wk_megafactory.* TO 'wkadmin'@'%';
 
@@ -609,11 +609,13 @@ pm2 flush  # PM2 로그 삭제
 # 3000번 포트는 localhost에서만 접근 가능하도록 (Nginx를 통해서만 접근)
 ```
 
-### 2. 데이터베이스 접근 제한
+### 2. 데이터베이스 접근 제한 (외부 접속 허용 시)
 ```bash
 # MariaDB 설정 파일 수정
 sudo nano /etc/mysql/mariadb.conf.d/50-server.cnf
-# bind-address = 127.0.0.1  # 이미 localhost만 허용하도록 설정되어 있는지 확인
+# bind-address = 0.0.0.0  # 모든 인터페이스에서 접속 허용 (외부 접속 허용 시)
+# 또는 bind-address = 127.0.0.1  # localhost만 허용 (외부 접속 차단 시)
+# 변경 후 sudo systemctl restart mariadb
 ```
 
 ### 3. SSH 보안 강화

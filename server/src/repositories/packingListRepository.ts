@@ -976,7 +976,7 @@ export class PackingListRepository {
    */
   async getShippingCostByPurchaseOrder(purchaseOrderId: string): Promise<PurchaseOrderShippingCost | null> {
     try {
-      const [rows] = await pool.execute<PurchaseOrderShippingCost[]>(
+      const [rows] = await pool.execute<RowDataPacket[]>(
         `SELECT purchase_order_id, ordered_quantity, total_shipping_cost, 
                 total_shipped_quantity, unit_shipping_cost
          FROM v_purchase_order_packing_shipping_cost
@@ -988,7 +988,7 @@ export class PackingListRepository {
         return null;
       }
 
-      return rows[0];
+      return rows[0] as PurchaseOrderShippingCost;
     } catch (error: any) {
       console.error(`[getShippingCostByPurchaseOrder] 오류 발생, purchaseOrderId: ${purchaseOrderId}`, error);
       console.error(`[getShippingCostByPurchaseOrder] 오류 메시지:`, error.message);
@@ -1001,7 +1001,7 @@ export class PackingListRepository {
    * 발주별 배송 수량 집계 조회
    */
   async getShippingSummaryByPurchaseOrder(purchaseOrderId: string): Promise<PurchaseOrderShippingSummary | null> {
-    const [rows] = await pool.execute<PurchaseOrderShippingSummary[]>(
+    const [rows] = await pool.execute<RowDataPacket[]>(
       `SELECT purchase_order_id, ordered_quantity, shipped_quantity, arrived_quantity,
               unshipped_quantity, shipping_quantity
        FROM v_purchase_order_shipping_summary
@@ -1013,7 +1013,7 @@ export class PackingListRepository {
       return null;
     }
 
-    return rows[0];
+    return rows[0] as PurchaseOrderShippingSummary;
   }
 
   // 매핑 함수들

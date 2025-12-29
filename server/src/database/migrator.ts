@@ -1,6 +1,7 @@
 import { pool } from '../config/database.js';
-import { readdir, readFile, existsSync } from 'fs/promises';
-import { join, dirname, resolve } from 'path';
+import { readdir, readFile } from 'fs/promises';
+import { existsSync } from 'fs';
+import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);

@@ -121,8 +121,8 @@ export class ProjectRepository {
 
     const entries: ProjectEntryPublic[] = [];
 
-    for (const entryRow of entryRows) {
-      const entry = this.mapRowToProjectEntry(entryRow);
+      for (const entryRow of entryRows) {
+        const entryBase = this.mapRowToProjectEntry(entryRow);
 
       // 이미지 조회
       const [imageRows] = await pool.execute<ProjectEntryImageRow[]>(
@@ -130,7 +130,7 @@ export class ProjectRepository {
          FROM project_entry_images
          WHERE entry_id = ?
          ORDER BY display_order ASC, created_at ASC`,
-        [entry.id]
+        [entryBase.id]
       );
 
       const images: ProjectEntryImagePublic[] = [];
@@ -148,12 +148,13 @@ export class ProjectRepository {
           [image.id]
         );
 
-        image.reactions = reactionRows.map(this.mapRowToProjectEntryImageReaction);
+        const imagePublic: ProjectEntryImagePublic = {
+          ...image,
+          reactions: reactionRows.map(this.mapRowToProjectEntryImageReaction),
+        };
 
-        images.push(image);
+        images.push(imagePublic);
       }
-
-      entry.images = images;
 
       // 댓글 조회 (최신순)
       const [commentRows] = await pool.execute<ProjectEntryCommentRow[]>(
@@ -161,13 +162,13 @@ export class ProjectRepository {
          FROM project_entry_comments
          WHERE entry_id = ?
          ORDER BY created_at ASC`,
-        [entry.id]
+        [entryBase.id]
       );
 
       const comments: ProjectEntryCommentPublic[] = [];
 
       for (const commentRow of commentRows) {
-        const comment = this.mapRowToProjectEntryComment(commentRow);
+        const commentBase = this.mapRowToProjectEntryComment(commentRow);
 
         // 답글 조회
         const [replyRows] = await pool.execute<ProjectEntryCommentReplyRow[]>(
@@ -175,15 +176,22 @@ export class ProjectRepository {
            FROM project_entry_comment_replies
            WHERE comment_id = ?
            ORDER BY created_at ASC`,
-          [comment.id]
+          [commentBase.id]
         );
 
-        comment.replies = replyRows.map(this.mapRowToProjectEntryCommentReply);
+        const commentPublic: ProjectEntryCommentPublic = {
+          ...commentBase,
+          replies: replyRows.map(this.mapRowToProjectEntryCommentReply),
+        };
 
-        comments.push(comment);
+        comments.push(commentPublic);
       }
 
-      entry.comments = comments;
+      const entry: ProjectEntryPublic = {
+        ...entryBase,
+        images,
+        comments,
+      };
 
       entries.push(entry);
     }

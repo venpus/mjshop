@@ -9,6 +9,7 @@ import {
   UpdateTestImageMetadataDTO,
 } from '../models/material.js';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import type { PoolConnection } from 'mysql2/promise';
 
 interface MaterialRow extends RowDataPacket {
   id: number;
@@ -264,11 +265,11 @@ export class MaterialRepository {
    * 트랜잭션 내에서 사용해야 함
    */
   async createInventoryTransaction(
-    connection: any,
+    connection: PoolConnection,
     materialId: number,
     data: CreateInventoryTransactionDTO
   ): Promise<MaterialInventoryTransaction> {
-    const [result] = await connection.execute<ResultSetHeader>(
+    const result = await connection.execute<ResultSetHeader>(
       `INSERT INTO material_inventory_transactions
        (material_id, transaction_date, transaction_type, quantity, related_order, notes, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -283,13 +284,14 @@ export class MaterialRepository {
       ]
     );
 
-    const [rows] = await connection.execute<RowDataPacket[]>(
+    const rowsResult = await connection.execute<RowDataPacket[]>(
       `SELECT id, material_id, transaction_date, transaction_type, quantity,
               related_order, notes, created_at, created_by
        FROM material_inventory_transactions
        WHERE id = ?`,
-      [result.insertId]
+      [(result as any)[0].insertId]
     );
+    const rows = rowsResult[0] as RowDataPacket[];
 
     if (rows.length === 0) {
       throw new Error('입출고 기록 생성 후 조회에 실패했습니다.');
@@ -313,11 +315,11 @@ export class MaterialRepository {
    * 부자재 현재 재고 조회 (SELECT FOR UPDATE로 락)
    * 트랜잭션 내에서 사용해야 함
    */
-  async findCurrentStockForUpdate(connection: any, materialId: number): Promise<number> {
+  async findCurrentStockForUpdate(connection: PoolConnection, materialId: number): Promise<number> {
     const [rows] = await connection.execute<RowDataPacket[]>(
       `SELECT current_stock FROM materials WHERE id = ? FOR UPDATE`,
       [materialId]
-    );
+    ) as [RowDataPacket[], any];
 
     if (rows.length === 0) {
       throw new Error('부자재를 찾을 수 없습니다.');
@@ -330,7 +332,7 @@ export class MaterialRepository {
    * 부자재 현재 재고 업데이트
    * 트랜잭션 내에서 사용해야 함
    */
-  async updateCurrentStock(connection: any, materialId: number, newStock: number): Promise<void> {
+  async updateCurrentStock(connection: PoolConnection, materialId: number, newStock: number): Promise<void> {
     await connection.execute(
       `UPDATE materials SET current_stock = ? WHERE id = ?`,
       [newStock, materialId]
