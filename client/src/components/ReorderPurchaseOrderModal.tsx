@@ -4,7 +4,15 @@ import { useState, useEffect } from 'react';
 interface PurchaseOrder {
   id: string;
   poNumber: string;
-  product: string;
+  product?: {
+    id: string | null;
+    name: string;
+    name_chinese: string | null;
+    main_image: string | null;
+    category?: string;
+    size?: string | null;
+    weight?: string | null;
+  } | string;
   unitPrice: number;
   quantity: number;
   orderDate?: string;
@@ -45,6 +53,20 @@ export function ReorderPurchaseOrderModal({ purchaseOrder, onConfirm, onCancel }
     });
   };
 
+  // ESC 키로 모달 닫기
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [onCancel]);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
@@ -64,7 +86,7 @@ export function ReorderPurchaseOrderModal({ purchaseOrder, onConfirm, onCancel }
           <div className="mb-4">
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
               <p className="text-sm text-gray-600">발주번호: <span className="font-medium text-gray-900">{purchaseOrder.poNumber}</span></p>
-              <p className="text-sm text-gray-600">상품명: <span className="font-medium text-gray-900">{purchaseOrder.product}</span></p>
+              <p className="text-sm text-gray-600">상품명: <span className="font-medium text-gray-900">{typeof purchaseOrder.product === 'string' ? purchaseOrder.product : (purchaseOrder.product?.name || '-')}</span></p>
               <p className="text-sm text-gray-600">원본 수량: <span className="font-medium text-gray-900">{purchaseOrder.quantity}</span></p>
               <p className="text-sm text-gray-600">원본 단가: <span className="font-medium text-gray-900">¥{purchaseOrder.unitPrice.toFixed(2)}</span></p>
             </div>

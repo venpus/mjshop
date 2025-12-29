@@ -462,7 +462,6 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
         credentials: "include",
         body: JSON.stringify({
           ...formData,
-          supplier_name: selectedProductForOrder?.supplier.name, // supplier_id 조회를 위해 이름 전달
         }),
       });
 
@@ -650,9 +649,8 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
           )}
 
           {/* Purchase Order Form Modal */}
-          {isPurchaseOrderFormOpen && selectedProductForOrder && (
+          {isPurchaseOrderFormOpen && (
             <PurchaseOrderForm
-              product={selectedProductForOrder}
               onClose={handleClosePurchaseOrderForm}
               onSave={handleSavePurchaseOrder}
             />

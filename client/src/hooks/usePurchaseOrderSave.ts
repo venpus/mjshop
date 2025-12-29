@@ -30,6 +30,8 @@ interface OriginalData {
   packaging: number;
   order_date: string;
   estimated_delivery: string;
+  work_start_date: string;
+  work_end_date: string;
   is_confirmed: boolean;
   optionItems: LaborCostItem[];
   laborCostItems: LaborCostItem[];
@@ -37,6 +39,10 @@ interface OriginalData {
   returnExchangeItems: ReturnExchangeItem[];
   workItems: WorkItem[];
   deliverySets: DeliverySet[];
+  // 상품 정보 필드
+  product_name?: string;
+  product_size?: string;
+  product_weight?: string;
 }
 
 interface UsePurchaseOrderSaveProps {
@@ -55,6 +61,8 @@ interface UsePurchaseOrderSaveProps {
   packaging: number;
   orderDate: string;
   deliveryDate: string;
+  workStartDate: string;
+  workEndDate: string;
   isOrderConfirmed: boolean;
   optionItems: LaborCostItem[];
   laborCostItems: LaborCostItem[];
@@ -75,13 +83,17 @@ interface UsePurchaseOrderSaveProps {
   reloadDeliverySets: () => Promise<void>;
   currentUserId: string;
   onUpdateOriginalData?: (data: OriginalData) => void;
+  // 상품 정보 필드 (새 발주일 때 사용)
+  productName?: string;
+  productSize?: string;
+  productWeight?: string;
 }
 
 interface UsePurchaseOrderSaveReturn {
   isDirty: boolean;
   isSaving: boolean;
   lastSavedAt: Date | null;
-  handleSave: (isManual?: boolean) => Promise<void>;
+  handleSave: (isManual?: boolean) => Promise<string | void>; // 새 발주 저장 시 ID 반환
   setOriginalData: (data: OriginalData) => void;
 }
 
@@ -228,7 +240,7 @@ function areDeliverySetsEqual(a: DeliverySet[] | undefined, b: DeliverySet[] | u
       const aLog = set.logisticsInfoList[i];
       const bLog = bSet.logisticsInfoList[i];
       if (aLog.id !== bLog.id || aLog.trackingNumber !== bLog.trackingNumber ||
-          aLog.company !== bLog.company) {
+          aLog.inlandCompanyId !== bLog.inlandCompanyId || aLog.warehouseId !== bLog.warehouseId) {
         return false;
       }
     }
@@ -256,7 +268,12 @@ export function usePurchaseOrderSave({
   packaging,
   orderDate,
   deliveryDate,
+  workStartDate,
+  workEndDate,
   isOrderConfirmed,
+  productName,
+  productSize,
+  productWeight,
   optionItems,
   laborCostItems,
   factoryShipments,
@@ -292,13 +309,25 @@ export function usePurchaseOrderSave({
     });
     originalDataRef.current = data;
     initialLoadCompletedRef.current = false; // originalData가 설정되면 초기 로드 완료 플래그 리셋
+    
+    // originalData가 설정되면 즉시 isDirty를 false로 초기화 (초기 로드 시 잘못된 변경 감지 방지)
+    // 다음 useEffect에서 checkForChanges가 실행되면 정확한 상태를 반영함
+    setIsDirty(false);
   }, []);
 
   // 변경 감지 로직
   const checkForChanges = useCallback(() => {
     if (!originalDataRef.current) {
-      console.log('[usePurchaseOrderSave] checkForChanges - originalDataRef.current is null');
-      return false;
+      // 새 발주인 경우 모든 입력 필드를 체크하여 dirty 여부 판단
+      const hasProductInfo = productName?.trim() !== '' || productSize?.trim() !== '' || productWeight?.trim() !== '';
+      const hasBasicInfo = unitPrice > 0 || quantity > 0 || shippingCost > 0 || warehouseShippingCost > 0;
+      const hasDateInfo = orderDate !== '' || deliveryDate !== '';
+      const hasOtherInfo = packaging > 0 || commissionRate > 0 || advancePaymentRate > 0;
+      const hasItems = optionItems.length > 0 || laborCostItems.length > 0 || factoryShipments.length > 0;
+      
+      const isNewOrderDirty = hasProductInfo || hasBasicInfo || hasDateInfo || hasOtherInfo || hasItems;
+      // setIsDirty는 useEffect에서 호출하므로 여기서는 반환값만 사용
+      return isNewOrderDirty;
     }
     
     const original = originalDataRef.current;
@@ -318,7 +347,12 @@ export function usePurchaseOrderSave({
     if (packaging !== original.packaging) fieldChanges.push(`packaging: ${original.packaging} -> ${packaging}`);
     if (orderDate !== original.order_date) fieldChanges.push(`orderDate: ${original.order_date} -> ${orderDate}`);
     if (deliveryDate !== original.estimated_delivery) fieldChanges.push(`deliveryDate: ${original.estimated_delivery} -> ${deliveryDate}`);
+    if (workStartDate !== original.work_start_date) fieldChanges.push(`workStartDate: ${original.work_start_date} -> ${workStartDate}`);
+    if (workEndDate !== original.work_end_date) fieldChanges.push(`workEndDate: ${original.work_end_date} -> ${workEndDate}`);
     if (isOrderConfirmed !== original.is_confirmed) fieldChanges.push(`isOrderConfirmed: ${original.is_confirmed} -> ${isOrderConfirmed}`);
+    if (productName !== original.product_name) fieldChanges.push(`productName: ${original.product_name} -> ${productName}`);
+    if (productSize !== original.product_size) fieldChanges.push(`productSize: ${original.product_size} -> ${productSize}`);
+    if (productWeight !== original.product_weight) fieldChanges.push(`productWeight: ${original.product_weight} -> ${productWeight}`);
     
     const basicFieldsChanged = fieldChanges.length > 0;
     if (basicFieldsChanged) {
@@ -449,9 +483,11 @@ export function usePurchaseOrderSave({
 
     return hasChanges;
   }, [
+    productName, productSize, productWeight,
     unitPrice, backMargin, quantity, shippingCost, warehouseShippingCost,
     commissionRate, commissionType, advancePaymentRate, advancePaymentDate,
-    balancePaymentDate, packaging, orderDate, deliveryDate, isOrderConfirmed,
+    balancePaymentDate, packaging, orderDate, deliveryDate, workStartDate, workEndDate,
+    isOrderConfirmed,
     optionItems, laborCostItems, factoryShipments, returnExchangeItems, workItems, deliverySets
   ]);
 
@@ -459,18 +495,21 @@ export function usePurchaseOrderSave({
   const handleSave = useCallback(async (isManual: boolean = true) => {
     console.log('[usePurchaseOrderSave] handleSave 호출, isManual:', isManual);
     console.log('[usePurchaseOrderSave] handleSave - order:', order);
+    console.log('[usePurchaseOrderSave] handleSave - orderId:', orderId);
     console.log('[usePurchaseOrderSave] handleSave - isSaving:', isSaving);
     console.log('[usePurchaseOrderSave] handleSave - deliverySets:', deliverySets);
     console.log('[usePurchaseOrderSave] handleSave - deliverySets 길이:', (deliverySets || []).length);
     
-    if (!order || isSaving) {
-      console.log('[usePurchaseOrderSave] handleSave - order 없음 또는 저장 중이어서 종료');
+    if (isSaving) {
+      console.log('[usePurchaseOrderSave] handleSave - 저장 중이어서 종료');
       return;
     }
 
+    const isNewOrder = orderId === 'new';
+
     try {
       setIsSaving(true);
-      console.log('[usePurchaseOrderSave] handleSave - 저장 시작');
+      console.log('[usePurchaseOrderSave] handleSave - 저장 시작, isNewOrder:', isNewOrder);
       
       // 최종 결제 금액 계산
       const basicCostTotal = calculateBasicCostTotal(
@@ -501,6 +540,60 @@ export function usePurchaseOrderSave({
         advancePaymentAmount
       );
       
+      let savedOrderId = orderId;
+      
+      if (isNewOrder) {
+        // 새 발주 생성
+        const createData: any = {
+          product_name: productName || '',
+          product_size: productSize || undefined,
+          product_weight: productWeight || undefined,
+          unit_price: unitPrice,
+          quantity: quantity,
+          shipping_cost: shippingCost || 0,
+          warehouse_shipping_cost: warehouseShippingCost || 0,
+          commission_rate: commissionRate || 0,
+          commission_type: commissionType || null,
+          advance_payment_rate: advancePaymentRate || 0,
+          advance_payment_amount: advancePaymentAmount || null,
+          advance_payment_date: advancePaymentDate || null,
+          balance_payment_amount: balancePaymentAmount || null,
+          balance_payment_date: balancePaymentDate || null,
+          packaging: packaging || 0,
+          order_date: orderDate || null,
+          estimated_shipment_date: deliveryDate || null,
+          work_start_date: workStartDate || null,
+          work_end_date: workEndDate || null,
+          is_confirmed: isOrderConfirmed,
+          created_by: currentUserId,
+        };
+
+        console.log('[usePurchaseOrderSave] 새 발주 생성 요청:', createData);
+        const createResponse = await fetch(`${API_BASE_URL}/purchase-orders`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(createData),
+        });
+
+        if (!createResponse.ok) {
+          const errorData = await createResponse.json().catch(() => ({}));
+          throw new Error(errorData.error || '발주 생성에 실패했습니다.');
+        }
+
+        const createResult = await createResponse.json();
+        savedOrderId = createResult.data.id;
+        console.log('[usePurchaseOrderSave] 새 발주 생성 성공, ID:', savedOrderId);
+        
+        // 새 발주 생성 후 ID 반환 (페이지 이동은 호출하는 쪽에서 처리)
+        // 나머지 저장 로직은 스킵하고 ID만 반환
+        setIsSaving(false);
+        return savedOrderId;
+      }
+
+      // 기존 발주 수정
       const updateData: any = {
         unit_price: unitPrice,
         back_margin: backMargin || null,
@@ -517,7 +610,12 @@ export function usePurchaseOrderSave({
         packaging: packaging || 0,
         order_date: orderDate || null,
         estimated_delivery: deliveryDate || null,
+        work_start_date: workStartDate || null,
+        work_end_date: workEndDate || null,
         is_confirmed: isOrderConfirmed,
+        product_name: productName || undefined,
+        product_size: productSize || undefined,
+        product_weight: productWeight || undefined,
         updated_by: currentUserId,
       };
 
@@ -972,6 +1070,8 @@ export function usePurchaseOrderSave({
           packaging: updated.packaging || 0,
           order_date: formatDateForInput(updated.order_date),
           estimated_delivery: formatDateForInput(updated.estimated_delivery),
+          work_start_date: workStartDate || '',
+          work_end_date: workEndDate || '',
           is_confirmed: updated.is_confirmed || false,
           optionItems: JSON.parse(JSON.stringify(optionItems)),
           laborCostItems: JSON.parse(JSON.stringify(laborCostItems)),
@@ -1064,6 +1164,7 @@ export function usePurchaseOrderSave({
     order, orderId, unitPrice, backMargin, quantity, shippingCost, warehouseShippingCost,
     commissionRate, commissionType, advancePaymentRate, advancePaymentDate,
     balancePaymentDate, packaging, orderDate, deliveryDate, isOrderConfirmed,
+    productName, productSize, productWeight,
     optionItems, laborCostItems, factoryShipments, returnExchangeItems, workItems, deliverySets, isSaving, currentUserId,
     setFactoryShipments, setReturnExchangeItems, setWorkItems, setDeliverySets, reloadFactoryShipments, reloadReturnExchanges, reloadWorkItems, reloadDeliverySets,
     onUpdateOriginalData,
@@ -1119,19 +1220,15 @@ export function usePurchaseOrderSave({
 
   // 변경 감지 (자동 저장 제거 - 수동 저장만 사용)
   useEffect(() => {
-    // originalDataRef가 설정되지 않았으면 변경사항 없음으로 처리 (초기 로드 시)
-    if (originalDataRef.current) {
-      console.log('[usePurchaseOrderSave] useEffect - checkForChanges called, originalDataRef exists');
-      const hasChanges = checkForChanges();
-      console.log('[usePurchaseOrderSave] useEffect - setting isDirty to:', hasChanges);
-      setIsDirty(hasChanges);
-    } else {
-      console.log('[usePurchaseOrderSave] useEffect - originalDataRef.current is null, setting isDirty to false');
-      // originalDataRef가 아직 설정되지 않았으면 dirty하지 않음
-      setIsDirty(false);
-    }
+    // checkForChanges 함수 내에서 originalDataRef가 null인 경우(새 발주)도 처리하므로 항상 호출
+    console.log('[usePurchaseOrderSave] useEffect - checkForChanges called');
+    const hasChanges = checkForChanges();
+    console.log('[usePurchaseOrderSave] useEffect - setting isDirty to:', hasChanges);
+    // checkForChanges 내에서 setIsDirty를 호출하지만, 반환값도 사용하여 확실하게 설정
+    setIsDirty(hasChanges);
   }, [
     checkForChanges,
+    productName, productSize, productWeight,
     unitPrice, backMargin, quantity, shippingCost, warehouseShippingCost,
     commissionRate, commissionType, advancePaymentRate, advancePaymentDate,
     balancePaymentDate, packaging, orderDate, deliveryDate, isOrderConfirmed,

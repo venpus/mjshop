@@ -17,11 +17,36 @@ export class PurchaseOrderService {
   }
 
   /**
-   * 모든 발주 조회
+   * 모든 발주 조회 (패킹리스트 shipping summary 포함)
    */
   async getAllPurchaseOrders(): Promise<PurchaseOrderPublic[]> {
     const purchaseOrders = await this.repository.findAll();
-    return Promise.all(purchaseOrders.map((po) => this.enrichPurchaseOrder(po)));
+    return Promise.all(purchaseOrders.map(async (po) => {
+      const enriched = await this.enrichPurchaseOrder(po);
+      return {
+        ...enriched,
+        factory_shipped_quantity: po.factory_shipped_quantity,
+        unshipped_quantity: po.unshipped_quantity,
+        shipped_quantity: po.shipped_quantity,
+        shipping_quantity: po.shipping_quantity,
+        arrived_quantity: po.arrived_quantity,
+        unreceived_quantity: po.unreceived_quantity,
+      };
+    }));
+  }
+
+  /**
+   * 미출고 수량이 있는 발주 목록 조회
+   */
+  async getPurchaseOrdersWithUnshipped(): Promise<Array<PurchaseOrderPublic & { unshipped_quantity: number }>> {
+    const purchaseOrders = await this.repository.findAllWithUnshipped();
+    return Promise.all(purchaseOrders.map(async (po) => {
+      const enriched = await this.enrichPurchaseOrder(po);
+      return {
+        ...enriched,
+        unshipped_quantity: po.unshipped_quantity,
+      };
+    }));
   }
 
   /**
@@ -46,25 +71,9 @@ export class PurchaseOrderService {
     const poId = await this.repository.generateNextId();
     const poNumber = await this.repository.generateNextPoNumber();
 
-    // supplier_id 처리
-    let supplierId = data.supplier_id;
-    if (!supplierId && data.supplier_name) {
-      // supplier_name으로 조회
-      const foundSupplierId = await this.repository.findSupplierIdByName(data.supplier_name);
-      if (!foundSupplierId) {
-        throw new Error(`공급업체를 찾을 수 없습니다: ${data.supplier_name}`);
-      }
-      supplierId = foundSupplierId;
-    }
-
-    if (!supplierId) {
-      throw new Error('공급업체 ID 또는 이름이 필요합니다.');
-    }
-
     // 발주 생성
     const purchaseOrderData: CreatePurchaseOrderDTO = {
       ...data,
-      supplier_id: supplierId,
       created_by: createdBy,
     };
 
@@ -118,8 +127,16 @@ export class PurchaseOrderService {
 
     // 새 발주 기본 정보 생성 (수량, 단가, 날짜는 사용자 입력값 사용, 나머지는 원본 복사)
     const newOrderData: CreatePurchaseOrderDTO = {
-      product_id: sourceOrder.product_id,
-      supplier_id: sourceOrder.supplier_id,
+      product_name: sourceOrder.product_name,
+      product_name_chinese: sourceOrder.product_name_chinese || undefined,
+      product_category: sourceOrder.product_category,
+      product_main_image: sourceOrder.product_main_image || undefined,
+      product_size: sourceOrder.product_size || undefined,
+      product_weight: sourceOrder.product_weight || undefined,
+      product_packaging_size: sourceOrder.product_packaging_size || undefined,
+      product_set_count: sourceOrder.product_set_count,
+      product_small_pack_count: sourceOrder.product_small_pack_count,
+      product_box_count: sourceOrder.product_box_count,
       unit_price: reorderData.unit_price !== undefined ? reorderData.unit_price : sourceOrder.unit_price,
       quantity: reorderData.quantity,
       size: sourceOrder.size || undefined,
@@ -132,6 +149,26 @@ export class PurchaseOrderService {
 
     // 새 발주 생성
     const newOrder = await this.repository.create(newOrderData, poId, poNumber);
+
+    // 메인 이미지 파일 복사 (product_main_image가 있는 경우)
+    if (sourceOrder.product_main_image) {
+      try {
+        const { copyPOMainImage, getPOImageUrl } = await import('../utils/upload.js');
+        const copiedMainImageRelativePath = await copyPOMainImage(
+          sourceOrder.product_main_image,
+          newOrder.id
+        );
+        const newMainImageUrl = getPOImageUrl(copiedMainImageRelativePath);
+        
+        // 새 발주의 메인 이미지 URL 업데이트
+        await this.repository.update(newOrder.id, {
+          product_main_image: newMainImageUrl,
+        });
+      } catch (error: any) {
+        console.error(`메인 이미지 복사 실패: ${sourceOrder.product_main_image}`, error);
+        // 메인 이미지 복사 실패해도 계속 진행 (경고만 출력)
+      }
+    }
 
     // 추가 비용 정보 복사 (운송비, 수수료 등)
     const updateData: UpdatePurchaseOrderDTO = {
@@ -223,6 +260,38 @@ export class PurchaseOrderService {
       }
     }
 
+    // other 타입 이미지 복사 (사진첩에 업로드한 이미지들)
+    const otherImages = await this.getImagesByPoIdAndType(sourceOrderId, 'other');
+    if (otherImages.length > 0) {
+      const { copyPOImageFile } = await import('../utils/upload.js');
+      const copiedImageUrls: string[] = [];
+      
+      // 각 이미지 파일을 새 발주 폴더로 복사
+      for (const sourceImage of otherImages) {
+        try {
+          const newImageUrl = await copyPOImageFile(
+            sourceImage.image_url,
+            newOrder.id,
+            'other'
+          );
+          copiedImageUrls.push(newImageUrl);
+        } catch (error: any) {
+          console.error(`other 타입 이미지 복사 실패: ${sourceImage.image_url}`, error);
+          // 원본 파일이 없어도 계속 진행 (경고만 출력)
+        }
+      }
+      
+      // 복사된 이미지 URL을 DB에 저장 (related_id는 0으로 설정)
+      if (copiedImageUrls.length > 0) {
+        await this.saveImages(
+          newOrder.id,
+          'other',
+          0,
+          copiedImageUrls
+        );
+      }
+    }
+
     return this.enrichPurchaseOrder(newOrder);
   }
 
@@ -256,36 +325,18 @@ export class PurchaseOrderService {
       ...po,
     };
 
-    // 공급업체 정보 조회
-    if (po.supplier_id) {
-      const [supplierRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT id, name, url FROM suppliers WHERE id = ? LIMIT 1',
-        [po.supplier_id]
-      );
-      if (supplierRows.length > 0) {
-        result.supplier = {
-          id: supplierRows[0].id,
-          name: supplierRows[0].name,
-          url: supplierRows[0].url,
-        };
-      }
-    }
+    // 상품 정보는 더 이상 JOIN 불필요 - 직접 매핑
+    result.product = {
+      id: po.product_id,
+      name: po.product_name,
+      name_chinese: po.product_name_chinese,
+      main_image: po.product_main_image,
+      category: po.product_category,
+      size: po.product_size,
+      weight: po.product_weight,
+    };
 
-    // 상품 정보 조회
-    if (po.product_id) {
-      const [productRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT id, name, name_chinese, main_image FROM products WHERE id = ? LIMIT 1',
-        [po.product_id]
-      );
-      if (productRows.length > 0) {
-        result.product = {
-          id: productRows[0].id,
-          name: productRows[0].name,
-          name_chinese: productRows[0].name_chinese,
-          main_image: productRows[0].main_image,
-        };
-      }
-    }
+    console.log(`[enrichPurchaseOrder] 발주 ID: ${po.id}, product_main_image: ${po.product_main_image}, product.main_image: ${result.product.main_image}`);
 
     return result;
   }

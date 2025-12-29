@@ -1,503 +1,599 @@
-import { useEffect, useRef } from 'react';
-
-interface PackingListItem {
-  id: string;
-  shippingDate: string; // 발송일
-  code: string; // 코드
-  productName: string; // 제품명
-  productImage?: string; // 제품사진
-  quantityPerBox: number; // 입수량
-  boxCount: number; // 박스수
-  unit: string; // 단위
-  totalQuantity: number; // 총수량
-  inlandTrackingNumber: string; // 내륙송장
-  logisticsCompany: string; // 물류회사
-  warehouseArrivalDate?: string; // 물류창고 도착일
-  koreaArrivalDate?: string; // 한국도착일
-  weight: number; // 중량
-  shippingCost: number; // 배송비
-  paymentDate?: string; // 지급일
-  wkPaymentDate?: string; // WK결제일
-}
-
-// Dummy Data
-const dummyData: PackingListItem[] = [
-  {
-    id: '1',
-    shippingDate: '2024-12-01',
-    code: 'CODE001',
-    productName: '봉제인형 A',
-    productImage: '',
-    quantityPerBox: 10,
-    boxCount: 30,
-    unit: '개',
-    totalQuantity: 300,
-    inlandTrackingNumber: 'CN-TRK-001',
-    logisticsCompany: '顺丰',
-    warehouseArrivalDate: '2024-12-05',
-    koreaArrivalDate: '2024-12-15',
-    weight: 3000,
-    shippingCost: 120000,
-    paymentDate: '2024-12-20',
-    wkPaymentDate: '2024-12-25',
-  },
-  {
-    id: '2',
-    shippingDate: '2024-12-01',
-    code: 'CODE001',
-    productName: '봉제인형 B',
-    productImage: '',
-    quantityPerBox: 10,
-    boxCount: 20,
-    unit: '개',
-    totalQuantity: 200,
-    inlandTrackingNumber: 'CN-TRK-001',
-    logisticsCompany: '顺丰',
-    warehouseArrivalDate: '2024-12-05',
-    koreaArrivalDate: '2024-12-15',
-    weight: 2000,
-    shippingCost: 120000,
-    paymentDate: '2024-12-20',
-    wkPaymentDate: '2024-12-25',
-  },
-  {
-    id: '3',
-    shippingDate: '2024-12-02',
-    code: 'CODE002',
-    productName: '피규어 A',
-    productImage: '',
-    quantityPerBox: 5,
-    boxCount: 50,
-    unit: '개',
-    totalQuantity: 250,
-    inlandTrackingNumber: 'CN-TRK-002',
-    logisticsCompany: '中通',
-    warehouseArrivalDate: '2024-12-06',
-    koreaArrivalDate: '2024-12-16',
-    weight: 4000,
-    shippingCost: 180000,
-    paymentDate: '2024-12-21',
-    wkPaymentDate: '2024-12-26',
-  },
-];
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { PackageSearch, Plus, Edit, Download, Trash2, Save } from 'lucide-react';
+import { PackingListCreateModal, type PackingListFormData } from './PackingListCreateModal';
+import { useAuth } from '../contexts/AuthContext';
+import { GalleryImageModal } from './GalleryImageModal';
+import { PackingListTable } from './packing-list/PackingListTable';
+import { usePackingListSelection } from '../hooks/usePackingListSelection';
+import { convertItemToFormData, getGroupId } from '../utils/packingListUtils';
+import type { PackingListItem } from './packing-list/types';
+import {
+  getAllPackingLists, 
+  createPackingList, 
+  updatePackingList, 
+  createPackingListItem, 
+  deletePackingListItem, 
+  getPackingListById, 
+  updatePackingListItem,
+  createDomesticInvoice,
+  updateDomesticInvoice,
+  deleteDomesticInvoice,
+  createKoreaArrival,
+  updateKoreaArrival,
+  deleteKoreaArrival,
+  deletePackingList,
+} from '../api/packingListApi';
+import { transformServerToClient, transformFormDataProductsToItems, transformFormDataToServerRequest, getPackingListIdFromCode } from '../utils/packingListTransform';
 
 export function ShippingHistory() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const luckysheetInitialized = useRef(false);
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.level === 'A-SuperAdmin';
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [packingListItems, setPackingListItems] = useState<PackingListItem[]>([]);
+  const [originalPackingListItems, setOriginalPackingListItems] = useState<PackingListItem[]>([]); // 원본 데이터 (변경 감지용)
+  const [selectedInvoiceImage, setSelectedInvoiceImage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false); // 변경사항이 있는지 여부
+  const [isSaving, setIsSaving] = useState(false); // 저장 중인지 여부
+  
+  // location state에서 initialPackingListData 확인 (공장→물류창고에서 전달된 데이터)
+  useEffect(() => {
+    const state = location.state as { initialPackingListData?: PackingListFormData } | null;
+    if (state?.initialPackingListData) {
+      setIsCreateModalOpen(true);
+      // state를 클리어하여 다시 로드 시 중복 실행 방지
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
-  // 데이터를 Luckysheet 형식으로 변환
-  const convertToLuckysheetData = (data: PackingListItem[]) => {
-    // 헤더 정의
-    const headers = [
-      '발송일',
-      '코드',
-      '제품명',
-      '제품사진',
-      '입수량',
-      '박스수',
-      '단위',
-      '총수량',
-      '내륙송장',
-      '물류회사',
-      '물류창고 도착일',
-      '한국도착일',
-      '중량',
-      '배송비',
-      '지급일',
-      'WK결제일',
-    ];
+  // 선택 상태 관리 훅
+  const {
+    selectedCodes,
+    toggleCode,
+    toggleAllCodes,
+    isAllSelected,
+    isCodeSelected,
+    clearSelection,
+  } = usePackingListSelection(packingListItems);
 
-    // 헤더 행 생성
-    const headerRow: any[] = headers.map((header, index) => ({
-      v: header,
-      ct: { fa: 'General', t: 'g' },
-      m: header,
-      bg: '#f0f0f0',
-      bl: 1,
-      it: 0,
-      fs: 12,
-      fc: '#000000',
-      ht: 1,
-      vt: 1,
-      mc: { r: 0, c: index, rs: 1, cs: 1 },
-    }));
-
-    // 데이터 행 생성
-    const dataRows: any[][] = data.map((item) => [
-      {
-        v: item.shippingDate || '',
-        ct: { fa: 'yyyy-mm-dd', t: 'd' },
-        m: item.shippingDate || '',
-      },
-      {
-        v: item.code || '',
-        ct: { fa: 'General', t: 'g' },
-        m: item.code || '',
-      },
-      {
-        v: item.productName || '',
-        ct: { fa: 'General', t: 'g' },
-        m: item.productName || '',
-      },
-      {
-        v: item.productImage || '',
-        ct: { fa: 'General', t: 'g' },
-        m: item.productImage || '',
-      },
-      {
-        v: item.quantityPerBox || 0,
-        ct: { fa: 'General', t: 'n' },
-        m: String(item.quantityPerBox || 0),
-      },
-      {
-        v: item.boxCount || 0,
-        ct: { fa: 'General', t: 'n' },
-        m: String(item.boxCount || 0),
-      },
-      {
-        v: item.unit || '',
-        ct: { fa: 'General', t: 'g' },
-        m: item.unit || '',
-      },
-      {
-        v: item.totalQuantity || 0,
-        ct: { fa: 'General', t: 'n' },
-        m: String(item.totalQuantity || 0),
-      },
-      {
-        v: item.inlandTrackingNumber || '',
-        ct: { fa: 'General', t: 'g' },
-        m: item.inlandTrackingNumber || '',
-      },
-      {
-        v: item.logisticsCompany || '',
-        ct: { fa: 'General', t: 'g' },
-        m: item.logisticsCompany || '',
-      },
-      {
-        v: item.warehouseArrivalDate || '',
-        ct: { fa: 'yyyy-mm-dd', t: 'd' },
-        m: item.warehouseArrivalDate || '',
-      },
-      {
-        v: item.koreaArrivalDate || '',
-        ct: { fa: 'yyyy-mm-dd', t: 'd' },
-        m: item.koreaArrivalDate || '',
-      },
-      {
-        v: item.weight || 0,
-        ct: { fa: '#,##0"g"', t: 'n' },
-        m: String(item.weight || 0),
-      },
-      {
-        v: item.shippingCost || 0,
-        ct: { fa: '¥#,##0', t: 'n' },
-        m: String(item.shippingCost || 0),
-      },
-      {
-        v: item.paymentDate || '',
-        ct: { fa: 'yyyy-mm-dd', t: 'd' },
-        m: item.paymentDate || '',
-      },
-      {
-        v: item.wkPaymentDate || '',
-        ct: { fa: 'yyyy-mm-dd', t: 'd' },
-        m: item.wkPaymentDate || '',
-      },
-    ]);
-
-    // 셀 병합 처리 (코드 열 기준)
-    const mergedCells: any[] = [];
-    const codeColumnIndex = 1; // 코드 열 인덱스
-
-    // 코드별로 그룹화
-    const codeGroups: { [key: string]: number[] } = {};
-    data.forEach((item, index) => {
-      if (!codeGroups[item.code]) {
-        codeGroups[item.code] = [];
-      }
-      codeGroups[item.code].push(index + 1); // +1은 헤더 행 때문
-    });
-
-    // 병합 셀 추가
-    Object.values(codeGroups).forEach((rowIndices) => {
-      if (rowIndices.length > 1) {
-        const startRow = rowIndices[0];
-        const endRow = rowIndices[rowIndices.length - 1];
-        mergedCells.push({
-          r: startRow,
-          c: codeColumnIndex,
-          rs: rowIndices.length,
-          cs: 1,
-        });
-      }
-    });
-
-    // 모든 행 합치기
-    const celldata: any[][] = [headerRow, ...dataRows];
-
-    return {
-      name: '패킹리스트',
-      index: 0,
-      order: 0,
-      status: 1,
-      celldata: celldata,
-      config: {
-        merge: mergedCells,
-        borderInfo: [],
-        rowlen: {},
-        columnlen: {},
-        rowhidden: {},
-        colhidden: {},
-        customHeight: {},
-        customWidth: {},
-      },
-      scrollLeft: 0,
-      scrollTop: 0,
-      luckysheet_select_save: [],
-      calcChain: [],
-      isPivotTable: false,
-      pivotTable: {},
-      filter_select: {},
-      filter: null,
-      luckysheet_conditionformat_save: [],
-      frozen: {},
-      chart: [],
-      zoomRatio: 1,
-      image: [],
-      showGridLines: 1,
-      dataVerification: {},
-    };
+  // 데이터 로드
+  const loadPackingLists = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      console.log('[비율 로드] 패킹리스트 로드 시작');
+      const serverData = await getAllPackingLists();
+      console.log('[비율 로드] 서버에서 받은 데이터:', serverData.map(pl => ({
+        id: pl.id,
+        code: pl.code,
+        weight_ratio: pl.weight_ratio
+      })));
+      const transformedItems = transformServerToClient(serverData);
+      console.log('[비율 로드] 변환된 아이템의 weightRatio:', transformedItems.map(item => ({
+        id: item.id,
+        code: item.code,
+        weightRatio: item.weightRatio
+      })));
+      setPackingListItems(transformedItems);
+      setOriginalPackingListItems(JSON.parse(JSON.stringify(transformedItems))); // 깊은 복사로 원본 저장
+      setIsDirty(false); // 로드 후 변경사항 없음
+    } catch (err: any) {
+      console.error('패킹리스트 로드 오류:', err);
+      setError(err.message || '패킹리스트를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Luckysheet 초기화
   useEffect(() => {
-    if (!containerRef.current || luckysheetInitialized.current) {
-      return;
-    }
-
-    // Luckysheet 스크립트 및 스타일 동적 로드
-    const loadLuckysheet = async () => {
-      try {
-        // CSS 로드
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://cdn.jsdelivr.net/npm/luckysheet@latest/dist/plugins/css/pluginsCss.css';
-        document.head.appendChild(link);
-
-        const link2 = document.createElement('link');
-        link2.rel = 'stylesheet';
-        link2.href = 'https://cdn.jsdelivr.net/npm/luckysheet@latest/dist/plugins/plugins.css';
-        document.head.appendChild(link2);
-
-        const link3 = document.createElement('link');
-        link3.rel = 'stylesheet';
-        link3.href = 'https://cdn.jsdelivr.net/npm/luckysheet@latest/dist/css/luckysheet.css';
-        document.head.appendChild(link3);
-
-        // JavaScript 로드
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/luckysheet@latest/dist/plugins/js/plugin.js';
-        script.async = true;
-
-        script.onload = () => {
-          const script2 = document.createElement('script');
-          script2.src = 'https://cdn.jsdelivr.net/npm/luckysheet@latest/dist/luckysheet.umd.js';
-          script2.async = true;
-
-          script2.onload = () => {
-            // @ts-ignore
-            if (window.luckysheet) {
-              // 데이터 변환
-              const sheetData = convertToLuckysheetData(dummyData);
-
-              // Luckysheet 초기화
-              // @ts-ignore
-              window.luckysheet.create({
-                container: 'luckysheet',
-                lang: 'ko',
-                allowCopy: true,
-                allowEdit: true,
-                enableAddRow: true,
-                enableAddCol: true,
-                showtoolbar: true,
-                showinfobar: false,
-                showsheetbar: true,
-                showstatisticBar: true,
-                enableAddBackTop: true,
-                data: [sheetData],
-                title: '패킹리스트',
-                userInfo: false,
-                myFolderUrl: '',
-              });
-
-              luckysheetInitialized.current = true;
-            }
-          };
-
-          document.body.appendChild(script2);
-        };
-
-        document.body.appendChild(script);
-      } catch (error) {
-        console.error('Luckysheet 로드 실패:', error);
-      }
-    };
-
-    loadLuckysheet();
-
-    // 클린업 함수
-    return () => {
-      // @ts-ignore
-      if (window.luckysheet && luckysheetInitialized.current) {
-        try {
-          // @ts-ignore
-          window.luckysheet.destroy();
-          luckysheetInitialized.current = false;
-        } catch (error) {
-          console.error('Luckysheet 정리 실패:', error);
-        }
-      }
-    };
+    loadPackingLists();
   }, []);
 
-  // 데이터 저장 함수
-  const handleSave = async () => {
+  const handleProductNameClick = (purchaseOrderId?: string) => {
+    if (purchaseOrderId) {
+      navigate(`/admin/purchase-orders/${purchaseOrderId}`);
+    }
+  };
+
+  const handleCreatePackingList = async (data: PackingListFormData) => {
     try {
-      // @ts-ignore
-      if (!window.luckysheet) {
-        alert('Luckysheet가 아직 로드되지 않았습니다.');
+      // 서버 API 형식으로 변환
+      const items = transformFormDataProductsToItems(data);
+      const { packingList } = transformFormDataToServerRequest(data, items);
+
+      // 패킹리스트 생성
+      const createdPackingList = await createPackingList(packingList);
+
+      // 각 아이템 생성 (중간에 실패하면 이미 생성된 패킹리스트가 남을 수 있음)
+      // 에러 발생 시 사용자에게 알림
+      const createdItems: number[] = [];
+      try {
+        for (const item of items) {
+          const createdItem = await createPackingListItem(createdPackingList.id, item);
+          createdItems.push(createdItem.id);
+        }
+      } catch (itemError: any) {
+        // 아이템 생성 중 오류 발생 시 사용자에게 알림
+        console.error('패킹리스트 아이템 생성 오류:', itemError);
+        alert(`패킹리스트는 생성되었지만 일부 아이템 생성에 실패했습니다: ${itemError.message || '알 수 없는 오류'}`);
+        // 데이터 다시 로드하여 부분적으로 생성된 상태를 표시
+        await loadPackingLists();
+        setIsCreateModalOpen(false);
         return;
       }
 
-      // @ts-ignore
-      const allSheets = window.luckysheet.getAllSheets();
-      const sheetData = allSheets[0]; // 첫 번째 시트 데이터
-
-      // API로 저장
-      const response = await fetch(`${API_BASE_URL}/packing-list/save`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          data: sheetData,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('저장에 실패했습니다.');
-      }
-
-      const result = await response.json();
-      if (result.success) {
-        alert('저장되었습니다.');
-      } else {
-        throw new Error(result.error || '저장에 실패했습니다.');
-      }
-    } catch (error: any) {
-      console.error('저장 오류:', error);
-      alert(error.message || '저장 중 오류가 발생했습니다.');
+      // 데이터 다시 로드
+      await loadPackingLists();
+      setIsCreateModalOpen(false);
+    } catch (err: any) {
+      console.error('패킹리스트 생성 오류:', err);
+      alert(err.message || '패킹리스트 생성에 실패했습니다.');
     }
   };
 
-  // 데이터 로드 함수
-  const handleLoad = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/packing-list/load`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
+  const handleUpdatePackingList = async (data: PackingListFormData) => {
+    if (!editingCode) return;
 
-      if (!response.ok) {
-        throw new Error('데이터 로드에 실패했습니다.');
+    try {
+      const packingListId = getPackingListIdFromCode(packingListItems, editingCode);
+      if (!packingListId) {
+        alert('패킹리스트를 찾을 수 없습니다.');
+        return;
       }
 
-      const result = await response.json();
-      if (result.success && result.data) {
-        // @ts-ignore
-        if (window.luckysheet) {
-          // @ts-ignore
-          window.luckysheet.destroy();
-          luckysheetInitialized.current = false;
+      // 서버 API 형식으로 변환
+      const items = transformFormDataProductsToItems(data);
+      const { packingList } = transformFormDataToServerRequest(data, items);
 
-          // 새로운 데이터로 재초기화
-          // @ts-ignore
-          window.luckysheet.create({
-            container: 'luckysheet',
-            lang: 'ko',
-            allowCopy: true,
-            allowEdit: true,
-            enableAddRow: true,
-            enableAddCol: true,
-            showtoolbar: true,
-            showinfobar: false,
-            showsheetbar: true,
-            showstatisticBar: true,
-            enableAddBackTop: true,
-            data: [result.data],
-            title: '패킹리스트',
-            userInfo: false,
-            myFolderUrl: '',
-          });
+      // 기존 패킹리스트 정보 가져오기 (아이템 ID 확인용)
+      const existingPackingList = await getPackingListById(packingListId);
+      if (!existingPackingList) {
+        alert('패킹리스트를 찾을 수 없습니다.');
+        return;
+      }
 
-          luckysheetInitialized.current = true;
-          alert('데이터를 불러왔습니다.');
+      // 패킹리스트 메인 정보 업데이트
+      await updatePackingList(packingListId, packingList);
+
+      // 기존 아이템 삭제
+      // 참고: 내륙송장은 packing_list_id에 연결되어 있어 아이템 삭제와 무관하게 유지됩니다.
+      // 한국도착일은 packing_list_item_id에 연결되어 있어 아이템 삭제 시 CASCADE로 삭제됩니다.
+      if (existingPackingList.items) {
+        for (const item of existingPackingList.items) {
+          await deletePackingListItem(item.id);
         }
       }
-    } catch (error: any) {
-      console.error('로드 오류:', error);
-      alert(error.message || '데이터 로드 중 오류가 발생했습니다.');
+
+      // 새로운 아이템 생성 (중간에 실패하면 이미 삭제된 아이템이 복구되지 않을 수 있음)
+      // 에러 발생 시 사용자에게 알림
+      try {
+        for (const item of items) {
+          await createPackingListItem(packingListId, item);
+        }
+      } catch (itemError: any) {
+        // 아이템 생성 중 오류 발생 시 사용자에게 알림
+        console.error('패킹리스트 아이템 생성 오류:', itemError);
+        alert(`패킹리스트 정보는 업데이트되었지만 일부 아이템 생성에 실패했습니다: ${itemError.message || '알 수 없는 오류'}\n데이터를 다시 로드합니다.`);
+        // 데이터 다시 로드
+        await loadPackingLists();
+        return;
+      }
+
+      // 데이터 다시 로드
+      await loadPackingLists();
+      setIsEditModalOpen(false);
+      setEditingCode(null);
+      clearSelection();
+    } catch (err: any) {
+      console.error('패킹리스트 수정 오류:', err);
+      alert(err.message || '패킹리스트 수정에 실패했습니다.');
     }
   };
 
+  // 최신 상태를 참조하기 위한 ref
+  const itemsRef = useRef<PackingListItem[]>([]);
+  useEffect(() => {
+    itemsRef.current = packingListItems;
+  }, [packingListItems]);
+
+  // 변경사항 감지 (원본 데이터와 비교)
+  const checkForChanges = useCallback(() => {
+    const hasChanges = JSON.stringify(packingListItems) !== JSON.stringify(originalPackingListItems);
+    setIsDirty(hasChanges);
+  }, [packingListItems, originalPackingListItems]);
+
+  // packingListItems 변경 시 변경사항 감지
+  useEffect(() => {
+    if (originalPackingListItems.length > 0) {
+      checkForChanges();
+    }
+  }, [packingListItems, originalPackingListItems, checkForChanges]);
+
+  // 내륙송장 변경 핸들러 (로컬 상태만 업데이트, 저장은 저장 버튼으로)
+  const handleDomesticInvoiceChange = useCallback((groupId: string, invoices: import('./packing-list/types').DomesticInvoice[]) => {
+    // 로컬 상태만 업데이트 (변경사항 감지는 useEffect에서 자동으로 처리)
+    setPackingListItems(prev => prev.map(item => {
+      if (getGroupId(item.id) === groupId) {
+        return { ...item, domesticInvoice: invoices };
+      }
+      return item;
+    }));
+  }, []);
+
+  // 패킹리스트 삭제 핸들러
+  const handleDeletePackingLists = useCallback(async () => {
+    if (selectedCodes.size === 0) {
+      return;
+    }
+
+    const confirmMessage = selectedCodes.size === 1
+      ? `선택한 패킹리스트를 삭제하시겠습니까?\n\n삭제된 패킹리스트의 데이터는 복구할 수 없으며, 발주 관리 목록의 수량이 자동으로 업데이트됩니다.`
+      : `${selectedCodes.size}개의 패킹리스트를 삭제하시겠습니까?\n\n삭제된 패킹리스트의 데이터는 복구할 수 없으며, 발주 관리 목록의 수량이 자동으로 업데이트됩니다.`;
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      const codesToDelete = Array.from(selectedCodes);
+      const deletePromises = codesToDelete.map(async (code) => {
+        const packingListId = getPackingListIdFromCode(packingListItems, code);
+        if (!packingListId) {
+          console.warn(`패킹리스트 ID를 찾을 수 없습니다: ${code}`);
+          return;
+        }
+        await deletePackingList(packingListId);
+      });
+
+      await Promise.all(deletePromises);
+      
+      // 선택 상태 초기화
+      clearSelection();
+      
+      // 목록 새로고침
+      await loadPackingLists();
+      
+      alert(selectedCodes.size === 1 
+        ? '패킹리스트가 삭제되었습니다.' 
+        : `${selectedCodes.size}개의 패킹리스트가 삭제되었습니다.`);
+    } catch (error: any) {
+      console.error('패킹리스트 삭제 오류:', error);
+      alert(error.message || '패킹리스트 삭제 중 오류가 발생했습니다.');
+    }
+  }, [selectedCodes, packingListItems, clearSelection, loadPackingLists]);
+
+  // 한국도착일 변경 핸들러 (로컬 상태만 업데이트, 저장은 저장 버튼으로)
+  const handleKoreaArrivalChange = useCallback((groupId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => {
+    // 로컬 상태만 업데이트 (변경사항 감지는 useEffect에서 자동으로 처리)
+    setPackingListItems(prev => prev.map(item => {
+      if (getGroupId(item.id) === groupId) {
+        return { ...item, koreaArrivalDate: koreaArrivalDates };
+      }
+      return item;
+    }));
+  }, []);
+
+  // 아이템 업데이트 헬퍼 함수 (로컬 상태만 업데이트, 저장은 저장 버튼으로)
+  const handleItemUpdate = useCallback((groupId: string, updater: (item: PackingListItem) => PackingListItem) => {
+    // 로컬 상태만 업데이트 (변경사항 감지는 useEffect에서 자동으로 처리)
+    setPackingListItems(prev => {
+      const updated = prev.map(item => {
+        const itemGroupId = getGroupId(item.id);
+        if (itemGroupId === groupId) {
+          return updater(item);
+        }
+        return item;
+      });
+      // ref도 업데이트 (필요시 사용)
+      itemsRef.current = updated;
+      return updated;
+    });
+  }, []);
+
+  // 모든 변경사항 저장
+  const handleSave = useCallback(async () => {
+    if (!isDirty) return;
+
+    setIsSaving(true);
+    try {
+      // 그룹별로 변경사항 저장
+      const groupMap = new Map<string, PackingListItem[]>();
+      
+      packingListItems.forEach(item => {
+        const groupId = getGroupId(item.id);
+        if (!groupMap.has(groupId)) {
+          groupMap.set(groupId, []);
+        }
+        groupMap.get(groupId)!.push(item);
+      });
+
+      for (const [groupId, items] of groupMap.entries()) {
+        const firstItem = items.find(item => item.isFirstRow);
+        if (!firstItem) continue;
+
+        const parts = firstItem.id.split('-');
+        const packingListId = parseInt(parts[0]);
+        const itemId = parseInt(parts[1]);
+
+        if (isNaN(packingListId) || isNaN(itemId)) {
+          console.error('Invalid packing list ID or item ID:', firstItem.id);
+          continue;
+        }
+
+        // 패킹리스트 아이템 업데이트 (unit)
+        await updatePackingListItem(itemId, {
+          unit: firstItem.unit,
+        });
+
+        // 패킹리스트 메인 필드 업데이트
+        // weight_ratio 처리: 빈 문자열이면 null, 그 외에는 숫자로 변환
+        console.log('[비율 저장] firstItem.weightRatio:', firstItem.weightRatio, 'packingListId:', packingListId);
+        let weightRatioValue: number | null | undefined = undefined;
+        if (firstItem.weightRatio === '') {
+          weightRatioValue = null;
+          console.log('[비율 저장] 빈 문자열 → null');
+        } else if (firstItem.weightRatio) {
+          const numericValue = parseFloat(firstItem.weightRatio.replace('%', ''));
+          weightRatioValue = isNaN(numericValue) ? null : numericValue;
+          console.log('[비율 저장] 변환:', firstItem.weightRatio, '→', numericValue, '→', weightRatioValue);
+        }
+        // weight_ratio는 항상 업데이트해야 하므로 undefined가 아닌 값을 보장
+        // undefined면 null로 설정하여 명시적으로 null로 업데이트
+        if (weightRatioValue === undefined) {
+          weightRatioValue = null;
+          console.log('[비율 저장] undefined → null로 설정');
+        }
+        console.log('[비율 저장] 서버에 전송할 값:', weightRatioValue);
+        
+        await updatePackingList(packingListId, {
+          logistics_company: firstItem.logisticsCompany || undefined,
+          warehouse_arrival_date: firstItem.warehouseArrivalDate || undefined,
+          actual_weight: firstItem.actualWeight ? parseFloat(firstItem.actualWeight) : undefined,
+          weight_ratio: weightRatioValue,
+          calculated_weight: firstItem.calculatedWeight ? parseFloat(firstItem.calculatedWeight) : undefined,
+          shipping_cost: firstItem.shippingCost ? parseFloat(firstItem.shippingCost) : undefined,
+          payment_date: firstItem.paymentDate || undefined,
+          wk_payment_date: firstItem.wkPaymentDate || undefined,
+        });
+        
+        console.log('[비율 저장] 서버 업데이트 완료');
+
+        // 내륙송장 업데이트
+        const currentPackingList = await getPackingListById(packingListId);
+        if (currentPackingList) {
+          const currentInvoices = currentPackingList.items?.[0]?.domestic_invoices || [];
+          
+          // 새로운 내륙송장 생성 (송장번호가 없어도 사진이 있으면 생성)
+          for (const invoice of firstItem.domesticInvoice) {
+            if (!invoice.id && (invoice.number.trim() || (invoice.images && invoice.images.length > 0))) {
+              const created = await createDomesticInvoice(packingListId, {
+                invoice_number: invoice.number || '', // 송장번호가 없으면 빈 문자열
+              });
+              // 로컬 상태에 id 업데이트 (저장 후 다시 로드할 예정이지만, 일관성을 위해)
+              setPackingListItems(prev => prev.map(item => {
+                if (getGroupId(item.id) === groupId) {
+                  return {
+                    ...item,
+                    domesticInvoice: item.domesticInvoice.map(inv => 
+                      !inv.id && inv.number === invoice.number ? { ...inv, id: created.id } : inv
+                    ),
+                  };
+                }
+                return item;
+              }));
+            } else if (invoice.id) {
+              // 기존 내륙송장 번호 수정
+              const serverInvoice = currentInvoices.find(inv => inv.id === invoice.id);
+              if (serverInvoice && serverInvoice.invoice_number !== invoice.number) {
+                await updateDomesticInvoice(invoice.id, {
+                  invoice_number: invoice.number,
+                });
+              }
+            }
+          }
+
+          // 삭제된 내륙송장 제거
+          for (const serverInvoice of currentInvoices) {
+            const existsInClient = firstItem.domesticInvoice.some(inv => inv.id === serverInvoice.id);
+            if (!existsInClient) {
+              await deleteDomesticInvoice(serverInvoice.id);
+            }
+          }
+
+          // 한국도착일 업데이트
+          for (const item of items) {
+            const itemId = parseInt(item.id.split('-')[1]);
+            if (isNaN(itemId)) continue;
+
+            const currentItem = currentPackingList.items?.find(i => i.id === itemId);
+            const currentKoreaArrivals = currentItem?.korea_arrivals || [];
+            const koreaArrivalDates = item.koreaArrivalDate || [];
+
+            // 새로운 한국도착일 생성
+            for (const arrival of koreaArrivalDates) {
+              if (!arrival.id && arrival.date && arrival.quantity) {
+                await createKoreaArrival(itemId, {
+                  arrival_date: arrival.date,
+                  quantity: parseInt(arrival.quantity) || 0,
+                });
+              } else if (arrival.id && arrival.date && arrival.quantity) {
+                // 기존 한국도착일 업데이트
+                await updateKoreaArrival(arrival.id, {
+                  arrival_date: arrival.date,
+                  quantity: parseInt(arrival.quantity) || 0,
+                });
+              }
+            }
+
+            // 삭제된 한국도착일 제거
+            for (const serverArrival of currentKoreaArrivals) {
+              const existsInClient = koreaArrivalDates.some(arr => arr.id === serverArrival.id);
+              if (!existsInClient) {
+                await deleteKoreaArrival(serverArrival.id);
+              }
+            }
+          }
+        }
+      }
+
+      // 데이터 다시 로드하여 DB에 저장된 최신 값 반영
+      await loadPackingLists();
+      
+      alert('변경사항이 저장되었습니다.');
+    } catch (error: any) {
+      console.error('패킹리스트 저장 오류:', error);
+      alert(error.message || '변경사항 저장에 실패했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [isDirty, packingListItems, loadPackingLists]);
+
   return (
-    <div className="flex flex-col w-full h-screen bg-white">
-      {/* 헤더 영역 */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 p-4 z-10">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-gray-900 mb-2">패킹리스트</h2>
-            <p className="text-gray-600">발송된 상품의 패킹 정보를 확인하고 편집할 수 있습니다</p>
+    <div className="p-8">
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center shadow-md">
+              <PackageSearch className="w-5 h-5 text-white" />
+            </div>
+            <h2 className="text-gray-900">패킹리스트</h2>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {selectedCodes.size > 0 && (
+              <>
+                <button
+                  onClick={() => {
+                    const firstCode = Array.from(selectedCodes)[0];
+                    const itemsToEdit = packingListItems.filter(item => item.code === firstCode);
+                    
+                    if (itemsToEdit.length === 0) {
+                      alert('수정할 항목을 찾을 수 없습니다.');
+                      return;
+                    }
+
+                    const formData = convertItemToFormData(itemsToEdit);
+                    if (!formData) {
+                      alert('데이터 변환에 실패했습니다.');
+                      return;
+                    }
+
+                    setEditingCode(firstCode);
+                    setIsEditModalOpen(true);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Edit className="w-4 h-4" />
+                  수정하기
+                </button>
+                <button
+                  onClick={() => {
+                    // TODO: 내보내기 기능 구현
+                    alert(`${selectedCodes.size}개의 항목을 내보냅니다.`);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  내보내기
+                </button>
+                <button
+                  onClick={handleDeletePackingLists}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  삭제
+                </button>
+              </>
+            )}
             <button
-              onClick={handleLoad}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
             >
-              불러오기
+              <Plus className="w-5 h-5" />
+              패킹 리스트 생성
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              disabled={!isDirty || isSaving}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                isDirty && !isSaving
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
             >
-              저장하기
+              <Save className="w-4 h-4" />
+              {isSaving ? '저장 중...' : '저장'}
             </button>
           </div>
         </div>
+        <p className="text-gray-600">발송된 상품의 패킹 정보를 확인할 수 있습니다</p>
       </div>
 
-      {/* Luckysheet 컨테이너 */}
-      <div className="flex-1 relative" style={{ minHeight: '600px' }}>
-        <div
-          id="luckysheet"
-          ref={containerRef}
-          style={{
-            margin: '0px',
-            padding: '0px',
-            position: 'absolute',
-            width: '100%',
-            height: '100%',
-            left: '0px',
-            top: '0px',
-          }}
+      {/* 패킹 리스트 생성 모달 */}
+      <PackingListCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreatePackingList}
+        initialData={(location.state as { initialPackingListData?: PackingListFormData } | null)?.initialPackingListData}
+        mode="create"
+      />
+
+      {/* 패킹 리스트 수정 모달 */}
+      {editingCode && (() => {
+        const itemsToEdit = packingListItems.filter(item => item.code === editingCode);
+        const formData = convertItemToFormData(itemsToEdit);
+        return (
+          <PackingListCreateModal
+            isOpen={isEditModalOpen}
+            onClose={() => {
+              setIsEditModalOpen(false);
+              setEditingCode(null);
+            }}
+            onSubmit={handleUpdatePackingList}
+            initialData={formData || undefined}
+            mode="edit"
+          />
+        );
+      })()}
+
+      {/* 이미지 모달 */}
+      <GalleryImageModal
+        imageUrl={selectedInvoiceImage}
+        onClose={() => setSelectedInvoiceImage(null)}
+      />
+
+      {/* 에러 메시지 */}
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* 패킹 리스트 테이블 */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-gray-500">로딩 중...</div>
+        </div>
+      ) : (
+        <PackingListTable
+          items={packingListItems}
+          isSuperAdmin={isSuperAdmin}
+          isAllSelected={isAllSelected}
+          onToggleAll={toggleAllCodes}
+          onToggleCode={toggleCode}
+          isCodeSelected={isCodeSelected}
+          onItemUpdate={handleItemUpdate}
+          onDomesticInvoiceChange={handleDomesticInvoiceChange}
+          onKoreaArrivalChange={handleKoreaArrivalChange}
+          onProductNameClick={handleProductNameClick}
+          onImageClick={setSelectedInvoiceImage}
         />
-      </div>
+      )}
     </div>
   );
 }

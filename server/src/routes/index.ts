@@ -2,7 +2,10 @@ import { Router } from 'express';
 import adminAccountRoutes from './adminAccounts.js';
 import productRoutes from './products.js';
 import purchaseOrderRoutes from './purchaseOrders.js';
+import materialRoutes from './materials.js';
 import logisticsOptionsRoutes from './logisticsOptions.js';
+import packingListRoutes from './packingLists.js';
+import projectRoutes from './projects.js';
 
 const router = Router();
 
@@ -10,7 +13,10 @@ const router = Router();
 router.use('/admin-accounts', adminAccountRoutes);
 router.use('/products', productRoutes);
 router.use('/purchase-orders', purchaseOrderRoutes);
+router.use('/materials', materialRoutes);
 router.use('/logistics-options', logisticsOptionsRoutes);
+router.use('/packing-lists', packingListRoutes);
+router.use('/projects', projectRoutes);
 
 router.get('/', (req, res) => {
   res.json({ 

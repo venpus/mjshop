@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { X } from "lucide-react";
 
 interface GalleryImageModalProps {
@@ -9,6 +10,22 @@ export function GalleryImageModal({
   imageUrl,
   onClose,
 }: GalleryImageModalProps) {
+  // ESC 키로 모달 닫기
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && imageUrl) {
+        onClose();
+      }
+    };
+
+    if (imageUrl) {
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }
+  }, [imageUrl, onClose]);
+
   if (!imageUrl) return null;
 
   return (

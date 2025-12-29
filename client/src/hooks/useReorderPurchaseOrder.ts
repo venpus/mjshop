@@ -5,7 +5,15 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 interface PurchaseOrder {
   id: string;
   poNumber: string;
-  product: string;
+  product?: {
+    id: string | null;
+    name: string;
+    name_chinese: string | null;
+    main_image: string | null;
+    category?: string;
+    size?: string | null;
+    weight?: string | null;
+  } | string;
   unitPrice: number;
   quantity: number;
 }

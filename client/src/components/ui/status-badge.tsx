@@ -40,6 +40,7 @@ function getStatusColor(status: string, type: StatusBadgeType): string {
       if (status === '통관및 배달') return 'bg-emerald-100 text-emerald-800';
       if (status === '항공운송중') return 'bg-sky-100 text-sky-800';
       if (status === '해운운송중') return 'bg-blue-100 text-blue-800';
+      if (status === '배송중') return 'bg-blue-100 text-blue-800';
       if (status === '내륙운송중') return 'bg-indigo-100 text-indigo-800';
       if (status === '대기중' || status === '공장출고') return 'bg-purple-100 text-purple-800';
       if (status === '중국운송중') return 'bg-indigo-100 text-indigo-800';

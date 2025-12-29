@@ -6,7 +6,7 @@ interface PurchaseOrderRow extends RowDataPacket {
   id: string;
   po_number: string;
   supplier_id: number;
-  product_id: string;
+  product_id: string | null;
   unit_price: number;
   back_margin: number | null;
   order_unit_price: number | null;
@@ -15,6 +15,17 @@ interface PurchaseOrderRow extends RowDataPacket {
   size: string | null;
   weight: string | null;
   packaging: number | null;
+  // 상품 정보 필드
+  product_name: string;
+  product_name_chinese: string | null;
+  product_category: string;
+  product_main_image: string | null;
+  product_size: string | null;
+  product_weight: string | null;
+  product_packaging_size: string | null;
+  product_set_count: number;
+  product_small_pack_count: number;
+  product_box_count: number;
   delivery_status: string;
   payment_status: string;
   is_confirmed: boolean;
@@ -41,24 +52,81 @@ interface PurchaseOrderRow extends RowDataPacket {
 
 export class PurchaseOrderRepository {
   /**
-   * 모든 발주 조회
+   * 모든 발주 조회 (패킹리스트 shipping summary 포함)
    */
-  async findAll(): Promise<PurchaseOrder[]> {
-    const [rows] = await pool.execute<PurchaseOrderRow[]>(
-      `SELECT id, po_number, supplier_id, product_id, unit_price, back_margin,
-              order_unit_price, expected_final_unit_price, quantity, size, weight, packaging,
-              delivery_status, payment_status, is_confirmed, order_status,
-              order_date, estimated_delivery, estimated_shipment_date,
-              work_start_date, work_end_date,
-              shipping_cost, warehouse_shipping_cost, commission_rate, commission_type,
-              advance_payment_rate, advance_payment_amount, advance_payment_date,
-              balance_payment_amount, balance_payment_date,
-              created_at, updated_at, created_by, updated_by
-       FROM purchase_orders
-       ORDER BY created_at DESC`
+  async findAll(): Promise<Array<PurchaseOrder & {
+    factory_shipped_quantity: number;
+    unshipped_quantity: number;
+    shipped_quantity: number;
+    shipping_quantity: number;
+    arrived_quantity: number;
+    unreceived_quantity: number;
+  }>> {
+    const [rows] = await pool.execute<any[]>(
+      `SELECT 
+        po.id, po.po_number, po.product_id, po.unit_price, po.back_margin,
+        po.order_unit_price, po.expected_final_unit_price, po.quantity, po.size, po.weight, po.packaging,
+        po.product_name, po.product_name_chinese, po.product_category, po.product_main_image,
+        po.product_size, po.product_weight, po.product_packaging_size,
+        po.product_set_count, po.product_small_pack_count, po.product_box_count,
+        po.delivery_status, po.payment_status, po.is_confirmed, po.order_status,
+        po.order_date, po.estimated_delivery, po.estimated_shipment_date,
+        po.work_start_date, po.work_end_date,
+        po.shipping_cost, po.warehouse_shipping_cost, po.commission_rate, po.commission_type,
+        po.advance_payment_rate, po.advance_payment_amount, po.advance_payment_date,
+        po.balance_payment_amount, po.balance_payment_date,
+        po.created_at, po.updated_at, po.created_by, po.updated_by,
+        COALESCE(summary.factory_shipped_quantity, 0) AS factory_shipped_quantity,
+        COALESCE(summary.unshipped_quantity, 0) AS unshipped_quantity,
+        COALESCE(summary.shipped_quantity, 0) AS shipped_quantity,
+        COALESCE(summary.shipping_quantity, 0) AS shipping_quantity,
+        COALESCE(summary.arrived_quantity, 0) AS arrived_quantity,
+        COALESCE(summary.unreceived_quantity, 0) AS unreceived_quantity
+       FROM purchase_orders po
+       LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
+       ORDER BY po.created_at DESC`
     );
 
-    return rows.map(this.mapRowToPurchaseOrder);
+    return rows.map((row) => ({
+      ...this.mapRowToPurchaseOrder(row),
+      factory_shipped_quantity: Number(row.factory_shipped_quantity) || 0,
+      unshipped_quantity: Number(row.unshipped_quantity) || 0,
+      shipped_quantity: Number(row.shipped_quantity) || 0,
+      shipping_quantity: Number(row.shipping_quantity) || 0,
+      arrived_quantity: Number(row.arrived_quantity) || 0,
+      unreceived_quantity: Number(row.unreceived_quantity) || 0,
+    }));
+  }
+
+  /**
+   * 미출고 수량이 있는 발주만 조회 (VIEW JOIN)
+   */
+  async findAllWithUnshipped(): Promise<Array<PurchaseOrder & { unshipped_quantity: number }>> {
+    const [rows] = await pool.execute<any[]>(
+      `SELECT 
+        po.id, po.po_number, po.product_id, po.unit_price, po.back_margin,
+        po.order_unit_price, po.expected_final_unit_price, po.quantity, po.size, po.weight, po.packaging,
+        po.product_name, po.product_name_chinese, po.product_category, po.product_main_image,
+        po.product_size, po.product_weight, po.product_packaging_size,
+        po.product_set_count, po.product_small_pack_count, po.product_box_count,
+        po.delivery_status, po.payment_status, po.is_confirmed, po.order_status,
+        po.order_date, po.estimated_delivery, po.estimated_shipment_date,
+        po.work_start_date, po.work_end_date,
+        po.shipping_cost, po.warehouse_shipping_cost, po.commission_rate, po.commission_type,
+        po.advance_payment_rate, po.advance_payment_amount, po.advance_payment_date,
+        po.balance_payment_amount, po.balance_payment_date,
+        po.created_at, po.updated_at, po.created_by, po.updated_by,
+        COALESCE(summary.unshipped_quantity, 0) AS unshipped_quantity
+       FROM purchase_orders po
+       LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
+       WHERE COALESCE(summary.unshipped_quantity, 0) > 0
+       ORDER BY po.created_at DESC`
+    );
+
+    return rows.map((row) => ({
+      ...this.mapRowToPurchaseOrder(row),
+      unshipped_quantity: Number(row.unshipped_quantity) || 0,
+    }));
   }
 
   /**
@@ -66,8 +134,11 @@ export class PurchaseOrderRepository {
    */
   async findById(id: string): Promise<PurchaseOrder | null> {
     const [rows] = await pool.execute<PurchaseOrderRow[]>(
-      `SELECT id, po_number, supplier_id, product_id, unit_price, back_margin,
+      `SELECT id, po_number, product_id, unit_price, back_margin,
               order_unit_price, expected_final_unit_price, quantity, size, weight, packaging,
+              product_name, product_name_chinese, product_category, product_main_image,
+              product_size, product_weight, product_packaging_size,
+              product_set_count, product_small_pack_count, product_box_count,
               delivery_status, payment_status, is_confirmed, order_status,
               order_date, estimated_delivery, estimated_shipment_date,
               work_start_date, work_end_date,
@@ -92,8 +163,16 @@ export class PurchaseOrderRepository {
    */
   async create(data: CreatePurchaseOrderDTO, poId: string, poNumber: string): Promise<PurchaseOrder> {
     const {
-      product_id,
-      supplier_id,
+      product_name,
+      product_name_chinese,
+      product_category,
+      product_main_image,
+      product_size,
+      product_weight,
+      product_packaging_size,
+      product_set_count,
+      product_small_pack_count,
+      product_box_count,
       unit_price,
       order_unit_price,
       quantity,
@@ -107,14 +186,27 @@ export class PurchaseOrderRepository {
 
     await pool.execute<ResultSetHeader>(
       `INSERT INTO purchase_orders
-       (id, po_number, supplier_id, product_id, unit_price, order_unit_price, quantity,
+       (id, po_number, product_id,
+        product_name, product_name_chinese, product_category, product_main_image,
+        product_size, product_weight, product_packaging_size,
+        product_set_count, product_small_pack_count, product_box_count,
+        unit_price, order_unit_price, quantity,
         size, weight, packaging, order_date, estimated_shipment_date, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         poId,
         poNumber,
-        supplier_id!,
-        product_id,
+        null, // product_id는 더 이상 사용하지 않음
+        product_name,
+        product_name_chinese || null,
+        product_category || '봉제',
+        product_main_image || null,
+        product_size || null,
+        product_weight || null,
+        product_packaging_size || null,
+        product_set_count || 1,
+        product_small_pack_count || 1,
+        product_box_count || 1,
         unit_price,
         order_unit_price || null,
         quantity,
@@ -219,6 +311,46 @@ export class PurchaseOrderRepository {
     if (data.work_end_date !== undefined) {
       updates.push('work_end_date = ?');
       values.push(data.work_end_date || null);
+    }
+    if (data.product_name !== undefined) {
+      updates.push('product_name = ?');
+      values.push(data.product_name);
+    }
+    if (data.product_name_chinese !== undefined) {
+      updates.push('product_name_chinese = ?');
+      values.push(data.product_name_chinese || null);
+    }
+    if (data.product_category !== undefined) {
+      updates.push('product_category = ?');
+      values.push(data.product_category);
+    }
+    if (data.product_main_image !== undefined) {
+      updates.push('product_main_image = ?');
+      values.push(data.product_main_image || null);
+    }
+    if (data.product_size !== undefined) {
+      updates.push('product_size = ?');
+      values.push(data.product_size || null);
+    }
+    if (data.product_weight !== undefined) {
+      updates.push('product_weight = ?');
+      values.push(data.product_weight || null);
+    }
+    if (data.product_packaging_size !== undefined) {
+      updates.push('product_packaging_size = ?');
+      values.push(data.product_packaging_size || null);
+    }
+    if (data.product_set_count !== undefined) {
+      updates.push('product_set_count = ?');
+      values.push(data.product_set_count);
+    }
+    if (data.product_small_pack_count !== undefined) {
+      updates.push('product_small_pack_count = ?');
+      values.push(data.product_small_pack_count);
+    }
+    if (data.product_box_count !== undefined) {
+      updates.push('product_box_count = ?');
+      values.push(data.product_box_count);
     }
     if (data.shipping_cost !== undefined) {
       updates.push('shipping_cost = ?');
@@ -328,25 +460,12 @@ export class PurchaseOrderRepository {
   }
 
   /**
-   * 공급업체 이름으로 ID 조회
-   */
-  async findSupplierIdByName(name: string): Promise<number | null> {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT id FROM suppliers WHERE name = ? LIMIT 1',
-      [name]
-    );
-
-    return rows.length > 0 ? (rows[0].id as number) : null;
-  }
-
-  /**
    * Row를 PurchaseOrder 객체로 변환
    */
   private mapRowToPurchaseOrder(row: PurchaseOrderRow): PurchaseOrder {
     return {
       id: row.id,
       po_number: row.po_number,
-      supplier_id: row.supplier_id,
       product_id: row.product_id,
       unit_price: Number(row.unit_price),
       back_margin: row.back_margin ? Number(row.back_margin) : null,
@@ -356,6 +475,17 @@ export class PurchaseOrderRepository {
       size: row.size,
       weight: row.weight,
       packaging: row.packaging,
+      // 상품 정보 필드
+      product_name: row.product_name,
+      product_name_chinese: row.product_name_chinese,
+      product_category: row.product_category,
+      product_main_image: row.product_main_image,
+      product_size: row.product_size,
+      product_weight: row.product_weight,
+      product_packaging_size: row.product_packaging_size,
+      product_set_count: row.product_set_count,
+      product_small_pack_count: row.product_small_pack_count,
+      product_box_count: row.product_box_count,
       delivery_status: row.delivery_status as any,
       payment_status: row.payment_status as any,
       is_confirmed: Boolean(row.is_confirmed),

@@ -8,6 +8,9 @@ const purchaseOrderController = new PurchaseOrderController();
 // 발주 목록 조회
 router.get('/', purchaseOrderController.getAllPurchaseOrders);
 
+// 미출고 수량이 있는 발주 목록 조회
+router.get('/unshipped', purchaseOrderController.getPurchaseOrdersWithUnshipped);
+
 // 발주 상세 조회
 router.get('/:id', purchaseOrderController.getPurchaseOrderById);
 
@@ -47,6 +50,9 @@ router.put('/:id/delivery-sets', purchaseOrderController.saveDeliverySets);
 router.get('/:id/images/:type', purchaseOrderController.getImages);
 router.post('/:id/images/:type/:relatedId', poImageUpload.array('images', 10), purchaseOrderController.uploadImages);
 router.delete('/images/:imageId', purchaseOrderController.deleteImage);
+
+// 메인 이미지 업로드
+router.post('/:id/main-image', poImageUpload.single('mainImage'), purchaseOrderController.uploadMainImage);
 
 export default router;
 

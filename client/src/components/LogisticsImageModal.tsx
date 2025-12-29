@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { X } from "lucide-react";
 
 interface LogisticsImageModalProps {
@@ -11,6 +12,22 @@ export function LogisticsImageModal({
   isOpen,
   onClose,
 }: LogisticsImageModalProps) {
+  // ESC 키로 모달 닫기
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && imageUrl) {
+        onClose();
+      }
+    };
+
+    if (isOpen && imageUrl) {
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }
+  }, [isOpen, imageUrl, onClose]);
+
   if (!isOpen || !imageUrl) return null;
 
   return (

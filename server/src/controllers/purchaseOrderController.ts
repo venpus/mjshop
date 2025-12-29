@@ -38,6 +38,26 @@ export class PurchaseOrderController {
   };
 
   /**
+   * 미출고 수량이 있는 발주 목록 조회
+   * GET /api/purchase-orders?unshippedOnly=true
+   */
+  getPurchaseOrdersWithUnshipped = async (req: Request, res: Response) => {
+    try {
+      const purchaseOrders = await this.service.getPurchaseOrdersWithUnshipped();
+      res.json({
+        success: true,
+        data: purchaseOrders,
+      });
+    } catch (error: any) {
+      console.error('미출고 발주 목록 조회 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '미출고 발주 목록을 불러오는데 실패했습니다.',
+      });
+    }
+  };
+
+  /**
    * ID로 발주 조회
    * GET /api/purchase-orders/:id
    */
@@ -73,9 +93,16 @@ export class PurchaseOrderController {
   createPurchaseOrder = async (req: Request, res: Response) => {
     try {
       const {
-        product_id,
-        supplier_id,
-        supplier_name,
+        product_name,
+        product_name_chinese,
+        product_category,
+        product_main_image,
+        product_size,
+        product_weight,
+        product_packaging_size,
+        product_set_count,
+        product_small_pack_count,
+        product_box_count,
         unit_price,
         order_unit_price,
         quantity,
@@ -84,19 +111,14 @@ export class PurchaseOrderController {
         packaging,
         order_date,
         estimated_shipment_date,
+        testImageUrl, // 부자재 테스트 이미지 URL (선택적)
       } = req.body;
 
       // 유효성 검사
-      if (!product_id) {
+      if (!product_name || product_name.trim() === '') {
         return res.status(400).json({
           success: false,
-          error: '상품 ID는 필수입니다.',
-        });
-      }
-      if (!supplier_id && !supplier_name) {
-        return res.status(400).json({
-          success: false,
-          error: '공급업체 ID 또는 이름은 필수입니다.',
+          error: '상품명은 필수입니다.',
         });
       }
       if (!unit_price || unit_price <= 0) {
@@ -113,9 +135,16 @@ export class PurchaseOrderController {
       }
 
       const createData: CreatePurchaseOrderDTO = {
-        product_id,
-        supplier_id,
-        supplier_name,
+        product_name: product_name.trim(),
+        product_name_chinese: product_name_chinese?.trim() || undefined,
+        product_category: product_category || '봉제',
+        product_main_image: product_main_image || undefined,
+        product_size: product_size || undefined,
+        product_weight: product_weight || undefined,
+        product_packaging_size: product_packaging_size || undefined,
+        product_set_count: product_set_count ? Number(product_set_count) : undefined,
+        product_small_pack_count: product_small_pack_count ? Number(product_small_pack_count) : undefined,
+        product_box_count: product_box_count ? Number(product_box_count) : undefined,
         unit_price: Number(unit_price),
         order_unit_price: order_unit_price ? Number(order_unit_price) : undefined,
         quantity: Number(quantity),
@@ -128,6 +157,34 @@ export class PurchaseOrderController {
       };
 
       const purchaseOrder = await this.service.createPurchaseOrder(createData);
+
+      // 부자재 테스트 이미지가 있는 경우, 발주 메인 이미지로 복사
+      if (testImageUrl && purchaseOrder.id) {
+        try {
+          const { copyMaterialTestImageToPOMainImage, getPOImageUrl } = await import('../utils/upload.js');
+          const copiedMainImageRelativePath = await copyMaterialTestImageToPOMainImage(
+            testImageUrl,
+            purchaseOrder.id
+          );
+          const newMainImageUrl = getPOImageUrl(copiedMainImageRelativePath);
+          
+          // 발주의 메인 이미지 URL 업데이트
+          await this.service.updatePurchaseOrder(purchaseOrder.id, {
+            product_main_image: newMainImageUrl,
+            updated_by: (req as any).user?.id,
+          });
+
+          // 업데이트된 발주 정보 다시 조회
+          const updatedPurchaseOrder = await this.service.getPurchaseOrderById(purchaseOrder.id);
+          return res.status(201).json({
+            success: true,
+            data: updatedPurchaseOrder,
+          });
+        } catch (error: any) {
+          console.error(`부자재 테스트 이미지 복사 실패: ${testImageUrl}`, error);
+          // 이미지 복사 실패해도 발주는 생성되었으므로 계속 진행 (경고만 출력)
+        }
+      }
 
       res.status(201).json({
         success: true,
@@ -731,6 +788,67 @@ export class PurchaseOrderController {
       res.status(500).json({
         success: false,
         error: error.message || '이미지 업로드에 실패했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 발주 메인 이미지 업로드
+   * POST /api/purchase-orders/:id/main-image
+   */
+  uploadMainImage = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({
+          success: false,
+          error: '업로드할 이미지 파일이 없습니다.',
+        });
+      }
+
+      // 발주 존재 확인
+      const purchaseOrder = await this.service.getPurchaseOrderById(id);
+      if (!purchaseOrder) {
+        return res.status(404).json({
+          success: false,
+          error: '발주를 찾을 수 없습니다.',
+        });
+      }
+
+      // 메인 이미지 저장
+      const { savePOMainImage, getPOImageUrl, deletePOMainImage } = await import('../utils/upload.js');
+      
+      // 기존 메인 이미지 삭제
+      if (purchaseOrder.product_main_image) {
+        await deletePOMainImage(id);
+      }
+
+      // 새 메인 이미지 저장
+      const relativePath = await savePOMainImage(file.path, id);
+      const imageUrl = getPOImageUrl(relativePath);
+
+      // 발주 정보 업데이트 (product_main_image 필드)
+      await this.service.updatePurchaseOrder(id, {
+        product_main_image: imageUrl,
+        updated_by: (req as any).user?.id,
+      });
+
+      console.log(`[uploadMainImage] 이미지 업로드 완료 - 발주 ID: ${id}, 이미지 URL: ${imageUrl}`);
+
+      res.json({
+        success: true,
+        message: '메인 이미지가 업로드되었습니다.',
+        data: {
+          imageUrl: imageUrl,
+        },
+      });
+    } catch (error: any) {
+      console.error('발주 메인 이미지 업로드 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '메인 이미지 업로드에 실패했습니다.',
       });
     }
   };

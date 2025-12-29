@@ -7,7 +7,9 @@ import {
   Box,
   Calendar,
   DollarSign,
+  Upload,
 } from "lucide-react";
+import { useRef } from "react";
 
 interface ProductInfoSectionProps {
   // 상품 기본 정보
@@ -35,9 +37,16 @@ interface ProductInfoSectionProps {
   onDeliveryDateChange: (value: string) => void;
   onOrderConfirmedChange: (value: boolean) => void;
   onCancelOrder: () => void;
-  onProductClick: () => void;
+  onProductClick?: () => void; // 제품명 링크 기능 제거로 optional로 변경
   onPhotoGalleryClick: () => void;
   onImageClick: () => void;
+  onMainImageUpload?: (file: File) => Promise<void>; // 메인 이미지 업로드 핸들러
+  
+  // 편집 모드 (새 발주일 때 true)
+  isEditable?: boolean;
+  onProductNameChange?: (value: string) => void;
+  onSizeChange?: (value: string) => void;
+  onWeightChange?: (value: string) => void;
 }
 
 export function ProductInfoSection({
@@ -60,7 +69,47 @@ export function ProductInfoSection({
   onProductClick,
   onPhotoGalleryClick,
   onImageClick,
+  onMainImageUpload,
+  isEditable = false,
+  onProductNameChange,
+  onSizeChange,
+  onWeightChange,
 }: ProductInfoSectionProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageClick = () => {
+    if (productImage) {
+      // 이미지가 있으면 크게 보기
+      onImageClick();
+    } else if (onMainImageUpload) {
+      // 이미지가 없고 업로드 핸들러가 있으면 파일 선택
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 이미지 파일 검증
+    if (!file.type.startsWith('image/')) {
+      alert('이미지 파일만 업로드할 수 있습니다.');
+      return;
+    }
+
+    if (onMainImageUpload) {
+      try {
+        await onMainImageUpload(file);
+      } catch (error: any) {
+        alert(error.message || '이미지 업로드에 실패했습니다.');
+      }
+    }
+
+    // input 초기화 (같은 파일을 다시 선택할 수 있도록)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-4">
@@ -69,23 +118,32 @@ export function ProductInfoSection({
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center shadow-md">
               <Package className="w-4 h-4 text-white" />
             </div>
-            <span
-              className="text-xl font-bold text-blue-600 hover:text-blue-800 cursor-pointer hover:underline transition-colors"
-              onClick={onProductClick}
-              title="클릭하여 상품 상세 정보 보기"
-            >
-              {productName} ({poNumber})
-            </span>
+            {isEditable ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={productName}
+                  onChange={(e) => onProductNameChange?.(e.target.value)}
+                  placeholder="상품명을 입력하세요"
+                  className="text-xl font-bold text-blue-600 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[200px]"
+                />
+                <span className="text-xl font-bold text-gray-600">({poNumber})</span>
+              </div>
+            ) : (
+              <span className="text-xl font-bold text-gray-900">
+                {productName || '(상품명 없음)'} ({poNumber})
+              </span>
+            )}
           </div>
 
-          {/* 사진모아보기 버튼 */}
+          {/* 사진첩 버튼 */}
           <button
             onClick={onPhotoGalleryClick}
             className="flex items-center gap-2 px-4 py-3 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg border border-purple-200 transition-colors"
-            title="사진모아보기"
+            title="사진첩"
           >
             <Images className="w-5 h-5" />
-            <span className="font-semibold">사진모아보기</span>
+            <span className="font-semibold">사진첩</span>
           </button>
         </div>
 
@@ -125,26 +183,47 @@ export function ProductInfoSection({
       </div>
 
       <div className="flex gap-6">
-        <div
-          className="w-32 h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity relative group"
-          onClick={() => productImage && onImageClick()}
-        >
-          {productImage ? (
-            <>
-              <img
-                src={productImage}
-                alt={productName}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none"></div>
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity bg-black bg-opacity-50 px-2 py-1 rounded">
-                  크게 보기
-                </span>
-              </div>
-            </>
-          ) : (
-            <Image className="w-12 h-12 text-gray-400" />
+        <div className="relative">
+          <div
+            className={`w-32 h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 transition-opacity relative group ${
+              onMainImageUpload ? 'cursor-pointer hover:opacity-90' : productImage ? 'cursor-pointer hover:opacity-90' : ''
+            }`}
+            onClick={handleImageClick}
+          >
+            {productImage ? (
+              <>
+                <img
+                  src={productImage}
+                  alt={productName}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none"></div>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <span className="text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity bg-black bg-opacity-50 px-2 py-1 rounded">
+                    {onMainImageUpload ? '클릭하여 변경' : '크게 보기'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <Image className="w-12 h-12 text-gray-400" />
+                {onMainImageUpload && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                    <span className="text-xs text-gray-500">이미지 업로드</span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          {onMainImageUpload && (
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
           )}
         </div>
 
@@ -159,7 +238,17 @@ export function ProductInfoSection({
                   </div>
                   <div>
                     <span className="text-gray-600 text-sm">사이즈</span>
-                    <p className="text-gray-900">{size ? `${size} cm` : '-'}</p>
+                    {isEditable ? (
+                      <input
+                        type="text"
+                        value={size}
+                        onChange={(e) => onSizeChange?.(e.target.value)}
+                        placeholder="예: 30x20x15"
+                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{size ? `${size} cm` : '-'}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -168,7 +257,17 @@ export function ProductInfoSection({
                   </div>
                   <div>
                     <span className="text-gray-600 text-sm">무게</span>
-                    <p className="text-gray-900">{weight ? `${weight} g` : '-'}</p>
+                    {isEditable ? (
+                      <input
+                        type="text"
+                        value={weight}
+                        onChange={(e) => onWeightChange?.(e.target.value)}
+                        placeholder="예: 500"
+                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    ) : (
+                      <p className="text-gray-900">{weight ? `${weight} g` : '-'}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

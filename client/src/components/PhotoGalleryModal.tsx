@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Images, X, Download, Image, Upload, Loader2 } from "lucide-react";
 
 interface PhotoGalleryModalProps {
@@ -6,7 +6,8 @@ interface PhotoGalleryModalProps {
   productName: string;
   poNumber: string;
   images: string[];
-  productId?: string;
+  productId?: string; // 상품 이미지 업로드용
+  purchaseOrderId?: string; // 발주 이미지 업로드용
   onClose: () => void;
   onImageClick: (imageUrl: string) => void;
   onImagesUpdated?: () => void;
@@ -21,12 +22,29 @@ export function PhotoGalleryModal({
   poNumber,
   images,
   productId,
+  purchaseOrderId,
   onClose,
   onImageClick,
   onImagesUpdated,
 }: PhotoGalleryModalProps) {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ESC 키로 모달 닫기
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -63,7 +81,59 @@ export function PhotoGalleryModal({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length === 0 || !productId) return;
+    if (files.length === 0) return;
+    
+    // 발주 이미지 업로드인 경우
+    if (purchaseOrderId) {
+      setIsUploading(true);
+      
+      try {
+        const formData = new FormData();
+        
+        // 이미지 파일들을 FormData에 추가
+        files.forEach((file) => {
+          formData.append('images', file);
+        });
+
+        // 발주 이미지 업로드 API 호출 (타입: other, relatedId: 0)
+        const uploadResponse = await fetch(`${API_BASE_URL}/purchase-orders/${purchaseOrderId}/images/other/0`, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json().catch(() => ({}));
+          throw new Error(errorData.error || '이미지 업로드에 실패했습니다.');
+        }
+
+        const uploadData = await uploadResponse.json();
+        if (!uploadData.success) {
+          throw new Error(uploadData.error || '이미지 업로드에 실패했습니다.');
+        }
+
+        alert('이미지가 성공적으로 업로드되었습니다.');
+        
+        // 이미지 목록 갱신
+        if (onImagesUpdated) {
+          onImagesUpdated();
+        }
+
+        // 파일 input 초기화
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      } catch (error: any) {
+        console.error('발주 이미지 업로드 오류:', error);
+        alert(error.message || '이미지 업로드 중 오류가 발생했습니다.');
+      } finally {
+        setIsUploading(false);
+      }
+      return;
+    }
+
+    // 상품 이미지 업로드인 경우 (기존 로직)
+    if (!productId) return;
 
     setIsUploading(true);
     
@@ -193,7 +263,7 @@ export function PhotoGalleryModal({
               <Images className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-gray-900">사진 모아보기</h3>
+              <h3 className="text-gray-900">사진첩</h3>
               <p className="text-sm text-gray-600 mt-0.5">
                 {productName} ({poNumber})
               </p>
@@ -253,8 +323,8 @@ export function PhotoGalleryModal({
 
         {/* Footer */}
         <div className="flex items-center justify-between p-6 border-t border-gray-200">
-          {/* 업로드 버튼 (productId가 있는 경우만 표시) */}
-          {productId && (
+          {/* 업로드 버튼 (productId 또는 purchaseOrderId가 있는 경우 표시) */}
+          {(productId || purchaseOrderId) && (
             <>
               <input
                 ref={fileInputRef}

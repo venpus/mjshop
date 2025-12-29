@@ -1,4 +1,4 @@
-import { Factory, Plus, Trash2, X } from "lucide-react";
+import { Factory, Plus, Trash2, X, Truck } from "lucide-react";
 
 export interface FactoryShipment {
   id: string;
@@ -35,6 +35,7 @@ interface FactoryShippingTabProps {
   onUpdateReturnExchangeItem: (id: string, field: keyof ReturnExchangeItem, value: any) => void;
   onHandleReturnImageUpload: (id: string, e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemoveReturnImage: (itemId: string, imageIndex: number, imageUrl: string) => void;
+  onFactoryToWarehouse?: () => void; // 공장→물류창고 버튼 핸들러
 }
 
 export function FactoryShippingTab({
@@ -52,6 +53,7 @@ export function FactoryShippingTab({
   onUpdateReturnExchangeItem,
   onHandleReturnImageUpload,
   onRemoveReturnImage,
+  onFactoryToWarehouse,
 }: FactoryShippingTabProps) {
   return (
     <div className="space-y-6">
@@ -100,6 +102,15 @@ export function FactoryShippingTab({
 
         {/* 출고 항목 추가 버튼 */}
         <div className="flex items-center gap-3">
+          {onFactoryToWarehouse && (
+            <button
+              onClick={onFactoryToWarehouse}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              <Truck className="w-4 h-4" />
+              <span>공장→물류창고</span>
+            </button>
+          )}
           <button
             onClick={onAddFactoryShipment}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"

@@ -3,7 +3,15 @@ import { AlertTriangle, X } from 'lucide-react';
 interface PurchaseOrder {
   id: string;
   poNumber: string;
-  product: string;
+  product?: {
+    id: string | null;
+    name: string;
+    name_chinese: string | null;
+    main_image: string | null;
+    category?: string;
+    size?: string | null;
+    weight?: string | null;
+  } | string;
 }
 
 interface PurchaseOrderDeleteDialogProps {
@@ -41,7 +49,7 @@ export function PurchaseOrderDeleteDialog({
           <p className="text-gray-700 mb-2">다음 발주를 삭제하시겠습니까?</p>
           <div className="bg-gray-50 rounded-lg p-4 space-y-2">
             <p className="text-gray-900 font-medium">발주번호: {purchaseOrder.poNumber}</p>
-            <p className="text-gray-900 font-medium">상품명: {purchaseOrder.product}</p>
+            <p className="text-gray-900 font-medium">상품명: {typeof purchaseOrder.product === 'string' ? purchaseOrder.product : (purchaseOrder.product?.name || '-')}</p>
           </div>
           <p className="text-red-600 text-sm mt-4">
             삭제된 발주는 복구할 수 없으며, 관련 이미지도 모두 삭제됩니다.

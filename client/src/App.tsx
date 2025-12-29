@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Menu, X, Globe, LogOut, User } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
@@ -17,6 +17,11 @@ import { Gallery } from './components/Gallery';
 import { ChinaWarehouse } from './components/ChinaWarehouse';
 import { Invoice } from './components/Invoice';
 import { AdminAccount } from './components/AdminAccount';
+import { Materials } from './components/Materials';
+import { MaterialDetail } from './components/materials/MaterialDetail';
+import { PackagingWork } from './components/PackagingWork';
+import { Projects } from './components/Projects';
+import { ProjectDetail } from './components/ProjectDetail';
 import { Login } from './components/Login';
 import { useAuth } from './contexts/AuthContext';
 
@@ -30,6 +35,13 @@ function AdminLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [language, setLanguage] = useState<Language>('ko');
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
+  
+  // 사이드바를 접힌 상태로 표시할 페이지 확인 (패킹리스트, 발주관리)
+  const isCollapsedPage = location.pathname.includes('/admin/shipping-history') || 
+                          location.pathname === '/admin/purchase-orders';
+  
+  // 사이드바 접힘 상태 (패킹리스트와 발주관리는 기본 접힘, 나머지는 기본 펼침)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(isCollapsedPage);
 
   const languages = {
     ko: { name: '한국어', flag: '🇰🇷' },
@@ -58,6 +70,11 @@ function AdminLayout() {
   };
 
   const currentPage = getCurrentPage();
+
+  // 경로가 변경될 때 패킹리스트 또는 발주관리면 사이드바 접기, 아니면 펼치기
+  useEffect(() => {
+    setIsSidebarCollapsed(isCollapsedPage);
+  }, [isCollapsedPage]);
 
   const handleViewOrderDetail = (orderId: string, tab?: 'cost' | 'factory' | 'work' | 'delivery', autoSave?: boolean) => {
     let url = `/admin/purchase-orders/${orderId}`;
@@ -95,13 +112,18 @@ function AdminLayout() {
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <Sidebar currentPage={currentPage as any} onPageChange={(page) => {
-          if (page === 'purchase-order-detail') {
-            // purchase-order-detail은 직접 이동할 수 없음
-            return;
-          }
-          navigate(`/admin/${page}`);
-        }} />
+        <Sidebar 
+          currentPage={currentPage as any} 
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onPageChange={(page) => {
+            if (page === 'purchase-order-detail') {
+              // purchase-order-detail은 직접 이동할 수 없음
+              return;
+            }
+            navigate(`/admin/${page}`);
+          }} 
+        />
       </div>
 
       {/* Main Content */}
@@ -208,6 +230,11 @@ function AdminLayout() {
           <Route path="/gallery" element={<Gallery />} />
           <Route path="/china-warehouse" element={<ChinaWarehouse />} />
           <Route path="/invoice" element={<Invoice />} />
+          <Route path="/materials" element={<Materials />} />
+          <Route path="/materials/:id" element={<MaterialDetailWrapper />} />
+          <Route path="/packaging-work" element={<PackagingWork />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/projects/:id" element={<ProjectDetailWrapper />} />
           <Route path="/admin-account" element={<AdminAccount />} />
         </Routes>
       </main>
@@ -228,6 +255,27 @@ function PurchaseOrderDetailWrapper({ onBack }: { onBack: () => void }) {
   }
 
   return <PurchaseOrderDetail orderId={id} onBack={onBack} initialTab={tabParam} autoSave={autoSaveParam} />;
+}
+
+// MaterialDetail 래퍼 (URL 파라미터 처리)
+function MaterialDetailWrapper() {
+  console.log('MaterialDetailWrapper is rendering');
+  try {
+    return <MaterialDetail />;
+  } catch (error) {
+    console.error('Error in MaterialDetailWrapper:', error);
+    return <div>Error loading material detail</div>;
+  }
+}
+
+// ProjectDetail 래퍼 (URL 파라미터 처리)
+function ProjectDetailWrapper() {
+  try {
+    return <ProjectDetail />;
+  } catch (error) {
+    console.error('Error in ProjectDetailWrapper:', error);
+    return <div>Error loading project detail</div>;
+  }
 }
 
 // Protected Route 컴포넌트

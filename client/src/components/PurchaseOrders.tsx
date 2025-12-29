@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Filter, Download, Eye, Package, Plus, Image, Edit, X, CheckSquare, RotateCw, Trash2 } from 'lucide-react';
+import { Filter, Download, Eye, Package, Plus, Image, X, CheckSquare, RotateCw, Trash2 } from 'lucide-react';
 import { TablePagination } from './ui/table-pagination';
 import { StatusBadge } from './ui/status-badge';
 import { SearchBar } from './ui/search-bar';
@@ -9,10 +9,14 @@ import { PurchaseOrderDeleteDialog } from './PurchaseOrderDeleteDialog';
 import { useAuth } from '../contexts/AuthContext';
 import { useDeletePurchaseOrder } from '../hooks/useDeletePurchaseOrder';
 import { formatDateForInput } from '../utils/dateUtils';
+import { CreatePurchaseOrderButton } from './purchase-order/CreatePurchaseOrderButton';
 import { 
   calculateBasicCostTotal, 
   calculateShippingCostTotal, 
-  calculateFinalPaymentAmount 
+  calculateFinalPaymentAmount,
+  calculateDeliveryStatus,
+  calculateFactoryStatusFromQuantity,
+  calculateWorkStatus
 } from '../utils/purchaseOrderCalculations';
 
 interface PurchaseOrdersProps {
@@ -22,9 +26,20 @@ interface PurchaseOrdersProps {
 interface PurchaseOrder {
   id: string;
   poNumber: string;
-  supplier: string;
-  product: string;
-  productImage?: string;
+  supplier?: {
+    id: number;
+    name: string;
+    url: string | null;
+  };
+  product?: {
+    id: string | null;
+    name: string;
+    name_chinese: string | null;
+    main_image: string | null;
+    category?: string;
+    size?: string | null;
+    weight?: string | null;
+  };
   unitPrice: number;
   backMargin: number; // 추가 단가
   optionCost: number;
@@ -39,11 +54,16 @@ interface PurchaseOrder {
   warehouseShippingCost: number; // 창고 배송비
   factoryStatus: '출고대기' | '배송중' | '수령완료';
   workStatus: '작업대기' | '작업중' | '완료';
-  deliveryStatus: '대기중' | '내륙운송중' | '항공운송중' | '해운운송중' | '통관및 배달' | '한국도착';
+  deliveryStatus: '대기중' | '배송중' | '내륙운송중' | '항공운송중' | '해운운송중' | '통관및 배달' | '한국도착';
   paymentStatus: '미결제' | '선금결제' | '완료';
   orderStatus: '발주확인' | '발주 대기' | '취소됨';
   date: string;
   isOrderConfirmed?: boolean;
+  // 수량 정보
+  unshippedQuantity?: number; // 미발송 수량 (업체 출고 수량 - 패킹리스트 출고 수량)
+  shippingQuantity?: number; // 배송중 수량 (패킹리스트 출고 수량 - 한국도착 수량)
+  unreceivedQuantity?: number; // 미입고 수량 (발주 수량 - 업체 출고 수량)
+  koreaArrivedQuantity?: number; // 한국도착 수량
 }
 
 export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
@@ -101,12 +121,12 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       if (data.success && data.data) {
         // 서버 응답을 클라이언트 PurchaseOrder 인터페이스로 변환
         const convertedOrders: PurchaseOrder[] = data.data.map((po: any) => {
+          console.log(`[PurchaseOrders] 발주 ID: ${po.id}, product.main_image: ${po.product?.main_image}, product.size: ${po.product?.size}, product.weight: ${po.product?.weight}, po.size: ${po.size}, po.weight: ${po.weight}`);
           return {
             id: po.id,
             poNumber: po.po_number,
-            supplier: po.supplier?.name || '',
-            product: po.product?.name || '',
-            productImage: po.product?.main_image ? getFullImageUrl(po.product.main_image) : undefined,
+            supplier: po.supplier,
+            product: po.product,
             unitPrice: po.unit_price || 0,
             backMargin: po.back_margin || 0,
             optionCost: 0, // 옵션 비용은 별도로 계산 필요 (목록에서는 0으로 설정)
@@ -116,17 +136,36 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             commissionRate: po.commission_rate || 0,
             shippingCost: po.shipping_cost || 0,
             warehouseShippingCost: po.warehouse_shipping_cost || 0,
-            size: po.size || '',
-            weight: po.weight || '',
+            size: po.product?.size || po.size || '',
+            weight: po.product?.weight || po.weight || '',
             packaging: po.packaging || 0,
-            factoryStatus: '출고대기', // VIEW에서 가져오거나 별도 계산 필요
-            workStatus: '작업대기', // VIEW에서 가져오거나 별도 계산 필요
-            deliveryStatus: po.delivery_status || '대기중',
+            // 업체 출고 상태 계산: factory_shipped_quantity와 ordered_quantity를 기반으로 계산
+            factoryStatus: calculateFactoryStatusFromQuantity(
+              po.factory_shipped_quantity !== undefined ? Number(po.factory_shipped_quantity) : 0,
+              po.quantity || 0
+            ),
+            // 작업 상태 계산: work_start_date와 work_end_date를 기반으로 계산
+            workStatus: calculateWorkStatus(
+              po.work_start_date ? formatDateForInput(po.work_start_date) : null,
+              po.work_end_date ? formatDateForInput(po.work_end_date) : null
+            ),
+            // 배송 상태 계산: 패킹리스트 정보를 기반으로 계산
+            // 상세페이지와 동일한 로직 적용
+            deliveryStatus: calculateDeliveryStatus(
+              po.shipped_quantity !== undefined ? Number(po.shipped_quantity) : 0,
+              po.shipping_quantity !== undefined ? Number(po.shipping_quantity) : 0,
+              po.delivery_status || '대기중'
+            ),
             paymentStatus: po.payment_status || '미결제',
             // order_status가 있으면 사용, 없으면 is_confirmed 기반으로 계산 (기존 데이터 호환성)
             orderStatus: po.order_status || (po.is_confirmed ? '발주확인' : '발주 대기'),
             date: formatDateForInput(po.order_date),
             isOrderConfirmed: po.is_confirmed || false,
+            // 패킹리스트와 연동된 수량 정보
+            unshippedQuantity: po.unshipped_quantity !== undefined ? Number(po.unshipped_quantity) : undefined,
+            shippingQuantity: po.shipping_quantity !== undefined ? Number(po.shipping_quantity) : undefined,
+            unreceivedQuantity: po.unreceived_quantity !== undefined ? Number(po.unreceived_quantity) : undefined,
+            koreaArrivedQuantity: po.arrived_quantity !== undefined ? Number(po.arrived_quantity) : undefined,
           };
         });
         setPurchaseOrders(convertedOrders);
@@ -167,8 +206,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const filteredPurchaseOrders = purchaseOrders.filter(po => {
     const matchesSearch = 
       po.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      po.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      po.product.toLowerCase().includes(searchTerm.toLowerCase());
+      po.supplier?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      po.product?.name?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesFactoryStatus = filters.factoryStatus.length === 0 || filters.factoryStatus.includes(po.factoryStatus);
     const matchesWorkStatus = filters.workStatus.length === 0 || filters.workStatus.includes(po.workStatus);
@@ -367,9 +406,12 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
   return (
     <div className="p-8 min-h-[1080px]">
-      <div className="mb-8">
-        <h2 className="text-gray-900 mb-2">발주 관리</h2>
-        <p className="text-gray-600">중국 제조사에 발주한 상품을 확인하고 제조 상태를 관리할 수 있습니다</p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h2 className="text-gray-900 mb-2">발주 관리</h2>
+          <p className="text-gray-600">중국 제조사에 발주한 상품을 확인하고 제조 상태를 관리할 수 있습니다</p>
+        </div>
+        <CreatePurchaseOrderButton />
       </div>
 
       {/* Filters */}
@@ -377,7 +419,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
         <SearchBar
           value={searchTerm}
           onChange={setSearchTerm}
-          placeholder="발주번호, 제조사명, 상품명으로 검색..."
+          placeholder="발주번호, 공급업체명, 상품명으로 검색..."
         />
         <div className="flex gap-2">
           <div className="relative">
@@ -529,10 +571,6 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             <Download className="w-5 h-5" />
             <span>내보내기</span>
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
-            <Plus className="w-5 h-5" />
-            <span>발주 생성</span>
-          </button>
         </div>
       </div>
 
@@ -560,6 +598,10 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">사이즈</th>
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">무게</th>
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">소포장 방식</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">미입고 수량</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">미발송 수량</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">배송중 수량</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">한국도착 수량</th>
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">상태</th>
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">결제</th>
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">관리</th>
@@ -617,20 +659,20 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     >
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden flex items-center justify-center">
-                          {po.productImage ? (
+                          {po.product?.main_image ? (
                             <img
-                              src={po.productImage}
-                              alt={po.product}
+                              src={getFullImageUrl(po.product.main_image)}
+                              alt={po.product.name}
                               className="w-full h-full object-cover"
                               onMouseMove={handleMouseMove}
-                              onMouseEnter={() => setHoveredProduct(po.productImage || null)}
+                              onMouseEnter={() => setHoveredProduct(getFullImageUrl(po.product.main_image))}
                               onMouseLeave={() => setHoveredProduct(null)}
                             />
                           ) : (
                             <Image className="w-5 h-5 text-gray-400" />
                           )}
                         </div>
-                        <span className="text-gray-600 text-center font-bold">{po.product}</span>
+                        <span className="text-gray-600 text-center font-bold">{po.product?.name || '-'}</span>
                       </div>
                     </td>
                     <td className="px-4 py-2 text-center">
@@ -646,9 +688,21 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     <td className="px-4 py-2 text-center text-gray-600">{po.quantity}개</td>
                     <td className="px-4 py-2 text-center text-gray-900">¥{finalPaymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="px-4 py-2 text-center text-gray-900 bg-yellow-100">¥{finalUnitPrice.toFixed(2)}</td>
-                    <td className="px-4 py-2 text-center text-gray-600">{po.size}</td>
-                    <td className="px-4 py-2 text-center text-gray-600">{po.weight}</td>
+                    <td className="px-4 py-2 text-center text-gray-600">{po.size ? `${po.size}cm` : '-'}</td>
+                    <td className="px-4 py-2 text-center text-gray-600">{po.weight ? `${po.weight}g` : '-'}</td>
                     <td className="px-4 py-2 text-center text-gray-600">{po.packaging.toLocaleString()}개</td>
+                    <td className="px-4 py-2 text-center text-gray-600">
+                      {po.unreceivedQuantity !== undefined ? `${po.unreceivedQuantity}개` : '-'}
+                    </td>
+                    <td className="px-4 py-2 text-center text-gray-600">
+                      {po.unshippedQuantity !== undefined ? `${po.unshippedQuantity}개` : '-'}
+                    </td>
+                    <td className="px-4 py-2 text-center text-gray-600">
+                      {po.shippingQuantity !== undefined ? `${po.shippingQuantity}개` : '-'}
+                    </td>
+                    <td className="px-4 py-2 text-center text-gray-600">
+                      {po.koreaArrivedQuantity !== undefined ? `${po.koreaArrivedQuantity}개` : '-'}
+                    </td>
                     <td className="px-4 py-2 text-center">
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-center gap-1.5">
@@ -675,7 +729,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                             }}
                           />
                         </div>
-                        <div className="flex items-center justify-center gap-1.5">
+                        {/* 배송 상태 배지 (임시 주석처리) */}
+                        {/* <div className="flex items-center justify-center gap-1.5">
                           <span className="text-gray-600 text-xs whitespace-nowrap font-bold">배송:</span>
                           <StatusBadge 
                             status={po.deliveryStatus} 
@@ -686,7 +741,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                               onViewDetail(po.id, 'delivery');
                             }}
                           />
-                        </div>
+                        </div> */}
                       </div>
                     </td>
                     <td className="px-4 py-2 text-center">
@@ -694,12 +749,6 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     </td>
                     <td className="px-4 py-2 text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <button 
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="수정"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -757,35 +806,6 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
           onPageChange={handlePageChange}
           onItemsPerPageChange={handleItemsPerPageChange}
         />
-      </div>
-
-      {/* Total */}
-      <div className="mt-6 bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-        <div className="flex justify-between items-center">
-          <span className="text-gray-600">총 발주 금액</span>
-          <span className="text-gray-900">
-            ¥{filteredPurchaseOrders.reduce((sum, po) => {
-              // 최종 결제 금액 계산
-              const basicCostTotal = calculateBasicCostTotal(
-                po.unitPrice,
-                po.quantity,
-                po.commissionRate,
-                po.backMargin
-              );
-              const shippingCostTotal = calculateShippingCostTotal(
-                po.shippingCost,
-                po.warehouseShippingCost
-              );
-              const finalPaymentAmount = calculateFinalPaymentAmount(
-                basicCostTotal,
-                shippingCostTotal,
-                po.optionCost,
-                po.laborCost
-              );
-              return sum + finalPaymentAmount;
-            }, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </span>
-        </div>
       </div>
 
       {/* Product Image Preview */}

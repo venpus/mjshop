@@ -29,9 +29,16 @@ interface HeaderSectionProps {
   onDeliveryDateChange: (value: string) => void;
   onOrderConfirmedChange: (value: boolean) => void;
   onCancelOrder: () => void;
-  onProductClick: () => void;
+  onProductClick?: () => void; // 제품명 링크 기능 제거로 optional로 변경
   onPhotoGalleryClick: () => void;
   onImageClick: () => void;
+  
+  // 편집 모드 (새 발주일 때 true)
+  isEditable?: boolean;
+  onProductNameChange?: (value: string) => void;
+  onSizeChange?: (value: string) => void;
+  onWeightChange?: (value: string) => void;
+  onMainImageUpload?: (file: File) => Promise<void>;
 
   // ProgressStatusSection props
   currentFactoryStatus: string;
@@ -81,6 +88,11 @@ export function HeaderSection({
   workItems,
   deliveryStatus,
   paymentStatus,
+  isEditable,
+  onProductNameChange,
+  onSizeChange,
+  onWeightChange,
+  onMainImageUpload,
 }: HeaderSectionProps) {
   return (
     <>
@@ -121,6 +133,11 @@ export function HeaderSection({
             onProductClick={onProductClick}
             onPhotoGalleryClick={onPhotoGalleryClick}
             onImageClick={onImageClick}
+            onMainImageUpload={onMainImageUpload}
+            isEditable={isEditable}
+            onProductNameChange={onProductNameChange}
+            onSizeChange={onSizeChange}
+            onWeightChange={onWeightChange}
           />
         </div>
 

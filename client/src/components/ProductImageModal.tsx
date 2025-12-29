@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { X, Download, Images } from "lucide-react";
 
 interface ProductImageModalProps {
@@ -17,6 +18,22 @@ export function ProductImageModal({
   onClose,
   onOpenGallery,
 }: ProductImageModalProps) {
+  // ESC 키로 모달 닫기
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && imageUrl) {
+        onClose();
+      }
+    };
+
+    if (isOpen && imageUrl) {
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }
+  }, [isOpen, imageUrl, onClose]);
+
   if (!isOpen || !imageUrl) return null;
 
   const handleDownloadImage = async () => {

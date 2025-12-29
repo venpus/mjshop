@@ -13,6 +13,10 @@ interface PurchaseOrderRawData {
   po_number: string;
   supplier?: { name: string };
   product?: { id: string; name: string; main_image?: string };
+  product_name?: string;
+  product_size?: string;
+  product_weight?: string;
+  product_main_image?: string;
   unit_price: number;
   quantity: number;
   size?: string;
@@ -81,6 +85,7 @@ export interface UsePurchaseOrderDataReturn {
   reloadReturnExchanges: () => Promise<void>;
   reloadWorkItems: () => Promise<void>;
   reloadDeliverySets: () => Promise<void>;
+  reloadPurchaseOrder: () => Promise<void>;
 }
 
 /**
@@ -131,8 +136,10 @@ export function usePurchaseOrderData(orderId: string | null): UsePurchaseOrderDa
             id: po.id,
             poNumber: po.po_number,
             supplier: po.supplier?.name || '',
-            product: po.product?.name || '',
-            productImage: po.product?.main_image ? `${SERVER_BASE_URL}${po.product.main_image}` : undefined,
+            product: po.product?.name || po.product_name || '',
+            productImage: po.product_main_image 
+              ? (po.product_main_image.startsWith('http') ? po.product_main_image : `${SERVER_BASE_URL}${po.product_main_image}`)
+              : (po.product?.main_image ? (po.product.main_image.startsWith('http') ? po.product.main_image : `${SERVER_BASE_URL}${po.product.main_image}`) : undefined),
             unitPrice: po.unit_price,
             optionCost: 0, // 옵션 비용은 별도로 계산 필요
             quantity: po.quantity,
@@ -590,6 +597,70 @@ export function usePurchaseOrderData(orderId: string | null): UsePurchaseOrderDa
     }
   }, [order, loadDeliverySets]);
 
+  // 발주 데이터 재로드 함수
+  const reloadPurchaseOrder = useCallback(async () => {
+    if (!orderId) return;
+    
+    try {
+      setIsLoading(true);
+      const url = `${API_BASE_URL}/purchase-orders/${orderId}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || '발주 정보를 불러오는데 실패했습니다.');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        const po = data.data;
+        
+        // 서버 응답을 클라이언트 형식으로 변환
+        const convertedOrder: PurchaseOrder = {
+          id: po.id,
+          poNumber: po.po_number,
+          supplier: po.supplier?.name || '',
+          product: po.product?.name || po.product_name || '',
+          productImage: po.product_main_image 
+            ? (po.product_main_image.startsWith('http') ? po.product_main_image : `${SERVER_BASE_URL}${po.product_main_image}`)
+            : (po.product?.main_image ? (po.product.main_image.startsWith('http') ? po.product.main_image : `${SERVER_BASE_URL}${po.product.main_image}`) : undefined),
+          unitPrice: po.unit_price,
+          optionCost: 0,
+          quantity: po.quantity,
+          size: po.size || '',
+          weight: po.weight || '',
+          packaging: po.packaging || 0,
+          factoryStatus: '출고대기',
+          workStatus: '작업대기',
+          deliveryStatus: po.delivery_status || '대기중',
+          paymentStatus: po.payment_status || '미결제',
+          date: formatDateForInput(po.order_date),
+          estimatedDelivery: formatDateForInput(po.estimated_delivery),
+          notes: '',
+          supplierContact: '',
+          supplierAddress: '',
+          _rawData: po,
+        };
+        
+        setOrder(convertedOrder);
+        setIsLoading(false);
+      } else {
+        setIsLoading(false);
+      }
+    } catch (err: any) {
+      console.error('발주 정보 재로드 오류:', err);
+      setIsLoading(false);
+    }
+  }, [orderId, API_BASE_URL, SERVER_BASE_URL]);
+
   return {
     order,
     isLoading,
@@ -610,6 +681,7 @@ export function usePurchaseOrderData(orderId: string | null): UsePurchaseOrderDa
     reloadReturnExchanges: loadReturnExchanges,
     reloadWorkItems: loadWorkItems,
     reloadDeliverySets: loadDeliverySets,
+    reloadPurchaseOrder,
   };
 }
 

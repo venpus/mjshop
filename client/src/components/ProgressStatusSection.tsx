@@ -116,8 +116,8 @@ export function ProgressStatusSection({
           </div>
         </div>
 
-        {/* Delivery Status */}
-        <div>
+        {/* Delivery Status (임시 주석처리) */}
+        {/* <div>
           <div className="flex items-center gap-2 mb-2">
             <Truck className="w-4 h-4 text-gray-600" />
             <span className="text-gray-600 text-sm">배송</span>
@@ -139,7 +139,7 @@ export function ProgressStatusSection({
           >
             {deliveryStatus}
           </span>
-        </div>
+        </div> */}
 
         {/* Payment Status */}
         <div>

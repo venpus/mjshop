@@ -22,6 +22,7 @@ import {
   Images,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { ProductDetailModal } from "./ProductDetailModal";
 import { FactoryShippingTab, type FactoryShipment, type ReturnExchangeItem } from "./tabs/FactoryShippingTab";
 import { ProcessingPackagingTab, type WorkItem } from "./tabs/ProcessingPackagingTab";
@@ -51,7 +52,10 @@ import {
   calculateFinalPaymentAmount,
   calculateExpectedFinalUnitPrice,
   calculateBalancePaymentAmount,
+  calculatePackingListShippingCost,
+  calculateDeliveryStatus,
 } from "../utils/purchaseOrderCalculations";
+import { getShippingCostByPurchaseOrder, getShippingSummaryByPurchaseOrder } from "../api/packingListApi";
 import { usePurchaseOrderData } from "../hooks/usePurchaseOrderData";
 import { usePurchaseOrderSave } from "../hooks/usePurchaseOrderSave";
 import { useMemoManagement } from "../hooks/useMemoManagement";
@@ -62,6 +66,7 @@ import { useLogisticsHandlers } from "../hooks/useLogisticsHandlers";
 import { useCostItemHandlers } from "../hooks/useCostItemHandlers";
 import { useAuth } from "../contexts/AuthContext";
 import { formatDateForInput } from "../utils/dateUtils";
+import { convertFactoryShipmentsToFormData } from "../utils/packingListTransform";
 
 interface PurchaseOrderDetailProps {
   orderId: string;
@@ -80,15 +85,19 @@ export function PurchaseOrderDetail({
   const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
   const { user } = useAuth();
   const isSuperAdmin = user?.level === 'A-SuperAdmin';
+  const navigate = useNavigate();
   
-  // 데이터 로딩 Hook 사용
+  // 새 발주인지 확인
+  const isNewOrder = orderId === 'new';
+
+  // 데이터 로딩 Hook 사용 (orderId가 null이 아닌 경우에만 호출)
   const {
-    order,
+    order: loadedOrder,
     isLoading,
-    optionItems,
-    laborCostItems,
-    factoryShipments,
-    returnExchangeItems,
+    optionItems: loadedOptionItems,
+    laborCostItems: loadedLaborCostItems,
+    factoryShipments: loadedFactoryShipments,
+    returnExchangeItems: loadedReturnExchangeItems,
     workItems: loadedWorkItems,
     setOptionItems,
     setLaborCostItems,
@@ -102,7 +111,15 @@ export function PurchaseOrderDetail({
     deliverySets: loadedDeliverySets,
     setDeliverySets,
     reloadDeliverySets,
-  } = usePurchaseOrderData(orderId);
+    reloadPurchaseOrder,
+  } = usePurchaseOrderData(isNewOrder ? null : orderId);
+
+  // 새 발주인 경우 빈 데이터 사용, 아니면 로드된 데이터 사용
+  const order = isNewOrder ? null : loadedOrder;
+  const optionItems = isNewOrder ? [] : loadedOptionItems;
+  const laborCostItems = isNewOrder ? [] : loadedLaborCostItems;
+  const factoryShipments = isNewOrder ? [] : loadedFactoryShipments;
+  const returnExchangeItems = isNewOrder ? [] : loadedReturnExchangeItems;
 
   // Editable cost state
   const [unitPrice, setUnitPrice] = useState(0);
@@ -110,12 +127,22 @@ export function PurchaseOrderDetail({
   const [quantity, setQuantity] = useState(0);
   const [shippingCost, setShippingCost] = useState(0);
   const [warehouseShippingCost, setWarehouseShippingCost] = useState(0);
+  // 패킹리스트 배송비 (서버에서 가져온 값)
+  const [packingListShippingCost, setPackingListShippingCost] = useState(0);
   const [commissionRate, setCommissionRate] = useState(0);
   const [commissionType, setCommissionType] = useState("");
   const [optionCost, setOptionCost] = useState(0);
   const [orderDate, setOrderDate] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [packaging, setPackaging] = useState(0);
+
+  // 상품 정보 상태 (새 발주일 때 입력 가능)
+  const [productName, setProductName] = useState("");
+  const [productSize, setProductSize] = useState("");
+  const [productWeight, setProductWeight] = useState("");
+  const [productImage, setProductImage] = useState<string>("");
+  const [pendingMainImageFile, setPendingMainImageFile] = useState<File | null>(null);
+  const [pendingMainImagePreview, setPendingMainImagePreview] = useState<string>("");
 
   // 발주 컨펌 상태
   const [isOrderConfirmed, setIsOrderConfirmed] = useState(false);
@@ -204,20 +231,7 @@ export function PurchaseOrderDetail({
   });
 
   // 물류 배송 핸들러 Hook 사용
-  const {
-    addDeliverySet,
-    removeDeliverySet,
-    addPackageInfo,
-    removePackageInfo,
-    updatePackageInfo,
-    addLogisticsInfo,
-    removeLogisticsInfo,
-    updateLogisticsInfo,
-    handleLogisticsImageUpload,
-    removeLogisticsImage,
-    handleUpdatePackageInfo,
-    handleUpdateLogisticsInfo,
-  } = useLogisticsHandlers({
+  useLogisticsHandlers({
     orderId,
     deliverySets: loadedDeliverySets,
     setDeliverySets,
@@ -293,11 +307,11 @@ export function PurchaseOrderDetail({
 
   // 저장 및 변경 감지 Hook 사용
   const {
-    isDirty,
-    isSaving,
-    lastSavedAt,
-    handleSave,
-    setOriginalData,
+    isDirty: hookIsDirty,
+    isSaving: hookIsSaving,
+    lastSavedAt: hookLastSavedAt,
+    handleSave: originalHandleSave,
+    setOriginalData: hookSetOriginalData,
   } = usePurchaseOrderSave({
     order,
     orderId,
@@ -315,6 +329,9 @@ export function PurchaseOrderDetail({
     orderDate,
     deliveryDate,
     isOrderConfirmed,
+    productName,
+    productSize,
+    productWeight,
     optionItems,
     laborCostItems,
     factoryShipments,
@@ -335,8 +352,162 @@ export function PurchaseOrderDetail({
     currentUserId,
   });
 
-  // order가 로드되면 상태 업데이트
+  // hook에서 반환된 값들을 사용할 수 있도록 변수 정의
+  const isDirty = hookIsDirty;
+  const isSaving = hookIsSaving;
+  const lastSavedAt = hookLastSavedAt;
+  const setOriginalData = hookSetOriginalData;
+
+  // 배송 상태 계산을 위한 패킹리스트 정보
+  const [shippingSummary, setShippingSummary] = useState<{
+    shipped_quantity: number;
+    shipping_quantity: number;
+  } | null>(null);
+
+  // 패킹리스트 배송 정보 로드
   useEffect(() => {
+    if (!isNewOrder && orderId) {
+      getShippingSummaryByPurchaseOrder(orderId)
+        .then((summary) => {
+          if (summary) {
+            setShippingSummary({
+              shipped_quantity: summary.shipped_quantity || 0,
+              shipping_quantity: summary.shipping_quantity || 0,
+            });
+          } else {
+            setShippingSummary({
+              shipped_quantity: 0,
+              shipping_quantity: 0,
+            });
+          }
+        })
+        .catch((error) => {
+          console.error('배송 정보 로드 오류:', error);
+          setShippingSummary({
+            shipped_quantity: 0,
+            shipping_quantity: 0,
+          });
+        });
+    }
+  }, [orderId, isNewOrder]);
+
+  // 계산된 배송 상태
+  const calculatedDeliveryStatus = order
+    ? calculateDeliveryStatus(
+        shippingSummary?.shipped_quantity || 0,
+        shippingSummary?.shipping_quantity || 0,
+        order.deliveryStatus || '대기중'
+      )
+    : '대기중';
+
+  // handleSave 래핑하여 새 발주 저장 시 이미지도 함께 업로드
+  const handleSave = useCallback(async (isManual?: boolean) => {
+    const savedOrderId = await originalHandleSave(isManual);
+    
+    // 새 발주 저장 성공 시 이미지 업로드
+    if (isNewOrder && savedOrderId && typeof savedOrderId === 'string' && pendingMainImageFile) {
+      try {
+        const formData = new FormData();
+        formData.append('mainImage', pendingMainImageFile);
+
+        const response = await fetch(`${API_BASE_URL}/purchase-orders/${savedOrderId}/main-image`, {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('이미지 업로드 실패:', errorData.error || '이미지 업로드에 실패했습니다.');
+        } else {
+          const result = await response.json();
+          if (result.success && result.data?.imageUrl) {
+            console.log('이미지 업로드 성공:', result.data.imageUrl);
+          }
+        }
+      } catch (error: any) {
+        console.error('메인 이미지 업로드 오류:', error);
+      }
+      
+      // 임시 미리보기 정리
+      if (pendingMainImagePreview) {
+        URL.revokeObjectURL(pendingMainImagePreview);
+      }
+      setPendingMainImageFile(null);
+      setPendingMainImagePreview("");
+      
+      // 새 발주 페이지로 이동
+      window.location.href = `/admin/purchase-orders/${savedOrderId}`;
+      return;
+    }
+    
+    // 기존 발주는 그대로 진행
+    if (savedOrderId && typeof savedOrderId === 'string') {
+      // 이미지가 있는 경우 이미지 업로드 (기존 발주)
+      if (pendingMainImageFile) {
+        try {
+          const formData = new FormData();
+          formData.append('mainImage', pendingMainImageFile);
+
+          const response = await fetch(`${API_BASE_URL}/purchase-orders/${savedOrderId}/main-image`, {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data?.imageUrl) {
+              const imageUrl = result.data.imageUrl.startsWith('http') 
+                ? result.data.imageUrl 
+                : `${SERVER_BASE_URL}${result.data.imageUrl}`;
+              setProductImage(imageUrl);
+            }
+          }
+        } catch (error: any) {
+          console.error('메인 이미지 업로드 오류:', error);
+        }
+        
+        // 임시 미리보기 정리
+        if (pendingMainImagePreview) {
+          URL.revokeObjectURL(pendingMainImagePreview);
+        }
+        setPendingMainImageFile(null);
+        setPendingMainImagePreview("");
+      }
+    }
+  }, [isNewOrder, pendingMainImageFile, pendingMainImagePreview, originalHandleSave, API_BASE_URL, SERVER_BASE_URL]);
+
+  // orderId가 변경되면 상태 초기화 (새 발주인 경우 빈 상태로 초기화)
+  useEffect(() => {
+    if (isNewOrder) {
+      // 새 발주인 경우 빈 상태로 초기화
+      setUnitPrice(0);
+      setBackMargin(0);
+      setQuantity(0);
+      setOptionCost(0);
+      setOrderDate(new Date().toISOString().split('T')[0]); // 오늘 날짜
+      setDeliveryDate('');
+      setPackaging(0);
+      setShippingCost(0);
+      setWarehouseShippingCost(0);
+      setCommissionRate(0);
+      setCommissionType('');
+      setAdvancePaymentRate(0);
+      setAdvancePaymentDate('');
+      setBalancePaymentDate('');
+      setIsOrderConfirmed(false);
+      setOrderStatus('발주 대기');
+      setWorkStartDate('');
+      setWorkEndDate('');
+      setProductName('');
+      setProductSize('');
+      setProductWeight('');
+      setProductImage('');
+      return;
+    }
+
+    // 기존 발주인 경우 order가 로드되면 상태 업데이트
     if (order) {
       setUnitPrice(order.unitPrice || 0);
       setBackMargin(order._rawData?.back_margin || 0);
@@ -362,10 +533,47 @@ export function PurchaseOrderDetail({
         setWorkStartDate(formatDateForInput(order._rawData.work_start_date));
         setWorkEndDate(formatDateForInput(order._rawData.work_end_date));
         
+        // 상품 정보 로드 (product_name, product_size, product_weight, product_main_image)
+        if (order._rawData.product_name) {
+          setProductName(order._rawData.product_name);
+        }
+        if (order._rawData.product_size) {
+          setProductSize(order._rawData.product_size);
+        }
+        if (order._rawData.product_weight) {
+          setProductWeight(order._rawData.product_weight);
+        }
+        if (order.productImage) {
+          setProductImage(order.productImage);
+        }
+        
         // 원본 데이터는 모든 데이터가 로드된 후 별도 useEffect에서 설정됨 (아래 참조)
       }
+      
+      // 패킹리스트 배송비 가져오기
+      if (orderId && orderId !== 'new') {
+        getShippingCostByPurchaseOrder(orderId)
+          .then((shippingCostData) => {
+            if (shippingCostData) {
+              // 발주 수량 × 단위당 배송비로 총 배송비 계산
+              const packingListCost = calculatePackingListShippingCost(
+                shippingCostData.unit_shipping_cost,
+                shippingCostData.ordered_quantity
+              );
+              setPackingListShippingCost(packingListCost);
+            } else {
+              setPackingListShippingCost(0);
+            }
+          })
+          .catch((error) => {
+            console.error('패킹리스트 배송비 조회 오류:', error);
+            setPackingListShippingCost(0);
+          });
+      }
+    } else {
+      setPackingListShippingCost(0);
     }
-  }, [order, setOriginalData]);
+  }, [order, orderId, hookSetOriginalData]);
 
   // initialTab이 변경되면 activeTab 업데이트
   useEffect(() => {
@@ -429,6 +637,8 @@ export function PurchaseOrderDetail({
           const originalData = {
             unit_price: order._rawData.unit_price || 0,
             back_margin: order._rawData.back_margin || 0,
+            work_start_date: formatDateForInput(order._rawData.work_start_date) || '',
+            work_end_date: formatDateForInput(order._rawData.work_end_date) || '',
             quantity: order._rawData.quantity || 0,
             shipping_cost: order._rawData.shipping_cost || 0,
             warehouse_shipping_cost: order._rawData.warehouse_shipping_cost || 0,
@@ -441,13 +651,16 @@ export function PurchaseOrderDetail({
             order_date: formatDateForInput(order._rawData.order_date),
             estimated_delivery: formatDateForInput(order._rawData.estimated_delivery),
             is_confirmed: order._rawData.is_confirmed || false,
+            product_name: order._rawData.product_name || order.product || '',
+            product_size: order._rawData.product_size || order.size || '',
+            product_weight: order._rawData.product_weight || order.weight || '',
             optionItems: JSON.parse(JSON.stringify(optionItems)),
             laborCostItems: JSON.parse(JSON.stringify(laborCostItems)),
             factoryShipments: JSON.parse(JSON.stringify(factoryShipments.map(s => ({ ...s, pendingImages: undefined })))),
             returnExchangeItems: JSON.parse(JSON.stringify(returnExchangeItems.map(r => ({ ...r, pendingImages: undefined })))),
             workItems: JSON.parse(JSON.stringify(loadedWorkItems.map(w => ({ ...w, pendingImages: undefined })))),
             deliverySets: JSON.parse(JSON.stringify(loadedDeliverySets.map(set => ({
-              ...set,
+          ...set,
               logisticsInfoList: (set.logisticsInfoList || []).map(log => ({
                 ...log,
                 pendingImages: undefined,
@@ -635,6 +848,86 @@ export function PurchaseOrderDetail({
     return `${SERVER_BASE_URL}${imageUrl}`;
   }, [SERVER_BASE_URL]);
 
+  // 메인 이미지 업로드 핸들러
+  const handleMainImageUpload = useCallback(async (file: File) => {
+    try {
+      // 새 발주인 경우 임시로 파일 저장하고 미리보기 표시
+      if (isNewOrder) {
+        setPendingMainImageFile(file);
+        const previewUrl = URL.createObjectURL(file);
+        setPendingMainImagePreview(previewUrl);
+        return; // 새 발주는 저장 시 자동 업로드됨
+      }
+
+      // 기존 발주는 즉시 업로드
+      const formData = new FormData();
+      formData.append('mainImage', file);
+
+      const response = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}/main-image`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || '이미지 업로드에 실패했습니다.');
+      }
+
+      const result = await response.json();
+      if (result.success && result.data?.imageUrl) {
+        const imageUrl = result.data.imageUrl.startsWith('http') 
+          ? result.data.imageUrl 
+          : `${SERVER_BASE_URL}${result.data.imageUrl}`;
+        setProductImage(imageUrl);
+        
+        // 발주 데이터 재로드하여 최신 이미지 URL 반영
+        if (reloadPurchaseOrder) {
+          await reloadPurchaseOrder();
+        }
+        
+        alert('이미지가 업로드되었습니다.');
+      } else {
+        throw new Error(result.error || '이미지 업로드에 실패했습니다.');
+      }
+    } catch (error: any) {
+      console.error('메인 이미지 업로드 오류:', error);
+      throw error;
+    }
+  }, [isNewOrder, orderId, API_BASE_URL, SERVER_BASE_URL]);
+
+  // 공장→물류창고 핸들러
+  const handleFactoryToWarehouse = useCallback(() => {
+    if (!order) {
+      alert('발주 정보를 불러올 수 없습니다.');
+      return;
+    }
+
+    try {
+      // 발주 정보에서 제품명과 이미지 가져오기
+      const productName = order._rawData?.product_name || order.product || '';
+      const productImageUrl = order._rawData?.product_main_image || order.productImage || null;
+      const orderDate = formatDateForInput(order._rawData?.order_date || order.date);
+
+      // FactoryShipment를 PackingListFormData로 변환 (출고 항목이 없어도 가능)
+      const formData = convertFactoryShipmentsToFormData(
+        factoryShipments,
+        orderId,
+        productName,
+        productImageUrl,
+        orderDate
+      );
+
+      // ShippingHistory 페이지로 이동하면서 데이터 전달
+      navigate('/admin/shipping-history', {
+        state: { initialPackingListData: formData },
+      });
+    } catch (error: any) {
+      console.error('공장→물류창고 변환 오류:', error);
+      alert(error.message || '패킹리스트 데이터 변환에 실패했습니다.');
+    }
+  }, [order, factoryShipments, orderId, navigate]);
+
   // 상품 정보 가져오기 함수
   const handleProductClick = useCallback(async () => {
     if (!order?._rawData?.product?.id) {
@@ -687,96 +980,96 @@ export function PurchaseOrderDetail({
     }
   }, [order, API_BASE_URL, getFullImageUrl]);
 
-  // 사진모아보기 버튼 클릭 핸들러
+  // 사진첩 버튼 클릭 핸들러 (발주 관련 모든 이미지 가져오기)
   const handlePhotoGalleryClick = useCallback(async () => {
-    if (!order?._rawData?.product?.id) {
-      alert('상품 정보를 불러올 수 없습니다.');
+    if (!orderId || isNewOrder) {
+      alert('발주 정보를 불러올 수 없습니다.');
       return;
     }
 
-    const productId = order._rawData.product.id;
-    
     try {
-      const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
-        credentials: 'include',
-      });
+      const allImages: string[] = [];
+      const seenUrls = new Set<string>(); // URL 중복 체크용 Set
 
-      if (!response.ok) {
-        throw new Error('상품 이미지를 불러오는데 실패했습니다.');
+      // 1. 메인 이미지 추가
+      if (order?.productImage) {
+        const mainImageUrl = order.productImage.startsWith('http') 
+          ? order.productImage 
+          : `${SERVER_BASE_URL}${order.productImage}`;
+        if (mainImageUrl && !seenUrls.has(mainImageUrl)) {
+          allImages.push(mainImageUrl);
+          seenUrls.add(mainImageUrl);
+        }
       }
 
-      const data = await response.json();
-      if (data.success && data.data) {
-        const fullProduct = data.data;
-        
-        // 메인 이미지와 추가 이미지를 합쳐서 전달 (중복 제거)
-        const allImages: string[] = [];
-        const seenUrls = new Set<string>(); // URL 중복 체크용 Set
-        
-        // 메인 이미지 추가
-        if (fullProduct.main_image) {
-          const mainImageUrl = getFullImageUrl(fullProduct.main_image);
-          if (mainImageUrl && !seenUrls.has(mainImageUrl)) {
-            allImages.push(mainImageUrl);
-            seenUrls.add(mainImageUrl);
-          }
-        }
-        
-        // 추가 이미지들 추가 (메인 이미지와 중복되지 않는 경우만)
-        if (Array.isArray(fullProduct.images)) {
-          fullProduct.images.forEach((img: string) => {
-            const fullUrl = getFullImageUrl(img);
-            if (fullUrl && !seenUrls.has(fullUrl)) {
-              allImages.push(fullUrl);
-              seenUrls.add(fullUrl);
-            }
+      // 2. 각 타입별 이미지 가져오기
+      const imageTypes = ['factory_shipment', 'return_exchange', 'work_item', 'logistics', 'other'];
+      
+      for (const imageType of imageTypes) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}/images/${imageType}`, {
+            credentials: 'include',
           });
-        }
-        
-        setProductGalleryImages(allImages);
-        setIsPhotoGalleryOpen(true);
-      } else {
-        throw new Error(data.error || '상품 이미지를 불러오는데 실패했습니다.');
-      }
-    } catch (err: any) {
-      console.error('상품 이미지 로드 오류:', err);
-      alert(err.message || '상품 이미지를 불러오는 중 오류가 발생했습니다.');
-    }
-  }, [order, API_BASE_URL, getFullImageUrl, setIsPhotoGalleryOpen]);
 
-  // 로딩 중일 때 로딩 화면 표시
-  if (isLoading) {
-      return (
-        <div className="p-6 min-h-[1080px] flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">발주 정보를 불러오는 중...</p>
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && Array.isArray(data.data)) {
+              data.data.forEach((img: { id: number; image_url: string; display_order: number }) => {
+                const imageUrl = img.image_url.startsWith('http') 
+                  ? img.image_url 
+                  : `${SERVER_BASE_URL}${img.image_url}`;
+                if (imageUrl && !seenUrls.has(imageUrl)) {
+                  allImages.push(imageUrl);
+                  seenUrls.add(imageUrl);
+                }
+              });
+            }
+          }
+        } catch (err) {
+          console.error(`${imageType} 이미지 로드 오류:`, err);
+          // 하나의 타입 실패해도 계속 진행
+        }
+      }
+
+      setProductGalleryImages(allImages);
+      setIsPhotoGalleryOpen(true);
+    } catch (err: any) {
+      console.error('발주 이미지 로드 오류:', err);
+      alert(err.message || '발주 이미지를 불러오는 중 오류가 발생했습니다.');
+    }
+  }, [orderId, order, isNewOrder, API_BASE_URL, SERVER_BASE_URL, setIsPhotoGalleryOpen]);
+
+  // 로딩 중일 때 로딩 화면 표시 (새 발주가 아닌 경우에만)
+  if (!isNewOrder && isLoading) {
+    return (
+      <div className="p-6 min-h-[1080px] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">발주 정보를 불러오는 중...</p>
         </div>
       </div>
     );
   }
 
-  if (!order && !isLoading) {
+  // 새 발주인 경우 빈 데이터로 초기화된 화면 표시 (이미 위에서 처리됨)
+  // 기존 발주인데 로딩이 완료되었지만 order가 null인 경우에만 에러 메시지 표시
+  if (!isNewOrder && !order && !isLoading) {
     return (
       <div className="p-6 min-h-[1080px] flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600 mb-4">발주를 찾을 수 없습니다.</p>
-        <button
-          onClick={handleBackWithConfirm}
+          <button
+            onClick={handleBackWithConfirm}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-        >
+          >
             목록으로 돌아가기
-        </button>
+          </button>
         </div>
       </div>
     );
   }
 
-  if (!order) {
-    return null;
-  }
-
-  // 계산 함수 사용
+  // 계산 함수 사용 (새 발주인 경우에도 계산은 가능)
   const totalOptionCost = calculateTotalOptionCost(optionItems);
   const totalLaborCost = calculateTotalLaborCost(laborCostItems);
   const totalShippedQuantity = calculateTotalShippedQuantity(factoryShipments);
@@ -786,53 +1079,64 @@ export function PurchaseOrderDetail({
   const workStatus = calculateWorkStatus(workStartDate, workEndDate);
   const commissionAmount = calculateCommissionAmount(unitPrice, quantity, commissionRate, backMargin);
   const basicCostTotal = calculateBasicCostTotal(unitPrice, quantity, commissionRate, backMargin);
-  const shippingCostTotal = calculateShippingCostTotal(shippingCost, warehouseShippingCost);
+  const shippingCostTotal = calculateShippingCostTotal(
+    shippingCost,
+    warehouseShippingCost,
+    packingListShippingCost
+  );
   const finalPaymentAmount = calculateFinalPaymentAmount(basicCostTotal, shippingCostTotal, totalOptionCost, totalLaborCost);
   const expectedFinalUnitPrice = calculateExpectedFinalUnitPrice(finalPaymentAmount, quantity);
   // 선금 금액 = 기본비용 합의 50%
   const advancePaymentAmount = basicCostTotal * 0.5;
   const balancePaymentAmount = calculateBalancePaymentAmount(finalPaymentAmount, advancePaymentAmount);
 
-  return (
-    <div className="p-6 min-h-[1080px]">
-      <HeaderSection
-        onBack={handleBackWithConfirm}
-        onSave={() => handleSave(true)}
-        isDirty={isDirty}
-        isSaving={isSaving}
-        lastSavedAt={lastSavedAt}
-            productName={order.product}
-            poNumber={order.poNumber}
-            productImage={order.productImage}
-            size={order.size}
-            weight={order.weight}
-            packaging={packaging}
-            finalUnitPrice={expectedFinalUnitPrice}
-            orderDate={orderDate}
-            deliveryDate={deliveryDate}
-            isOrderConfirmed={isOrderConfirmed}
-            orderStatus={orderStatus}
-            onPackagingChange={setPackaging}
-            onOrderDateChange={setOrderDate}
-            onDeliveryDateChange={setDeliveryDate}
-            onOrderConfirmedChange={handleOrderConfirmedChange}
-            onCancelOrder={handleCancelOrder}
-            onProductClick={handleProductClick}
-            onPhotoGalleryClick={handlePhotoGalleryClick}
-            onImageClick={() => setIsImageModalOpen(true)}
-        currentFactoryStatus={currentFactoryStatus}
-        totalShippedQuantity={totalShippedQuantity}
-        totalReturnQuantity={totalReturnQuantity}
-        totalReceivedQuantity={totalReceivedQuantity}
-        hasFactoryShipments={factoryShipments.length > 0}
-        hasReturnItems={returnExchangeItems.length > 0}
-        workStatus={workStatus}
-        workItems={safeWorkItems}
-        deliveryStatus={order.deliveryStatus}
-        paymentStatus={order.paymentStatus}
-      />
+  // 새 발주인 경우 빈 폼 화면 표시
+  if (isNewOrder) {
+    return (
+      <div className="p-6 min-h-[1080px]">
+        <HeaderSection
+          onBack={handleBackWithConfirm}
+          onSave={() => handleSave(true)}
+          isDirty={isDirty}
+          isSaving={isSaving}
+          lastSavedAt={lastSavedAt}
+          productName={productName}
+          poNumber="새 발주"
+          productImage={pendingMainImagePreview || productImage || ""}
+          onMainImageUpload={handleMainImageUpload}
+          size={productSize}
+          weight={productWeight}
+          packaging={packaging}
+          finalUnitPrice={expectedFinalUnitPrice}
+          orderDate={orderDate}
+          deliveryDate={deliveryDate}
+          isOrderConfirmed={isOrderConfirmed}
+          orderStatus={orderStatus}
+          isEditable={true}
+          onPackagingChange={setPackaging}
+          onOrderDateChange={setOrderDate}
+          onDeliveryDateChange={setDeliveryDate}
+          onOrderConfirmedChange={handleOrderConfirmedChange}
+          onCancelOrder={handleCancelOrder}
+          onProductClick={() => {}}
+          onPhotoGalleryClick={() => {}}
+          onImageClick={() => {}}
+          onProductNameChange={setProductName}
+          onSizeChange={setProductSize}
+          onWeightChange={setProductWeight}
+          currentFactoryStatus={currentFactoryStatus}
+          totalShippedQuantity={totalShippedQuantity}
+          totalReturnQuantity={totalReturnQuantity}
+          totalReceivedQuantity={totalReceivedQuantity}
+          hasFactoryShipments={factoryShipments.length > 0}
+          hasReturnItems={returnExchangeItems.length > 0}
+          workStatus={workStatus}
+          workItems={safeWorkItems}
+          deliveryStatus="대기중"
+          paymentStatus="미결제"
+        />
 
-      <div className="grid grid-cols-[2fr_1fr] gap-6 mt-6">
+        <div className="grid grid-cols-[2fr_1fr] gap-6 mt-6">
         {/* Left Column - Main Info */}
         <div className="space-y-6">
 
@@ -915,6 +1219,7 @@ export function PurchaseOrderDetail({
                 onUpdateReturnExchangeItem={updateReturnExchangeItem}
                 onHandleReturnImageUpload={handleReturnExchangeImageUpload}
                 onRemoveReturnImage={removeReturnExchangeImage}
+                onFactoryToWarehouse={handleFactoryToWarehouse}
               />
             )}
 
@@ -980,13 +1285,178 @@ export function PurchaseOrderDetail({
           />
         </div>
       </div>
+      </div>
+    );
+  }
+
+  // 기존 발주 화면
+  return (
+    <div className="p-6 min-h-[1080px]">
+      <HeaderSection
+        onBack={handleBackWithConfirm}
+        onSave={() => handleSave(true)}
+        isDirty={isDirty}
+        isSaving={isSaving}
+        lastSavedAt={lastSavedAt}
+        productName={productName || order!.product || ''}
+        poNumber={order!.poNumber}
+        productImage={productImage || order!.productImage || ''}
+        onMainImageUpload={handleMainImageUpload}
+        size={productSize || order!.size || ''}
+        weight={productWeight || order!.weight || ''}
+        packaging={packaging}
+        finalUnitPrice={expectedFinalUnitPrice}
+        orderDate={orderDate}
+        deliveryDate={deliveryDate}
+        isOrderConfirmed={isOrderConfirmed}
+        orderStatus={orderStatus}
+        onPackagingChange={setPackaging}
+        onOrderDateChange={setOrderDate}
+        onDeliveryDateChange={setDeliveryDate}
+        onOrderConfirmedChange={handleOrderConfirmedChange}
+        onCancelOrder={handleCancelOrder}
+        onProductClick={undefined}
+        onPhotoGalleryClick={handlePhotoGalleryClick}
+        onImageClick={() => setIsImageModalOpen(true)}
+        currentFactoryStatus={currentFactoryStatus}
+        totalShippedQuantity={totalShippedQuantity}
+        totalReturnQuantity={totalReturnQuantity}
+        totalReceivedQuantity={totalReceivedQuantity}
+        hasFactoryShipments={factoryShipments.length > 0}
+        hasReturnItems={returnExchangeItems.length > 0}
+        workStatus={workStatus}
+        workItems={safeWorkItems}
+        deliveryStatus={calculatedDeliveryStatus}
+        paymentStatus={order!.paymentStatus}
+      />
+
+      <div className="grid grid-cols-[2fr_1fr] gap-6 mt-6">
+        {/* Left Column - Main Info */}
+        <div className="space-y-6">
+          {/* Cost Breakdown - Editable */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-2 rounded-lg border border-green-200">
+                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center shadow-md">
+                  <DollarSign className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  발주 진행 관리
+                </h3>
+              </div>
+            </div>
+
+            {/* 탭 네비게이션 */}
+            <TabNavigation
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+            />
+
+            {/* 탭 콘텐츠 */}
+            {activeTab === "cost" && (
+              <CostPaymentTab
+                unitPrice={unitPrice}
+                backMargin={backMargin}
+                quantity={quantity}
+                commissionType={commissionType}
+                commissionAmount={commissionAmount}
+                basicCostTotal={basicCostTotal}
+                isSuperAdmin={isSuperAdmin}
+                onSetUnitPrice={setUnitPrice}
+                onSetBackMargin={setBackMargin}
+                onSetQuantity={setQuantity}
+                onHandleCommissionTypeChange={handleCommissionTypeChange}
+                commissionOptions={commissionOptions}
+                shippingCost={shippingCost}
+                warehouseShippingCost={warehouseShippingCost}
+                shippingCostTotal={shippingCostTotal}
+                onSetShippingCost={setShippingCost}
+                onSetWarehouseShippingCost={setWarehouseShippingCost}
+                optionItems={optionItems}
+                totalOptionCost={totalOptionCost}
+                onUpdateOptionItemName={updateOptionItemName}
+                onUpdateOptionItemCost={updateOptionItemCost}
+                onRemoveOptionItem={removeOptionItem}
+                onAddOptionItem={addOptionItem}
+                laborCostItems={laborCostItems}
+                totalLaborCost={totalLaborCost}
+                onUpdateLaborCostItemName={updateLaborCostItemName}
+                onUpdateLaborCostItemCost={updateLaborCostItemCost}
+                onRemoveLaborCostItem={removeLaborCostItem}
+                onAddLaborCostItem={addLaborCostItem}
+                advancePaymentRate={advancePaymentRate}
+                advancePaymentAmount={advancePaymentAmount}
+                advancePaymentDate={advancePaymentDate}
+                balancePaymentAmount={balancePaymentAmount}
+                balancePaymentDate={balancePaymentDate}
+                finalPaymentAmount={finalPaymentAmount}
+                onSetAdvancePaymentRate={setAdvancePaymentRate}
+                onSetAdvancePaymentDate={setAdvancePaymentDate}
+                onSetBalancePaymentDate={setBalancePaymentDate}
+              />
+            )}
+
+            {activeTab === "factory" && (
+              <FactoryShippingTab
+                factoryShipments={factoryShipments}
+                returnExchangeItems={returnExchangeItems}
+                currentFactoryStatus={currentFactoryStatus}
+                onAddFactoryShipment={addFactoryShipment}
+                onRemoveFactoryShipment={removeFactoryShipment}
+                onUpdateFactoryShipment={updateFactoryShipment}
+                onHandleFactoryImageUpload={handleFactoryImageUpload}
+                onRemoveFactoryImage={removeFactoryImage}
+                onSetSelectedFactoryImage={setSelectedFactoryImage}
+                onAddReturnExchangeItem={addReturnExchangeItem}
+                onRemoveReturnExchangeItem={removeReturnExchangeItem}
+                onUpdateReturnExchangeItem={updateReturnExchangeItem}
+                onHandleReturnImageUpload={handleReturnExchangeImageUpload}
+                onRemoveReturnImage={removeReturnExchangeImage}
+                onFactoryToWarehouse={handleFactoryToWarehouse}
+              />
+            )}
+
+            {activeTab === "work" && (
+              <ProcessingPackagingTab
+                workItems={safeWorkItems}
+                workStatus={workStatus}
+                workStartDate={workStartDate}
+                workEndDate={workEndDate}
+                onSetWorkStartDate={setWorkStartDate}
+                onSetWorkEndDate={setWorkEndDate}
+                onHandleWorkImageUpload={handleWorkImageUpload}
+                onHandleWorkItemComplete={handleWorkItemComplete}
+                onRemoveWorkItem={removeWorkItem}
+                onUpdateWorkItemDescription={updateWorkItemDescription}
+                onSetSelectedFactoryImage={setSelectedFactoryImage}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Right Column - Status & Summary */}
+        <div className="space-y-6">
+          {/* 메모 섹션 */}
+          <MemoSection
+            memos={memos}
+            newMemoContent={newMemoContent}
+            replyInputs={replyInputs}
+            onSetNewMemoContent={setNewMemoContent}
+            onSetReplyInputs={setReplyInputs}
+            onAddMemo={addMemo}
+            onDeleteMemo={deleteMemo}
+            onAddReply={addReply}
+            onDeleteReply={deleteReply}
+          />
+        </div>
+      </div>
 
       {/* 상품 이미지 모달 */}
       <ProductImageModal
         isOpen={isImageModalOpen}
-        imageUrl={order.productImage}
-        productName={order.product}
-        poNumber={order.poNumber}
+        imageUrl={order!.productImage}
+        productName={order!.product}
+        poNumber={order!.poNumber}
         onClose={() => setIsImageModalOpen(false)}
         onOpenGallery={() => setIsPhotoGalleryOpen(true)}
       />
@@ -1005,13 +1475,14 @@ export function PurchaseOrderDetail({
         />
       )}
 
-      {/* 사진모아보기 모달 */}
+      {/* 사진첩 모달 */}
       <PhotoGalleryModal
         isOpen={isPhotoGalleryOpen}
-        productName={order.product}
-        poNumber={order.poNumber}
+        productName={order!.product}
+        poNumber={order!.poNumber}
         images={productGalleryImages}
-        productId={order._rawData?.product?.id}
+        productId={undefined} // 발주 관련 이미지는 productId 없이 표시
+        purchaseOrderId={orderId === 'new' ? undefined : orderId} // 발주 ID 전달
         onClose={() => {
           setIsPhotoGalleryOpen(false);
           setSelectedGalleryImage(null);
