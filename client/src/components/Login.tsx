@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogIn, Lock, User, AlertCircle, UserPlus } from 'lucide-react';
+import { LogIn, Lock, User, AlertCircle, UserPlus, CheckCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -18,6 +18,7 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
   const [error, setError] = useState<string | null>(null);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +59,17 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
         {/* Login Form */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Success Message */}
+            {signupSuccess && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-green-800 font-medium">가입 신청이 완료되었습니다.</p>
+                  <p className="text-sm text-green-700 mt-1">관리자 승인 후 이용 가능합니다.</p>
+                </div>
+              </div>
+            )}
+
             {/* Error Message */}
             {displayError && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
@@ -167,8 +179,18 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
       {/* Admin Signup Modal */}
       {showSignupModal && (
         <AdminSignupModal
-          onClose={() => setShowSignupModal(false)}
-          onSuccess={() => setShowSignupModal(false)}
+          onClose={() => {
+            setShowSignupModal(false);
+            setSignupSuccess(false);
+          }}
+          onSuccess={() => {
+            setShowSignupModal(false);
+            setSignupSuccess(true);
+            // 5초 후 성공 메시지 자동 제거
+            setTimeout(() => {
+              setSignupSuccess(false);
+            }, 5000);
+          }}
         />
       )}
     </div>

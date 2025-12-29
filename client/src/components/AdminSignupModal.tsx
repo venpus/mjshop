@@ -100,51 +100,47 @@ export function AdminSignupModal({ onClose, onSuccess }: AdminSignupModalProps) 
         }),
       });
 
+      const responseData = await response.json().catch(() => ({}));
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || '가입 신청에 실패했습니다.');
+        console.error('[회원가입] API 오류 응답:', response.status, responseData);
+        throw new Error(responseData.error || '가입 신청에 실패했습니다.');
       }
 
+      console.log('[회원가입] 성공 응답:', responseData);
+      
+      // 성공 시 에러 상태 초기화
+      setErrors({});
       // 성공 - onSuccess는 확인 버튼 클릭 시 호출
       setIsSuccess(true);
     } catch (error: any) {
+      console.error('[회원가입] 에러:', error);
       setErrors({ submit: error.message || '가입 신청 중 오류가 발생했습니다.' });
+      setIsSuccess(false);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // 성공 메시지 표시
-  if (isSuccess) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-          <div className="p-6">
-            <div className="flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 text-center mb-2">
-              가입 신청 완료
-            </h3>
-            <p className="text-gray-600 text-center mb-6">
-              관리자 승인 후 이용 가능합니다
-            </p>
-            <Button
-              onClick={() => {
-                if (onSuccess) {
-                  onSuccess();
-                }
-                onClose();
-              }}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-            >
-              확인
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // 성공 시 자동으로 모달 닫기 (성공 메시지는 Login 컴포넌트에서 표시)
+  useEffect(() => {
+    if (isSuccess) {
+      // 약간의 지연 후 모달 닫기
+      const timer = setTimeout(() => {
+        try {
+          if (onSuccess) {
+            onSuccess();
+          }
+          onClose();
+        } catch (error) {
+          console.error('[회원가입] 성공 처리 오류:', error);
+          onClose();
+        }
+      }, 500); // 0.5초 후 자동 닫기
+
+      return () => clearTimeout(timer);
+    }
+  }, [isSuccess, onSuccess, onClose]);
 
   // ESC 키로 모달 닫기
   useEffect(() => {
