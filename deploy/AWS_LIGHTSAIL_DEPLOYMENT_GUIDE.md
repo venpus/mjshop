@@ -154,7 +154,7 @@ sudo ufw allow 3306/tcp
 # 클라이언트 빌드
 cd client
 npm install
-npm run build
+npm run build  # TypeScript 타입 체크 없이 빌드 (타입 체크가 필요한 경우: npm run build:check)
 cd ..
 
 # 서버 빌드 (TypeScript 컴파일)
@@ -171,6 +171,12 @@ cd ..
 sudo su - wkadmin
 cd /home/wkadmin/app
 git clone [프로젝트_저장소_URL] .
+
+# Git 소유권 오류 해결 (필요시)
+# "fatal: detected dubious ownership in repository" 오류가 발생하는 경우:
+git config --global --add safe.directory /home/wkadmin/app
+# 또는 특정 디렉토리만:
+git config --global --add safe.directory '*'
 ```
 
 #### 방법 B: SCP 사용
@@ -380,13 +386,17 @@ cd ..
 sudo su - wkadmin
 cd /home/wkadmin/app
 
+# Git 소유권 오류 해결 (최초 1회 또는 오류 발생 시)
+# "fatal: detected dubious ownership in repository" 오류가 발생하는 경우:
+git config --global --add safe.directory /home/wkadmin/app
+
 # 최신 코드 가져오기
 git pull origin main
 
 # 클라이언트 재빌드 (또는 이미 빌드된 파일 전송)
 cd client
 npm install  # 의존성 변경 시
-npm run build
+npm run build  # TypeScript 타입 체크 없이 빌드 (타입 체크가 필요한 경우: npm run build:check)
 cd ..
 
 # 서버 재빌드
@@ -555,7 +565,7 @@ mysql -u wkadmin -p -h localhost wk_megafactory
 cat /home/wkadmin/app/server/.env | grep DB_
 ```
 
-### 3. 파일 업로드 오류
+### 4. 파일 업로드 오류
 ```bash
 # 업로드 디렉토리 권한 확인
 ls -la /home/wkadmin/app/server/uploads
@@ -565,7 +575,7 @@ sudo chown -R wkadmin:wkadmin /home/wkadmin/app/server/uploads
 sudo chmod -R 755 /home/wkadmin/app/server/uploads
 ```
 
-### 4. Nginx 502 Bad Gateway 오류
+### 5. Nginx 502 Bad Gateway 오류
 ```bash
 # 애플리케이션이 실행 중인지 확인
 pm2 status
@@ -577,7 +587,7 @@ sudo netstat -tulpn | grep 3000
 sudo tail -f /var/log/nginx/error.log
 ```
 
-### 5. 메모리 부족
+### 6. 메모리 부족
 ```bash
 # 메모리 사용량 확인
 free -h
@@ -587,7 +597,7 @@ pm2 start dist/index.js --name "app-server" --max-memory-restart 400M
 pm2 save
 ```
 
-### 6. 디스크 공간 부족
+### 7. 디스크 공간 부족
 ```bash
 # 디스크 사용량 확인
 df -h
