@@ -161,6 +161,11 @@ cd ..
 cd server
 npm install
 npm run build
+
+# 마이그레이션 파일 복사 (중요!)
+mkdir -p dist/database/migrations
+cp -r src/database/migrations/*.sql dist/database/migrations/
+
 cd ..
 ```
 
@@ -254,11 +259,11 @@ PORT=3000
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=wkadmin
-DB_PASSWORD=강력한_비밀번호
+DB_PASSWORD=TianXian007!
 DB_NAME=wk_megafactory
 
 # 세션 설정
-SESSION_SECRET=매우_긴_랜덤_문자열_생성_필요
+SESSION_SECRET=048f27942d4835d469825a3814741b44
 
 # 업로드 디렉토리
 UPLOAD_DIR=/home/wkadmin/app/server/uploads
@@ -287,6 +292,8 @@ npm run build
 VITE_API_URL=http://wkshop.kr/api
 VITE_SERVER_URL=http://wkshop.kr
 ```
+
+**중요**: 프로덕션 빌드 시 반드시 올바른 도메인으로 빌드해야 합니다. `localhost:3000`이 포함된 빌드는 프로덕션에서 작동하지 않습니다.
 
 ---
 
@@ -540,18 +547,60 @@ sudo tail -f /var/log/nginx/error.log
 
 ## 문제 해결
 
-### 1. 애플리케이션이 시작되지 않는 경우
+### 1. ERR_CONNECTION_REFUSED 오류 (서버가 실행되지 않는 경우)
+
+**증상**: 브라우저 콘솔에 `localhost:3000/api/... Failed to load resource: net::ERR_CONNECTION_REFUSED` 오류
+
+**원인**: Node.js 서버(포트 3000)가 실행되지 않음
+
+**해결 방법**:
+
+**1단계: PM2 상태 확인**
 ```bash
-# PM2 로그 확인
-pm2 logs app-server --err
+pm2 status
+```
+
+**2단계: 서버가 실행되지 않은 경우**
+```bash
+# wkadmin 사용자로 전환
+sudo su - wkadmin
+cd /home/wkadmin/app/server
+
+# .env 파일 확인
+ls -la .env
+cat .env
+
+# PM2로 서버 시작
+pm2 start dist/index.js --name "app-server"
+pm2 save
+
+# 로그 확인
+pm2 logs app-server --err --lines 50
+```
+
+**3단계: 에러가 발생하는 경우 로그 확인**
+```bash
+# PM2 에러 로그
+pm2 logs app-server --err --lines 100
 
 # 직접 실행하여 에러 확인
 cd /home/wkadmin/app/server
 node dist/index.js
-
-# 포트 사용 확인
-sudo netstat -tulpn | grep 3000
 ```
+
+**4단계: 포트 확인**
+```bash
+# 3000번 포트가 사용 중인지 확인
+sudo netstat -tulpn | grep 3000
+# 또는
+sudo ss -tulpn | grep 3000
+```
+
+**일반적인 원인:**
+- PM2 프로세스가 시작되지 않음
+- 데이터베이스 연결 실패 (로그에서 확인 가능)
+- .env 파일 누락 또는 잘못된 설정
+- 포트 충돌
 
 ### 2. 데이터베이스 연결 오류
 ```bash
@@ -565,7 +614,7 @@ mysql -u wkadmin -p -h localhost wk_megafactory
 cat /home/wkadmin/app/server/.env | grep DB_
 ```
 
-### 4. 파일 업로드 오류
+### 6. 파일 업로드 오류
 ```bash
 # 업로드 디렉토리 권한 확인
 ls -la /home/wkadmin/app/server/uploads
@@ -575,19 +624,69 @@ sudo chown -R wkadmin:wkadmin /home/wkadmin/app/server/uploads
 sudo chmod -R 755 /home/wkadmin/app/server/uploads
 ```
 
-### 5. Nginx 502 Bad Gateway 오류
+### 7. Nginx 502 Bad Gateway 오류
+
+**증상**: 브라우저 콘솔에 `POST http://wkshop.kr/api/... 502 (Bad Gateway)` 오류
+
+**원인**: Nginx가 Node.js 서버(포트 3000)에 연결할 수 없음
+
+**해결 방법**:
+
+**1단계: PM2 상태 확인**
 ```bash
-# 애플리케이션이 실행 중인지 확인
 pm2 status
+```
 
-# 포트 확인
+**2단계: 서버가 실행되지 않은 경우**
+```bash
+# wkadmin 사용자로 전환
+sudo su - wkadmin
+cd /home/wkadmin/app/server
+
+# 서버 시작
+pm2 start dist/index.js --name "app-server"
+pm2 save
+
+# 로그 확인
+pm2 logs app-server --lines 50
+```
+
+**3단계: 포트 확인**
+```bash
+# 3000번 포트가 사용 중인지 확인
 sudo netstat -tulpn | grep 3000
+# 또는
+sudo ss -tulpn | grep 3000
+```
 
-# Nginx 에러 로그 확인
+**4단계: 서버 오류 확인**
+```bash
+# PM2 에러 로그 확인
+pm2 logs app-server --err --lines 100
+
+# 서버를 직접 실행하여 오류 확인
+cd /home/wkadmin/app/server
+node dist/index.js
+```
+
+**5단계: Nginx 에러 로그 확인**
+```bash
 sudo tail -f /var/log/nginx/error.log
 ```
 
-### 6. 메모리 부족
+**6단계: Nginx 재시작 (필요시)**
+```bash
+sudo nginx -t  # 설정 테스트
+sudo systemctl restart nginx
+```
+
+**일반적인 원인:**
+- PM2 프로세스가 실행되지 않음
+- 서버 시작 시 오류 발생 (마이그레이션 파일 누락, DB 연결 실패 등)
+- 포트 충돌
+- 서버가 크래시됨
+
+### 8. 메모리 부족
 ```bash
 # 메모리 사용량 확인
 free -h
@@ -597,7 +696,7 @@ pm2 start dist/index.js --name "app-server" --max-memory-restart 400M
 pm2 save
 ```
 
-### 7. 디스크 공간 부족
+### 9. 디스크 공간 부족
 ```bash
 # 디스크 사용량 확인
 df -h
