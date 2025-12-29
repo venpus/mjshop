@@ -351,14 +351,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       // 성공 메시지
       alert(`${selectedOrderIds.length}개의 발주가 성공적으로 컨펌되었습니다.`);
 
-      // 로컬 상태 업데이트
-      setPurchaseOrders(prevOrders =>
-        prevOrders.map(po =>
-          selectedOrders.has(po.id)
-            ? { ...po, isOrderConfirmed: true }
-            : po
-        )
-      );
+      // 목록 새로고침하여 최신 상태 반영
+      await loadPurchaseOrders();
       
       // 선택 초기화
       setSelectedOrders(new Set());

@@ -84,7 +84,7 @@ export class PurchaseOrderRepository {
         COALESCE(summary.unreceived_quantity, 0) AS unreceived_quantity
        FROM purchase_orders po
        LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
-       ORDER BY po.created_at DESC`
+       ORDER BY po.order_date DESC, po.created_at DESC`
     );
 
     return rows.map((row) => ({
@@ -120,7 +120,7 @@ export class PurchaseOrderRepository {
        FROM purchase_orders po
        LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
        WHERE COALESCE(summary.unshipped_quantity, 0) > 0
-       ORDER BY po.created_at DESC`
+       ORDER BY po.order_date DESC, po.created_at DESC`
     );
 
     return rows.map((row) => ({
