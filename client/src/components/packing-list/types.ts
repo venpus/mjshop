@@ -28,7 +28,7 @@ export interface PackingListItem {
   warehouseArrivalDate: string; // 물류창고 도착일
   koreaArrivalDate: Array<{ id?: number; date: string; quantity: string }>; // 한국도착일 (날짜와 수량을 여러개 입력 가능, id는 서버 ID)
   actualWeight: string; // 실중량
-  weightRatio: '5%' | '10%' | '15%' | '20%' | ''; // 비율
+  weightRatio: '0%' | '5%' | '10%' | '15%' | '20%' | ''; // 비율
   calculatedWeight: string; // 중량 (실중량 x (1+비율))
   shippingCost: string; // 배송비
   paymentDate: string; // 지급일
@@ -39,4 +39,4 @@ export interface PackingListItem {
 
 // 상수
 export const LOGISTICS_COMPANIES = ['위해-한사장', '광저우-비전', '위해-비전', '정상해운'] as const;
-export const WEIGHT_RATIOS: Array<'5%' | '10%' | '15%' | '20%'> = ['5%', '10%', '15%', '20%'];
+export const WEIGHT_RATIOS: Array<'0%' | '5%' | '10%' | '15%' | '20%'> = ['0%', '5%', '10%', '15%', '20%'];

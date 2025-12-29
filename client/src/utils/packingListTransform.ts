@@ -1,6 +1,7 @@
 // 서버 API 데이터와 클라이언트 데이터 간 변환 함수
 
 import type { PackingListItem } from '../components/packing-list/types';
+import { calculateWeight } from './packingListUtils';
 import type {
   PackingListWithItems,
   PackingListItem as ServerPackingListItem,
@@ -25,24 +26,33 @@ function getFullImageUrl(imageUrl: string | null | undefined): string {
 
 /**
  * 날짜를 YYYY-MM-DD 형식으로 변환 (년 월 일만 표시)
+ * UTC 날짜를 그대로 사용하여 시간대 변환으로 인한 날짜 변경 방지
  */
 function formatDateOnly(dateStr: string | Date | null | undefined): string {
   if (!dateStr) return '';
   
-  // Date 객체인 경우 문자열로 변환
-  let dateString = typeof dateStr === 'string' ? dateStr : dateStr.toString();
+  // Date 객체인 경우 ISO 문자열로 변환
+  let dateString = typeof dateStr === 'string' ? dateStr : dateStr.toISOString();
   
   // 이미 YYYY-MM-DD 형식이면 그대로 반환
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
     return dateString;
   }
   
-  // ISO 문자열이나 다른 형식이면 YYYY-MM-DD로 변환
+  // ISO 문자열 (YYYY-MM-DDTHH:mm:ss.sssZ)인 경우 날짜 부분만 추출
+  const isoMatch = dateString.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoMatch) {
+    return isoMatch[1];
+  }
+  
+  // 다른 형식인 경우 Date 객체로 변환 시도
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return dateString;
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  
+  // UTC 날짜 사용 (시간대 변환 방지)
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
@@ -77,22 +87,34 @@ export function transformServerToClient(
           const ratio = packingList.weight_ratio;
           console.log('[비율 로드] 서버에서 받은 weight_ratio:', ratio, 'packingListId:', packingList.id);
           if (ratio === null || ratio === undefined) {
-            console.log('[비율 로드] null/undefined → 빈 문자열 반환');
-            return '';
+            console.log('[비율 로드] null/undefined → 기본값 0% 반환');
+            return '0%';
           }
-          // 숫자를 정수로 변환 후 퍼센트 문자열로 변환 (5.00 -> 5 -> "5%", 10.00 -> 10 -> "10%", 등)
+          // 숫자를 정수로 변환 후 퍼센트 문자열로 변환 (0.00 -> 0 -> "0%", 5.00 -> 5 -> "5%", 등)
           const ratioInt = Math.round(parseFloat(String(ratio)));
           const ratioStr = `${ratioInt}%`;
           console.log('[비율 로드] 변환:', ratio, '→', ratioInt, '→', ratioStr);
           // 타입 안전성을 위해 유효한 비율 값인지 확인
-          if (ratioStr === '5%' || ratioStr === '10%' || ratioStr === '15%' || ratioStr === '20%') {
+          if (ratioStr === '0%' || ratioStr === '5%' || ratioStr === '10%' || ratioStr === '15%' || ratioStr === '20%') {
             console.log('[비율 로드] 유효한 비율 값:', ratioStr);
             return ratioStr as PackingListItem['weightRatio'];
           }
-          console.log('[비율 로드] 유효하지 않은 비율 값:', ratioStr, '→ 빈 문자열 반환');
-          return '';
+          console.log('[비율 로드] 유효하지 않은 비율 값:', ratioStr, '→ 기본값 0% 반환');
+          return '0%';
         })(),
-        calculatedWeight: packingList.calculated_weight?.toString() || '',
+        calculatedWeight: (() => {
+          // calculated_weight가 있으면 사용, 없으면 계산
+          const actualWeight = packingList.actual_weight?.toString() || '';
+          const weightRatio = packingList.weight_ratio;
+          let ratioStr = '0%';
+          if (weightRatio !== null && weightRatio !== undefined) {
+            const ratioInt = Math.round(parseFloat(String(weightRatio)));
+            ratioStr = `${ratioInt}%`;
+          } else {
+            ratioStr = '0%';
+          }
+          return calculateWeight(actualWeight, ratioStr);
+        })(),
         shippingCost: packingList.shipping_cost?.toString() || '',
         paymentDate: packingList.payment_date ? formatDateOnly(packingList.payment_date) : '',
         wkPaymentDate: packingList.wk_payment_date ? formatDateOnly(packingList.wk_payment_date) : '',
@@ -145,22 +167,34 @@ export function transformServerToClient(
           const ratio = packingList.weight_ratio;
           console.log('[비율 로드] 서버에서 받은 weight_ratio:', ratio, 'packingListId:', packingList.id);
           if (ratio === null || ratio === undefined) {
-            console.log('[비율 로드] null/undefined → 빈 문자열 반환');
-            return '';
+            console.log('[비율 로드] null/undefined → 기본값 0% 반환');
+            return '0%';
           }
-          // 숫자를 정수로 변환 후 퍼센트 문자열로 변환 (5.00 -> 5 -> "5%", 10.00 -> 10 -> "10%", 등)
+          // 숫자를 정수로 변환 후 퍼센트 문자열로 변환 (0.00 -> 0 -> "0%", 5.00 -> 5 -> "5%", 등)
           const ratioInt = Math.round(parseFloat(String(ratio)));
           const ratioStr = `${ratioInt}%`;
           console.log('[비율 로드] 변환:', ratio, '→', ratioInt, '→', ratioStr);
           // 타입 안전성을 위해 유효한 비율 값인지 확인
-          if (ratioStr === '5%' || ratioStr === '10%' || ratioStr === '15%' || ratioStr === '20%') {
+          if (ratioStr === '0%' || ratioStr === '5%' || ratioStr === '10%' || ratioStr === '15%' || ratioStr === '20%') {
             console.log('[비율 로드] 유효한 비율 값:', ratioStr);
             return ratioStr as PackingListItem['weightRatio'];
           }
-          console.log('[비율 로드] 유효하지 않은 비율 값:', ratioStr, '→ 빈 문자열 반환');
-          return '';
+          console.log('[비율 로드] 유효하지 않은 비율 값:', ratioStr, '→ 기본값 0% 반환');
+          return '0%';
         })(),
-        calculatedWeight: packingList.calculated_weight?.toString() || '',
+        calculatedWeight: (() => {
+          // calculated_weight가 있으면 사용, 없으면 계산
+          const actualWeight = packingList.actual_weight?.toString() || '';
+          const weightRatio = packingList.weight_ratio;
+          let ratioStr = '0%';
+          if (weightRatio !== null && weightRatio !== undefined) {
+            const ratioInt = Math.round(parseFloat(String(weightRatio)));
+            ratioStr = `${ratioInt}%`;
+          } else {
+            ratioStr = '0%';
+          }
+          return calculateWeight(actualWeight, ratioStr);
+        })(),
         shippingCost: packingList.shipping_cost?.toString() || '',
         paymentDate: packingList.payment_date ? formatDateOnly(packingList.payment_date) : '',
         wkPaymentDate: packingList.wk_payment_date ? formatDateOnly(packingList.wk_payment_date) : '',
@@ -168,6 +202,25 @@ export function transformServerToClient(
         isFirstRow,
       });
     });
+  });
+
+  // 발송일 기준 최신순으로 정렬
+  // 같은 code(패킹리스트)의 항목들은 그룹으로 유지하면서 발송일 기준 정렬
+  clientItems.sort((a, b) => {
+    // date 필드를 비교 (YYYY-MM-DD 형식, 문자열 비교로 충분)
+    if (a.date && b.date) {
+      // YYYY-MM-DD 형식은 문자열 비교로도 정렬 가능 (역순)
+      if (a.date !== b.date) {
+        return b.date.localeCompare(a.date); // 최신순 (내림차순)
+      }
+    }
+    // date가 없거나 같으면 code로 비교 (같은 패킹리스트의 항목들은 그룹화)
+    if (a.code !== b.code) {
+      // code로 비교하되, 발송일이 같은 경우 code 역순으로 정렬 (최신 코드가 먼저)
+      return b.code.localeCompare(a.code);
+    }
+    // 같은 code인 경우 순서 유지 (id로 비교)
+    return a.id.localeCompare(b.id);
   });
 
   return clientItems;
@@ -193,7 +246,15 @@ export function transformFormDataToServerRequest(
       weightNum = weightNum / 1000; // g를 kg로 변환
     }
 
-    actualWeight = weightNum;
+    // 개별 중량 vs 합산 중량 구분
+    if (formData.weightType === '개별 중량' && formData.products.length === 1) {
+      // 개별 중량: 개별 중량 x 박스수 (소수점 두자리까지)
+      const boxCountNum = parseFloat(formData.boxCount) || 0;
+      actualWeight = parseFloat((weightNum * boxCountNum).toFixed(2));
+    } else {
+      // 합산 중량: 입력한 값 그대로 (소수점 두자리까지)
+      actualWeight = parseFloat(weightNum.toFixed(2));
+    }
 
     // 비율과 계산 중량은 나중에 클라이언트에서 입력될 수 있으므로 여기서는 undefined로 설정
     // 필요시 추가 로직 구현

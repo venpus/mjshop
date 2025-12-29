@@ -69,17 +69,13 @@ export function ShippingHistory() {
     try {
       console.log('[비율 로드] 패킹리스트 로드 시작');
       const serverData = await getAllPackingLists();
-      console.log('[비율 로드] 서버에서 받은 데이터:', serverData.map(pl => ({
-        id: pl.id,
-        code: pl.code,
-        weight_ratio: pl.weight_ratio
-      })));
+      console.log('[비율 로드] 서버에서 받은 데이터 (발송일 순서):', 
+        serverData.map(pl => `ID:${pl.id} Code:${pl.code} Date:${pl.shipment_date}`).join(', ')
+      );
       const transformedItems = transformServerToClient(serverData);
-      console.log('[비율 로드] 변환된 아이템의 weightRatio:', transformedItems.map(item => ({
-        id: item.id,
-        code: item.code,
-        weightRatio: item.weightRatio
-      })));
+      console.log('[비율 로드] 변환 후 정렬 확인 (발송일 순서):', 
+        transformedItems.map(item => `ID:${item.id} Code:${item.code} Date:${item.date}`).join(', ')
+      );
       setPackingListItems(transformedItems);
       setOriginalPackingListItems(JSON.parse(JSON.stringify(transformedItems))); // 깊은 복사로 원본 저장
       setIsDirty(false); // 로드 후 변경사항 없음

@@ -117,8 +117,8 @@ export function Sidebar({
           {!isCollapsed && isChinaExpanded && (
             <div className="ml-4 mt-1 space-y-1">
 
-              상품 관리 (A, S 등급 관리자만 표시)
-              {isAdminLevelA && (
+              {/* 상품 관리 (A, S 등급 관리자만 표시) */}
+              {/* {isAdminLevelA && (
                 <button
                   onClick={() => onPageChange("products")}
                   className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
@@ -131,7 +131,7 @@ export function Sidebar({
                   <Package className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
                   {!isCollapsed && <span>상품 관리</span>}
                 </button>
-              )}
+              )} */}
               {/* 발주 관리 (A, S 등급 관리자만 표시) */}
               {isAdminLevelA && (
                 <button
@@ -158,6 +158,30 @@ export function Sidebar({
               >
                 <PackageSearch className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
                 {!isCollapsed && <span>패킹리스트</span>}
+              </button>
+              <button
+                onClick={() => onPageChange("materials")}
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
+                  currentPage === "materials"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+                title={isCollapsed ? "부자재 관리" : undefined}
+              >
+                <Box className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
+                {!isCollapsed && <span>악세사리</span>}
+              </button>
+              <button
+                onClick={() => onPageChange("projects")}
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
+                  currentPage === "projects"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+                title={isCollapsed ? "프로젝트 관리" : undefined}
+              >
+                <Folder className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
+                {!isCollapsed && <span>프로젝트 관리</span>}
               </button>
               <button
                 onClick={() => onPageChange("china-payment")}
@@ -207,18 +231,7 @@ export function Sidebar({
                 <FileSpreadsheet className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
                 {!isCollapsed && <span>정상 인보이스(구현중)</span>}
               </button>
-              <button
-                onClick={() => onPageChange("materials")}
-                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === "materials"
-                    ? "bg-purple-50 text-purple-600"
-                    : "text-gray-600 hover:bg-gray-50"
-                }`}
-                title={isCollapsed ? "부자재 관리" : undefined}
-              >
-                <Box className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>부자재 관리</span>}
-              </button>
+              
               <button
                 onClick={() => onPageChange("packaging-work")}
                 className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
@@ -231,18 +244,7 @@ export function Sidebar({
                 <Hammer className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
                 {!isCollapsed && <span>포장작업 관리(구현중)</span>}
               </button>
-              <button
-                onClick={() => onPageChange("projects")}
-                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === "projects"
-                    ? "bg-purple-50 text-purple-600"
-                    : "text-gray-600 hover:bg-gray-50"
-                }`}
-                title={isCollapsed ? "프로젝트 관리" : undefined}
-              >
-                <Folder className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>프로젝트 관리(구현중)</span>}
-              </button>
+              
             </div>
           )}
         </div>

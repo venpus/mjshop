@@ -42,7 +42,7 @@ export function PackingListTable({
   onProductNameClick,
   onImageClick,
 }: PackingListTableProps) {
-  // 그룹별로 아이템들을 나누기
+  // 그룹별로 아이템들을 나누기 (순서 유지)
   const groupedItems = useMemo(() => {
     const groups: { [key: string]: PackingListItem[] } = {};
     items.forEach(item => {
@@ -55,14 +55,12 @@ export function PackingListTable({
     return groups;
   }, [items]);
 
-  // 그룹을 순회하면서 렌더링할 아이템 목록 생성
+  // 원본 items의 순서를 유지하면서 렌더링할 아이템 목록 생성
+  // (groupedItems는 그룹화 정보만 사용, 실제 렌더링은 원본 items 순서 유지)
   const renderItems = useMemo(() => {
-    const itemList: PackingListItem[] = [];
-    Object.values(groupedItems).forEach(group => {
-      itemList.push(...group);
-    });
-    return itemList;
-  }, [groupedItems]);
+    // 원본 items의 순서를 그대로 사용
+    return items;
+  }, [items]);
 
   // 아이템이 해당 그룹의 첫 번째 행인지 확인
   const isFirstRowInGroup = (item: PackingListItem): boolean => {
@@ -115,7 +113,7 @@ export function PackingListTable({
     onItemUpdate(groupId, (item) => ({ ...item, actualWeight, calculatedWeight }));
   };
 
-  const handleWeightRatioChange = (groupId: string, weightRatio: '5%' | '10%' | '15%' | '20%' | '', calculatedWeight: string) => {
+  const handleWeightRatioChange = (groupId: string, weightRatio: '0%' | '5%' | '10%' | '15%' | '20%' | '', calculatedWeight: string) => {
     onItemUpdate(groupId, (item) => ({ ...item, weightRatio, calculatedWeight }));
   };
 

@@ -102,9 +102,10 @@ export function createItemsFromFormData(data: PackingListFormData, groupId: stri
     const boxCountNum = parseFloat(data.boxCount) || 0;
     const totalQuantityValue = product.total * boxCountNum;
 
-    // 중량 계산
+    // 중량 계산 (소수점 두자리까지)
     let weightValue: string = '';
     if (data.products.length === 1 && data.weightType === '개별 중량') {
+      // 개별 중량: 개별 중량 x 박스수 (소수점 두자리까지)
       const weightStr = data.weight.trim();
       let weightNum = parseFloat(weightStr.replace(/[^0-9.]/g, '')) || 0;
       
@@ -112,9 +113,10 @@ export function createItemsFromFormData(data: PackingListFormData, groupId: stri
         weightNum = weightNum / 1000;
       }
       
-      const calculatedWeight = weightNum * boxCountNum;
-      weightValue = `${calculatedWeight}Kg`;
+      const calculatedWeight = parseFloat((weightNum * boxCountNum).toFixed(2));
+      weightValue = calculatedWeight.toString();
     } else if (data.weight) {
+      // 합산 중량: 입력한 값 그대로 (소수점 두자리까지)
       const weightStr = data.weight.trim();
       let weightNum = parseFloat(weightStr.replace(/[^0-9.]/g, '')) || 0;
       
@@ -122,7 +124,7 @@ export function createItemsFromFormData(data: PackingListFormData, groupId: stri
         weightNum = weightNum / 1000;
       }
       
-      weightValue = `${weightNum}Kg`;
+      weightValue = parseFloat(weightNum.toFixed(2)).toString();
     }
 
     return {

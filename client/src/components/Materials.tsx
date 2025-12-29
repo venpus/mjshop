@@ -189,7 +189,7 @@ export function Materials() {
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center shadow-md">
                   <Box className="w-5 h-5 text-white" />
                 </div>
-                <h2 className="text-gray-900">부자재 관리</h2>
+                <h2 className="text-gray-900">악세사리(Material) </h2>
               </div>
               <p className="text-sm text-gray-600 mt-2">
                 부자재 재고 및 관리를 수행합니다.

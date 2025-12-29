@@ -28,12 +28,49 @@ export class PackingListService {
 
   /**
    * 모든 패킹리스트 조회 (아이템 포함)
+   * 발송일 기준 최신순으로 정렬
    */
   async getAllPackingLists(): Promise<PackingListWithItems[]> {
     const packingLists = await this.repository.findAll();
-    return Promise.all(
+    // 아이템 포함하여 조회
+    const results = await Promise.all(
       packingLists.map((pl) => this.repository.findWithItems(pl.id))
-    ).then((results) => results.filter((r): r is PackingListWithItems => r !== null));
+    );
+    const filtered = results.filter((r): r is PackingListWithItems => r !== null);
+    
+    // 발송일 기준 최신순으로 정렬 (명시적 정렬)
+    filtered.sort((a, b) => {
+      // shipment_date를 Date 객체로 변환
+      const dateA = a.shipment_date instanceof Date 
+        ? a.shipment_date.getTime() 
+        : new Date(a.shipment_date).getTime();
+      const dateB = b.shipment_date instanceof Date 
+        ? b.shipment_date.getTime() 
+        : new Date(b.shipment_date).getTime();
+      
+      // 유효하지 않은 날짜 처리
+      if (isNaN(dateA) && isNaN(dateB)) {
+        return 0;
+      }
+      if (isNaN(dateA)) return 1; // dateA가 유효하지 않으면 뒤로
+      if (isNaN(dateB)) return -1; // dateB가 유효하지 않으면 뒤로
+      
+      if (dateA !== dateB) {
+        return dateB - dateA; // 최신순 (내림차순)
+      }
+      
+      // 발송일이 같으면 생성일 기준
+      const createdA = a.created_at instanceof Date 
+        ? a.created_at.getTime() 
+        : new Date(a.created_at).getTime();
+      const createdB = b.created_at instanceof Date 
+        ? b.created_at.getTime() 
+        : new Date(b.created_at).getTime();
+      
+      return createdB - createdA; // 최신순 (내림차순)
+    });
+    
+    return filtered;
   }
 
   /**

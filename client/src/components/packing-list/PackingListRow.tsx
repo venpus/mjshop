@@ -20,7 +20,7 @@ interface PackingListRowProps {
   onWarehouseArrivalDateChange: (groupId: string, date: string) => void;
   onKoreaArrivalChange: (groupId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => void;
   onActualWeightChange: (groupId: string, actualWeight: string, calculatedWeight: string) => void;
-  onWeightRatioChange: (groupId: string, weightRatio: '5%' | '10%' | '15%' | '20%' | '', calculatedWeight: string) => void;
+  onWeightRatioChange: (groupId: string, weightRatio: '0%' | '5%' | '10%' | '15%' | '20%' | '', calculatedWeight: string) => void;
   onShippingCostChange: (groupId: string, shippingCost: string) => void;
   onPaymentDateChange: (groupId: string, date: string) => void;
   onWkPaymentDateChange: (groupId: string, date: string) => void;

@@ -8,7 +8,7 @@ interface WeightCellProps {
   isSuperAdmin: boolean;
   rowSpan?: number;
   onActualWeightChange: (groupId: string, actualWeight: string, calculatedWeight: string) => void;
-  onWeightRatioChange: (groupId: string, weightRatio: '5%' | '10%' | '15%' | '20%' | '', calculatedWeight: string) => void;
+  onWeightRatioChange: (groupId: string, weightRatio: '0%' | '5%' | '10%' | '15%' | '20%' | '', calculatedWeight: string) => void;
 }
 
 export function WeightCell({
@@ -35,7 +35,7 @@ export function WeightCell({
   };
 
   const handleWeightRatioChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newRatio = e.target.value as '5%' | '10%' | '15%' | '20%' | '';
+    const newRatio = e.target.value as '0%' | '5%' | '10%' | '15%' | '20%' | '';
     console.log('[비율 변경] 사용자가 선택한 비율:', newRatio, 'item.weightRatio:', item.weightRatio, 'groupId:', groupId);
     const calculated = calculateWeight(item.actualWeight, newRatio);
     onWeightRatioChange(groupId, newRatio, calculated);
@@ -61,11 +61,10 @@ export function WeightCell({
       {isSuperAdmin && (
         <td rowSpan={rowSpan} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle">
           <select
-            value={item.weightRatio || ''}
+            value={item.weightRatio || '0%'}
             onChange={handleWeightRatioChange}
             className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
           >
-            <option value="">선택</option>
             {WEIGHT_RATIOS.map(ratio => (
               <option key={ratio} value={ratio}>{ratio}</option>
             ))}
