@@ -539,8 +539,8 @@ export function usePurchaseOrderSave({
         totalLaborCost
       );
       
-      // 선금 금액 = 기본비용 합의 50%
-      const advancePaymentAmount = basicCostTotal * 0.5;
+      // 선금 금액 = 최종 결제 금액 * (선금 비율 / 100)
+      const advancePaymentAmount = finalPaymentAmount * (advancePaymentRate / 100);
       
       // 잔금 금액 = 최종 결제 금액 - 선금 금액
       const balancePaymentAmount = calculateBalancePaymentAmount(

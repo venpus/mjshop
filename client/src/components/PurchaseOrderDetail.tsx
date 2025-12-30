@@ -1098,8 +1098,8 @@ export function PurchaseOrderDetail({
   );
   const finalPaymentAmount = calculateFinalPaymentAmount(basicCostTotal, shippingCostTotal, totalOptionCost, totalLaborCost);
   const expectedFinalUnitPrice = calculateExpectedFinalUnitPrice(finalPaymentAmount, quantity);
-  // 선금 금액 = 기본비용 합의 50%
-  const advancePaymentAmount = basicCostTotal * 0.5;
+  // 선금 금액 = 최종 결제 금액 * (선금 비율 / 100)
+  const advancePaymentAmount = finalPaymentAmount * (advancePaymentRate / 100);
   const balancePaymentAmount = calculateBalancePaymentAmount(finalPaymentAmount, advancePaymentAmount);
 
   // 새 발주인 경우 빈 폼 화면 표시
