@@ -1,4 +1,5 @@
 import { Factory, Plus, Trash2, X, Truck } from "lucide-react";
+import { handleNumberInput } from "../../utils/numberInputUtils";
 
 export interface FactoryShipment {
   id: string;
@@ -191,15 +192,17 @@ export function FactoryShippingTab({
                       <input
                         type="number"
                         value={shipment.quantity || ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const processedValue = handleNumberInput(e.target.value);
+                          if (processedValue !== e.target.value) {
+                            e.target.value = processedValue;
+                          }
                           onUpdateFactoryShipment(
                             shipment.id,
                             "quantity",
-                            e.target.value === "" ? 0 : parseInt(
-                              e.target.value,
-                            ) || 0,
-                          )
-                        }
+                            processedValue === "" ? 0 : parseInt(processedValue) || 0,
+                          );
+                        }}
                         className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <span className="text-sm text-gray-600 min-w-[20px]">
@@ -416,15 +419,17 @@ export function FactoryShippingTab({
                         <input
                           type="number"
                           value={item.quantity || ""}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const processedValue = handleNumberInput(e.target.value);
+                            if (processedValue !== e.target.value) {
+                              e.target.value = processedValue;
+                            }
                             onUpdateReturnExchangeItem(
                               item.id,
                               "quantity",
-                              e.target.value === "" ? 0 : parseInt(
-                                e.target.value,
-                              ) || 0,
-                            )
-                          }
+                              processedValue === "" ? 0 : parseInt(processedValue) || 0,
+                            );
+                          }}
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                         />
                         <span className="text-sm text-gray-600">

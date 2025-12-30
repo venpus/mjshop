@@ -47,9 +47,8 @@ export function TabNavigation({
             : "bg-orange-50 text-orange-700 border-transparent hover:bg-orange-100"
         }`}
       >
-        물류회사로 배송
+        연관 패킹리스트
       </button>
     </div>
   );
 }
-

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import {
   LayoutDashboard,
   Package,
@@ -59,20 +60,21 @@ export function Sidebar({
   onPageChange,
 }: SidebarProps) {
   const { user } = useAuth();
-  // A, S 등급 관리자만 표시
-  const isAdminLevelA = user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin';
+  const { t } = useLanguage();
+  // A, S, B 등급 관리자만 표시
+  const isAdminLevelA = user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin' || user?.level === 'B0: 중국Admin';
   const [isChinaExpanded, setIsChinaExpanded] = useState(true);
   const [isShopExpanded, setIsShopExpanded] = useState(true);
 
   return (
     <aside className={`bg-white border-r border-gray-200 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'} h-full flex flex-col`}>
       <div className={`p-6 ${isCollapsed ? 'px-4' : ''} flex items-center justify-between`}>
-        {!isCollapsed && <h1 className="text-purple-600 whitespace-nowrap">쇼핑몰 관리자</h1>}
+        {!isCollapsed && <h1 className="text-purple-600 whitespace-nowrap">{t('menu.adminTitle')}</h1>}
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
             className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900"
-            title={isCollapsed ? "사이드바 펼치기" : "사이드바 접기"}
+            title={isCollapsed ? t('menu.sidebarExpand') : t('menu.sidebarCollapse')}
           >
             {isCollapsed ? <ChevronRightIcon className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
           </button>
@@ -87,10 +89,10 @@ export function Sidebar({
               ? "bg-purple-50 text-purple-600"
               : "text-gray-700 hover:bg-gray-50"
           }`}
-          title={isCollapsed ? "대시보드" : undefined}
+          title={isCollapsed ? t('menu.dashboard') : undefined}
         >
           <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
-          {!isCollapsed && <span>대시보드</span>}
+          {!isCollapsed && <span>{t('menu.dashboard')}</span>}
         </button>
 
         {/* 중국협업 메뉴 */}
@@ -98,12 +100,12 @@ export function Sidebar({
           <button
             onClick={() => setIsChinaExpanded(!isChinaExpanded)}
             className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors text-gray-700 hover:bg-gray-50`}
-            title={isCollapsed ? "중국협업" : undefined}
+            title={isCollapsed ? t('menu.chinaCooperation') : undefined}
           >
             <Globe className="w-5 h-5 flex-shrink-0" />
             {!isCollapsed && (
               <>
-                <span className="flex-1 text-left">중국협업</span>
+                <span className="flex-1 text-left">{t('menu.chinaCooperation')}</span>
                 {isChinaExpanded ? (
                   <ChevronDown className="w-4 h-4" />
                 ) : (
@@ -132,7 +134,7 @@ export function Sidebar({
                   {!isCollapsed && <span>상품 관리</span>}
                 </button>
               )} */}
-              {/* 발주 관리 (A, S 등급 관리자만 표시) */}
+              {/* 발주 관리 (A, S, B 등급 관리자만 표시) */}
               {isAdminLevelA && (
                 <button
                   onClick={() => onPageChange("purchase-orders")}
@@ -141,10 +143,10 @@ export function Sidebar({
                       ? "bg-purple-50 text-purple-600"
                       : "text-gray-600 hover:bg-gray-50"
                   }`}
-                  title={isCollapsed ? "발주 관리" : undefined}
+                  title={isCollapsed ? t('menu.purchaseOrders') : undefined}
                 >
                   <FileText className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                  {!isCollapsed && <span>발주 관리</span>}
+                  {!isCollapsed && <span>{t('menu.purchaseOrders')}</span>}
                 </button>
               )}
               <button
@@ -154,10 +156,10 @@ export function Sidebar({
                     ? "bg-purple-50 text-purple-600"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
-                title={isCollapsed ? "패킹리스트" : undefined}
+                title={isCollapsed ? t('menu.packingList') : undefined}
               >
                 <PackageSearch className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>패킹리스트</span>}
+                {!isCollapsed && <span>{t('menu.packingList')}</span>}
               </button>
               <button
                 onClick={() => onPageChange("materials")}
@@ -166,10 +168,10 @@ export function Sidebar({
                     ? "bg-purple-50 text-purple-600"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
-                title={isCollapsed ? "부자재 관리" : undefined}
+                title={isCollapsed ? t('menu.materials') : undefined}
               >
                 <Box className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>악세사리</span>}
+                {!isCollapsed && <span>{t('menu.materials')}</span>}
               </button>
               <button
                 onClick={() => onPageChange("projects")}
@@ -178,10 +180,10 @@ export function Sidebar({
                     ? "bg-purple-50 text-purple-600"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
-                title={isCollapsed ? "프로젝트 관리" : undefined}
+                title={isCollapsed ? t('menu.projects') : undefined}
               >
                 <Folder className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>프로젝트 관리</span>}
+                {!isCollapsed && <span>{t('menu.projects')}</span>}
               </button>
               <button
                 onClick={() => onPageChange("china-payment")}
@@ -190,10 +192,10 @@ export function Sidebar({
                     ? "bg-purple-50 text-purple-600"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
-                title={isCollapsed ? "결제 내역(구현중)" : undefined}
+                title={isCollapsed ? t('menu.chinaPayment') : undefined}
               >
                 <DollarSign className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>결제 내역(구현중)</span>}
+                {!isCollapsed && <span>{t('menu.chinaPayment')}</span>}
               </button>
               <button
                 onClick={() => onPageChange("gallery")}
@@ -202,10 +204,10 @@ export function Sidebar({
                     ? "bg-purple-50 text-purple-600"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
-                title={isCollapsed ? "갤러리(구현중)" : undefined}
+                title={isCollapsed ? t('menu.gallery') : undefined}
               >
                 <ImageIcon className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>갤러리(구현중)</span>}
+                {!isCollapsed && <span>{t('menu.gallery')}</span>}
               </button>
               <button
                 onClick={() => onPageChange("china-warehouse")}
@@ -214,10 +216,10 @@ export function Sidebar({
                     ? "bg-purple-50 text-purple-600"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
-                title={isCollapsed ? "중국 입출고 현황(구현중)" : undefined}
+                title={isCollapsed ? t('menu.chinaWarehouse') : undefined}
               >
                 <ClipboardList className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>중국 입출고 현황(구현중)</span>}
+                {!isCollapsed && <span>{t('menu.chinaWarehouse')}</span>}
               </button>
               <button
                 onClick={() => onPageChange("invoice")}
@@ -226,10 +228,10 @@ export function Sidebar({
                     ? "bg-purple-50 text-purple-600"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
-                title={isCollapsed ? "정상 인보이스(구현중)" : undefined}
+                title={isCollapsed ? t('menu.invoice') : undefined}
               >
                 <FileSpreadsheet className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>정상 인보이스(구현중)</span>}
+                {!isCollapsed && <span>{t('menu.invoice')}</span>}
               </button>
               
               <button
@@ -239,10 +241,10 @@ export function Sidebar({
                     ? "bg-purple-50 text-purple-600"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
-                title={isCollapsed ? "포장작업 관리" : undefined}
+                title={isCollapsed ? t('menu.packagingWork') : undefined}
               >
                 <Hammer className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>포장작업 관리(구현중)</span>}
+                {!isCollapsed && <span>{t('menu.packagingWork')}</span>}
               </button>
               
             </div>
@@ -254,12 +256,12 @@ export function Sidebar({
           <button
             onClick={() => setIsShopExpanded(!isShopExpanded)}
             className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors text-gray-700 hover:bg-gray-50`}
-            title={isCollapsed ? "쇼핑몰 관리" : undefined}
+            title={isCollapsed ? t('menu.shopManagement') : undefined}
           >
             <Store className="w-5 h-5 flex-shrink-0" />
             {!isCollapsed && (
               <>
-                <span className="flex-1 text-left">쇼핑몰 관리</span>
+                <span className="flex-1 text-left">{t('menu.shopManagement')}</span>
                 {isShopExpanded ? (
                   <ChevronDown className="w-4 h-4" />
                 ) : (
@@ -279,10 +281,10 @@ export function Sidebar({
                     ? "bg-purple-50 text-purple-600"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
-                title={isCollapsed ? "주문 관리" : undefined}
+                title={isCollapsed ? t('menu.orders') : undefined}
               >
                 <ShoppingCart className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>주문 관리</span>}
+                {!isCollapsed && <span>{t('menu.orders')}</span>}
               </button>
               <button
                 onClick={() => onPageChange("shipping")}
@@ -291,10 +293,10 @@ export function Sidebar({
                     ? "bg-purple-50 text-purple-600"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
-                title={isCollapsed ? "배송 관리" : undefined}
+                title={isCollapsed ? t('menu.shipping') : undefined}
               >
                 <Truck className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>배송 관리</span>}
+                {!isCollapsed && <span>{t('menu.shipping')}</span>}
               </button>
               <button
                 onClick={() => onPageChange("payment")}
@@ -303,10 +305,10 @@ export function Sidebar({
                     ? "bg-purple-50 text-purple-600"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
-                title={isCollapsed ? "결제 관리" : undefined}
+                title={isCollapsed ? t('menu.payment') : undefined}
               >
                 <CreditCard className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>결제 관리</span>}
+                {!isCollapsed && <span>{t('menu.payment')}</span>}
               </button>
               <button
                 onClick={() => onPageChange("inventory")}
@@ -315,10 +317,10 @@ export function Sidebar({
                     ? "bg-purple-50 text-purple-600"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
-                title={isCollapsed ? "재고 관리" : undefined}
+                title={isCollapsed ? t('menu.inventory') : undefined}
               >
                 <Warehouse className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>재고 관리</span>}
+                {!isCollapsed && <span>{t('menu.inventory')}</span>}
               </button>
             </div>
           )}
@@ -332,10 +334,10 @@ export function Sidebar({
               ? "bg-purple-50 text-purple-600"
               : "text-gray-700 hover:bg-gray-50"
           }`}
-          title={isCollapsed ? "회원 관리" : undefined}
+          title={isCollapsed ? t('menu.members') : undefined}
         >
           <Users className="w-5 h-5 flex-shrink-0" />
-          {!isCollapsed && <span>회원 관리</span>}
+          {!isCollapsed && <span>{t('menu.members')}</span>}
         </button>
 
         {/* 관리자 계정 관리 */}
@@ -346,10 +348,10 @@ export function Sidebar({
               ? "bg-purple-50 text-purple-600"
               : "text-gray-700 hover:bg-gray-50"
           }`}
-          title={isCollapsed ? "관리자 계정 관리" : undefined}
+          title={isCollapsed ? t('menu.adminAccount') : undefined}
         >
           <UserCog className="w-5 h-5 flex-shrink-0" />
-          {!isCollapsed && <span>관리자 계정 관리</span>}
+          {!isCollapsed && <span>{t('menu.adminAccount')}</span>}
         </button>
       </nav>
     </aside>

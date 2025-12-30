@@ -54,5 +54,12 @@ router.delete('/images/:imageId', purchaseOrderController.deleteImage);
 // 메인 이미지 업로드
 router.post('/:id/main-image', poImageUpload.single('mainImage'), purchaseOrderController.uploadMainImage);
 
+// 메모 관련
+router.get('/:id/memos', purchaseOrderController.getMemos);
+router.post('/:id/memos', purchaseOrderController.addMemo);
+router.delete('/:id/memos/:memoId', purchaseOrderController.deleteMemo);
+router.post('/:id/memos/:memoId/replies', purchaseOrderController.addMemoReply);
+router.delete('/:id/memos/:memoId/replies/:replyId', purchaseOrderController.deleteMemoReply);
+
 export default router;
 

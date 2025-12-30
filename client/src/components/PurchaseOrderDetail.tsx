@@ -140,6 +140,7 @@ export function PurchaseOrderDetail({
   const [productName, setProductName] = useState("");
   const [productSize, setProductSize] = useState("");
   const [productWeight, setProductWeight] = useState("");
+  const [productPackagingSize, setProductPackagingSize] = useState("");
   const [productImage, setProductImage] = useState<string>("");
   const [pendingMainImageFile, setPendingMainImageFile] = useState<File | null>(null);
   const [pendingMainImagePreview, setPendingMainImagePreview] = useState<string>("");
@@ -153,7 +154,7 @@ export function PurchaseOrderDetail({
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   
   // 사진모아보기 이미지 상태
-  const [productGalleryImages, setProductGalleryImages] = useState<string[]>([]);
+  const [productGalleryImages, setProductGalleryImages] = useState<Array<{ id?: number; url: string; type?: string }>>([]);
 
   // 선금/잔금 관리
   const [advancePaymentRate, setAdvancePaymentRate] = useState(0);
@@ -206,6 +207,7 @@ export function PurchaseOrderDetail({
     setMemos,
   } = useMemoManagement({
     currentUserId,
+    purchaseOrderId: isNewOrder ? null : orderId,
   });
 
   // 업체 출고 핸들러 Hook 사용
@@ -250,11 +252,13 @@ export function PurchaseOrderDetail({
     addLaborCostItem,
     removeLaborCostItem,
     updateLaborCostItemName,
-    updateLaborCostItemCost,
+    updateLaborCostItemUnitPrice,
+    updateLaborCostItemQuantity,
     addOptionItem,
     removeOptionItem,
     updateOptionItemName,
-    updateOptionItemCost,
+    updateOptionItemUnitPrice,
+    updateOptionItemQuantity,
   } = useCostItemHandlers({
     optionItems,
     setOptionItems,
@@ -332,6 +336,7 @@ export function PurchaseOrderDetail({
     productName,
     productSize,
     productWeight,
+    productPackagingSize,
     optionItems,
     laborCostItems,
     factoryShipments,
@@ -350,6 +355,8 @@ export function PurchaseOrderDetail({
     reloadWorkItems,
     reloadDeliverySets,
     currentUserId,
+    isSuperAdmin,
+    userLevel: user?.level,
   });
 
   // hook에서 반환된 값들을 사용할 수 있도록 변수 정의
@@ -500,10 +507,11 @@ export function PurchaseOrderDetail({
       setOrderStatus('발주 대기');
       setWorkStartDate('');
       setWorkEndDate('');
-      setProductName('');
-      setProductSize('');
-      setProductWeight('');
-      setProductImage('');
+        setProductName('');
+        setProductSize('');
+        setProductWeight('');
+        setProductPackagingSize('');
+        setProductImage('');
       return;
     }
 
@@ -533,7 +541,7 @@ export function PurchaseOrderDetail({
         setWorkStartDate(formatDateForInput(order._rawData.work_start_date));
         setWorkEndDate(formatDateForInput(order._rawData.work_end_date));
         
-        // 상품 정보 로드 (product_name, product_size, product_weight, product_main_image)
+        // 상품 정보 로드 (product_name, product_size, product_weight, product_packaging_size, product_main_image)
         if (order._rawData.product_name) {
           setProductName(order._rawData.product_name);
         }
@@ -542,6 +550,9 @@ export function PurchaseOrderDetail({
         }
         if (order._rawData.product_weight) {
           setProductWeight(order._rawData.product_weight);
+        }
+        if (order._rawData.product_packaging_size) {
+          setProductPackagingSize(order._rawData.product_packaging_size);
         }
         if (order.productImage) {
           setProductImage(order.productImage);
@@ -654,6 +665,7 @@ export function PurchaseOrderDetail({
             product_name: order._rawData.product_name || order.product || '',
             product_size: order._rawData.product_size || order.size || '',
             product_weight: order._rawData.product_weight || order.weight || '',
+            product_packaging_size: order._rawData.product_packaging_size || '',
             optionItems: JSON.parse(JSON.stringify(optionItems)),
             laborCostItems: JSON.parse(JSON.stringify(laborCostItems)),
             factoryShipments: JSON.parse(JSON.stringify(factoryShipments.map(s => ({ ...s, pendingImages: undefined })))),
@@ -988,16 +1000,16 @@ export function PurchaseOrderDetail({
     }
 
     try {
-      const allImages: string[] = [];
+      const allImages: Array<{ id?: number; url: string; type?: string }> = [];
       const seenUrls = new Set<string>(); // URL 중복 체크용 Set
 
-      // 1. 메인 이미지 추가
+      // 1. 메인 이미지 추가 (메인 이미지는 ID가 없으므로 id 없이 추가)
       if (order?.productImage) {
         const mainImageUrl = order.productImage.startsWith('http') 
           ? order.productImage 
           : `${SERVER_BASE_URL}${order.productImage}`;
         if (mainImageUrl && !seenUrls.has(mainImageUrl)) {
-          allImages.push(mainImageUrl);
+          allImages.push({ url: mainImageUrl, type: 'main' });
           seenUrls.add(mainImageUrl);
         }
       }
@@ -1019,7 +1031,7 @@ export function PurchaseOrderDetail({
                   ? img.image_url 
                   : `${SERVER_BASE_URL}${img.image_url}`;
                 if (imageUrl && !seenUrls.has(imageUrl)) {
-                  allImages.push(imageUrl);
+                  allImages.push({ id: img.id, url: imageUrl, type: imageType });
                   seenUrls.add(imageUrl);
                 }
               });
@@ -1106,6 +1118,7 @@ export function PurchaseOrderDetail({
           onMainImageUpload={handleMainImageUpload}
           size={productSize}
           weight={productWeight}
+          packagingSize={productPackagingSize}
           packaging={packaging}
           finalUnitPrice={expectedFinalUnitPrice}
           orderDate={orderDate}
@@ -1124,6 +1137,7 @@ export function PurchaseOrderDetail({
           onProductNameChange={setProductName}
           onSizeChange={setProductSize}
           onWeightChange={setProductWeight}
+          onPackagingSizeChange={setProductPackagingSize}
           currentFactoryStatus={currentFactoryStatus}
           totalShippedQuantity={totalShippedQuantity}
           totalReturnQuantity={totalReturnQuantity}
@@ -1169,6 +1183,7 @@ export function PurchaseOrderDetail({
                 commissionAmount={commissionAmount}
                 basicCostTotal={basicCostTotal}
                 isSuperAdmin={isSuperAdmin}
+                userLevel={user?.level}
                 onSetUnitPrice={setUnitPrice}
                 onSetBackMargin={setBackMargin}
                 onSetQuantity={setQuantity}
@@ -1182,13 +1197,15 @@ export function PurchaseOrderDetail({
                 optionItems={optionItems}
                 totalOptionCost={totalOptionCost}
                 onUpdateOptionItemName={updateOptionItemName}
-                onUpdateOptionItemCost={updateOptionItemCost}
+                onUpdateOptionItemUnitPrice={updateOptionItemUnitPrice}
+                onUpdateOptionItemQuantity={updateOptionItemQuantity}
                 onRemoveOptionItem={removeOptionItem}
                 onAddOptionItem={addOptionItem}
                 laborCostItems={laborCostItems}
                 totalLaborCost={totalLaborCost}
                 onUpdateLaborCostItemName={updateLaborCostItemName}
-                onUpdateLaborCostItemCost={updateLaborCostItemCost}
+                onUpdateLaborCostItemUnitPrice={updateLaborCostItemUnitPrice}
+                onUpdateLaborCostItemQuantity={updateLaborCostItemQuantity}
                 onRemoveLaborCostItem={removeLaborCostItem}
                 onAddLaborCostItem={addLaborCostItem}
                 advancePaymentRate={advancePaymentRate}
@@ -1304,6 +1321,7 @@ export function PurchaseOrderDetail({
         onMainImageUpload={handleMainImageUpload}
         size={productSize || order!.size || ''}
         weight={productWeight || order!.weight || ''}
+        packagingSize={productPackagingSize || ''}
         packaging={packaging}
         finalUnitPrice={expectedFinalUnitPrice}
         orderDate={orderDate}
@@ -1316,6 +1334,9 @@ export function PurchaseOrderDetail({
         onOrderConfirmedChange={handleOrderConfirmedChange}
         onCancelOrder={handleCancelOrder}
         onProductClick={undefined}
+        onSizeChange={setProductSize}
+        onWeightChange={setProductWeight}
+        onPackagingSizeChange={setProductPackagingSize}
         onPhotoGalleryClick={handlePhotoGalleryClick}
         onImageClick={() => setIsImageModalOpen(true)}
         currentFactoryStatus={currentFactoryStatus}
@@ -1362,6 +1383,7 @@ export function PurchaseOrderDetail({
                 commissionAmount={commissionAmount}
                 basicCostTotal={basicCostTotal}
                 isSuperAdmin={isSuperAdmin}
+                userLevel={user?.level}
                 onSetUnitPrice={setUnitPrice}
                 onSetBackMargin={setBackMargin}
                 onSetQuantity={setQuantity}
@@ -1375,13 +1397,15 @@ export function PurchaseOrderDetail({
                 optionItems={optionItems}
                 totalOptionCost={totalOptionCost}
                 onUpdateOptionItemName={updateOptionItemName}
-                onUpdateOptionItemCost={updateOptionItemCost}
+                onUpdateOptionItemUnitPrice={updateOptionItemUnitPrice}
+                onUpdateOptionItemQuantity={updateOptionItemQuantity}
                 onRemoveOptionItem={removeOptionItem}
                 onAddOptionItem={addOptionItem}
                 laborCostItems={laborCostItems}
                 totalLaborCost={totalLaborCost}
                 onUpdateLaborCostItemName={updateLaborCostItemName}
-                onUpdateLaborCostItemCost={updateLaborCostItemCost}
+                onUpdateLaborCostItemUnitPrice={updateLaborCostItemUnitPrice}
+                onUpdateLaborCostItemQuantity={updateLaborCostItemQuantity}
                 onRemoveLaborCostItem={removeLaborCostItem}
                 onAddLaborCostItem={addLaborCostItem}
                 advancePaymentRate={advancePaymentRate}
@@ -1489,6 +1513,7 @@ export function PurchaseOrderDetail({
           setProductGalleryImages([]);
         }}
         onImageClick={(imageUrl) => setSelectedGalleryImage(imageUrl)}
+        images={productGalleryImages}
         onImagesUpdated={handlePhotoGalleryClick}
       />
 

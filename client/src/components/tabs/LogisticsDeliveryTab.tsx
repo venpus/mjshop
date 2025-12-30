@@ -222,7 +222,13 @@ export function LogisticsDeliveryTab({
                         <input
                           type="number"
                           value={pkg.count || ""}
-                          onChange={(e) => onUpdatePackageInfo(set.id, pkg.id, "count", e.target.value === "" ? null : parseInt(e.target.value) || null)}
+                          onChange={(e) => {
+                            const processedValue = handleNumberInput(e.target.value);
+                            if (processedValue !== e.target.value) {
+                              e.target.value = processedValue;
+                            }
+                            onUpdatePackageInfo(set.id, pkg.id, "count", processedValue === "" ? null : parseInt(processedValue) || null);
+                          }}
                           className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-orange-500"
                           min="0"
                         />

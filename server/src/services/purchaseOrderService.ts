@@ -125,23 +125,28 @@ export class PurchaseOrderService {
     const poId = await this.repository.generateNextId();
     const poNumber = await this.repository.generateNextPoNumber();
 
-    // 새 발주 기본 정보 생성 (수량, 단가, 날짜는 사용자 입력값 사용, 나머지는 원본 복사)
+    // 새 발주 기본 정보 생성
+    // - 수량, 단가, 날짜는 사용자 입력값 사용
+    // - 상품정보: 사이즈, 무게, 포장 박스 사이즈, 소포장 개수 복제
+    // - 가공/포장 탭(work_items): 작업 항목 및 이미지 복제
     const newOrderData: CreatePurchaseOrderDTO = {
       product_name: sourceOrder.product_name,
       product_name_chinese: sourceOrder.product_name_chinese || undefined,
       product_category: sourceOrder.product_category,
       product_main_image: sourceOrder.product_main_image || undefined,
+      // 상품정보 영역의 사이즈, 무게, 소포장 방식만 복제
       product_size: sourceOrder.product_size || undefined,
       product_weight: sourceOrder.product_weight || undefined,
       product_packaging_size: sourceOrder.product_packaging_size || undefined,
-      product_set_count: sourceOrder.product_set_count,
-      product_small_pack_count: sourceOrder.product_small_pack_count,
-      product_box_count: sourceOrder.product_box_count,
+      packaging: sourceOrder.packaging || undefined,
+      // 나머지 상품 정보 필드는 기본값 사용 (복제하지 않음)
+      product_set_count: 1,
+      product_small_pack_count: 1,
+      product_box_count: 1,
       unit_price: reorderData.unit_price !== undefined ? reorderData.unit_price : sourceOrder.unit_price,
       quantity: reorderData.quantity,
       size: sourceOrder.size || undefined,
       weight: sourceOrder.weight || undefined,
-      packaging: sourceOrder.packaging || undefined,
       order_date: reorderData.order_date || sourceOrder.order_date?.toISOString().split('T')[0] || undefined,
       estimated_shipment_date: reorderData.estimated_shipment_date || sourceOrder.estimated_shipment_date?.toISOString().split('T')[0] || undefined,
       created_by: createdBy,
@@ -186,7 +191,9 @@ export class PurchaseOrderService {
       const costItemsToCopy = costItems.map(item => ({
         item_type: item.item_type,
         name: item.name,
-        cost: item.cost,
+        unit_price: item.unit_price,
+        quantity: item.quantity,
+        is_admin_only: item.is_admin_only,
         display_order: item.display_order,
       }));
       await this.saveCostItems(newOrder.id, costItemsToCopy);
@@ -344,16 +351,18 @@ export class PurchaseOrderService {
   /**
    * 발주 비용 항목 조회
    */
-  async getCostItemsByPoId(purchaseOrderId: string): Promise<Array<{ id: number; item_type: 'option' | 'labor'; name: string; cost: number; display_order: number }>> {
+  async getCostItemsByPoId(purchaseOrderId: string): Promise<Array<{ id: number; item_type: 'option' | 'labor'; name: string; unit_price: number; quantity: number; cost: number; is_admin_only: boolean; display_order: number }>> {
     return this.repository.findCostItemsByPoId(purchaseOrderId);
   }
 
   /**
    * 발주 비용 항목 저장
+   * @param preserveAdminOnlyItems A 레벨이 아닌 경우, 기존 A 레벨 전용 항목을 유지할지 여부
    */
   async saveCostItems(
     purchaseOrderId: string,
-    items: Array<{ item_type: 'option' | 'labor'; name: string; cost: number; display_order?: number }>
+    items: Array<{ item_type: 'option' | 'labor'; name: string; unit_price: number; quantity: number; is_admin_only?: boolean; display_order?: number }>,
+    preserveAdminOnlyItems: boolean = false
   ): Promise<void> {
     // 발주 존재 확인
     const purchaseOrder = await this.repository.findById(purchaseOrderId);
@@ -361,7 +370,7 @@ export class PurchaseOrderService {
       throw new Error('발주를 찾을 수 없습니다.');
     }
 
-    await this.repository.saveCostItems(purchaseOrderId, items);
+    await this.repository.saveCostItems(purchaseOrderId, items, preserveAdminOnlyItems);
   }
 
   /**
@@ -545,6 +554,41 @@ export class PurchaseOrderService {
    */
   async deleteImages(imageIds: number[]): Promise<void> {
     await this.repository.deleteImages(imageIds);
+  }
+
+  /**
+   * 발주 메모 조회
+   */
+  async getMemos(purchaseOrderId: string) {
+    return await this.repository.getMemos(purchaseOrderId);
+  }
+
+  /**
+   * 발주 메모 추가
+   */
+  async addMemo(purchaseOrderId: string, content: string, userId: string) {
+    return await this.repository.addMemo(purchaseOrderId, content, userId);
+  }
+
+  /**
+   * 발주 메모 삭제
+   */
+  async deleteMemo(memoId: number) {
+    await this.repository.deleteMemo(memoId);
+  }
+
+  /**
+   * 메모 댓글 추가
+   */
+  async addMemoReply(memoId: number, content: string, userId: string) {
+    return await this.repository.addMemoReply(memoId, content, userId);
+  }
+
+  /**
+   * 메모 댓글 삭제
+   */
+  async deleteMemoReply(replyId: number) {
+    await this.repository.deleteMemoReply(replyId);
   }
 }
 

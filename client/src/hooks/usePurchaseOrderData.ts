@@ -16,6 +16,7 @@ interface PurchaseOrderRawData {
   product_name?: string;
   product_size?: string;
   product_weight?: string;
+  product_packaging_size?: string;
   product_main_image?: string;
   unit_price: number;
   quantity: number;
@@ -199,14 +200,20 @@ export function usePurchaseOrderData(orderId: string | null): UsePurchaseOrderDa
             .map((item: any) => ({
               id: item.id.toString(),
               name: item.name,
-              cost: item.cost,
+              unit_price: item.unit_price || 0,
+              quantity: item.quantity || 1,
+              cost: item.cost || 0,
+              isAdminOnly: item.is_admin_only || false,
             }));
           const labors: LaborCostItem[] = costItems
             .filter((item: any) => item.item_type === 'labor')
             .map((item: any) => ({
               id: item.id.toString(),
               name: item.name,
-              cost: item.cost,
+              unit_price: item.unit_price || 0,
+              quantity: item.quantity || 1,
+              cost: item.cost || 0,
+              isAdminOnly: item.is_admin_only || false,
             }));
           setOptionItems(options);
           setLaborCostItems(labors);

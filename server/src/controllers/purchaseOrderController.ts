@@ -328,7 +328,7 @@ export class PurchaseOrderController {
   saveCostItems = async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { items } = req.body;
+      const { items, userLevel } = req.body;
 
       if (!Array.isArray(items)) {
         return res.status(400).json({
@@ -336,6 +336,18 @@ export class PurchaseOrderController {
           error: 'items는 배열이어야 합니다.',
         });
       }
+
+      // 현재 사용자 권한 확인 (A 레벨 관리자 여부)
+      // req.user가 없는 경우 클라이언트에서 전송한 userLevel 사용
+      const user = (req as any).user;
+      const isAdminLevelA = user?.level === 'A-SuperAdmin' || userLevel === 'A-SuperAdmin';
+      
+      console.log('[purchaseOrderController.saveCostItems] 사용자 정보:', {
+        userId: user?.id,
+        userLevel: user?.level,
+        isAdminLevelA,
+        itemsCount: items.length
+      });
 
       // 유효성 검사
       for (const item of items) {
@@ -351,15 +363,41 @@ export class PurchaseOrderController {
             error: '각 항목의 name은 필수입니다.',
           });
         }
-        if (typeof item.cost !== 'number' || item.cost < 0) {
+        if (typeof item.unit_price !== 'number' || item.unit_price < 0) {
           return res.status(400).json({
             success: false,
-            error: '각 항목의 cost는 0 이상의 숫자여야 합니다.',
+            error: '각 항목의 unit_price는 0 이상의 숫자여야 합니다.',
+          });
+        }
+        if (typeof item.quantity !== 'number' || item.quantity < 0) {
+          return res.status(400).json({
+            success: false,
+            error: '각 항목의 quantity는 0 이상의 숫자여야 합니다.',
+          });
+        }
+        
+        // A 레벨 관리자가 아닌 경우 is_admin_only가 true인 항목 저장 불가
+        if (item.is_admin_only === true && !isAdminLevelA) {
+          console.log('[purchaseOrderController.saveCostItems] 에러: A 레벨 관리자가 아닌데 is_admin_only=true인 항목 발견:', {
+            itemName: item.name,
+            itemType: item.item_type,
+            is_admin_only: item.is_admin_only,
+            userLevel: user?.level,
+            isAdminLevelA
+          });
+          return res.status(403).json({
+            success: false,
+            error: 'A 레벨 관리자만 전용 항목을 저장할 수 있습니다.',
           });
         }
       }
+      
+      console.log('[purchaseOrderController.saveCostItems] 검증 통과, 저장 진행');
 
-      await this.service.saveCostItems(id, items);
+      // A 레벨이 아닌 관리자가 저장할 때는 기존 A 레벨 전용 항목을 유지
+      const preserveAdminOnlyItems = !isAdminLevelA;
+      
+      await this.service.saveCostItems(id, items, preserveAdminOnlyItems);
 
       res.json({
         success: true,
@@ -903,6 +941,178 @@ export class PurchaseOrderController {
       res.status(500).json({
         success: false,
         error: error.message || '이미지 삭제에 실패했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 발주 메모 조회
+   * GET /api/purchase-orders/:id/memos
+   */
+  getMemos = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const memos = await this.service.getMemos(id);
+
+      res.json({
+        success: true,
+        data: memos,
+      });
+    } catch (error: any) {
+      console.error('발주 메모 조회 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '메모 조회에 실패했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 발주 메모 추가
+   * POST /api/purchase-orders/:id/memos
+   */
+  addMemo = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { content, userId } = req.body;
+      const authenticatedUserId = (req as any).user?.id || userId;
+
+      if (!content || !content.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: '메모 내용을 입력해주세요.',
+        });
+      }
+
+      if (!authenticatedUserId) {
+        return res.status(401).json({
+          success: false,
+          error: '로그인이 필요합니다.',
+        });
+      }
+
+      const memoId = await this.service.addMemo(id, content.trim(), authenticatedUserId);
+
+      res.json({
+        success: true,
+        data: { id: memoId },
+        message: '메모가 추가되었습니다.',
+      });
+    } catch (error: any) {
+      console.error('발주 메모 추가 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '메모 추가에 실패했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 발주 메모 삭제
+   * DELETE /api/purchase-orders/:id/memos/:memoId
+   */
+  deleteMemo = async (req: Request, res: Response) => {
+    try {
+      const { memoId } = req.params;
+      const parsedMemoId = parseInt(memoId);
+
+      if (isNaN(parsedMemoId)) {
+        return res.status(400).json({
+          success: false,
+          error: '유효하지 않은 메모 ID입니다.',
+        });
+      }
+
+      await this.service.deleteMemo(parsedMemoId);
+
+      res.json({
+        success: true,
+        message: '메모가 삭제되었습니다.',
+      });
+    } catch (error: any) {
+      console.error('발주 메모 삭제 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '메모 삭제에 실패했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 메모 댓글 추가
+   * POST /api/purchase-orders/:id/memos/:memoId/replies
+   */
+  addMemoReply = async (req: Request, res: Response) => {
+    try {
+      const { memoId } = req.params;
+      const { content, userId } = req.body;
+      const authenticatedUserId = (req as any).user?.id || userId;
+
+      if (!content || !content.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: '댓글 내용을 입력해주세요.',
+        });
+      }
+
+      if (!authenticatedUserId) {
+        return res.status(401).json({
+          success: false,
+          error: '로그인이 필요합니다.',
+        });
+      }
+
+      const parsedMemoId = parseInt(memoId);
+      if (isNaN(parsedMemoId)) {
+        return res.status(400).json({
+          success: false,
+          error: '유효하지 않은 메모 ID입니다.',
+        });
+      }
+
+      const replyId = await this.service.addMemoReply(parsedMemoId, content.trim(), authenticatedUserId);
+
+      res.json({
+        success: true,
+        data: { id: replyId },
+        message: '댓글이 추가되었습니다.',
+      });
+    } catch (error: any) {
+      console.error('메모 댓글 추가 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '댓글 추가에 실패했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 메모 댓글 삭제
+   * DELETE /api/purchase-orders/:id/memos/:memoId/replies/:replyId
+   */
+  deleteMemoReply = async (req: Request, res: Response) => {
+    try {
+      const { replyId } = req.params;
+      const parsedReplyId = parseInt(replyId);
+
+      if (isNaN(parsedReplyId)) {
+        return res.status(400).json({
+          success: false,
+          error: '유효하지 않은 댓글 ID입니다.',
+        });
+      }
+
+      await this.service.deleteMemoReply(parsedReplyId);
+
+      res.json({
+        success: true,
+        message: '댓글이 삭제되었습니다.',
+      });
+    } catch (error: any) {
+      console.error('메모 댓글 삭제 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '댓글 삭제에 실패했습니다.',
       });
     }
   };

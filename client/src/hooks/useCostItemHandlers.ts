@@ -14,14 +14,16 @@ interface UseCostItemHandlersProps {
 interface UseCostItemHandlersReturn {
   commissionOptions: Array<{ label: string; rate: number }>;
   handleCommissionTypeChange: (value: string) => void;
-  addLaborCostItem: () => void;
+  addLaborCostItem: (isAdminOnly?: boolean) => void;
   removeLaborCostItem: (id: string) => void;
   updateLaborCostItemName: (id: string, name: string) => void;
-  updateLaborCostItemCost: (id: string, cost: number) => void;
-  addOptionItem: () => void;
+  updateLaborCostItemUnitPrice: (id: string, unitPrice: number) => void;
+  updateLaborCostItemQuantity: (id: string, quantity: number) => void;
+  addOptionItem: (isAdminOnly?: boolean) => void;
   removeOptionItem: (id: string) => void;
   updateOptionItemName: (id: string, name: string) => void;
-  updateOptionItemCost: (id: string, cost: number) => void;
+  updateOptionItemUnitPrice: (id: string, unitPrice: number) => void;
+  updateOptionItemQuantity: (id: string, quantity: number) => void;
 }
 
 /**
@@ -60,11 +62,14 @@ export function useCostItemHandlers({
   );
 
   // 인건비 항목 추가
-  const addLaborCostItem = useCallback(() => {
+  const addLaborCostItem = useCallback((isAdminOnly: boolean = false) => {
     const newItem: LaborCostItem = {
       id: Date.now().toString(),
       name: "",
-      cost: 0,
+      unit_price: 0,
+      quantity: 1,
+      cost: 0, // unit_price * quantity로 계산
+      isAdminOnly: isAdminOnly,
     };
     setLaborCostItems([...laborCostItems, newItem]);
   }, [laborCostItems, setLaborCostItems]);
@@ -91,24 +96,47 @@ export function useCostItemHandlers({
     [laborCostItems, setLaborCostItems],
   );
 
-  // 인건비 비용 수정
-  const updateLaborCostItemCost = useCallback(
-    (id: string, cost: number) => {
+  // 인건비 단가 수정
+  const updateLaborCostItemUnitPrice = useCallback(
+    (id: string, unitPrice: number) => {
       setLaborCostItems(
-        laborCostItems.map((item) =>
-          item.id === id ? { ...item, cost } : item,
-        ),
+        laborCostItems.map((item) => {
+          if (item.id === id) {
+            const newCost = unitPrice * item.quantity;
+            return { ...item, unit_price: unitPrice, cost: newCost };
+          }
+          return item;
+        }),
+      );
+    },
+    [laborCostItems, setLaborCostItems],
+  );
+
+  // 인건비 수량 수정
+  const updateLaborCostItemQuantity = useCallback(
+    (id: string, quantity: number) => {
+      setLaborCostItems(
+        laborCostItems.map((item) => {
+          if (item.id === id) {
+            const newCost = item.unit_price * quantity;
+            return { ...item, quantity, cost: newCost };
+          }
+          return item;
+        }),
       );
     },
     [laborCostItems, setLaborCostItems],
   );
 
   // 옵션 항목 추가
-  const addOptionItem = useCallback(() => {
+  const addOptionItem = useCallback((isAdminOnly: boolean = false) => {
     const newItem: LaborCostItem = {
       id: Date.now().toString(),
       name: "",
-      cost: 0,
+      unit_price: 0,
+      quantity: 1,
+      cost: 0, // unit_price * quantity로 계산
+      isAdminOnly: isAdminOnly,
     };
     setOptionItems([...optionItems, newItem]);
   }, [optionItems, setOptionItems]);
@@ -131,11 +159,33 @@ export function useCostItemHandlers({
     [optionItems, setOptionItems],
   );
 
-  // 옵션 비용 수정
-  const updateOptionItemCost = useCallback(
-    (id: string, cost: number) => {
+  // 옵션 단가 수정
+  const updateOptionItemUnitPrice = useCallback(
+    (id: string, unitPrice: number) => {
       setOptionItems(
-        optionItems.map((item) => (item.id === id ? { ...item, cost } : item)),
+        optionItems.map((item) => {
+          if (item.id === id) {
+            const newCost = unitPrice * item.quantity;
+            return { ...item, unit_price: unitPrice, cost: newCost };
+          }
+          return item;
+        }),
+      );
+    },
+    [optionItems, setOptionItems],
+  );
+
+  // 옵션 수량 수정
+  const updateOptionItemQuantity = useCallback(
+    (id: string, quantity: number) => {
+      setOptionItems(
+        optionItems.map((item) => {
+          if (item.id === id) {
+            const newCost = item.unit_price * quantity;
+            return { ...item, quantity, cost: newCost };
+          }
+          return item;
+        }),
       );
     },
     [optionItems, setOptionItems],
@@ -147,11 +197,13 @@ export function useCostItemHandlers({
     addLaborCostItem,
     removeLaborCostItem,
     updateLaborCostItemName,
-    updateLaborCostItemCost,
+    updateLaborCostItemUnitPrice,
+    updateLaborCostItemQuantity,
     addOptionItem,
     removeOptionItem,
     updateOptionItemName,
-    updateOptionItemCost,
+    updateOptionItemUnitPrice,
+    updateOptionItemQuantity,
   };
 }
 

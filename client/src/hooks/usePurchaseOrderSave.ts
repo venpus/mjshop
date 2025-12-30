@@ -43,10 +43,13 @@ interface OriginalData {
   product_name?: string;
   product_size?: string;
   product_weight?: string;
+  product_packaging_size?: string;
 }
 
 interface UsePurchaseOrderSaveProps {
   order: PurchaseOrder | null;
+  isSuperAdmin?: boolean; // A 레벨 관리자 여부
+  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin'; // 사용자 레벨
   orderId: string;
   unitPrice: number;
   backMargin: number;
@@ -87,6 +90,7 @@ interface UsePurchaseOrderSaveProps {
   productName?: string;
   productSize?: string;
   productWeight?: string;
+  productPackagingSize?: string;
 }
 
 interface UsePurchaseOrderSaveReturn {
@@ -274,6 +278,7 @@ export function usePurchaseOrderSave({
   productName,
   productSize,
   productWeight,
+  productPackagingSize,
   optionItems,
   laborCostItems,
   factoryShipments,
@@ -292,6 +297,8 @@ export function usePurchaseOrderSave({
   reloadWorkItems,
   reloadDeliverySets,
   currentUserId,
+  isSuperAdmin = false,
+  userLevel,
   onUpdateOriginalData,
 }: UsePurchaseOrderSaveProps): UsePurchaseOrderSaveReturn {
   const [isDirty, setIsDirty] = useState(false);
@@ -319,7 +326,7 @@ export function usePurchaseOrderSave({
   const checkForChanges = useCallback(() => {
     if (!originalDataRef.current) {
       // 새 발주인 경우 모든 입력 필드를 체크하여 dirty 여부 판단
-      const hasProductInfo = productName?.trim() !== '' || productSize?.trim() !== '' || productWeight?.trim() !== '';
+      const hasProductInfo = productName?.trim() !== '' || productSize?.trim() !== '' || productWeight?.trim() !== '' || productPackagingSize?.trim() !== '';
       const hasBasicInfo = unitPrice > 0 || quantity > 0 || shippingCost > 0 || warehouseShippingCost > 0;
       const hasDateInfo = orderDate !== '' || deliveryDate !== '';
       const hasOtherInfo = packaging > 0 || commissionRate > 0 || advancePaymentRate > 0;
@@ -353,6 +360,7 @@ export function usePurchaseOrderSave({
     if (productName !== original.product_name) fieldChanges.push(`productName: ${original.product_name} -> ${productName}`);
     if (productSize !== original.product_size) fieldChanges.push(`productSize: ${original.product_size} -> ${productSize}`);
     if (productWeight !== original.product_weight) fieldChanges.push(`productWeight: ${original.product_weight} -> ${productWeight}`);
+    if (productPackagingSize !== original.product_packaging_size) fieldChanges.push(`productPackagingSize: ${original.product_packaging_size} -> ${productPackagingSize}`);
     
     const basicFieldsChanged = fieldChanges.length > 0;
     if (basicFieldsChanged) {
@@ -483,7 +491,7 @@ export function usePurchaseOrderSave({
 
     return hasChanges;
   }, [
-    productName, productSize, productWeight,
+    productName, productSize, productWeight, productPackagingSize,
     unitPrice, backMargin, quantity, shippingCost, warehouseShippingCost,
     commissionRate, commissionType, advancePaymentRate, advancePaymentDate,
     balancePaymentDate, packaging, orderDate, deliveryDate, workStartDate, workEndDate,
@@ -548,6 +556,7 @@ export function usePurchaseOrderSave({
           product_name: productName || '',
           product_size: productSize || undefined,
           product_weight: productWeight || undefined,
+          product_packaging_size: productPackagingSize || undefined,
           unit_price: unitPrice,
           quantity: quantity,
           shipping_cost: shippingCost || 0,
@@ -616,6 +625,7 @@ export function usePurchaseOrderSave({
         product_name: productName || undefined,
         product_size: productSize || undefined,
         product_weight: productWeight || undefined,
+        product_packaging_size: productPackagingSize || undefined,
         updated_by: currentUserId,
       };
 
@@ -636,28 +646,56 @@ export function usePurchaseOrderSave({
       const result = await response.json();
       
       // cost items 저장
+      // A 레벨 관리자가 아닌 경우 isAdminOnly === true인 항목 제외
+      const filteredOptionItems = isSuperAdmin 
+        ? optionItems 
+        : optionItems.filter(item => item.isAdminOnly !== true);
+      const filteredLaborCostItems = isSuperAdmin 
+        ? laborCostItems 
+        : laborCostItems.filter(item => item.isAdminOnly !== true);
+      
+      console.log('[usePurchaseOrderSave] 필터링 전 optionItems:', optionItems.map(item => ({ name: item.name, isAdminOnly: item.isAdminOnly })));
+      console.log('[usePurchaseOrderSave] 필터링 전 laborCostItems:', laborCostItems.map(item => ({ name: item.name, isAdminOnly: item.isAdminOnly })));
+      console.log('[usePurchaseOrderSave] isSuperAdmin:', isSuperAdmin);
+      console.log('[usePurchaseOrderSave] 필터링 후 filteredOptionItems:', filteredOptionItems.map(item => ({ name: item.name, isAdminOnly: item.isAdminOnly })));
+      console.log('[usePurchaseOrderSave] 필터링 후 filteredLaborCostItems:', filteredLaborCostItems.map(item => ({ name: item.name, isAdminOnly: item.isAdminOnly })));
+      
       const costItems = [
-        ...optionItems.map((item, index) => ({
+        ...filteredOptionItems.map((item, index) => ({
           item_type: 'option' as const,
           name: item.name,
-          cost: item.cost,
+          unit_price: item.unit_price,
+          quantity: item.quantity,
+          is_admin_only: item.isAdminOnly === true, // 명시적으로 boolean으로 변환
           display_order: index,
         })),
-        ...laborCostItems.map((item, index) => ({
+        ...filteredLaborCostItems.map((item, index) => ({
           item_type: 'labor' as const,
           name: item.name,
-          cost: item.cost,
+          unit_price: item.unit_price,
+          quantity: item.quantity,
+          is_admin_only: item.isAdminOnly === true, // 명시적으로 boolean으로 변환
           display_order: index,
         })),
       ];
-
+      
+      // 전송 전 검증: A 레벨 관리자가 아닌 경우 is_admin_only가 true인 항목이 있는지 확인
+      const hasAdminOnlyItems = costItems.some(item => item.is_admin_only === true);
+      console.log('[usePurchaseOrderSave] 최종 전송할 costItems:', JSON.stringify(costItems.map(item => ({ name: item.name, is_admin_only: item.is_admin_only, item_type: item.item_type })), null, 2));
+      console.log('[usePurchaseOrderSave] 검증 정보:', { isSuperAdmin, hasAdminOnlyItems });
+      
+      if (!isSuperAdmin && hasAdminOnlyItems) {
+        console.error('[usePurchaseOrderSave] 에러: A 레벨 관리자가 아닌데 is_admin_only=true인 항목이 포함됨:', costItems.filter(item => item.is_admin_only === true));
+        throw new Error('A 레벨 관리자 전용 항목이 포함되어 있어 저장할 수 없습니다. 페이지를 새로고침해주세요.');
+      }
+      
       const costItemsResponse = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}/cost-items`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ items: costItems }),
+        body: JSON.stringify({ items: costItems, userLevel }),
       });
 
       if (!costItemsResponse.ok) {
@@ -1073,6 +1111,10 @@ export function usePurchaseOrderSave({
           work_start_date: workStartDate || '',
           work_end_date: workEndDate || '',
           is_confirmed: updated.is_confirmed || false,
+          product_name: updated.product_name || undefined,
+          product_size: updated.product_size || undefined,
+          product_weight: updated.product_weight || undefined,
+          product_packaging_size: updated.product_packaging_size || undefined,
           optionItems: JSON.parse(JSON.stringify(optionItems)),
           laborCostItems: JSON.parse(JSON.stringify(laborCostItems)),
           factoryShipments: JSON.parse(JSON.stringify(factoryShipments.map(s => ({ ...s, pendingImages: undefined })))),
@@ -1164,7 +1206,7 @@ export function usePurchaseOrderSave({
     order, orderId, unitPrice, backMargin, quantity, shippingCost, warehouseShippingCost,
     commissionRate, commissionType, advancePaymentRate, advancePaymentDate,
     balancePaymentDate, packaging, orderDate, deliveryDate, isOrderConfirmed,
-    productName, productSize, productWeight,
+    productName, productSize, productWeight, productPackagingSize,
     optionItems, laborCostItems, factoryShipments, returnExchangeItems, workItems, deliverySets, isSaving, currentUserId,
     setFactoryShipments, setReturnExchangeItems, setWorkItems, setDeliverySets, reloadFactoryShipments, reloadReturnExchanges, reloadWorkItems, reloadDeliverySets,
     onUpdateOriginalData,
@@ -1191,6 +1233,10 @@ export function usePurchaseOrderSave({
         order_date: orderDate,
         estimated_delivery: deliveryDate,
         is_confirmed: isOrderConfirmed,
+        product_name: productName || undefined,
+        product_size: productSize || undefined,
+        product_weight: productWeight || undefined,
+        product_packaging_size: productPackagingSize || undefined,
         optionItems: JSON.parse(JSON.stringify(optionItems)),
         laborCostItems: JSON.parse(JSON.stringify(laborCostItems)),
         factoryShipments: JSON.parse(JSON.stringify(factoryShipments.map(s => ({ ...s, pendingImages: undefined })))),
@@ -1214,6 +1260,7 @@ export function usePurchaseOrderSave({
     unitPrice, backMargin, quantity, shippingCost, warehouseShippingCost,
     commissionRate, commissionType, advancePaymentRate, advancePaymentDate,
     balancePaymentDate, packaging, orderDate, deliveryDate, isOrderConfirmed,
+    productName, productSize, productWeight, productPackagingSize,
     optionItems, laborCostItems, factoryShipments, returnExchangeItems, workItems, deliverySets,
     onUpdateOriginalData,
   ]);

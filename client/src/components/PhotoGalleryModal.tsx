@@ -1,11 +1,17 @@
 import { useState, useRef, useEffect } from "react";
-import { Images, X, Download, Image, Upload, Loader2 } from "lucide-react";
+import { Images, X, Download, Image, Upload, Loader2, Trash2 } from "lucide-react";
+
+interface ImageInfo {
+  id?: number;
+  url: string;
+  type?: string;
+}
 
 interface PhotoGalleryModalProps {
   isOpen: boolean;
   productName: string;
   poNumber: string;
-  images: string[];
+  images: ImageInfo[] | string[]; // 기존 호환성을 위해 string[]도 허용
   productId?: string; // 상품 이미지 업로드용
   purchaseOrderId?: string; // 발주 이미지 업로드용
   onClose: () => void;
@@ -28,7 +34,13 @@ export function PhotoGalleryModal({
   onImagesUpdated,
 }: PhotoGalleryModalProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // images를 ImageInfo[] 형식으로 정규화
+  const normalizedImages: ImageInfo[] = images.map(img => 
+    typeof img === 'string' ? { url: img } : img
+  );
 
   // ESC 키로 모달 닫기
   useEffect(() => {
@@ -70,6 +82,59 @@ export function PhotoGalleryModal({
         console.error("이미지 다운로드 실패:", error);
         alert("이미지 다운로드에 실패했습니다.");
       }
+    }
+  };
+
+  const handleDeleteImage = async (
+    e: React.MouseEvent,
+    imageId: number | undefined,
+    imageUrl: string,
+  ) => {
+    e.stopPropagation();
+    
+    if (!imageId) {
+      alert('이 이미지는 삭제할 수 없습니다. (ID가 없는 이미지)');
+      return;
+    }
+
+    if (!purchaseOrderId) {
+      alert('발주 ID가 없어 이미지를 삭제할 수 없습니다.');
+      return;
+    }
+
+    if (!confirm('이 이미지를 삭제하시겠습니까?')) {
+      return;
+    }
+
+    setIsDeleting(imageId);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/purchase-orders/images/${imageId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || '이미지 삭제에 실패했습니다.');
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || '이미지 삭제에 실패했습니다.');
+      }
+
+      alert('이미지가 성공적으로 삭제되었습니다.');
+      
+      // 이미지 목록 갱신
+      if (onImagesUpdated) {
+        onImagesUpdated();
+      }
+    } catch (error: any) {
+      console.error('이미지 삭제 오류:', error);
+      alert(error.message || '이미지 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -279,39 +344,66 @@ export function PhotoGalleryModal({
 
         {/* Content */}
         <div className="p-6">
-          {images && images.length > 0 ? (
+          {normalizedImages && normalizedImages.length > 0 ? (
             <div className="grid grid-cols-5 gap-4">
-              {images.map((imageUrl, index) => (
-                <div
-                  key={index}
-                  className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center border-2 border-gray-200 hover:border-purple-400 transition-all cursor-pointer group"
-                  onClick={() => onImageClick(imageUrl)}
-                >
-                  {imageUrl ? (
-                    <img
-                      src={imageUrl}
-                      alt={`${productName} ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <Image className="w-12 h-12 text-gray-400" />
-                  )}
-
-                  {/* 다운로드 버튼 */}
-                  <button
-                    onClick={(e) => handleDownloadImage(e, imageUrl, index)}
-                    className="absolute top-2 right-2 p-2 bg-white rounded-md shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-purple-50"
-                    title="다운로드"
+              {normalizedImages.map((imageInfo, index) => {
+                const imageUrl = typeof imageInfo === 'string' ? imageInfo : imageInfo.url;
+                const imageId = typeof imageInfo === 'string' ? undefined : imageInfo.id;
+                const imageType = typeof imageInfo === 'string' ? undefined : imageInfo.type;
+                // purchaseOrderId가 있고, imageId가 있으면 삭제 가능 (메인 이미지는 제외)
+                const canDelete = !!purchaseOrderId && !!imageId && imageType !== 'main';
+                
+                return (
+                  <div
+                    key={index}
+                    className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center border-2 border-gray-200 hover:border-purple-400 transition-all cursor-pointer group"
+                    onClick={() => onImageClick(imageUrl)}
                   >
-                    <Download className="w-4 h-4 text-purple-600" />
-                  </button>
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={`${productName} ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Image className="w-12 h-12 text-gray-400" />
+                    )}
 
-                  {/* 이미지 번호 */}
-                  <div className="absolute bottom-2 left-2 px-2 py-1 bg-black bg-opacity-60 text-white text-xs rounded">
-                    #{index + 1}
+                    {/* 버튼 그룹 */}
+                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* 다운로드 버튼 */}
+                      <button
+                        onClick={(e) => handleDownloadImage(e, imageUrl, index)}
+                        className="p-2 bg-white rounded-md shadow-md hover:bg-purple-50"
+                        title="다운로드"
+                      >
+                        <Download className="w-4 h-4 text-purple-600" />
+                      </button>
+
+                      {/* 삭제 버튼 - purchaseOrderId가 있고 imageId가 있으면 표시 */}
+                      {purchaseOrderId && imageId && (
+                        <button
+                          onClick={(e) => handleDeleteImage(e, imageId, imageUrl)}
+                          disabled={isDeleting === imageId}
+                          className="p-2 bg-white rounded-md shadow-md hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="삭제"
+                        >
+                          {isDeleting === imageId ? (
+                            <Loader2 className="w-4 h-4 text-red-600 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* 이미지 번호 */}
+                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-black bg-opacity-60 text-white text-xs rounded">
+                      #{index + 1}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12">

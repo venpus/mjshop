@@ -1,9 +1,13 @@
 import { Plus, Trash2 } from "lucide-react";
+import { handleNumberInput } from "../../utils/numberInputUtils";
 
 export interface LaborCostItem {
   id: string;
   name: string;
-  cost: number;
+  unit_price: number;
+  quantity: number;
+  cost: number; // 계산값: unit_price * quantity
+  isAdminOnly?: boolean; // A 레벨 관리자 전용 항목 여부
 }
 
 interface CostPaymentTabProps {
@@ -15,6 +19,7 @@ interface CostPaymentTabProps {
   commissionAmount: number;
   basicCostTotal: number;
   isSuperAdmin: boolean; // A 레벨 관리자 여부
+  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin'; // 사용자 레벨
   onSetUnitPrice: (value: number) => void;
   onSetBackMargin: (value: number) => void;
   onSetQuantity: (value: number) => void;
@@ -32,17 +37,19 @@ interface CostPaymentTabProps {
   optionItems: LaborCostItem[];
   totalOptionCost: number;
   onUpdateOptionItemName: (id: string, name: string) => void;
-  onUpdateOptionItemCost: (id: string, cost: number) => void;
+  onUpdateOptionItemUnitPrice: (id: string, unitPrice: number) => void;
+  onUpdateOptionItemQuantity: (id: string, quantity: number) => void;
   onRemoveOptionItem: (id: string) => void;
-  onAddOptionItem: () => void;
+  onAddOptionItem: (isAdminOnly?: boolean) => void;
   
   // 인건비
   laborCostItems: LaborCostItem[];
   totalLaborCost: number;
   onUpdateLaborCostItemName: (id: string, name: string) => void;
-  onUpdateLaborCostItemCost: (id: string, cost: number) => void;
+  onUpdateLaborCostItemUnitPrice: (id: string, unitPrice: number) => void;
+  onUpdateLaborCostItemQuantity: (id: string, quantity: number) => void;
   onRemoveLaborCostItem: (id: string) => void;
-  onAddLaborCostItem: () => void;
+  onAddLaborCostItem: (isAdminOnly?: boolean) => void;
   
   // 선금/잔금
   advancePaymentRate: number;
@@ -64,6 +71,7 @@ export function CostPaymentTab({
   commissionAmount,
   basicCostTotal,
   isSuperAdmin,
+  userLevel,
   onSetUnitPrice,
   onSetBackMargin,
   onSetQuantity,
@@ -77,13 +85,15 @@ export function CostPaymentTab({
   optionItems,
   totalOptionCost,
   onUpdateOptionItemName,
-  onUpdateOptionItemCost,
+  onUpdateOptionItemUnitPrice,
+  onUpdateOptionItemQuantity,
   onRemoveOptionItem,
   onAddOptionItem,
   laborCostItems,
   totalLaborCost,
   onUpdateLaborCostItemName,
-  onUpdateLaborCostItemCost,
+  onUpdateLaborCostItemUnitPrice,
+  onUpdateLaborCostItemQuantity,
   onRemoveLaborCostItem,
   onAddLaborCostItem,
   advancePaymentRate,
@@ -96,10 +106,24 @@ export function CostPaymentTab({
   onSetAdvancePaymentDate,
   onSetBalancePaymentDate,
 }: CostPaymentTabProps) {
+  // 레벨별 권한 확인
+  const isLevelA = isSuperAdmin; // A-SuperAdmin
+  const isLevelSorB = userLevel === 'S: Admin' || userLevel === 'B0: 중국Admin'; // S 또는 B 레벨
+  const isLevelC = userLevel === 'C0: 한국Admin'; // C 레벨
+  
+  // 항목을 일반 항목과 A레벨 전용 항목으로 분리
+  const normalOptionItems = optionItems.filter(item => !item.isAdminOnly);
+  const adminOnlyOptionItems = optionItems.filter(item => item.isAdminOnly);
+  
+  const normalLaborCostItems = laborCostItems.filter(item => !item.isAdminOnly);
+  const adminOnlyLaborCostItems = laborCostItems.filter(item => item.isAdminOnly);
+  
+  // 항목 추가 버튼 표시 여부: C 레벨은 표시 안 함
+  const canAddItems = isLevelA || isLevelSorB;
   return (
     <div className="space-y-4">
       {/* Cost sections in columns */}
-      <div className="grid grid-cols-4 gap-5">
+      <div className="grid grid-cols-[1fr_auto_1fr_1fr] gap-5">
         {/* 기본 비용 */}
         <div className="space-y-3">
           <h4 className="text-sm text-gray-700 mb-3 pb-2 border-b border-gray-200 flex justify-between items-center">
@@ -132,9 +156,13 @@ export function CostPaymentTab({
                   <input
                     type="number"
                     value={unitPrice || ""}
-                    onChange={(e) =>
-                      onSetUnitPrice(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)
-                    }
+                    onChange={(e) => {
+                      const processedValue = handleNumberInput(e.target.value);
+                      if (processedValue !== e.target.value) {
+                        e.target.value = processedValue;
+                      }
+                      onSetUnitPrice(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
+                    }}
                     step="0.01"
                     className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
@@ -152,9 +180,13 @@ export function CostPaymentTab({
                   <input
                     type="number"
                     value={backMargin || ""}
-                    onChange={(e) =>
-                      onSetBackMargin(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)
-                    }
+                    onChange={(e) => {
+                      const processedValue = handleNumberInput(e.target.value);
+                      if (processedValue !== e.target.value) {
+                        e.target.value = processedValue;
+                      }
+                      onSetBackMargin(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
+                    }}
                     step="0.01"
                     className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
@@ -212,10 +244,10 @@ export function CostPaymentTab({
         </div>
 
         {/* 운송비 */}
-        <div className="space-y-3 border-l border-gray-200 pl-5">
-          <h4 className="text-sm text-gray-700 mb-3 pb-2 border-b border-gray-200 flex justify-between items-center">
+        <div className="space-y-3 border-l border-gray-200 pl-5 w-fit">
+          <h4 className="text-sm text-gray-700 mb-3 pb-2 border-b border-gray-200 flex flex-col gap-1">
             <span>운송비</span>
-            <span className="text-lg font-semibold text-blue-700 bg-blue-100 px-3 py-1 rounded">
+            <span className="text-lg font-semibold text-blue-700 bg-blue-100 px-3 py-1 rounded self-start">
               ¥{shippingCostTotal.toFixed(2)}
             </span>
           </h4>
@@ -224,16 +256,20 @@ export function CostPaymentTab({
               <span className="text-gray-600 text-xs whitespace-nowrap min-w-[72px]">
                 업체 배송비
               </span>
-              <div className="flex items-center gap-1 flex-1 min-w-0">
+              <div className="flex items-center gap-1">
                 <span className="text-gray-500 text-sm">¥</span>
                 <input
                   type="number"
                   value={shippingCost || ""}
-                  onChange={(e) =>
-                    onSetShippingCost(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)
-                  }
+                  onChange={(e) => {
+                    const processedValue = handleNumberInput(e.target.value);
+                    if (processedValue !== e.target.value) {
+                      e.target.value = processedValue;
+                    }
+                    onSetShippingCost(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
+                  }}
                   step="0.01"
-                  className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-24 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
             </div>
@@ -241,18 +277,20 @@ export function CostPaymentTab({
               <span className="text-gray-600 text-xs whitespace-nowrap min-w-[72px]">
                 창고 배송비
               </span>
-              <div className="flex items-center gap-1 flex-1 min-w-0">
+              <div className="flex items-center gap-1">
                 <span className="text-gray-500 text-sm">¥</span>
                 <input
                   type="number"
                   value={warehouseShippingCost || ""}
-                  onChange={(e) =>
-                    onSetWarehouseShippingCost(
-                      e.target.value === "" ? 0 : parseFloat(e.target.value) || 0,
-                    )
-                  }
+                  onChange={(e) => {
+                    const processedValue = handleNumberInput(e.target.value);
+                    if (processedValue !== e.target.value) {
+                      e.target.value = processedValue;
+                    }
+                    onSetWarehouseShippingCost(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
+                  }}
                   step="0.01"
-                  className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-24 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
             </div>
@@ -267,47 +305,178 @@ export function CostPaymentTab({
               ¥{totalOptionCost.toFixed(2)}
             </span>
           </h4>
-          <div className="space-y-2">
-            {optionItems.map((item) => (
-              <div key={item.id} className="flex items-center gap-1.5">
-                <input
-                  type="text"
-                  value={item.name}
-                  onChange={(e) =>
-                    onUpdateOptionItemName(item.id, e.target.value)
-                  }
-                  placeholder="항목명"
-                  className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-                <span className="text-gray-500 text-xs">¥</span>
-                <input
-                  type="number"
-                  value={item.cost || ""}
-                  onChange={(e) =>
-                    onUpdateOptionItemCost(
-                      item.id,
-                      e.target.value === "" ? 0 : parseFloat(e.target.value) || 0,
-                    )
-                  }
-                  step="0.01"
-                  className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-                <button
-                  onClick={() => onRemoveOptionItem(item.id)}
-                  className="text-red-500 hover:text-red-700 flex-shrink-0"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+          {isLevelC ? (
+            // C 레벨은 항목 목록 숨김
+            <div className="text-sm text-gray-500 text-center py-4">
+              합계만 표시됩니다
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* 일반 영역 (S, B 레벨도 입력 가능) */}
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-gray-600 mb-2">일반 항목</div>
+                {normalOptionItems.map((item) => {
+                  const calculatedCost = item.unit_price * item.quantity;
+                  // 일반 항목은 A, S, B 레벨 모두 수정 가능
+                  const isEditable = isLevelA || isLevelSorB;
+                  return (
+                    <div key={item.id} className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={item.name}
+                        onChange={(e) =>
+                          onUpdateOptionItemName(item.id, e.target.value)
+                        }
+                        placeholder="항목명"
+                        disabled={!isEditable}
+                        className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isEditable ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      />
+                      <span className="text-gray-500 text-xs">¥</span>
+                      <input
+                        type="number"
+                        value={item.unit_price || ""}
+                        onChange={(e) => {
+                          const processedValue = handleNumberInput(e.target.value);
+                          if (processedValue !== e.target.value) {
+                            e.target.value = processedValue;
+                          }
+                          onUpdateOptionItemUnitPrice(
+                            item.id,
+                            processedValue === "" ? 0 : parseFloat(processedValue) || 0,
+                          );
+                        }}
+                        step="0.01"
+                        placeholder="단가"
+                        disabled={!isEditable}
+                        className={`w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isEditable ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      />
+                      <span className="text-gray-500 text-xs">×</span>
+                      <input
+                        type="number"
+                        value={item.quantity || ""}
+                        onChange={(e) => {
+                          const processedValue = handleNumberInput(e.target.value);
+                          if (processedValue !== e.target.value) {
+                            e.target.value = processedValue;
+                          }
+                          onUpdateOptionItemQuantity(
+                            item.id,
+                            processedValue === "" ? 0 : parseFloat(processedValue) || 0,
+                          );
+                        }}
+                        step="0.01"
+                        placeholder="수량"
+                        disabled={!isEditable}
+                        className={`w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isEditable ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      />
+                      <span className="text-gray-500 text-xs">=</span>
+                      <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                        ¥{calculatedCost.toFixed(2)}
+                      </div>
+                      {isEditable && (
+                        <button
+                          onClick={() => onRemoveOptionItem(item.id)}
+                          className="text-red-500 hover:text-red-700 flex-shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                {canAddItems && (
+                  <button
+                    onClick={() => onAddOptionItem(false)}
+                    className="flex items-center gap-1 px-2 py-1.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-xs w-full justify-center mt-2"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>일반 항목 추가</span>
+                  </button>
+                )}
               </div>
-            ))}
-            <button
-              onClick={onAddOptionItem}
-              className="flex items-center gap-1 px-2 py-1.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-xs w-full justify-center mt-2"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>추가</span>
-            </button>
-          </div>
+
+              {/* A레벨 전용 영역 (A 레벨만 볼 수 있음) */}
+              {isLevelA && (
+                <div className="space-y-2 pt-2 border-t border-blue-200">
+                  <div className="text-xs font-semibold text-blue-600 mb-2 flex items-center gap-1">
+                    <span className="text-blue-600 text-xs font-semibold px-1.5 py-0.5 bg-blue-100 rounded">A</span>
+                    <span>A 레벨 관리자 전용</span>
+                  </div>
+                  {adminOnlyOptionItems.map((item) => {
+                    const calculatedCost = item.unit_price * item.quantity;
+                    // A 레벨 전용 항목은 A 레벨만 수정 가능
+                    return (
+                      <div key={item.id} className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded p-1">
+                        <span className="text-blue-600 text-xs font-semibold px-1" title="A 레벨 관리자 전용">A</span>
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) =>
+                            onUpdateOptionItemName(item.id, e.target.value)
+                          }
+                          placeholder="항목명"
+                          className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <span className="text-gray-500 text-xs">¥</span>
+                        <input
+                          type="number"
+                          value={item.unit_price || ""}
+                          onChange={(e) => {
+                            const processedValue = handleNumberInput(e.target.value);
+                            if (processedValue !== e.target.value) {
+                              e.target.value = processedValue;
+                            }
+                            onUpdateOptionItemUnitPrice(
+                              item.id,
+                              processedValue === "" ? 0 : parseFloat(processedValue) || 0,
+                            );
+                          }}
+                          step="0.01"
+                          placeholder="단가"
+                          className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <span className="text-gray-500 text-xs">×</span>
+                        <input
+                          type="number"
+                          value={item.quantity || ""}
+                          onChange={(e) => {
+                            const processedValue = handleNumberInput(e.target.value);
+                            if (processedValue !== e.target.value) {
+                              e.target.value = processedValue;
+                            }
+                            onUpdateOptionItemQuantity(
+                              item.id,
+                              processedValue === "" ? 0 : parseFloat(processedValue) || 0,
+                            );
+                          }}
+                          step="0.01"
+                          placeholder="수량"
+                          className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <span className="text-gray-500 text-xs">=</span>
+                        <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                          ¥{calculatedCost.toFixed(2)}
+                        </div>
+                        <button
+                          onClick={() => onRemoveOptionItem(item.id)}
+                          className="text-red-500 hover:text-red-700 flex-shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button
+                    onClick={() => onAddOptionItem(true)}
+                    className="flex items-center gap-1 px-2 py-1.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs w-full justify-center mt-2"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>A 레벨 전용 항목 추가</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 인건비 */}
@@ -318,47 +487,178 @@ export function CostPaymentTab({
               ¥{totalLaborCost.toFixed(2)}
             </span>
           </h4>
-          <div className="space-y-2">
-            {laborCostItems.map((item) => (
-              <div key={item.id} className="flex items-center gap-1.5">
-                <input
-                  type="text"
-                  value={item.name}
-                  onChange={(e) =>
-                    onUpdateLaborCostItemName(item.id, e.target.value)
-                  }
-                  placeholder="항목명"
-                  className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-                <span className="text-gray-500 text-xs">¥</span>
-                <input
-                  type="number"
-                  value={item.cost || ""}
-                  onChange={(e) =>
-                    onUpdateLaborCostItemCost(
-                      item.id,
-                      e.target.value === "" ? 0 : parseFloat(e.target.value) || 0,
-                    )
-                  }
-                  step="0.01"
-                  className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-                <button
-                  onClick={() => onRemoveLaborCostItem(item.id)}
-                  className="text-red-500 hover:text-red-700 flex-shrink-0"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+          {isLevelC ? (
+            // C 레벨은 항목 목록 숨김
+            <div className="text-sm text-gray-500 text-center py-4">
+              합계만 표시됩니다
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* 일반 영역 (S, B 레벨도 입력 가능) */}
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-gray-600 mb-2">일반 항목</div>
+                {normalLaborCostItems.map((item) => {
+                  const calculatedCost = item.unit_price * item.quantity;
+                  // 일반 항목은 A, S, B 레벨 모두 수정 가능
+                  const isEditable = isLevelA || isLevelSorB;
+                  return (
+                    <div key={item.id} className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={item.name}
+                        onChange={(e) =>
+                          onUpdateLaborCostItemName(item.id, e.target.value)
+                        }
+                        placeholder="항목명"
+                        disabled={!isEditable}
+                        className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isEditable ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      />
+                      <span className="text-gray-500 text-xs">¥</span>
+                      <input
+                        type="number"
+                        value={item.unit_price || ""}
+                        onChange={(e) => {
+                          const processedValue = handleNumberInput(e.target.value);
+                          if (processedValue !== e.target.value) {
+                            e.target.value = processedValue;
+                          }
+                          onUpdateLaborCostItemUnitPrice(
+                            item.id,
+                            processedValue === "" ? 0 : parseFloat(processedValue) || 0,
+                          );
+                        }}
+                        step="0.01"
+                        placeholder="단가"
+                        disabled={!isEditable}
+                        className={`w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isEditable ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      />
+                      <span className="text-gray-500 text-xs">×</span>
+                      <input
+                        type="number"
+                        value={item.quantity || ""}
+                        onChange={(e) => {
+                          const processedValue = handleNumberInput(e.target.value);
+                          if (processedValue !== e.target.value) {
+                            e.target.value = processedValue;
+                          }
+                          onUpdateLaborCostItemQuantity(
+                            item.id,
+                            processedValue === "" ? 0 : parseFloat(processedValue) || 0,
+                          );
+                        }}
+                        step="0.01"
+                        placeholder="수량"
+                        disabled={!isEditable}
+                        className={`w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isEditable ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      />
+                      <span className="text-gray-500 text-xs">=</span>
+                      <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                        ¥{calculatedCost.toFixed(2)}
+                      </div>
+                      {isEditable && (
+                        <button
+                          onClick={() => onRemoveLaborCostItem(item.id)}
+                          className="text-red-500 hover:text-red-700 flex-shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                {canAddItems && (
+                  <button
+                    onClick={() => onAddLaborCostItem(false)}
+                    className="flex items-center gap-1 px-2 py-1.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-xs w-full justify-center mt-2"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>일반 항목 추가</span>
+                  </button>
+                )}
               </div>
-            ))}
-            <button
-              onClick={onAddLaborCostItem}
-              className="flex items-center gap-1 px-2 py-1.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-xs w-full justify-center mt-2"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>추가</span>
-            </button>
-          </div>
+
+              {/* A레벨 전용 영역 (A 레벨만 볼 수 있음) */}
+              {isLevelA && (
+                <div className="space-y-2 pt-2 border-t border-blue-200">
+                  <div className="text-xs font-semibold text-blue-600 mb-2 flex items-center gap-1">
+                    <span className="text-blue-600 text-xs font-semibold px-1.5 py-0.5 bg-blue-100 rounded">A</span>
+                    <span>A 레벨 관리자 전용</span>
+                  </div>
+                  {adminOnlyLaborCostItems.map((item) => {
+                    const calculatedCost = item.unit_price * item.quantity;
+                    // A 레벨 전용 항목은 A 레벨만 수정 가능
+                    return (
+                      <div key={item.id} className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded p-1">
+                        <span className="text-blue-600 text-xs font-semibold px-1" title="A 레벨 관리자 전용">A</span>
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) =>
+                            onUpdateLaborCostItemName(item.id, e.target.value)
+                          }
+                          placeholder="항목명"
+                          className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <span className="text-gray-500 text-xs">¥</span>
+                        <input
+                          type="number"
+                          value={item.unit_price || ""}
+                          onChange={(e) => {
+                            const processedValue = handleNumberInput(e.target.value);
+                            if (processedValue !== e.target.value) {
+                              e.target.value = processedValue;
+                            }
+                            onUpdateLaborCostItemUnitPrice(
+                              item.id,
+                              processedValue === "" ? 0 : parseFloat(processedValue) || 0,
+                            );
+                          }}
+                          step="0.01"
+                          placeholder="단가"
+                          className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <span className="text-gray-500 text-xs">×</span>
+                        <input
+                          type="number"
+                          value={item.quantity || ""}
+                          onChange={(e) => {
+                            const processedValue = handleNumberInput(e.target.value);
+                            if (processedValue !== e.target.value) {
+                              e.target.value = processedValue;
+                            }
+                            onUpdateLaborCostItemQuantity(
+                              item.id,
+                              processedValue === "" ? 0 : parseFloat(processedValue) || 0,
+                            );
+                          }}
+                          step="0.01"
+                          placeholder="수량"
+                          className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <span className="text-gray-500 text-xs">=</span>
+                        <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                          ¥{calculatedCost.toFixed(2)}
+                        </div>
+                        <button
+                          onClick={() => onRemoveLaborCostItem(item.id)}
+                          className="text-red-500 hover:text-red-700 flex-shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button
+                    onClick={() => onAddLaborCostItem(true)}
+                    className="flex items-center gap-1 px-2 py-1.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs w-full justify-center mt-2"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>A 레벨 전용 항목 추가</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -377,11 +677,15 @@ export function CostPaymentTab({
                       <input
                         type="number"
                         value={advancePaymentRate || ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const processedValue = handleNumberInput(e.target.value);
+                          if (processedValue !== e.target.value) {
+                            e.target.value = processedValue;
+                          }
                           onSetAdvancePaymentRate(
-                            e.target.value === "" ? 0 : parseFloat(e.target.value) || 0,
-                          )
-                        }
+                            processedValue === "" ? 0 : parseFloat(processedValue) || 0,
+                          );
+                        }}
                         min="0"
                         max="100"
                         step="1"

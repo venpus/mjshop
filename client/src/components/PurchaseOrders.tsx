@@ -570,6 +570,19 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
       {/* Purchase Orders Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        {/* 상단 페이징 */}
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          itemsPerPage={itemsPerPage}
+          totalItems={filteredPurchaseOrders.length}
+          startIndex={startIndex}
+          endIndex={endIndex}
+          onPageChange={handlePageChange}
+          onItemsPerPageChange={handleItemsPerPageChange}
+          className="border-t-0 border-b border-gray-200"
+        />
+        
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">

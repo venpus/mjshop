@@ -18,6 +18,7 @@ interface HeaderSectionProps {
   productImage?: string;
   size: string;
   weight: string;
+  packagingSize?: string;
   packaging: number;
   finalUnitPrice?: number;
   orderDate: string;
@@ -38,6 +39,7 @@ interface HeaderSectionProps {
   onProductNameChange?: (value: string) => void;
   onSizeChange?: (value: string) => void;
   onWeightChange?: (value: string) => void;
+  onPackagingSizeChange?: (value: string) => void;
   onMainImageUpload?: (file: File) => Promise<void>;
 
   // ProgressStatusSection props
@@ -64,6 +66,7 @@ export function HeaderSection({
   productImage,
   size,
   weight,
+  packagingSize,
   packaging,
   finalUnitPrice,
   orderDate,
@@ -92,6 +95,7 @@ export function HeaderSection({
   onProductNameChange,
   onSizeChange,
   onWeightChange,
+  onPackagingSizeChange,
   onMainImageUpload,
 }: HeaderSectionProps) {
   return (
@@ -119,6 +123,7 @@ export function HeaderSection({
             productImage={productImage}
             size={size}
             weight={weight}
+            packagingSize={packagingSize}
             packaging={packaging}
             finalUnitPrice={finalUnitPrice}
             orderDate={orderDate}
@@ -138,6 +143,7 @@ export function HeaderSection({
             onProductNameChange={onProductNameChange}
             onSizeChange={onSizeChange}
             onWeightChange={onWeightChange}
+            onPackagingSizeChange={onPackagingSizeChange}
           />
         </div>
 

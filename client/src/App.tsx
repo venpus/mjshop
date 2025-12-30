@@ -24,21 +24,21 @@ import { Projects } from './components/Projects';
 import { ProjectDetail } from './components/ProjectDetail';
 import { Login } from './components/Login';
 import { useAuth } from './contexts/AuthContext';
-
-type Language = 'ko' | 'en' | 'zh';
+import { LanguageProvider, useLanguage, Language } from './contexts/LanguageContext';
 
 // 메인 레이아웃 컴포넌트
 function AdminLayout() {
   const { logout, user } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [language, setLanguage] = useState<Language>('ko');
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   
-  // 사이드바를 접힌 상태로 표시할 페이지 확인 (패킹리스트, 발주관리)
+  // 사이드바를 접힌 상태로 표시할 페이지 확인 (패킹리스트, 발주관리, 발주상세)
   const isCollapsedPage = location.pathname.includes('/admin/shipping-history') || 
-                          location.pathname === '/admin/purchase-orders';
+                          location.pathname === '/admin/purchase-orders' ||
+                          location.pathname.startsWith('/admin/purchase-orders/');
   
   // 사이드바 접힘 상태 (패킹리스트와 발주관리는 기본 접힘, 나머지는 기본 펼침)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(isCollapsedPage);
@@ -155,10 +155,10 @@ function AdminLayout() {
             <button
               onClick={logout}
               className="flex items-center gap-2 px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              title="로그아웃"
+              title={t('common.logout')}
             >
               <LogOut className="w-4 h-4" />
-              <span className="text-sm font-medium">로그아웃</span>
+              <span className="text-sm font-medium">{t('common.logout')}</span>
             </button>
           </div>
 
@@ -217,7 +217,7 @@ function AdminLayout() {
           <Route path="/payment" element={<Payment />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/purchase-orders" element={
-            (user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin') ? (
+            (user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin' || user?.level === 'B0: 중국Admin') ? (
               <PurchaseOrders onViewDetail={handleViewOrderDetail} />
             ) : (
               <Navigate to="/admin/dashboard" replace />
@@ -300,7 +300,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export default function App() {
+function AppContent() {
   const { isAuthenticated, isLoading, login } = useAuth();
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -360,5 +360,13 @@ export default function App() {
       {/* 404 - 존재하지 않는 경로 */}
       <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
     </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
   );
 }

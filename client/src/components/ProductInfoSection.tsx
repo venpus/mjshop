@@ -9,7 +9,8 @@ import {
   DollarSign,
   Upload,
 } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
+import { handleNumberInput } from "../utils/numberInputUtils";
 
 interface ProductInfoSectionProps {
   // 상품 기본 정보
@@ -47,6 +48,8 @@ interface ProductInfoSectionProps {
   onProductNameChange?: (value: string) => void;
   onSizeChange?: (value: string) => void;
   onWeightChange?: (value: string) => void;
+  onPackagingSizeChange?: (value: string) => void;
+  packagingSize?: string;
 }
 
 export function ProductInfoSection({
@@ -74,8 +77,62 @@ export function ProductInfoSection({
   onProductNameChange,
   onSizeChange,
   onWeightChange,
+  onPackagingSizeChange,
+  packagingSize,
 }: ProductInfoSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 포장 박스 사이즈를 3개의 필드로 관리
+  const [packagingWidth, setPackagingWidth] = useState<string>('');
+  const [packagingHeight, setPackagingHeight] = useState<string>('');
+  const [packagingDepth, setPackagingDepth] = useState<string>('');
+
+  // packagingSize prop이 변경되면 파싱하여 3개 필드로 분리
+  useEffect(() => {
+    if (packagingSize) {
+      // '30x 20x15cm' 형식을 파싱
+      const match = packagingSize.match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*cm?/i);
+      if (match) {
+        setPackagingWidth(match[1]);
+        setPackagingHeight(match[2]);
+        setPackagingDepth(match[3]);
+      } else {
+        // '30x20x15' 형식도 지원
+        const parts = packagingSize.split(/[x×]/).map(s => s.trim());
+        if (parts.length === 3) {
+          setPackagingWidth(parts[0]);
+          setPackagingHeight(parts[1]);
+          setPackagingDepth(parts[2].replace(/cm\s*$/i, ''));
+        }
+      }
+    } else {
+      setPackagingWidth('');
+      setPackagingHeight('');
+      setPackagingDepth('');
+    }
+  }, [packagingSize]);
+
+  // 포장 박스 사이즈 변경 핸들러
+  const handlePackagingSizeChange = (newWidth: string, newHeight: string, newDepth: string) => {
+    // 각 값에 대해 소수점 입력 처리
+    const processedWidth = handleNumberInput(newWidth);
+    const processedHeight = handleNumberInput(newHeight);
+    const processedDepth = handleNumberInput(newDepth);
+    
+    // 상태 업데이트
+    setPackagingWidth(processedWidth);
+    setPackagingHeight(processedHeight);
+    setPackagingDepth(processedDepth);
+    
+    // 모든 값이 입력되었을 때만 '가로x 세로x높이cm' 형식으로 변환하여 전달
+    if (processedWidth && processedHeight && processedDepth) {
+      const formatted = `${processedWidth}x ${processedHeight}x${processedDepth}cm`;
+      onPackagingSizeChange?.(formatted);
+    } else {
+      // 하나라도 비어있으면 빈 문자열 전달
+      onPackagingSizeChange?.('');
+    }
+  };
 
   const handleImageClick = () => {
     if (productImage) {
@@ -231,18 +288,19 @@ export function ProductInfoSection({
           {/* 상품 정보 영역 */}
           <div className="bg-gray-50 rounded-lg p-4 space-y-3">
             <div>
-              <div className="flex items-center gap-6">
+              {/* 첫 번째 줄: 사이즈와 무게 */}
+              <div className="flex items-center gap-6 mb-4">
                 <div className="flex items-center gap-2">
                   <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Ruler className="w-5 h-5 text-purple-600" />
                   </div>
                   <div>
                     <span className="text-gray-600 text-sm">사이즈</span>
-                    {isEditable ? (
+                    {onSizeChange ? (
                       <input
                         type="text"
                         value={size}
-                        onChange={(e) => onSizeChange?.(e.target.value)}
+                        onChange={(e) => onSizeChange(e.target.value)}
                         placeholder="예: 30x20x15"
                         className="mt-1 w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
@@ -257,11 +315,11 @@ export function ProductInfoSection({
                   </div>
                   <div>
                     <span className="text-gray-600 text-sm">무게</span>
-                    {isEditable ? (
+                    {onWeightChange ? (
                       <input
                         type="text"
                         value={weight}
-                        onChange={(e) => onWeightChange?.(e.target.value)}
+                        onChange={(e) => onWeightChange(e.target.value)}
                         placeholder="예: 500"
                         className="mt-1 w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
@@ -270,6 +328,10 @@ export function ProductInfoSection({
                     )}
                   </div>
                 </div>
+              </div>
+              
+              {/* 두 번째 줄: 소포장과 포장박스 사이즈 */}
+              <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Box className="w-5 h-5 text-green-600" />
@@ -280,13 +342,55 @@ export function ProductInfoSection({
                       <input
                         type="number"
                         value={packaging}
-                        onChange={(e) =>
-                          onPackagingChange(parseInt(e.target.value) || 0)
-                        }
+                        onChange={(e) => {
+                          const processedValue = handleNumberInput(e.target.value);
+                          if (processedValue !== e.target.value) {
+                            e.target.value = processedValue;
+                          }
+                          onPackagingChange(parseInt(processedValue) || 0);
+                        }}
                         className="w-16 px-2 py-1 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
                       <span className="text-gray-500 text-xs">개</span>
                     </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Box className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-gray-600 text-sm">포장 박스 사이즈</span>
+                    {onPackagingSizeChange ? (
+                      <div className="mt-1 flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={packagingWidth}
+                          onChange={(e) => handlePackagingSizeChange(e.target.value, packagingHeight, packagingDepth)}
+                          placeholder="가로"
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <span className="text-gray-500 text-sm">×</span>
+                        <input
+                          type="number"
+                          value={packagingHeight}
+                          onChange={(e) => handlePackagingSizeChange(packagingWidth, e.target.value, packagingDepth)}
+                          placeholder="세로"
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <span className="text-gray-500 text-sm">×</span>
+                        <input
+                          type="number"
+                          value={packagingDepth}
+                          onChange={(e) => handlePackagingSizeChange(packagingWidth, packagingHeight, e.target.value)}
+                          placeholder="높이"
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <span className="text-gray-500 text-xs">cm</span>
+                      </div>
+                    ) : (
+                      <p className="text-gray-900">{packagingSize || '-'}</p>
+                    )}
                   </div>
                 </div>
               </div>

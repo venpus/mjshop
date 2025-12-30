@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { PasswordForgotDialog } from './PasswordForgotDialog';
 import { AdminSignupModal } from './AdminSignupModal';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface LoginProps {
   onLogin: (id: string, password: string) => Promise<void>;
@@ -13,6 +14,7 @@ interface LoginProps {
 }
 
 export function Login({ onLogin, isLoading = false, error: externalError }: LoginProps) {
+  const { t } = useLanguage();
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -26,19 +28,19 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
 
     // 유효성 검사
     if (!id.trim()) {
-      setError('ID를 입력해주세요.');
+      setError(t('login.idRequired') || 'ID를 입력해주세요.');
       return;
     }
 
     if (!password.trim()) {
-      setError('비밀번호를 입력해주세요.');
+      setError(t('login.passwordRequired') || '비밀번호를 입력해주세요.');
       return;
     }
 
     try {
       await onLogin(id.trim(), password);
     } catch (err: any) {
-      setError(err.message || '로그인에 실패했습니다.');
+      setError(err.message || (t('login.failed') || '로그인에 실패했습니다.'));
     }
   };
 
@@ -52,8 +54,8 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
           <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-600 rounded-2xl mb-4">
             <LogIn className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">관리자 로그인</h1>
-          <p className="text-gray-600">시스템에 접근하려면 로그인하세요</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('login.title')}</h1>
+          <p className="text-gray-600">{t('login.subtitle')}</p>
         </div>
 
         {/* Login Form */}
@@ -64,8 +66,8 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
                 <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-sm text-green-800 font-medium">가입 신청이 완료되었습니다.</p>
-                  <p className="text-sm text-green-700 mt-1">관리자 승인 후 이용 가능합니다.</p>
+                  <p className="text-sm text-green-800 font-medium">{t('login.signupSuccess')}</p>
+                  <p className="text-sm text-green-700 mt-1">{t('login.signupSuccessDetail')}</p>
                 </div>
               </div>
             )}
@@ -81,7 +83,7 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
             {/* ID Input */}
             <div className="space-y-2">
               <Label htmlFor="id" className="text-gray-700 font-medium">
-                ID
+                {t('login.id')}
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -90,7 +92,7 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
                   type="text"
                   value={id}
                   onChange={(e) => setId(e.target.value)}
-                  placeholder="관리자 ID를 입력하세요"
+                  placeholder={t('login.idPlaceholder') || '관리자 ID를 입력하세요'}
                   className="pl-10 h-12"
                   disabled={isLoading}
                   autoComplete="username"

@@ -514,9 +514,9 @@ export class PurchaseOrderRepository {
   /**
    * 발주 비용 항목 조회
    */
-  async findCostItemsByPoId(purchaseOrderId: string): Promise<Array<{ id: number; item_type: 'option' | 'labor'; name: string; cost: number; display_order: number }>> {
+  async findCostItemsByPoId(purchaseOrderId: string): Promise<Array<{ id: number; item_type: 'option' | 'labor'; name: string; unit_price: number; quantity: number; cost: number; is_admin_only: boolean; display_order: number }>> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT id, item_type, name, cost, display_order
+      `SELECT id, item_type, name, unit_price, quantity, cost, is_admin_only, display_order
        FROM po_cost_items
        WHERE purchase_order_id = ?
        ORDER BY display_order ASC, id ASC`,
@@ -527,44 +527,64 @@ export class PurchaseOrderRepository {
       id: row.id,
       item_type: row.item_type,
       name: row.name,
+      unit_price: Number(row.unit_price),
+      quantity: Number(row.quantity),
       cost: Number(row.cost),
+      is_admin_only: Boolean(row.is_admin_only),
       display_order: row.display_order,
     }));
   }
 
   /**
    * 발주 비용 항목 저장 (기존 항목 삭제 후 새로 저장)
+   * @param preserveAdminOnlyItems A 레벨이 아닌 경우, 기존 A 레벨 전용 항목을 유지할지 여부
    */
   async saveCostItems(
     purchaseOrderId: string,
-    items: Array<{ item_type: 'option' | 'labor'; name: string; cost: number; display_order?: number }>
+    items: Array<{ item_type: 'option' | 'labor'; name: string; unit_price: number; quantity: number; is_admin_only?: boolean; display_order?: number }>,
+    preserveAdminOnlyItems: boolean = false
   ): Promise<void> {
     const connection = await pool.getConnection();
     
     try {
       await connection.beginTransaction();
 
-      // 기존 항목 삭제
-      await connection.execute(
-        'DELETE FROM po_cost_items WHERE purchase_order_id = ?',
-        [purchaseOrderId]
-      );
+      // 기존 항목 삭제 (A 레벨 전용 항목을 유지하는 경우 제외)
+      if (preserveAdminOnlyItems) {
+        // 일반 항목만 삭제 (is_admin_only = 0인 항목만 삭제, is_admin_only = 1인 항목은 유지)
+        await connection.execute(
+          'DELETE FROM po_cost_items WHERE purchase_order_id = ? AND is_admin_only = 0',
+          [purchaseOrderId]
+        );
+      } else {
+        await connection.execute(
+          'DELETE FROM po_cost_items WHERE purchase_order_id = ?',
+          [purchaseOrderId]
+        );
+      }
 
-      // 새 항목 저장
-      if (items.length > 0) {
-        const values = items.map((item, index) => [
+      // A 레벨 전용 항목은 DB에 이미 존재하므로 INSERT하지 않음
+      // 전달받은 항목만 INSERT (preserveAdminOnlyItems가 true일 때는 일반 항목만, false일 때는 모든 항목)
+      const allItems = items;
+
+      // 새 항목 저장 (cost = unit_price * quantity로 계산)
+      if (allItems.length > 0) {
+        const values = allItems.map((item, index) => [
           purchaseOrderId,
           item.item_type,
           item.name,
-          item.cost,
+          item.unit_price,
+          item.quantity,
+          item.unit_price * item.quantity, // cost = unit_price * quantity
+          item.is_admin_only !== undefined ? (item.is_admin_only ? 1 : 0) : 0, // is_admin_only (기본값: false)
           item.display_order !== undefined ? item.display_order : index
         ]);
 
-        const placeholders = items.map(() => '(?, ?, ?, ?, ?)').join(', ');
+        const placeholders = allItems.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
         const flatValues = values.flat();
 
         await connection.execute(
-          `INSERT INTO po_cost_items (purchase_order_id, item_type, name, cost, display_order)
+          `INSERT INTO po_cost_items (purchase_order_id, item_type, name, unit_price, quantity, cost, is_admin_only, display_order)
            VALUES ${placeholders}`,
           flatValues
         );
@@ -1395,6 +1415,103 @@ export class PurchaseOrderRepository {
     await pool.execute(
       `DELETE FROM po_images WHERE id IN (${placeholders})`,
       imageIds
+    );
+  }
+
+  /**
+   * 발주 메모 조회
+   */
+  async getMemos(purchaseOrderId: string): Promise<Array<{
+    id: number;
+    content: string;
+    userId: string;
+    createdAt: Date;
+    replies: Array<{
+      id: number;
+      content: string;
+      userId: string;
+      createdAt: Date;
+    }>;
+  }>> {
+    const [memoRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT id, content, user_id, created_at
+       FROM po_memos
+       WHERE purchase_order_id = ?
+       ORDER BY created_at DESC`,
+      [purchaseOrderId]
+    );
+
+    const memos = await Promise.all(
+      memoRows.map(async (memo) => {
+        const [replyRows] = await pool.execute<RowDataPacket[]>(
+          `SELECT id, content, user_id, created_at
+           FROM po_memo_replies
+           WHERE memo_id = ?
+           ORDER BY created_at ASC`,
+          [memo.id]
+        );
+
+        return {
+          id: memo.id,
+          content: memo.content,
+          userId: memo.user_id,
+          createdAt: memo.created_at,
+          replies: replyRows.map((reply) => ({
+            id: reply.id,
+            content: reply.content,
+            userId: reply.user_id,
+            createdAt: reply.created_at,
+          })),
+        };
+      })
+    );
+
+    return memos;
+  }
+
+  /**
+   * 발주 메모 추가
+   */
+  async addMemo(purchaseOrderId: string, content: string, userId: string): Promise<number> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      `INSERT INTO po_memos (purchase_order_id, content, user_id)
+       VALUES (?, ?, ?)`,
+      [purchaseOrderId, content, userId]
+    );
+
+    return result.insertId;
+  }
+
+  /**
+   * 발주 메모 삭제
+   */
+  async deleteMemo(memoId: number): Promise<void> {
+    await pool.execute(
+      `DELETE FROM po_memos WHERE id = ?`,
+      [memoId]
+    );
+  }
+
+  /**
+   * 메모 댓글 추가
+   */
+  async addMemoReply(memoId: number, content: string, userId: string): Promise<number> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      `INSERT INTO po_memo_replies (memo_id, content, user_id)
+       VALUES (?, ?, ?)`,
+      [memoId, content, userId]
+    );
+
+    return result.insertId;
+  }
+
+  /**
+   * 메모 댓글 삭제
+   */
+  async deleteMemoReply(replyId: number): Promise<void> {
+    await pool.execute(
+      `DELETE FROM po_memo_replies WHERE id = ?`,
+      [replyId]
     );
   }
 }
