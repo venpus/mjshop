@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Filter, Download, Eye, Package, Plus, Image, X, CheckSquare, RotateCw, Trash2 } from 'lucide-react';
 import { TablePagination } from './ui/table-pagination';
 import { StatusBadge } from './ui/status-badge';
@@ -69,6 +70,8 @@ interface PurchaseOrder {
 export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const { user } = useAuth();
   const isSuperAdmin = user?.level === 'A-SuperAdmin';
+  const location = useLocation();
+  const navigate = useNavigate();
   
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,8 +80,14 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(15);
+  
+  // URL 쿼리 파라미터에서 페이지 번호 읽기
+  const searchParams = new URLSearchParams(location.search);
+  const pageFromUrl = parseInt(searchParams.get('page') || '1', 10);
+  const itemsPerPageFromUrl = parseInt(searchParams.get('itemsPerPage') || '15', 10);
+  
+  const [currentPage, setCurrentPage] = useState(pageFromUrl);
+  const [itemsPerPage, setItemsPerPage] = useState(itemsPerPageFromUrl);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState({
     factoryStatus: [] as string[],
@@ -188,8 +197,13 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     onSuccess: (newOrderId) => {
       // 목록 새로고침
       loadPurchaseOrders();
-      // 새로 생성된 발주의 상세 페이지로 이동 (자동 저장 옵션 포함)
-      onViewDetail(newOrderId, 'work', true); // true = autoSave
+      // 새로 생성된 발주의 상세 페이지로 이동 (자동 저장 옵션 포함, 현재 페이지 정보 포함)
+      const params = new URLSearchParams();
+      params.set('tab', 'work');
+      params.set('autoSave', 'true');
+      params.set('returnPage', currentPage.toString());
+      params.set('returnItemsPerPage', itemsPerPage.toString());
+      navigate(`/admin/purchase-orders/${newOrderId}?${params.toString()}`);
     },
   });
 
@@ -228,12 +242,35 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+    // URL 쿼리 파라미터 업데이트
+    const params = new URLSearchParams(location.search);
+    params.set('page', page.toString());
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
   };
 
   const handleItemsPerPageChange = (value: number) => {
     setItemsPerPage(value);
     setCurrentPage(1); // Reset to first page when changing items per page
+    // URL 쿼리 파라미터 업데이트
+    const params = new URLSearchParams(location.search);
+    params.set('itemsPerPage', value.toString());
+    params.set('page', '1');
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
   };
+
+  // URL 쿼리 파라미터 변경 시 페이지 상태 동기화
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const pageFromUrl = parseInt(searchParams.get('page') || '1', 10);
+    const itemsPerPageFromUrl = parseInt(searchParams.get('itemsPerPage') || '15', 10);
+    
+    if (pageFromUrl !== currentPage) {
+      setCurrentPage(pageFromUrl);
+    }
+    if (itemsPerPageFromUrl !== itemsPerPage) {
+      setItemsPerPage(itemsPerPageFromUrl);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     loadPurchaseOrders();
@@ -653,7 +690,13 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     </td>
                     <td 
                       className="px-4 py-2 text-center cursor-pointer hover:bg-purple-50 transition-colors"
-                      onClick={() => onViewDetail(po.id)}
+                      onClick={() => {
+                        // 현재 페이지 정보를 URL 쿼리 파라미터로 전달하기 위해 직접 navigate
+                        const params = new URLSearchParams();
+                        params.set('returnPage', currentPage.toString());
+                        params.set('returnItemsPerPage', itemsPerPage.toString());
+                        navigate(`/admin/purchase-orders/${po.id}?${params.toString()}`);
+                      }}
                     >
                       <div className="flex flex-col gap-0.5">
                         <span className="text-gray-900">{po.date}</span>
@@ -662,7 +705,13 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     </td>
                     <td 
                       className="px-4 py-2 text-center cursor-pointer hover:bg-purple-50 transition-colors"
-                      onClick={() => onViewDetail(po.id)}
+                      onClick={() => {
+                        // 현재 페이지 정보를 URL 쿼리 파라미터로 전달하기 위해 직접 navigate
+                        const params = new URLSearchParams();
+                        params.set('returnPage', currentPage.toString());
+                        params.set('returnItemsPerPage', itemsPerPage.toString());
+                        navigate(`/admin/purchase-orders/${po.id}?${params.toString()}`);
+                      }}
                     >
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden flex items-center justify-center">
@@ -720,7 +769,11 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                             size="xs" 
                             onClick={(e) => {
                               e.stopPropagation();
-                              onViewDetail(po.id, 'factory');
+                              const params = new URLSearchParams();
+                              params.set('tab', 'factory');
+                              params.set('returnPage', currentPage.toString());
+                              params.set('returnItemsPerPage', itemsPerPage.toString());
+                              navigate(`/admin/purchase-orders/${po.id}?${params.toString()}`);
                             }}
                           />
                         </div>
@@ -732,7 +785,11 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                             size="xs" 
                             onClick={(e) => {
                               e.stopPropagation();
-                              onViewDetail(po.id, 'work');
+                              const params = new URLSearchParams();
+                              params.set('tab', 'work');
+                              params.set('returnPage', currentPage.toString());
+                              params.set('returnItemsPerPage', itemsPerPage.toString());
+                              navigate(`/admin/purchase-orders/${po.id}?${params.toString()}`);
                             }}
                           />
                         </div>

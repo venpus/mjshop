@@ -246,15 +246,37 @@ function AdminLayout() {
 function PurchaseOrderDetailWrapper({ onBack }: { onBack: () => void }) {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const tabParam = searchParams.get('tab') as 'cost' | 'factory' | 'work' | 'delivery' | undefined;
   const autoSaveParam = searchParams.get('autoSave') === 'true';
+  
+  // returnPage와 returnItemsPerPage 파라미터 가져오기
+  const returnPage = searchParams.get('returnPage');
+  const returnItemsPerPage = searchParams.get('returnItemsPerPage');
+
+  // 목록으로 돌아가기 핸들러 (페이지 정보 포함)
+  const handleBackWithPage = () => {
+    let url = '/admin/purchase-orders';
+    const params = new URLSearchParams();
+    if (returnPage) {
+      params.set('page', returnPage);
+    }
+    if (returnItemsPerPage) {
+      params.set('itemsPerPage', returnItemsPerPage);
+    }
+    const queryString = params.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+    navigate(url);
+  };
 
   if (!id) {
     return <Navigate to="/admin/purchase-orders" replace />;
   }
 
-  return <PurchaseOrderDetail orderId={id} onBack={onBack} initialTab={tabParam} autoSave={autoSaveParam} />;
+  return <PurchaseOrderDetail orderId={id} onBack={handleBackWithPage} initialTab={tabParam} autoSave={autoSaveParam} />;
 }
 
 // MaterialDetail 래퍼 (URL 파라미터 처리)
