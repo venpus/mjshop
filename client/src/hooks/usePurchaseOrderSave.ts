@@ -8,6 +8,7 @@ import {
   calculateTotalOptionCost,
   calculateTotalLaborCost,
   calculateFinalPaymentAmount,
+  calculateAdvancePaymentAmount,
   calculateBalancePaymentAmount
 } from "../utils/purchaseOrderCalculations";
 import type { DeliverySet } from "../components/tabs/LogisticsDeliveryTab";
@@ -539,10 +540,11 @@ export function usePurchaseOrderSave({
         totalLaborCost
       );
       
-      // 선금 금액 = 최종 결제 금액 * (선금 비율 / 100)
-      const advancePaymentAmount = finalPaymentAmount * (advancePaymentRate / 100);
+      // 선금 금액 = 발주단가 * 수량 * (선금 비율 / 100)
+      // 발주단가 = 기본단가 + 백마진
+      const advancePaymentAmount = calculateAdvancePaymentAmount(unitPrice, quantity, advancePaymentRate, backMargin);
       
-      // 잔금 금액 = 최종 결제 금액 - 선금 금액
+      // 잔금 금액 = 최종 결제 금액 - 선금
       const balancePaymentAmount = calculateBalancePaymentAmount(
         finalPaymentAmount,
         advancePaymentAmount

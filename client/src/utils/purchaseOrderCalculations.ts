@@ -172,13 +172,17 @@ export function calculatePackingListShippingCost(
 
 /**
  * 선금 금액을 계산합니다.
+ * 선금 = 발주단가 * 수량 * (선금 비율 / 100)
+ * 발주단가 = 기본단가 + 백마진
  */
 export function calculateAdvancePaymentAmount(
   unitPrice: number,
   quantity: number,
-  advancePaymentRate: number
+  advancePaymentRate: number,
+  backMargin: number = 0
 ): number {
-  return unitPrice * quantity * (advancePaymentRate / 100);
+  const orderUnitPrice = unitPrice + backMargin; // 발주단가
+  return orderUnitPrice * quantity * (advancePaymentRate / 100);
 }
 
 /**
