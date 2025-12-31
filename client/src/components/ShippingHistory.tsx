@@ -33,7 +33,7 @@ export function ShippingHistory() {
   const isSuperAdmin = user?.level === 'A-SuperAdmin';
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [editingCodeDate, setEditingCodeDate] = useState<string | null>(null); // code-date 조합
   const [packingListItems, setPackingListItems] = useState<PackingListItem[]>([]);
   const [originalPackingListItems, setOriginalPackingListItems] = useState<PackingListItem[]>([]); // 원본 데이터 (변경 감지용)
   const [selectedInvoiceImage, setSelectedInvoiceImage] = useState<string | null>(null);
@@ -54,7 +54,8 @@ export function ShippingHistory() {
 
   // 선택 상태 관리 훅
   const {
-    selectedCodes,
+    selectedCodes, // 하위 호환성을 위해 유지 (실제로는 사용하지 않음)
+    selectedKeys, // 코드-날짜 조합 Set
     toggleCode,
     toggleAllCodes,
     isAllSelected,
@@ -134,10 +135,10 @@ export function ShippingHistory() {
   };
 
   const handleUpdatePackingList = async (data: PackingListFormData) => {
-    if (!editingCode) return;
+    if (!editingCodeDate) return;
 
     try {
-      const packingListId = getPackingListIdFromCode(packingListItems, editingCode);
+      const packingListId = getPackingListIdFromCode(packingListItems, editingCodeDate);
       if (!packingListId) {
         alert('패킹리스트를 찾을 수 없습니다.');
         return;
@@ -184,7 +185,7 @@ export function ShippingHistory() {
       // 데이터 다시 로드
       await loadPackingLists();
       setIsEditModalOpen(false);
-      setEditingCode(null);
+      setEditingCodeDate(null);
       clearSelection();
     } catch (err: any) {
       console.error('패킹리스트 수정 오류:', err);
@@ -224,24 +225,24 @@ export function ShippingHistory() {
 
   // 패킹리스트 삭제 핸들러
   const handleDeletePackingLists = useCallback(async () => {
-    if (selectedCodes.size === 0) {
+    if (selectedKeys.size === 0) {
       return;
     }
 
-    const confirmMessage = selectedCodes.size === 1
+    const confirmMessage = selectedKeys.size === 1
       ? `선택한 패킹리스트를 삭제하시겠습니까?\n\n삭제된 패킹리스트의 데이터는 복구할 수 없으며, 발주 관리 목록의 수량이 자동으로 업데이트됩니다.`
-      : `${selectedCodes.size}개의 패킹리스트를 삭제하시겠습니까?\n\n삭제된 패킹리스트의 데이터는 복구할 수 없으며, 발주 관리 목록의 수량이 자동으로 업데이트됩니다.`;
+      : `${selectedKeys.size}개의 패킹리스트를 삭제하시겠습니까?\n\n삭제된 패킹리스트의 데이터는 복구할 수 없으며, 발주 관리 목록의 수량이 자동으로 업데이트됩니다.`;
 
     if (!confirm(confirmMessage)) {
       return;
     }
 
     try {
-      const codesToDelete = Array.from(selectedCodes);
-      const deletePromises = codesToDelete.map(async (code) => {
-        const packingListId = getPackingListIdFromCode(packingListItems, code);
+      const keysToDelete = Array.from(selectedKeys);
+      const deletePromises = keysToDelete.map(async (codeDateKey) => {
+        const packingListId = getPackingListIdFromCode(packingListItems, codeDateKey);
         if (!packingListId) {
-          console.warn(`패킹리스트 ID를 찾을 수 없습니다: ${code}`);
+          console.warn(`패킹리스트 ID를 찾을 수 없습니다: ${codeDateKey}`);
           return;
         }
         await deletePackingList(packingListId);
@@ -255,14 +256,14 @@ export function ShippingHistory() {
       // 목록 새로고침
       await loadPackingLists();
       
-      alert(selectedCodes.size === 1 
+      alert(selectedKeys.size === 1 
         ? '패킹리스트가 삭제되었습니다.' 
-        : `${selectedCodes.size}개의 패킹리스트가 삭제되었습니다.`);
+        : `${selectedKeys.size}개의 패킹리스트가 삭제되었습니다.`);
     } catch (error: any) {
       console.error('패킹리스트 삭제 오류:', error);
       alert(error.message || '패킹리스트 삭제 중 오류가 발생했습니다.');
     }
-  }, [selectedCodes, packingListItems, clearSelection, loadPackingLists]);
+  }, [selectedKeys, packingListItems, clearSelection, loadPackingLists]);
 
   // 한국도착일 변경 핸들러 (로컬 상태만 업데이트, 저장은 저장 버튼으로)
   const handleKoreaArrivalChange = useCallback((itemId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => {
@@ -529,25 +530,42 @@ export function ShippingHistory() {
             <h2 className="text-gray-900">패킹리스트</h2>
           </div>
           <div className="flex items-center gap-2">
-            {selectedCodes.size > 0 && (
+            {selectedKeys.size > 0 && (
               <>
                 <button
                   onClick={() => {
-                    const firstCode = Array.from(selectedCodes)[0];
-                    const itemsToEdit = packingListItems.filter(item => item.code === firstCode);
+                    const firstKey = Array.from(selectedKeys)[0];
+                    // code-date 키에서 code와 date 추출 (첫 번째 하이픈 기준으로 분리)
+                    const firstDashIndex = firstKey.indexOf('-');
+                    if (firstDashIndex === -1) {
+                      alert('유효하지 않은 선택입니다.');
+                      return;
+                    }
+                    const code = firstKey.substring(0, firstDashIndex);
+                    const date = firstKey.substring(firstDashIndex + 1);
                     
-                    if (itemsToEdit.length === 0) {
+                    const itemsToEdit = packingListItems.filter(item => item.code === code && item.date === date && item.isFirstRow);
+                    
+                    // 같은 그룹의 모든 아이템 가져오기
+                    const groupItems = packingListItems.filter(item => {
+                      const groupId = getGroupId(item.id);
+                      const firstItem = itemsToEdit[0];
+                      if (!firstItem) return false;
+                      return getGroupId(firstItem.id) === groupId;
+                    });
+                    
+                    if (groupItems.length === 0) {
                       alert('수정할 항목을 찾을 수 없습니다.');
                       return;
                     }
 
-                    const formData = convertItemToFormData(itemsToEdit);
+                    const formData = convertItemToFormData(groupItems);
                     if (!formData) {
                       alert('데이터 변환에 실패했습니다.');
                       return;
                     }
 
-                    setEditingCode(firstCode);
+                    setEditingCodeDate(firstKey);
                     setIsEditModalOpen(true);
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -558,7 +576,7 @@ export function ShippingHistory() {
                 <button
                   onClick={() => {
                     // TODO: 내보내기 기능 구현
-                    alert(`${selectedCodes.size}개의 항목을 내보냅니다.`);
+                    alert(`${selectedKeys.size}개의 항목을 내보냅니다.`);
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
@@ -608,15 +626,26 @@ export function ShippingHistory() {
       />
 
       {/* 패킹 리스트 수정 모달 */}
-      {editingCode && (() => {
-        const itemsToEdit = packingListItems.filter(item => item.code === editingCode);
+      {editingCodeDate && (() => {
+        // code-date 키에서 code와 date 추출 (첫 번째 하이픈 기준으로 분리)
+        const firstDashIndex = editingCodeDate.indexOf('-');
+        if (firstDashIndex === -1) return null;
+        const code = editingCodeDate.substring(0, firstDashIndex);
+        const date = editingCodeDate.substring(firstDashIndex + 1);
+        
+        const firstItem = packingListItems.find(item => item.code === code && item.date === date && item.isFirstRow);
+        if (!firstItem) return null;
+        
+        const groupId = getGroupId(firstItem.id);
+        const itemsToEdit = packingListItems.filter(item => getGroupId(item.id) === groupId);
+        
         const formData = convertItemToFormData(itemsToEdit);
         return (
           <PackingListCreateModal
             isOpen={isEditModalOpen}
             onClose={() => {
               setIsEditModalOpen(false);
-              setEditingCode(null);
+              setEditingCodeDate(null);
             }}
             onSubmit={handleUpdatePackingList}
             initialData={formData || undefined}

@@ -13,7 +13,7 @@ interface PackingListRowProps {
   groupSize: number;
   isSuperAdmin: boolean;
   isCodeSelected: boolean;
-  onToggleCode: (code: string) => void;
+  onToggleCode: (code: string, date: string) => void;
   onUnitChange: (groupId: string, unit: '박스' | '마대') => void;
   onInvoiceChange: (groupId: string, invoices: DomesticInvoice[]) => void;
   onLogisticsCompanyChange: (groupId: string, logisticsCompany: string) => void;
@@ -83,7 +83,7 @@ export function PackingListRow({
         <input
           type="checkbox"
           checked={isCodeSelected}
-          onChange={() => onToggleCode(item.code)}
+          onChange={() => onToggleCode(item.code, item.date)}
           className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
         />
       </td>

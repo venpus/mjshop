@@ -9,8 +9,8 @@ interface PackingListTableProps {
   isSuperAdmin: boolean;
   isAllSelected: boolean;
   onToggleAll: (checked: boolean) => void;
-  onToggleCode: (code: string) => void;
-  isCodeSelected: (code: string) => boolean;
+  onToggleCode: (code: string, date: string) => void;
+  isCodeSelected: (code: string, date: string) => boolean;
   onItemUpdate: (groupId: string, updater: (item: PackingListItem) => PackingListItem) => void;
   onDomesticInvoiceChange?: (groupId: string, invoices: DomesticInvoice[]) => void;
   onKoreaArrivalChange?: (itemId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => void;
@@ -156,7 +156,7 @@ export function PackingListTable({
                     isFirst={isFirst}
                     groupSize={groupSize}
                     isSuperAdmin={isSuperAdmin}
-                    isCodeSelected={isCodeSelected(item.code)}
+                    isCodeSelected={isCodeSelected(item.code, item.date)}
                     onToggleCode={onToggleCode}
                     onUnitChange={handleUnitChange}
                     onInvoiceChange={handleInvoiceChange}

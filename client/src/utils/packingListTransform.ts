@@ -385,16 +385,24 @@ export function convertFactoryShipmentsToFormData(
 
 /**
  * 클라이언트 PackingListItem을 서버 API 형식으로 변환하는 헬퍼 함수
- * (현재는 주로 코드 그룹 기준으로 변환)
+ * 코드와 날짜 조합으로 패킹리스트 ID를 찾음
  */
 export function getPackingListIdFromCode(
   clientItems: PackingListItem[],
-  code: string
+  codeDateKey: string
 ): number | null {
   if (clientItems.length === 0) return null;
 
+  // codeDateKey 형식: "code-date" (예: "F20-2025-12-11")
+  // 첫 번째 하이픈 위치를 찾아서 코드와 날짜를 분리
+  const firstDashIndex = codeDateKey.indexOf('-');
+  if (firstDashIndex === -1) return null;
+
+  const code = codeDateKey.substring(0, firstDashIndex);
+  const date = codeDateKey.substring(firstDashIndex + 1); // 첫 번째 하이픈 이후가 날짜
+
   // id에서 packing_list_id 추출 (형식: "packingListId-itemId")
-  const firstItem = clientItems.find((item) => item.code === code);
+  const firstItem = clientItems.find((item) => item.code === code && item.date === date && item.isFirstRow);
   if (!firstItem) return null;
 
   const parts = firstItem.id.split('-');
