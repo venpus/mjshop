@@ -30,6 +30,7 @@ interface CostPaymentTabProps {
   shippingCost: number;
   warehouseShippingCost: number;
   shippingCostTotal: number;
+  packingListShippingCost: number; // 패킹리스트 배송비 (읽기 전용)
   onSetShippingCost: (value: number) => void;
   onSetWarehouseShippingCost: (value: number) => void;
   
@@ -80,6 +81,7 @@ export function CostPaymentTab({
   shippingCost,
   warehouseShippingCost,
   shippingCostTotal,
+  packingListShippingCost,
   onSetShippingCost,
   onSetWarehouseShippingCost,
   optionItems,
@@ -292,6 +294,18 @@ export function CostPaymentTab({
                   step="0.01"
                   className="w-24 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
+              </div>
+            </div>
+            {/* 패킹리스트 배송비 (읽기 전용) */}
+            <div className="flex items-center gap-2">
+              <span className="text-gray-600 text-xs whitespace-nowrap min-w-[72px]">
+                패킹리스트 배송비
+              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-gray-500 text-sm">¥</span>
+                <div className="w-24 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-right text-sm text-gray-700">
+                  {packingListShippingCost.toFixed(2)}
+                </div>
               </div>
             </div>
           </div>

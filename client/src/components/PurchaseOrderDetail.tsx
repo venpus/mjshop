@@ -1094,8 +1094,7 @@ export function PurchaseOrderDetail({
   const basicCostTotal = calculateBasicCostTotal(unitPrice, quantity, commissionRate, backMargin);
   const shippingCostTotal = calculateShippingCostTotal(
     shippingCost,
-    warehouseShippingCost,
-    packingListShippingCost
+    warehouseShippingCost
   );
   const finalPaymentAmount = calculateFinalPaymentAmount(basicCostTotal, shippingCostTotal, totalOptionCost, totalLaborCost);
   const expectedFinalUnitPrice = calculateExpectedFinalUnitPrice(finalPaymentAmount, quantity);
@@ -1195,6 +1194,7 @@ export function PurchaseOrderDetail({
                 shippingCost={shippingCost}
                 warehouseShippingCost={warehouseShippingCost}
                 shippingCostTotal={shippingCostTotal}
+                packingListShippingCost={packingListShippingCost}
                 onSetShippingCost={setShippingCost}
                 onSetWarehouseShippingCost={setWarehouseShippingCost}
                 optionItems={optionItems}
@@ -1395,6 +1395,7 @@ export function PurchaseOrderDetail({
                 shippingCost={shippingCost}
                 warehouseShippingCost={warehouseShippingCost}
                 shippingCostTotal={shippingCostTotal}
+                packingListShippingCost={packingListShippingCost}
                 onSetShippingCost={setShippingCost}
                 onSetWarehouseShippingCost={setWarehouseShippingCost}
                 optionItems={optionItems}

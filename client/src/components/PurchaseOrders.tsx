@@ -707,8 +707,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                 );
                 const shippingCostTotal = calculateShippingCostTotal(
                   po.shippingCost,
-                  po.warehouseShippingCost,
-                  po.packingListShippingCost || 0
+                  po.warehouseShippingCost
                 );
                 const finalPaymentAmount = calculateFinalPaymentAmount(
                   basicCostTotal,

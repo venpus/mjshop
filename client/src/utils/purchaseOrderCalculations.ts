@@ -125,18 +125,18 @@ export function calculateCommissionAmount(
 
 /**
  * 배송비 총액을 계산합니다.
- * 기존 배송비(shippingCost, warehouseShippingCost) + 패킹리스트 배송비
+ * 업체 배송비 + 창고 배송비 (패킹리스트 배송비는 제외)
  */
 export function calculateShippingCostTotal(
   shippingCost: number,
-  warehouseShippingCost: number,
-  packingListShippingCost: number = 0 // 패킹리스트에서 계산된 배송비 (발주 수량 × 단위당 배송비)
+  warehouseShippingCost: number
 ): number {
-  return shippingCost + warehouseShippingCost + packingListShippingCost;
+  return shippingCost + warehouseShippingCost;
 }
 
 /**
  * 최종 결제 금액을 계산합니다.
+ * 패킹리스트 배송비는 제외 (별도 관리)
  */
 export function calculateFinalPaymentAmount(
   basicCostTotal: number,
@@ -149,7 +149,7 @@ export function calculateFinalPaymentAmount(
 
 /**
  * 최종 예상 단가를 계산합니다. (최종 결제 금액 / 수량)
- * 패킹리스트 배송비를 포함한 최종 단가
+ * 패킹리스트 배송비는 제외 (별도 관리)
  */
 export function calculateExpectedFinalUnitPrice(
   finalPaymentAmount: number,
