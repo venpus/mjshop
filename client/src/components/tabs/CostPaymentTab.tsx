@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
-import { handleNumberInput } from "../../utils/numberInputUtils";
+import { handleNumberInput, formatNumberForInput } from "../../utils/numberInputUtils";
 
 export interface LaborCostItem {
   id: string;
@@ -155,7 +155,7 @@ export function CostPaymentTab({
                   <span className="text-gray-500 text-sm">¥</span>
                   <input
                     type="number"
-                    value={unitPrice || ""}
+                    value={formatNumberForInput(unitPrice)}
                     onChange={(e) => {
                       const processedValue = handleNumberInput(e.target.value);
                       if (processedValue !== e.target.value) {
@@ -179,7 +179,7 @@ export function CostPaymentTab({
                   <span className="text-gray-500 text-sm">¥</span>
                   <input
                     type="number"
-                    value={backMargin || ""}
+                    value={formatNumberForInput(backMargin)}
                     onChange={(e) => {
                       const processedValue = handleNumberInput(e.target.value);
                       if (processedValue !== e.target.value) {
@@ -260,7 +260,7 @@ export function CostPaymentTab({
                 <span className="text-gray-500 text-sm">¥</span>
                 <input
                   type="number"
-                  value={shippingCost || ""}
+                  value={formatNumberForInput(shippingCost)}
                   onChange={(e) => {
                     const processedValue = handleNumberInput(e.target.value);
                     if (processedValue !== e.target.value) {
@@ -281,7 +281,7 @@ export function CostPaymentTab({
                 <span className="text-gray-500 text-sm">¥</span>
                 <input
                   type="number"
-                  value={warehouseShippingCost || ""}
+                  value={formatNumberForInput(warehouseShippingCost)}
                   onChange={(e) => {
                     const processedValue = handleNumberInput(e.target.value);
                     if (processedValue !== e.target.value) {
@@ -334,7 +334,7 @@ export function CostPaymentTab({
                       <span className="text-gray-500 text-xs">¥</span>
                       <input
                         type="number"
-                        value={item.unit_price || ""}
+                        value={formatNumberForInput(item.unit_price)}
                         onChange={(e) => {
                           const processedValue = handleNumberInput(e.target.value);
                           if (processedValue !== e.target.value) {
@@ -353,7 +353,7 @@ export function CostPaymentTab({
                       <span className="text-gray-500 text-xs">×</span>
                       <input
                         type="number"
-                        value={item.quantity || ""}
+                        value={formatNumberForInput(item.quantity)}
                         onChange={(e) => {
                           const processedValue = handleNumberInput(e.target.value);
                           if (processedValue !== e.target.value) {
@@ -420,7 +420,7 @@ export function CostPaymentTab({
                         <span className="text-gray-500 text-xs">¥</span>
                         <input
                           type="number"
-                          value={item.unit_price || ""}
+                          value={formatNumberForInput(item.unit_price)}
                           onChange={(e) => {
                             const processedValue = handleNumberInput(e.target.value);
                             if (processedValue !== e.target.value) {
@@ -438,7 +438,7 @@ export function CostPaymentTab({
                         <span className="text-gray-500 text-xs">×</span>
                         <input
                           type="number"
-                          value={item.quantity || ""}
+                          value={formatNumberForInput(item.quantity)}
                           onChange={(e) => {
                             const processedValue = handleNumberInput(e.target.value);
                             if (processedValue !== e.target.value) {
@@ -516,7 +516,7 @@ export function CostPaymentTab({
                       <span className="text-gray-500 text-xs">¥</span>
                       <input
                         type="number"
-                        value={item.unit_price || ""}
+                        value={formatNumberForInput(item.unit_price)}
                         onChange={(e) => {
                           const processedValue = handleNumberInput(e.target.value);
                           if (processedValue !== e.target.value) {
@@ -535,7 +535,7 @@ export function CostPaymentTab({
                       <span className="text-gray-500 text-xs">×</span>
                       <input
                         type="number"
-                        value={item.quantity || ""}
+                        value={formatNumberForInput(item.quantity)}
                         onChange={(e) => {
                           const processedValue = handleNumberInput(e.target.value);
                           if (processedValue !== e.target.value) {
@@ -602,7 +602,7 @@ export function CostPaymentTab({
                         <span className="text-gray-500 text-xs">¥</span>
                         <input
                           type="number"
-                          value={item.unit_price || ""}
+                          value={formatNumberForInput(item.unit_price)}
                           onChange={(e) => {
                             const processedValue = handleNumberInput(e.target.value);
                             if (processedValue !== e.target.value) {
@@ -620,7 +620,7 @@ export function CostPaymentTab({
                         <span className="text-gray-500 text-xs">×</span>
                         <input
                           type="number"
-                          value={item.quantity || ""}
+                          value={formatNumberForInput(item.quantity)}
                           onChange={(e) => {
                             const processedValue = handleNumberInput(e.target.value);
                             if (processedValue !== e.target.value) {
@@ -676,7 +676,7 @@ export function CostPaymentTab({
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
-                        value={advancePaymentRate || ""}
+                        value={formatNumberForInput(advancePaymentRate)}
                         onChange={(e) => {
                           const processedValue = handleNumberInput(e.target.value);
                           if (processedValue !== e.target.value) {

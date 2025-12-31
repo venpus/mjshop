@@ -37,6 +37,35 @@ export function handleNumberInput(value: string): string {
 }
 
 /**
+ * 숫자 값을 input의 value 속성에 사용할 수 있는 문자열로 변환
+ * 소수점 앞의 0을 보존합니다 (예: 0.5 -> "0.5", 5 -> "5")
+ * @param num 숫자 값
+ * @returns 문자열로 변환된 값 (null/undefined이면 빈 문자열, 0이면 "0")
+ */
+export function formatNumberForInput(num: number | null | undefined): string {
+  if (num === null || num === undefined) {
+    return '';
+  }
+  
+  // 숫자를 문자열로 변환 (0도 "0"으로 표시)
+  const str = num.toString();
+  
+  // 소수점이 포함되어 있고, 0으로 시작하는 경우 (예: 0.5)
+  // toString()이 이미 "0.5"로 변환하므로 그대로 반환
+  if (str.includes('.') && str.startsWith('0.')) {
+    return str;
+  }
+  
+  // 음수이고 소수점이 포함되어 있고, -0으로 시작하는 경우 (예: -0.5)
+  if (str.startsWith('-0.')) {
+    return str;
+  }
+  
+  // 일반적인 경우 그대로 반환 (정수, 음수 등)
+  return str;
+}
+
+/**
  * 숫자 입력 필드의 onChange 핸들러를 생성
  * @param setter 상태 설정 함수
  * @returns onChange 핸들러
