@@ -160,8 +160,9 @@ export function calculateExpectedFinalUnitPrice(
 
 /**
  * 패킹리스트 배송비를 발주 수량 기준으로 계산합니다.
- * unit_shipping_cost는 이미 발주 수량 기준으로 계산되어 있으므로
- * 발주 수량 × 단위당 배송비로 총 배송비를 계산합니다.
+ * unit_shipping_cost는 출고 수량 기준 평균 배송비이므로,
+ * 발주 수량 × 단위당 배송비로 총 예상 배송비를 계산합니다.
+ * (미출고 수량에 대해서도 동일한 평균 단가를 적용)
  */
 export function calculatePackingListShippingCost(
   unitShippingCost: number,

@@ -124,8 +124,30 @@ export class PackingListRepository {
               actual_weight, weight_ratio, calculated_weight, shipping_cost,
               payment_date, wk_payment_date, created_at, updated_at, created_by, updated_by
        FROM packing_lists
-       WHERE code = ?`,
+       WHERE code = ?
+       ORDER BY shipment_date DESC, created_at DESC
+       LIMIT 1`,
       [code]
+    );
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    return this.mapRowToPackingList(rows[0]);
+  }
+
+  /**
+   * 코드와 날짜로 패킹리스트 조회 (중복 체크용)
+   */
+  async findByCodeAndDate(code: string, shipmentDate: string): Promise<PackingList | null> {
+    const [rows] = await pool.execute<PackingListRow[]>(
+      `SELECT id, code, shipment_date, logistics_company, warehouse_arrival_date,
+              actual_weight, weight_ratio, calculated_weight, shipping_cost,
+              payment_date, wk_payment_date, created_at, updated_at, created_by, updated_by
+       FROM packing_lists
+       WHERE code = ? AND shipment_date = ?`,
+      [code, shipmentDate]
     );
 
     if (rows.length === 0) {

@@ -95,10 +95,13 @@ export class PackingListService {
    * 패킹리스트 생성
    */
   async createPackingList(data: CreatePackingListDTO): Promise<PackingList> {
-    // 코드 중복 체크
-    const existing = await this.repository.findByCode(data.code);
+    // 코드와 날짜 조합으로 중복 체크
+    const shipmentDate = typeof data.shipment_date === 'string' 
+      ? data.shipment_date.split('T')[0] 
+      : data.shipment_date;
+    const existing = await this.repository.findByCodeAndDate(data.code, shipmentDate);
     if (existing) {
-      throw new Error('이미 존재하는 패킹리스트 코드입니다.');
+      throw new Error('동일한 코드와 날짜의 패킹리스트가 이미 존재합니다.');
     }
 
     return this.repository.create(data);
@@ -113,11 +116,33 @@ export class PackingListService {
       throw new Error('패킹리스트를 찾을 수 없습니다.');
     }
 
-    // 코드 변경 시 중복 체크
-    if (data.code && data.code !== existing.code) {
-      const codeExists = await this.repository.findByCode(data.code);
-      if (codeExists) {
-        throw new Error('이미 존재하는 패킹리스트 코드입니다.');
+    // 코드 또는 날짜 변경 시 중복 체크
+    const newCode = data.code ?? existing.code;
+    let newShipmentDate: string;
+    
+    if (data.shipment_date) {
+      // 새로운 날짜가 제공된 경우
+      newShipmentDate = typeof data.shipment_date === 'string' 
+        ? data.shipment_date.split('T')[0] 
+        : data.shipment_date instanceof Date 
+          ? data.shipment_date.toISOString().split('T')[0]
+          : String(data.shipment_date).split('T')[0];
+    } else {
+      // 기존 날짜 사용
+      if (existing.shipment_date instanceof Date) {
+        newShipmentDate = existing.shipment_date.toISOString().split('T')[0];
+      } else if (typeof existing.shipment_date === 'string') {
+        newShipmentDate = existing.shipment_date.split('T')[0];
+      } else {
+        newShipmentDate = String(existing.shipment_date).split('T')[0];
+      }
+    }
+    
+    // 코드나 날짜가 변경되었을 때만 중복 체크
+    if (data.code || data.shipment_date) {
+      const duplicate = await this.repository.findByCodeAndDate(newCode, newShipmentDate);
+      if (duplicate && duplicate.id !== id) {
+        throw new Error('동일한 코드와 날짜의 패킹리스트가 이미 존재합니다.');
       }
     }
 

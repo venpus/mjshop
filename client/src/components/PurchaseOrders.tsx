@@ -142,8 +142,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             product: po.product,
             unitPrice: po.unit_price || 0,
             backMargin: po.back_margin || 0,
-            optionCost: 0, // 옵션 비용은 별도로 계산 필요 (목록에서는 0으로 설정)
-            laborCost: 0, // 인건비는 별도로 계산 필요 (목록에서는 0으로 설정)
+            optionCost: po.total_option_cost || 0, // 서버에서 계산된 옵션 비용 총액
+            laborCost: po.total_labor_cost || 0, // 서버에서 계산된 인건비 총액
             quantity: po.quantity || 0,
             amount: 0, // 최종 결제 금액은 별도로 계산
             commissionRate: po.commission_rate || 0,

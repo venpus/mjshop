@@ -343,6 +343,19 @@ export class PurchaseOrderService {
       weight: po.product_weight,
     };
 
+    // 옵션 비용과 인건비 총액 계산
+    const costItems = await this.repository.findCostItemsByPoId(po.id);
+    const totalOptionCost = costItems
+      .filter(item => item.item_type === 'option')
+      .reduce((sum, item) => sum + item.cost, 0);
+    const totalLaborCost = costItems
+      .filter(item => item.item_type === 'labor')
+      .reduce((sum, item) => sum + item.cost, 0);
+
+    // 옵션 비용과 인건비 총액을 결과에 추가 (타입 확장 필요)
+    (result as any).total_option_cost = totalOptionCost;
+    (result as any).total_labor_cost = totalLaborCost;
+
     console.log(`[enrichPurchaseOrder] 발주 ID: ${po.id}, product_main_image: ${po.product_main_image}, product.main_image: ${result.product.main_image}`);
 
     return result;
