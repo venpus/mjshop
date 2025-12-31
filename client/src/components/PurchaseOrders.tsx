@@ -93,7 +93,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   
   const [currentPage, setCurrentPage] = useState(pageFromUrl);
   const [itemsPerPage, setItemsPerPage] = useState(itemsPerPageFromUrl);
-  const [searchTerm, setSearchTerm] = useState(searchFromUrl);
+  const [searchTerm, setSearchTerm] = useState(searchFromUrl); // 실제 검색에 사용되는 검색어
+  const [inputSearchTerm, setInputSearchTerm] = useState(searchFromUrl); // 입력 필드에 표시되는 검색어
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState({
     factoryStatus: [] as string[],
@@ -120,9 +121,14 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     try {
       setIsLoading(true);
       
-      // 페이징 파라미터 추가 (현재는 클라이언트 필터링을 위해 전체 데이터를 받아옴)
-      // 추후 서버 사이드 필터링으로 개선 가능
-      const response = await fetch(`${API_BASE_URL}/purchase-orders?page=${currentPage}&limit=${itemsPerPage}`, {
+      // 페이징 및 검색 파라미터 추가
+      const params = new URLSearchParams();
+      params.set('page', currentPage.toString());
+      params.set('limit', itemsPerPage.toString());
+      if (searchTerm.trim()) {
+        params.set('search', searchTerm.trim());
+      }
+      const response = await fetch(`${API_BASE_URL}/purchase-orders?${params.toString()}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -254,27 +260,23 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     onSuccess: loadPurchaseOrders,
   });
 
+  // 상태 필터만 클라이언트 측에서 적용 (검색은 서버 사이드에서 처리)
   const filteredPurchaseOrders = purchaseOrders.filter(po => {
-    const matchesSearch = 
-      po.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      po.supplier?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      po.product?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-    
     const matchesFactoryStatus = filters.factoryStatus.length === 0 || filters.factoryStatus.includes(po.factoryStatus);
     const matchesWorkStatus = filters.workStatus.length === 0 || filters.workStatus.includes(po.workStatus);
     const matchesDeliveryStatus = filters.deliveryStatus.length === 0 || filters.deliveryStatus.includes(po.deliveryStatus);
     const matchesPaymentStatus = filters.paymentStatus.length === 0 || filters.paymentStatus.includes(po.paymentStatus);
     const matchesOrderStatus = filters.orderStatus.length === 0 || filters.orderStatus.includes(po.orderStatus);
     
-    return matchesSearch && matchesFactoryStatus && matchesWorkStatus && matchesDeliveryStatus && matchesPaymentStatus && matchesOrderStatus;
+    return matchesFactoryStatus && matchesWorkStatus && matchesDeliveryStatus && matchesPaymentStatus && matchesOrderStatus;
   });
 
   const statusOptions = ['전체', '출고대기', '배송중', '수령완료', '작업대기', '작업중', '완료', '공장출고', '중국운송중', '항공운송중', '해운운송중', '통관및 배달', '한국도착'];
 
   // Pagination calculations
-  // 서버 사이드 페이징: 서버에서 페이징된 데이터를 받아옴
-  // 클라이언트 필터링이 적용되면 필터링된 결과를 표시 (필터링 없을 때는 서버 페이징 사용)
-  const hasActiveFilters = searchTerm.trim() !== '' || 
+  // 검색은 서버 사이드에서 처리되므로, 검색어가 있을 때는 서버에서 받은 결과를 그대로 사용
+  // 상태 필터만 클라이언트 측에서 적용
+  const hasActiveStatusFilters = 
     filters.factoryStatus.length > 0 || 
     filters.workStatus.length > 0 || 
     filters.deliveryStatus.length > 0 || 
@@ -283,37 +285,53 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   
   const filteredCount = filteredPurchaseOrders.length;
   
-  // 필터링이 있을 때: 클라이언트에서 필터링된 결과를 페이징
-  // 필터링이 없을 때: 서버에서 페이징된 결과를 그대로 사용
-  const totalPages = hasActiveFilters 
+  // 상태 필터가 있을 때: 클라이언트에서 필터링된 결과를 페이징
+  // 상태 필터가 없을 때: 서버에서 페이징된 결과를 그대로 사용
+  const totalPages = hasActiveStatusFilters 
     ? Math.ceil(filteredCount / itemsPerPage)
     : Math.ceil(totalItems / itemsPerPage);
   
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   
-  // 필터링이 있을 때만 slice, 없을 때는 서버에서 받은 데이터를 그대로 사용
-  const currentPurchaseOrders = hasActiveFilters 
+  // 상태 필터가 있을 때만 slice, 없을 때는 서버에서 받은 데이터를 그대로 사용
+  const currentPurchaseOrders = hasActiveStatusFilters 
     ? filteredPurchaseOrders.slice(startIndex, endIndex)
-    : filteredPurchaseOrders; // 서버에서 이미 페이징되어 있으므로 그대로 사용
+    : purchaseOrders; // 서버에서 이미 페이징되어 있으므로 그대로 사용
   
-  // 표시할 전체 개수: 필터링이 있으면 필터링된 개수, 없으면 서버의 전체 개수
-  const displayTotalItems = hasActiveFilters ? filteredCount : totalItems;
+  // 표시할 전체 개수: 상태 필터가 있으면 필터링된 개수, 없으면 서버의 전체 개수
+  const displayTotalItems = hasActiveStatusFilters ? filteredCount : totalItems;
 
-  // 검색어 변경 핸들러
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-    setCurrentPage(1); // 검색어 변경 시 첫 페이지로 이동
+  // 검색 실행 핸들러 (엔터키 또는 검색 버튼 클릭 시)
+  const handleSearch = () => {
+    const trimmedSearch = inputSearchTerm.trim();
+    setSearchTerm(trimmedSearch);
+    setCurrentPage(1); // 검색 시 첫 페이지로 이동
     
     // URL 쿼리 파라미터 업데이트
     const params = new URLSearchParams(location.search);
-    if (value.trim()) {
-      params.set('search', value.trim());
+    if (trimmedSearch) {
+      params.set('search', trimmedSearch);
     } else {
       params.delete('search');
     }
-    params.set('page', '1'); // 검색어 변경 시 페이지를 1로 리셋
+    params.set('page', '1'); // 검색 시 페이지를 1로 리셋
     navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+    
+    // 검색어가 변경되면 서버에서 데이터를 다시 로드 (useEffect에서 자동 처리됨)
+  };
+
+  // 입력 필드 변경 핸들러 (실제 검색은 실행하지 않음)
+  const handleSearchInputChange = (value: string) => {
+    setInputSearchTerm(value);
+  };
+
+  // 엔터키 입력 핸들러
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+    }
   };
 
   const handlePageChange = (page: number) => {
@@ -345,12 +363,13 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     setCurrentPage(pageFromUrl);
     setItemsPerPage(itemsPerPageFromUrl);
     setSearchTerm(searchFromUrl);
+    setInputSearchTerm(searchFromUrl); // 입력 필드도 동기화
   }, [location.search]);
 
   useEffect(() => {
     loadPurchaseOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, itemsPerPage]); // 페이지나 itemsPerPage 변경 시 다시 로드
+  }, [currentPage, itemsPerPage, searchTerm]); // 페이지, itemsPerPage, 검색어 변경 시 다시 로드
 
   const handleMouseMove = (e: React.MouseEvent) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
@@ -523,11 +542,20 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <SearchBar
-          value={searchTerm}
-          onChange={handleSearchChange}
-          placeholder="발주번호, 공급업체명, 상품명으로 검색..."
-        />
+        <div className="flex gap-2">
+          <SearchBar
+            value={inputSearchTerm}
+            onChange={handleSearchInputChange}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="발주번호, 공급업체명, 상품명으로 검색..."
+          />
+          <button
+            onClick={handleSearch}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium whitespace-nowrap"
+          >
+            검색
+          </button>
+        </div>
         <div className="flex gap-2">
           <div className="relative">
             <button
@@ -689,8 +717,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
           totalPages={totalPages}
           itemsPerPage={itemsPerPage}
           totalItems={displayTotalItems}
-          startIndex={hasActiveFilters ? startIndex + 1 : 1}
-          endIndex={hasActiveFilters ? Math.min(endIndex, filteredCount) : Math.min(purchaseOrders.length, itemsPerPage)}
+          startIndex={hasActiveStatusFilters ? startIndex + 1 : 1}
+          endIndex={hasActiveStatusFilters ? Math.min(endIndex, filteredCount) : Math.min(purchaseOrders.length, itemsPerPage)}
           onPageChange={handlePageChange}
           onItemsPerPageChange={handleItemsPerPageChange}
           className="border-t-0 border-b border-gray-200"
@@ -951,8 +979,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
           totalPages={totalPages}
           itemsPerPage={itemsPerPage}
           totalItems={displayTotalItems}
-          startIndex={hasActiveFilters ? startIndex + 1 : 1}
-          endIndex={hasActiveFilters ? Math.min(endIndex, filteredCount) : Math.min(purchaseOrders.length, itemsPerPage)}
+          startIndex={hasActiveStatusFilters ? startIndex + 1 : 1}
+          endIndex={hasActiveStatusFilters ? Math.min(endIndex, filteredCount) : Math.min(purchaseOrders.length, itemsPerPage)}
           onPageChange={handlePageChange}
           onItemsPerPageChange={handleItemsPerPageChange}
         />

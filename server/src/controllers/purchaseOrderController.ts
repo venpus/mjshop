@@ -19,10 +19,11 @@ export class PurchaseOrderController {
 
   /**
    * 모든 발주 조회
-   * GET /api/purchase-orders?page=1&limit=15
+   * GET /api/purchase-orders?page=1&limit=15&search=검색어
    */
   getAllPurchaseOrders = async (req: Request, res: Response) => {
     try {
+      const searchTerm = req.query.search as string | undefined;
       const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
 
@@ -40,7 +41,7 @@ export class PurchaseOrderController {
         });
       }
 
-      const result = await this.service.getAllPurchaseOrders(page, limit);
+      const result = await this.service.getAllPurchaseOrders(searchTerm, page, limit);
       res.json({
         success: true,
         data: result.data,

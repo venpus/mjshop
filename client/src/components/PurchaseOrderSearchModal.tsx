@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getPurchaseOrdersWithUnshipped, getFullImageUrl, type PurchaseOrderWithUnshipped } from '../api/purchaseOrderApi';
 
@@ -15,7 +15,8 @@ export function PurchaseOrderSearchModal({
   onClose,
   onSelect,
 }: PurchaseOrderSearchModalProps) {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(''); // 실제 검색에 사용되는 검색어
+  const [inputSearchTerm, setInputSearchTerm] = useState(''); // 입력 필드에 표시되는 검색어
   const [orders, setOrders] = useState<PurchaseOrderWithUnshipped[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -45,17 +46,9 @@ export function PurchaseOrderSearchModal({
     if (isOpen) {
       setCurrentPage(1);
       setSearchTerm('');
+      setInputSearchTerm('');
     }
   }, [isOpen]);
-
-  // 검색어 변경 시 첫 페이지로 리셋
-  const prevSearchTermRef = useRef(searchTerm);
-  useEffect(() => {
-    if (isOpen && searchTerm !== prevSearchTermRef.current) {
-      prevSearchTermRef.current = searchTerm;
-      setCurrentPage(1);
-    }
-  }, [searchTerm, isOpen]);
 
   // 페이지, 모달 열림 상태, 검색어 변경 시 목록 로드
   useEffect(() => {
@@ -85,6 +78,27 @@ export function PurchaseOrderSearchModal({
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
+
+  // 검색 실행 핸들러 (엔터키 또는 검색 버튼 클릭 시)
+  const handleSearch = () => {
+    const trimmedSearch = inputSearchTerm.trim();
+    setSearchTerm(trimmedSearch);
+    setCurrentPage(1); // 검색 시 첫 페이지로 이동
+    // 검색어가 변경되면 서버에서 데이터를 다시 로드 (useEffect에서 자동 처리됨)
+  };
+
+  // 입력 필드 변경 핸들러 (실제 검색은 실행하지 않음)
+  const handleSearchInputChange = (value: string) => {
+    setInputSearchTerm(value);
+  };
+
+  // 엔터키 입력 핸들러
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+    }
+  };
 
   const handleSelect = (order: PurchaseOrderWithUnshipped) => {
     onSelect(order);
@@ -116,16 +130,25 @@ export function PurchaseOrderSearchModal({
 
         {/* Search Bar */}
         <div className="p-6 border-b border-gray-200">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="발주번호 또는 제품명으로 검색..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              autoFocus
-            />
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={inputSearchTerm}
+                onChange={(e) => handleSearchInputChange(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="발주번호 또는 제품명으로 검색..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                autoFocus
+              />
+            </div>
+            <button
+              onClick={handleSearch}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium whitespace-nowrap"
+            >
+              검색
+            </button>
           </div>
         </div>
 
@@ -141,7 +164,7 @@ export function PurchaseOrderSearchModal({
             </div>
           ) : filteredOrders.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
-              {searchTerm ? '검색 결과가 없습니다.' : '미출고 발주가 없습니다.'}
+              {inputSearchTerm.trim() ? '검색 결과가 없습니다.' : '미출고 발주가 없습니다.'}
             </div>
           ) : (
             <div className="grid grid-cols-5 gap-4">

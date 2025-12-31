@@ -18,10 +18,11 @@ export class PurchaseOrderService {
 
   /**
    * 모든 발주 조회 (패킹리스트 shipping summary 포함)
+   * @param searchTerm 검색어 (선택사항)
    * @param page 페이지 번호 (1부터 시작)
    * @param limit 페이지당 항목 수
    */
-  async getAllPurchaseOrders(page?: number, limit?: number): Promise<{
+  async getAllPurchaseOrders(searchTerm?: string, page?: number, limit?: number): Promise<{
     data: PurchaseOrderPublic[];
     total: number;
     page: number;
@@ -33,10 +34,10 @@ export class PurchaseOrderService {
 
     if (page !== undefined && limit !== undefined) {
       const offset = (page - 1) * limit;
-      purchaseOrders = await this.repository.findAll(limit, offset);
-      total = await this.repository.count();
+      purchaseOrders = await this.repository.findAll(searchTerm, limit, offset);
+      total = await this.repository.count(searchTerm);
     } else {
-      purchaseOrders = await this.repository.findAll();
+      purchaseOrders = await this.repository.findAll(searchTerm);
       total = purchaseOrders.length;
     }
 
