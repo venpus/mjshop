@@ -121,21 +121,11 @@ export class PackingListService {
     let newShipmentDate: string;
     
     if (data.shipment_date) {
-      // 새로운 날짜가 제공된 경우
-      newShipmentDate = typeof data.shipment_date === 'string' 
-        ? data.shipment_date.split('T')[0] 
-        : data.shipment_date instanceof Date 
-          ? data.shipment_date.toISOString().split('T')[0]
-          : String(data.shipment_date).split('T')[0];
+      // 새로운 날짜가 제공된 경우 (data.shipment_date는 string | undefined)
+      newShipmentDate = data.shipment_date.split('T')[0];
     } else {
-      // 기존 날짜 사용
-      if (existing.shipment_date instanceof Date) {
-        newShipmentDate = existing.shipment_date.toISOString().split('T')[0];
-      } else if (typeof existing.shipment_date === 'string') {
-        newShipmentDate = existing.shipment_date.split('T')[0];
-      } else {
-        newShipmentDate = String(existing.shipment_date).split('T')[0];
-      }
+      // 기존 날짜 사용 (existing.shipment_date는 Date 타입)
+      newShipmentDate = existing.shipment_date.toISOString().split('T')[0];
     }
     
     // 코드나 날짜가 변경되었을 때만 중복 체크
