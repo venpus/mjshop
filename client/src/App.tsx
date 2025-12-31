@@ -251,11 +251,12 @@ function PurchaseOrderDetailWrapper({ onBack }: { onBack: () => void }) {
   const tabParam = searchParams.get('tab') as 'cost' | 'factory' | 'work' | 'delivery' | undefined;
   const autoSaveParam = searchParams.get('autoSave') === 'true';
   
-  // returnPage와 returnItemsPerPage 파라미터 가져오기
+  // returnPage, returnItemsPerPage, returnSearch 파라미터 가져오기
   const returnPage = searchParams.get('returnPage');
   const returnItemsPerPage = searchParams.get('returnItemsPerPage');
+  const returnSearch = searchParams.get('returnSearch');
 
-  // 목록으로 돌아가기 핸들러 (페이지 정보 포함)
+  // 목록으로 돌아가기 핸들러 (페이지 정보 및 검색어 포함)
   const handleBackWithPage = () => {
     let url = '/admin/purchase-orders';
     const params = new URLSearchParams();
@@ -264,6 +265,9 @@ function PurchaseOrderDetailWrapper({ onBack }: { onBack: () => void }) {
     }
     if (returnItemsPerPage) {
       params.set('itemsPerPage', returnItemsPerPage);
+    }
+    if (returnSearch) {
+      params.set('search', returnSearch);
     }
     const queryString = params.toString();
     if (queryString) {

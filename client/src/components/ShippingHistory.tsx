@@ -413,16 +413,21 @@ export function ShippingHistory() {
 
             // 새로운 한국도착일 생성
             for (const arrival of koreaArrivalDates) {
-              if (!arrival.id && arrival.date && arrival.quantity) {
+              // date와 quantity가 모두 유효한지 확인
+              const trimmedQuantity = arrival.quantity?.trim() || '';
+              const quantityNum = parseInt(trimmedQuantity);
+              const isValidQuantity = trimmedQuantity !== '' && !isNaN(quantityNum) && quantityNum > 0;
+              
+              if (!arrival.id && arrival.date && isValidQuantity) {
                 await createKoreaArrival(itemId, {
                   arrival_date: arrival.date,
-                  quantity: parseInt(arrival.quantity) || 0,
+                  quantity: quantityNum,
                 });
-              } else if (arrival.id && arrival.date && arrival.quantity) {
+              } else if (arrival.id && arrival.date && isValidQuantity) {
                 // 기존 한국도착일 업데이트
                 await updateKoreaArrival(arrival.id, {
                   arrival_date: arrival.date,
-                  quantity: parseInt(arrival.quantity) || 0,
+                  quantity: quantityNum,
                 });
               }
             }

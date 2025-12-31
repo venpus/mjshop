@@ -17,8 +17,10 @@ import {
   calculateFinalPaymentAmount,
   calculateDeliveryStatus,
   calculateFactoryStatusFromQuantity,
-  calculateWorkStatus
+  calculateWorkStatus,
+  calculatePackingListShippingCost
 } from '../utils/purchaseOrderCalculations';
+import { getShippingCostByPurchaseOrder } from '../api/packingListApi';
 
 interface PurchaseOrdersProps {
   onViewDetail: (orderId: string, tab?: 'cost' | 'factory' | 'work' | 'delivery', autoSave?: boolean) => void;
@@ -65,6 +67,7 @@ interface PurchaseOrder {
   shippingQuantity?: number; // 배송중 수량 (패킹리스트 출고 수량 - 한국도착 수량)
   unreceivedQuantity?: number; // 미입고 수량 (발주 수량 - 업체 출고 수량)
   koreaArrivedQuantity?: number; // 한국도착 수량
+  packingListShippingCost?: number; // 패킹리스트 배송비
 }
 
 export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
@@ -75,19 +78,20 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('전체');
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   
-  // URL 쿼리 파라미터에서 페이지 번호 읽기
+  // URL 쿼리 파라미터에서 페이지 번호 및 검색어 읽기
   const searchParams = new URLSearchParams(location.search);
   const pageFromUrl = parseInt(searchParams.get('page') || '1', 10);
   const itemsPerPageFromUrl = parseInt(searchParams.get('itemsPerPage') || '15', 10);
+  const searchFromUrl = searchParams.get('search') || '';
   
   const [currentPage, setCurrentPage] = useState(pageFromUrl);
   const [itemsPerPage, setItemsPerPage] = useState(itemsPerPageFromUrl);
+  const [searchTerm, setSearchTerm] = useState(searchFromUrl);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState({
     factoryStatus: [] as string[],
@@ -177,7 +181,27 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             koreaArrivedQuantity: po.arrived_quantity !== undefined ? Number(po.arrived_quantity) : undefined,
           };
         });
-        setPurchaseOrders(convertedOrders);
+        
+        // 각 발주에 대해 패킹리스트 배송비 가져오기
+        const ordersWithShippingCost = await Promise.all(convertedOrders.map(async (order) => {
+          try {
+            const shippingCostData = await getShippingCostByPurchaseOrder(order.id);
+            if (shippingCostData) {
+              // 발주 수량 × 단위당 배송비로 총 배송비 계산
+              const packingListShippingCost = calculatePackingListShippingCost(
+                shippingCostData.unit_shipping_cost,
+                shippingCostData.ordered_quantity
+              );
+              return { ...order, packingListShippingCost };
+            }
+            return { ...order, packingListShippingCost: 0 };
+          } catch (error) {
+            console.error(`패킹리스트 배송비 조회 오류 (발주 ID: ${order.id}):`, error);
+            return { ...order, packingListShippingCost: 0 };
+          }
+        }));
+        
+        setPurchaseOrders(ordersWithShippingCost);
       }
     } catch (err: any) {
       console.error('발주 로드 오류:', err);
@@ -197,12 +221,15 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     onSuccess: (newOrderId) => {
       // 목록 새로고침
       loadPurchaseOrders();
-      // 새로 생성된 발주의 상세 페이지로 이동 (자동 저장 옵션 포함, 현재 페이지 정보 포함)
+      // 새로 생성된 발주의 상세 페이지로 이동 (자동 저장 옵션 포함, 현재 페이지 정보 및 검색어 포함)
       const params = new URLSearchParams();
       params.set('tab', 'work');
       params.set('autoSave', 'true');
       params.set('returnPage', currentPage.toString());
       params.set('returnItemsPerPage', itemsPerPage.toString());
+      if (searchTerm.trim()) {
+        params.set('returnSearch', searchTerm.trim());
+      }
       navigate(`/admin/purchase-orders/${newOrderId}?${params.toString()}`);
     },
   });
@@ -240,6 +267,22 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const endIndex = startIndex + itemsPerPage;
   const currentPurchaseOrders = filteredPurchaseOrders.slice(startIndex, endIndex);
 
+  // 검색어 변경 핸들러
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1); // 검색어 변경 시 첫 페이지로 이동
+    
+    // URL 쿼리 파라미터 업데이트
+    const params = new URLSearchParams(location.search);
+    if (value.trim()) {
+      params.set('search', value.trim());
+    } else {
+      params.delete('search');
+    }
+    params.set('page', '1'); // 검색어 변경 시 페이지를 1로 리셋
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+  };
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     // URL 쿼리 파라미터 업데이트
@@ -258,18 +301,17 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     navigate(`${location.pathname}?${params.toString()}`, { replace: true });
   };
 
-  // URL 쿼리 파라미터 변경 시 페이지 상태 동기화
+  // URL 쿼리 파라미터 변경 시 상태 동기화
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const pageFromUrl = parseInt(searchParams.get('page') || '1', 10);
     const itemsPerPageFromUrl = parseInt(searchParams.get('itemsPerPage') || '15', 10);
+    const searchFromUrl = searchParams.get('search') || '';
     
-    if (pageFromUrl !== currentPage) {
-      setCurrentPage(pageFromUrl);
-    }
-    if (itemsPerPageFromUrl !== itemsPerPage) {
-      setItemsPerPage(itemsPerPageFromUrl);
-    }
+    // URL 값으로 상태 업데이트
+    setCurrentPage(pageFromUrl);
+    setItemsPerPage(itemsPerPageFromUrl);
+    setSearchTerm(searchFromUrl);
   }, [location.search]);
 
   useEffect(() => {
@@ -449,7 +491,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <SearchBar
           value={searchTerm}
-          onChange={setSearchTerm}
+          onChange={handleSearchChange}
           placeholder="발주번호, 공급업체명, 상품명으로 검색..."
         />
         <div className="flex gap-2">
@@ -665,7 +707,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                 );
                 const shippingCostTotal = calculateShippingCostTotal(
                   po.shippingCost,
-                  po.warehouseShippingCost
+                  po.warehouseShippingCost,
+                  po.packingListShippingCost || 0
                 );
                 const finalPaymentAmount = calculateFinalPaymentAmount(
                   basicCostTotal,
@@ -691,10 +734,13 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     <td 
                       className="px-4 py-2 text-center cursor-pointer hover:bg-purple-50 transition-colors"
                       onClick={() => {
-                        // 현재 페이지 정보를 URL 쿼리 파라미터로 전달하기 위해 직접 navigate
+                        // 현재 페이지 정보 및 검색어를 URL 쿼리 파라미터로 전달하기 위해 직접 navigate
                         const params = new URLSearchParams();
                         params.set('returnPage', currentPage.toString());
                         params.set('returnItemsPerPage', itemsPerPage.toString());
+                        if (searchTerm.trim()) {
+                          params.set('returnSearch', searchTerm.trim());
+                        }
                         navigate(`/admin/purchase-orders/${po.id}?${params.toString()}`);
                       }}
                     >
@@ -706,10 +752,13 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     <td 
                       className="px-4 py-2 text-center cursor-pointer hover:bg-purple-50 transition-colors"
                       onClick={() => {
-                        // 현재 페이지 정보를 URL 쿼리 파라미터로 전달하기 위해 직접 navigate
+                        // 현재 페이지 정보 및 검색어를 URL 쿼리 파라미터로 전달하기 위해 직접 navigate
                         const params = new URLSearchParams();
                         params.set('returnPage', currentPage.toString());
                         params.set('returnItemsPerPage', itemsPerPage.toString());
+                        if (searchTerm.trim()) {
+                          params.set('returnSearch', searchTerm.trim());
+                        }
                         navigate(`/admin/purchase-orders/${po.id}?${params.toString()}`);
                       }}
                     >
