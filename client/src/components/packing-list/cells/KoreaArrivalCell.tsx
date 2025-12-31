@@ -3,35 +3,33 @@ import type { PackingListItem } from '../types';
 
 interface KoreaArrivalCellProps {
   item: PackingListItem;
-  groupId: string;
-  onKoreaArrivalChange: (groupId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => void;
+  onKoreaArrivalChange: (itemId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => void;
 }
 
 export function KoreaArrivalCell({
   item,
-  groupId,
   onKoreaArrivalChange,
 }: KoreaArrivalCellProps) {
   const handleDateChange = (dateIndex: number, date: string) => {
     const newDates = [...(item.koreaArrivalDate || [])];
     newDates[dateIndex] = { ...newDates[dateIndex], date };
-    onKoreaArrivalChange(groupId, newDates);
+    onKoreaArrivalChange(item.id, newDates);
   };
 
   const handleQuantityChange = (dateIndex: number, quantity: string) => {
     const newDates = [...(item.koreaArrivalDate || [])];
     newDates[dateIndex] = { ...newDates[dateIndex], quantity };
-    onKoreaArrivalChange(groupId, newDates);
+    onKoreaArrivalChange(item.id, newDates);
   };
 
   const handleDelete = (dateIndex: number) => {
     const newDates = (item.koreaArrivalDate || []).filter((_, idx) => idx !== dateIndex);
-    onKoreaArrivalChange(groupId, newDates);
+    onKoreaArrivalChange(item.id, newDates);
   };
 
   const handleAdd = () => {
     const newDates = [...(item.koreaArrivalDate || []), { date: '', quantity: '' }];
-    onKoreaArrivalChange(groupId, newDates);
+    onKoreaArrivalChange(item.id, newDates);
   };
 
   return (

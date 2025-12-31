@@ -265,10 +265,10 @@ export function ShippingHistory() {
   }, [selectedCodes, packingListItems, clearSelection, loadPackingLists]);
 
   // 한국도착일 변경 핸들러 (로컬 상태만 업데이트, 저장은 저장 버튼으로)
-  const handleKoreaArrivalChange = useCallback((groupId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => {
-    // 로컬 상태만 업데이트 (변경사항 감지는 useEffect에서 자동으로 처리)
+  const handleKoreaArrivalChange = useCallback((itemId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => {
+    // 로컬 상태만 업데이트 (변경사항 감지는 useEffect에서 자동으로 처리) - 특정 아이템만 업데이트
     setPackingListItems(prev => prev.map(item => {
-      if (getGroupId(item.id) === groupId) {
+      if (item.id === itemId) {
         return { ...item, koreaArrivalDate: koreaArrivalDates };
       }
       return item;

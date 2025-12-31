@@ -18,7 +18,7 @@ interface PackingListRowProps {
   onInvoiceChange: (groupId: string, invoices: DomesticInvoice[]) => void;
   onLogisticsCompanyChange: (groupId: string, logisticsCompany: string) => void;
   onWarehouseArrivalDateChange: (groupId: string, date: string) => void;
-  onKoreaArrivalChange: (groupId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => void;
+  onKoreaArrivalChange: (itemId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => void;
   onActualWeightChange: (groupId: string, actualWeight: string, calculatedWeight: string) => void;
   onWeightRatioChange: (groupId: string, weightRatio: '0%' | '5%' | '10%' | '15%' | '20%' | '', calculatedWeight: string) => void;
   onShippingCostChange: (groupId: string, shippingCost: string) => void;
@@ -52,7 +52,7 @@ export function PackingListRow({
   const groupId = getGroupId(item.id);
 
   if (!isFirst) {
-    // 두 번째 행 이후: rowspan으로 병합된 열들은 생략하고 제품, 입수량, 총수량만 표시
+    // 두 번째 행 이후: rowspan으로 병합된 열들은 생략하고 제품, 입수량, 총수량, 한국도착일만 표시
     return (
       <tr className="hover:bg-gray-50">
         <td className="px-4 py-3 text-sm text-center border-r border-gray-200">
@@ -63,6 +63,13 @@ export function PackingListRow({
         </td>
         <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle">
           {item.totalQuantity.toLocaleString()}개
+        </td>
+        {/* 한국도착일 (제품별로 표시) */}
+        <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle">
+          <KoreaArrivalCell
+            item={item}
+            onKoreaArrivalChange={onKoreaArrivalChange}
+          />
         </td>
       </tr>
     );
@@ -147,10 +154,9 @@ export function PackingListRow({
         />
       </td>
       {/* 한국도착일 */}
-      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle">
+      <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle">
         <KoreaArrivalCell
           item={item}
-          groupId={groupId}
           onKoreaArrivalChange={onKoreaArrivalChange}
         />
       </td>

@@ -13,7 +13,7 @@ interface PackingListTableProps {
   isCodeSelected: (code: string) => boolean;
   onItemUpdate: (groupId: string, updater: (item: PackingListItem) => PackingListItem) => void;
   onDomesticInvoiceChange?: (groupId: string, invoices: DomesticInvoice[]) => void;
-  onKoreaArrivalChange?: (groupId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => void;
+  onKoreaArrivalChange?: (itemId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => void;
   onProductNameClick?: (purchaseOrderId?: string) => void;
   onImageClick?: (imageUrl: string) => void;
 }
@@ -100,12 +100,11 @@ export function PackingListTable({
     onItemUpdate(groupId, (item) => ({ ...item, warehouseArrivalDate: date }));
   };
 
-  const handleKoreaArrivalChange = (groupId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => {
-    // 로컬 상태 업데이트 (UI 즉시 반영)
-    onItemUpdate(groupId, (item) => ({ ...item, koreaArrivalDate: koreaArrivalDates }));
+  const handleKoreaArrivalChange = (itemId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => {
+    // 로컬 상태 업데이트는 onKoreaArrivalChange에서 처리
     // 서버에 저장은 저장 버튼으로 처리
     if (onKoreaArrivalChange) {
-      onKoreaArrivalChange(groupId, koreaArrivalDates);
+      onKoreaArrivalChange(itemId, koreaArrivalDates);
     }
   };
 
