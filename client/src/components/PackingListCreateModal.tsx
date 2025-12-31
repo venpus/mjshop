@@ -486,7 +486,6 @@ export function PackingListCreateModal({
                 onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                 placeholder="중량을 입력하세요 (예: 50g, 1.2kg)"
-                required
               />
             </div>
           </div>

@@ -292,13 +292,68 @@ export function ShippingHistory() {
     });
   }, []);
 
+  // 그룹이 변경되었는지 확인하는 함수
+  const isGroupChanged = useCallback((groupId: string, currentItems: PackingListItem[], originalItems: PackingListItem[]): boolean => {
+    const currentGroupItems = currentItems.filter(item => getGroupId(item.id) === groupId);
+    const originalGroupItems = originalItems.filter(item => getGroupId(item.id) === groupId);
+    
+    if (currentGroupItems.length !== originalGroupItems.length) {
+      return true; // 아이템 개수가 다르면 변경됨
+    }
+    
+    const currentFirstItem = currentGroupItems.find(item => item.isFirstRow);
+    const originalFirstItem = originalGroupItems.find(item => item.isFirstRow);
+    
+    if (!currentFirstItem || !originalFirstItem) {
+      return false;
+    }
+    
+    // 메인 필드 비교
+    if (
+      currentFirstItem.unit !== originalFirstItem.unit ||
+      currentFirstItem.logisticsCompany !== originalFirstItem.logisticsCompany ||
+      currentFirstItem.warehouseArrivalDate !== originalFirstItem.warehouseArrivalDate ||
+      currentFirstItem.actualWeight !== originalFirstItem.actualWeight ||
+      currentFirstItem.weightRatio !== originalFirstItem.weightRatio ||
+      currentFirstItem.calculatedWeight !== originalFirstItem.calculatedWeight ||
+      currentFirstItem.shippingCost !== originalFirstItem.shippingCost ||
+      currentFirstItem.paymentDate !== originalFirstItem.paymentDate ||
+      currentFirstItem.wkPaymentDate !== originalFirstItem.wkPaymentDate
+    ) {
+      return true;
+    }
+    
+    // 내륙송장 비교
+    const currentInvoices = JSON.stringify(currentFirstItem.domesticInvoice || []);
+    const originalInvoices = JSON.stringify(originalFirstItem.domesticInvoice || []);
+    if (currentInvoices !== originalInvoices) {
+      return true;
+    }
+    
+    // 각 아이템의 한국도착일 비교
+    for (const currentItem of currentGroupItems) {
+      const originalItem = originalGroupItems.find(item => item.id === currentItem.id);
+      if (!originalItem) {
+        return true; // 아이템이 없으면 변경됨
+      }
+      
+      const currentKoreaArrivals = JSON.stringify(currentItem.koreaArrivalDate || []);
+      const originalKoreaArrivals = JSON.stringify(originalItem.koreaArrivalDate || []);
+      if (currentKoreaArrivals !== originalKoreaArrivals) {
+        return true;
+      }
+    }
+    
+    return false;
+  }, []);
+
   // 모든 변경사항 저장
   const handleSave = useCallback(async () => {
     if (!isDirty) return;
 
     setIsSaving(true);
     try {
-      // 그룹별로 변경사항 저장
+      // 그룹별로 분류
       const groupMap = new Map<string, PackingListItem[]>();
       
       packingListItems.forEach(item => {
@@ -309,7 +364,15 @@ export function ShippingHistory() {
         groupMap.get(groupId)!.push(item);
       });
 
-      for (const [groupId, items] of groupMap.entries()) {
+      // 변경된 그룹만 필터링
+      const changedGroups = Array.from(groupMap.entries()).filter(([groupId]) => {
+        return isGroupChanged(groupId, packingListItems, originalPackingListItems);
+      });
+
+      console.log(`[저장] 변경된 그룹 수: ${changedGroups.length} / 전체 그룹 수: ${groupMap.size}`);
+
+      // 변경된 그룹만 저장
+      for (const [groupId, items] of changedGroups) {
         const firstItem = items.find(item => item.isFirstRow);
         if (!firstItem) continue;
 
@@ -453,7 +516,7 @@ export function ShippingHistory() {
     } finally {
       setIsSaving(false);
     }
-  }, [isDirty, packingListItems, loadPackingLists]);
+  }, [isDirty, packingListItems, originalPackingListItems, isGroupChanged, loadPackingLists]);
 
   return (
     <div className="p-8">

@@ -53,8 +53,10 @@ interface PurchaseOrderRow extends RowDataPacket {
 export class PurchaseOrderRepository {
   /**
    * 모든 발주 조회 (패킹리스트 shipping summary 포함)
+   * @param limit 페이지당 항목 수 (선택사항, 없으면 전체 조회)
+   * @param offset 건너뛸 항목 수 (선택사항)
    */
-  async findAll(): Promise<Array<PurchaseOrder & {
+  async findAll(limit?: number, offset?: number): Promise<Array<PurchaseOrder & {
     factory_shipped_quantity: number;
     unshipped_quantity: number;
     shipped_quantity: number;
@@ -62,8 +64,7 @@ export class PurchaseOrderRepository {
     arrived_quantity: number;
     unreceived_quantity: number;
   }>> {
-    const [rows] = await pool.execute<any[]>(
-      `SELECT 
+    let query = `SELECT 
         po.id, po.po_number, po.product_id, po.unit_price, po.back_margin,
         po.order_unit_price, po.expected_final_unit_price, po.quantity, po.size, po.weight, po.packaging,
         po.product_name, po.product_name_chinese, po.product_category, po.product_main_image,
@@ -84,9 +85,37 @@ export class PurchaseOrderRepository {
         COALESCE(summary.unreceived_quantity, 0) AS unreceived_quantity
        FROM purchase_orders po
        LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
-       ORDER BY po.order_date DESC, po.created_at DESC`
-    );
+       ORDER BY po.order_date DESC, po.created_at DESC`;
+    
+    if (limit !== undefined) {
+      query += ` LIMIT ?`;
+      if (offset !== undefined) {
+        query += ` OFFSET ?`;
+        const [rows] = await pool.execute<any[]>(query, [limit, offset]);
+        return rows.map((row) => ({
+          ...this.mapRowToPurchaseOrder(row),
+          factory_shipped_quantity: Number(row.factory_shipped_quantity) || 0,
+          unshipped_quantity: Number(row.unshipped_quantity) || 0,
+          shipped_quantity: Number(row.shipped_quantity) || 0,
+          shipping_quantity: Number(row.shipping_quantity) || 0,
+          arrived_quantity: Number(row.arrived_quantity) || 0,
+          unreceived_quantity: Number(row.unreceived_quantity) || 0,
+        }));
+      } else {
+        const [rows] = await pool.execute<any[]>(query, [limit]);
+        return rows.map((row) => ({
+          ...this.mapRowToPurchaseOrder(row),
+          factory_shipped_quantity: Number(row.factory_shipped_quantity) || 0,
+          unshipped_quantity: Number(row.unshipped_quantity) || 0,
+          shipped_quantity: Number(row.shipped_quantity) || 0,
+          shipping_quantity: Number(row.shipping_quantity) || 0,
+          arrived_quantity: Number(row.arrived_quantity) || 0,
+          unreceived_quantity: Number(row.unreceived_quantity) || 0,
+        }));
+      }
+    }
 
+    const [rows] = await pool.execute<any[]>(query);
     return rows.map((row) => ({
       ...this.mapRowToPurchaseOrder(row),
       factory_shipped_quantity: Number(row.factory_shipped_quantity) || 0,
@@ -99,11 +128,24 @@ export class PurchaseOrderRepository {
   }
 
   /**
-   * 미출고 수량이 있는 발주만 조회 (VIEW JOIN)
+   * 발주 총 개수 조회
    */
-  async findAllWithUnshipped(): Promise<Array<PurchaseOrder & { unshipped_quantity: number }>> {
-    const [rows] = await pool.execute<any[]>(
-      `SELECT 
+  async count(): Promise<number> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) as total
+       FROM purchase_orders`
+    );
+    return rows[0].total;
+  }
+
+  /**
+   * 미출고 수량이 있는 발주만 조회 (VIEW JOIN)
+   * @param searchTerm 검색어 (선택사항)
+   * @param limit 페이지당 항목 수 (선택사항, 없으면 전체 조회)
+   * @param offset 건너뛸 항목 수 (선택사항)
+   */
+  async findAllWithUnshipped(searchTerm?: string, limit?: number, offset?: number): Promise<Array<PurchaseOrder & { unshipped_quantity: number }>> {
+    let query = `SELECT 
         po.id, po.po_number, po.product_id, po.unit_price, po.back_margin,
         po.order_unit_price, po.expected_final_unit_price, po.quantity, po.size, po.weight, po.packaging,
         po.product_name, po.product_name_chinese, po.product_category, po.product_main_image,
@@ -119,14 +161,69 @@ export class PurchaseOrderRepository {
         COALESCE(summary.unshipped_quantity, 0) AS unshipped_quantity
        FROM purchase_orders po
        LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
-       WHERE COALESCE(summary.unshipped_quantity, 0) > 0
-       ORDER BY po.order_date DESC, po.created_at DESC`
-    );
+       WHERE COALESCE(summary.unshipped_quantity, 0) > 0`;
+    
+    const params: any[] = [];
+    
+    // 검색어가 있으면 WHERE 조건 추가
+    if (searchTerm && searchTerm.trim()) {
+      const searchPattern = `%${searchTerm.trim()}%`;
+      query += ` AND (
+        po.po_number LIKE ? OR
+        po.product_name LIKE ? OR
+        po.product_name_chinese LIKE ?
+      )`;
+      params.push(searchPattern, searchPattern, searchPattern);
+    }
+    
+    query += ` ORDER BY po.order_date DESC, po.created_at DESC`;
+    
+    if (limit !== undefined) {
+      query += ` LIMIT ?`;
+      params.push(limit);
+      if (offset !== undefined) {
+        query += ` OFFSET ?`;
+        params.push(offset);
+      }
+      const [rows] = await pool.execute<any[]>(query, params);
+      return rows.map((row) => ({
+        ...this.mapRowToPurchaseOrder(row),
+        unshipped_quantity: Number(row.unshipped_quantity) || 0,
+      }));
+    }
 
+    const [rows] = await pool.execute<any[]>(query, params);
     return rows.map((row) => ({
       ...this.mapRowToPurchaseOrder(row),
       unshipped_quantity: Number(row.unshipped_quantity) || 0,
     }));
+  }
+
+  /**
+   * 미출고 수량이 있는 발주 총 개수 조회
+   * @param searchTerm 검색어 (선택사항)
+   */
+  async countUnshipped(searchTerm?: string): Promise<number> {
+    let query = `SELECT COUNT(*) as total
+       FROM purchase_orders po
+       LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
+       WHERE COALESCE(summary.unshipped_quantity, 0) > 0`;
+    
+    const params: any[] = [];
+    
+    // 검색어가 있으면 WHERE 조건 추가
+    if (searchTerm && searchTerm.trim()) {
+      const searchPattern = `%${searchTerm.trim()}%`;
+      query += ` AND (
+        po.po_number LIKE ? OR
+        po.product_name LIKE ? OR
+        po.product_name_chinese LIKE ?
+      )`;
+      params.push(searchPattern, searchPattern, searchPattern);
+    }
+    
+    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
+    return rows[0].total;
   }
 
   /**

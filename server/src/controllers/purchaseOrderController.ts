@@ -19,14 +19,37 @@ export class PurchaseOrderController {
 
   /**
    * 모든 발주 조회
-   * GET /api/purchase-orders
+   * GET /api/purchase-orders?page=1&limit=15
    */
   getAllPurchaseOrders = async (req: Request, res: Response) => {
     try {
-      const purchaseOrders = await this.service.getAllPurchaseOrders();
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+
+      // 유효성 검사
+      if (page !== undefined && (isNaN(page) || page < 1)) {
+        return res.status(400).json({
+          success: false,
+          error: 'page는 1 이상의 정수여야 합니다.',
+        });
+      }
+      if (limit !== undefined && (isNaN(limit) || limit < 1)) {
+        return res.status(400).json({
+          success: false,
+          error: 'limit는 1 이상의 정수여야 합니다.',
+        });
+      }
+
+      const result = await this.service.getAllPurchaseOrders(page, limit);
       res.json({
         success: true,
-        data: purchaseOrders,
+        data: result.data,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: result.totalPages,
+        },
       });
     } catch (error: any) {
       console.error('발주 목록 조회 오류:', error);
@@ -39,14 +62,38 @@ export class PurchaseOrderController {
 
   /**
    * 미출고 수량이 있는 발주 목록 조회
-   * GET /api/purchase-orders?unshippedOnly=true
+   * GET /api/purchase-orders/unshipped?page=1&limit=20&search=검색어
    */
   getPurchaseOrdersWithUnshipped = async (req: Request, res: Response) => {
     try {
-      const purchaseOrders = await this.service.getPurchaseOrdersWithUnshipped();
+      const searchTerm = req.query.search as string | undefined;
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+
+      // 유효성 검사
+      if (page !== undefined && (isNaN(page) || page < 1)) {
+        return res.status(400).json({
+          success: false,
+          error: 'page는 1 이상의 정수여야 합니다.',
+        });
+      }
+      if (limit !== undefined && (isNaN(limit) || limit < 1)) {
+        return res.status(400).json({
+          success: false,
+          error: 'limit는 1 이상의 정수여야 합니다.',
+        });
+      }
+
+      const result = await this.service.getPurchaseOrdersWithUnshipped(searchTerm, page, limit);
       res.json({
         success: true,
-        data: purchaseOrders,
+        data: result.data,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: result.totalPages,
+        },
       });
     } catch (error: any) {
       console.error('미출고 발주 목록 조회 오류:', error);

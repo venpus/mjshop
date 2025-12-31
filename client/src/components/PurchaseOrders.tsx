@@ -78,6 +78,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const navigate = useNavigate();
   
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [totalItems, setTotalItems] = useState(0); // 전체 발주 개수 (서버에서 받음)
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('전체');
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
@@ -118,7 +119,10 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const loadPurchaseOrders = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${API_BASE_URL}/purchase-orders`, {
+      
+      // 페이징 파라미터 추가 (현재는 클라이언트 필터링을 위해 전체 데이터를 받아옴)
+      // 추후 서버 사이드 필터링으로 개선 가능
+      const response = await fetch(`${API_BASE_URL}/purchase-orders?page=${currentPage}&limit=${itemsPerPage}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -133,6 +137,11 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
       const data = await response.json();
       if (data.success && data.data) {
+        // 페이징 정보 저장
+        if (data.pagination) {
+          setTotalItems(data.pagination.total);
+        }
+        
         // 서버 응답을 클라이언트 PurchaseOrder 인터페이스로 변환
         const convertedOrders: PurchaseOrder[] = data.data.map((po: any) => {
           console.log(`[PurchaseOrders] 발주 ID: ${po.id}, product.main_image: ${po.product?.main_image}, product.size: ${po.product?.size}, product.weight: ${po.product?.weight}, po.size: ${po.size}, po.weight: ${po.weight}`);
@@ -263,10 +272,33 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const statusOptions = ['전체', '출고대기', '배송중', '수령완료', '작업대기', '작업중', '완료', '공장출고', '중국운송중', '항공운송중', '해운운송중', '통관및 배달', '한국도착'];
 
   // Pagination calculations
-  const totalPages = Math.ceil(filteredPurchaseOrders.length / itemsPerPage);
+  // 서버 사이드 페이징: 서버에서 페이징된 데이터를 받아옴
+  // 클라이언트 필터링이 적용되면 필터링된 결과를 표시 (필터링 없을 때는 서버 페이징 사용)
+  const hasActiveFilters = searchTerm.trim() !== '' || 
+    filters.factoryStatus.length > 0 || 
+    filters.workStatus.length > 0 || 
+    filters.deliveryStatus.length > 0 || 
+    filters.paymentStatus.length > 0 || 
+    filters.orderStatus.length > 0;
+  
+  const filteredCount = filteredPurchaseOrders.length;
+  
+  // 필터링이 있을 때: 클라이언트에서 필터링된 결과를 페이징
+  // 필터링이 없을 때: 서버에서 페이징된 결과를 그대로 사용
+  const totalPages = hasActiveFilters 
+    ? Math.ceil(filteredCount / itemsPerPage)
+    : Math.ceil(totalItems / itemsPerPage);
+  
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentPurchaseOrders = filteredPurchaseOrders.slice(startIndex, endIndex);
+  
+  // 필터링이 있을 때만 slice, 없을 때는 서버에서 받은 데이터를 그대로 사용
+  const currentPurchaseOrders = hasActiveFilters 
+    ? filteredPurchaseOrders.slice(startIndex, endIndex)
+    : filteredPurchaseOrders; // 서버에서 이미 페이징되어 있으므로 그대로 사용
+  
+  // 표시할 전체 개수: 필터링이 있으면 필터링된 개수, 없으면 서버의 전체 개수
+  const displayTotalItems = hasActiveFilters ? filteredCount : totalItems;
 
   // 검색어 변경 핸들러
   const handleSearchChange = (value: string) => {
@@ -317,7 +349,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
   useEffect(() => {
     loadPurchaseOrders();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, itemsPerPage]); // 페이지나 itemsPerPage 변경 시 다시 로드
 
   const handleMouseMove = (e: React.MouseEvent) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
@@ -655,9 +688,9 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
           currentPage={currentPage}
           totalPages={totalPages}
           itemsPerPage={itemsPerPage}
-          totalItems={filteredPurchaseOrders.length}
-          startIndex={startIndex}
-          endIndex={endIndex}
+          totalItems={displayTotalItems}
+          startIndex={hasActiveFilters ? startIndex + 1 : 1}
+          endIndex={hasActiveFilters ? Math.min(endIndex, filteredCount) : Math.min(purchaseOrders.length, itemsPerPage)}
           onPageChange={handlePageChange}
           onItemsPerPageChange={handleItemsPerPageChange}
           className="border-t-0 border-b border-gray-200"
@@ -917,9 +950,9 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
           currentPage={currentPage}
           totalPages={totalPages}
           itemsPerPage={itemsPerPage}
-          totalItems={filteredPurchaseOrders.length}
-          startIndex={startIndex}
-          endIndex={endIndex}
+          totalItems={displayTotalItems}
+          startIndex={hasActiveFilters ? startIndex + 1 : 1}
+          endIndex={hasActiveFilters ? Math.min(endIndex, filteredCount) : Math.min(purchaseOrders.length, itemsPerPage)}
           onPageChange={handlePageChange}
           onItemsPerPageChange={handleItemsPerPageChange}
         />

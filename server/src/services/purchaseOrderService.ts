@@ -18,10 +18,29 @@ export class PurchaseOrderService {
 
   /**
    * 모든 발주 조회 (패킹리스트 shipping summary 포함)
+   * @param page 페이지 번호 (1부터 시작)
+   * @param limit 페이지당 항목 수
    */
-  async getAllPurchaseOrders(): Promise<PurchaseOrderPublic[]> {
-    const purchaseOrders = await this.repository.findAll();
-    return Promise.all(purchaseOrders.map(async (po) => {
+  async getAllPurchaseOrders(page?: number, limit?: number): Promise<{
+    data: PurchaseOrderPublic[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    let purchaseOrders;
+    let total: number;
+
+    if (page !== undefined && limit !== undefined) {
+      const offset = (page - 1) * limit;
+      purchaseOrders = await this.repository.findAll(limit, offset);
+      total = await this.repository.count();
+    } else {
+      purchaseOrders = await this.repository.findAll();
+      total = purchaseOrders.length;
+    }
+
+    const enrichedOrders = await Promise.all(purchaseOrders.map(async (po) => {
       const enriched = await this.enrichPurchaseOrder(po);
       return {
         ...enriched,
@@ -33,20 +52,64 @@ export class PurchaseOrderService {
         unreceived_quantity: po.unreceived_quantity,
       };
     }));
+
+    const currentPage = page || 1;
+    const currentLimit = limit || total;
+    const totalPages = limit ? Math.ceil(total / limit) : 1;
+
+    return {
+      data: enrichedOrders,
+      total,
+      page: currentPage,
+      limit: currentLimit,
+      totalPages,
+    };
   }
 
   /**
    * 미출고 수량이 있는 발주 목록 조회
+   * @param searchTerm 검색어 (선택사항)
+   * @param page 페이지 번호 (1부터 시작)
+   * @param limit 페이지당 항목 수
    */
-  async getPurchaseOrdersWithUnshipped(): Promise<Array<PurchaseOrderPublic & { unshipped_quantity: number }>> {
-    const purchaseOrders = await this.repository.findAllWithUnshipped();
-    return Promise.all(purchaseOrders.map(async (po) => {
+  async getPurchaseOrdersWithUnshipped(searchTerm?: string, page?: number, limit?: number): Promise<{
+    data: Array<PurchaseOrderPublic & { unshipped_quantity: number }>;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    let purchaseOrders;
+    let total: number;
+
+    if (page !== undefined && limit !== undefined) {
+      const offset = (page - 1) * limit;
+      purchaseOrders = await this.repository.findAllWithUnshipped(searchTerm, limit, offset);
+      total = await this.repository.countUnshipped(searchTerm);
+    } else {
+      purchaseOrders = await this.repository.findAllWithUnshipped(searchTerm);
+      total = purchaseOrders.length;
+    }
+
+    const enrichedOrders = await Promise.all(purchaseOrders.map(async (po) => {
       const enriched = await this.enrichPurchaseOrder(po);
       return {
         ...enriched,
         unshipped_quantity: po.unshipped_quantity,
       };
     }));
+
+    const currentPage = page || 1;
+    const currentLimit = limit || total;
+    const totalPages = limit ? Math.ceil(total / limit) : 1;
+
+    return {
+      data: enrichedOrders,
+      total,
+      page: currentPage,
+      limit: currentLimit,
+      totalPages,
+    };
   }
 
   /**
