@@ -1097,7 +1097,7 @@ export function PurchaseOrderDetail({
     warehouseShippingCost
   );
   const finalPaymentAmount = calculateFinalPaymentAmount(basicCostTotal, shippingCostTotal, totalOptionCost, totalLaborCost);
-  const expectedFinalUnitPrice = calculateExpectedFinalUnitPrice(finalPaymentAmount, quantity);
+  const expectedFinalUnitPrice = calculateExpectedFinalUnitPrice(finalPaymentAmount, packingListShippingCost, quantity);
   // 선금 금액 = 발주단가 * 수량 * (선금 비율 / 100)
   // 발주단가 = 기본단가 + 백마진
   const advancePaymentAmount = calculateAdvancePaymentAmount(unitPrice, quantity, advancePaymentRate, backMargin);

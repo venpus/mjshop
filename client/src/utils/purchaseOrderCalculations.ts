@@ -148,14 +148,16 @@ export function calculateFinalPaymentAmount(
 }
 
 /**
- * 최종 예상 단가를 계산합니다. (최종 결제 금액 / 수량)
- * 패킹리스트 배송비는 제외 (별도 관리)
+ * 최종 예상 단가를 계산합니다.
+ * (최종 결제 금액 + 패킹리스트 배송비) / 수량
+ * 패킹리스트 배송비는 최종 예상 단가 계산에만 포함 (최종 결제 금액에는 제외)
  */
 export function calculateExpectedFinalUnitPrice(
   finalPaymentAmount: number,
+  packingListShippingCost: number,
   quantity: number
 ): number {
-  return quantity > 0 ? finalPaymentAmount / quantity : 0;
+  return quantity > 0 ? (finalPaymentAmount + packingListShippingCost) / quantity : 0;
 }
 
 /**

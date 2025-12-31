@@ -15,6 +15,7 @@ import {
   calculateBasicCostTotal, 
   calculateShippingCostTotal, 
   calculateFinalPaymentAmount,
+  calculateExpectedFinalUnitPrice,
   calculateDeliveryStatus,
   calculateFactoryStatusFromQuantity,
   calculateWorkStatus,
@@ -716,8 +717,12 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                   po.laborCost
                 );
                 
-                // 예상최종단가 = 최종 결제 금액 / 수량
-                const finalUnitPrice = po.quantity > 0 ? finalPaymentAmount / po.quantity : 0;
+                // 예상최종단가 = (최종 결제 금액 + 패킹리스트 배송비) / 수량
+                const finalUnitPrice = calculateExpectedFinalUnitPrice(
+                  finalPaymentAmount,
+                  po.packingListShippingCost || 0,
+                  po.quantity
+                );
                 
                 return (
                   <tr key={po.id} className={`hover:bg-gray-50 ${po.isOrderConfirmed ? 'bg-green-50' : ''}`}>
