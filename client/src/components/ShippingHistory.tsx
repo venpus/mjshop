@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { PackageSearch, Plus, Edit, Download, Trash2, Save } from 'lucide-react';
+import { PackageSearch, Plus, Edit, Download, Trash2, Save, Filter, X } from 'lucide-react';
+import { SearchBar } from './ui/search-bar';
 import { PackingListCreateModal, type PackingListFormData } from './PackingListCreateModal';
 import { useAuth } from '../contexts/AuthContext';
 import { GalleryImageModal } from './GalleryImageModal';
@@ -8,6 +9,7 @@ import { PackingListTable } from './packing-list/PackingListTable';
 import { usePackingListSelection } from '../hooks/usePackingListSelection';
 import { convertItemToFormData, getGroupId } from '../utils/packingListUtils';
 import type { PackingListItem } from './packing-list/types';
+import { LOGISTICS_COMPANIES } from './packing-list/types';
 import {
   getAllPackingLists, 
   createPackingList, 
@@ -41,6 +43,19 @@ export function ShippingHistory() {
   const [error, setError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false); // 변경사항이 있는지 여부
   const [isSaving, setIsSaving] = useState(false); // 저장 중인지 여부
+  
+  // 검색/필터 상태
+  const [inputSearchTerm, setInputSearchTerm] = useState(''); // 입력 필드에 표시되는 검색어
+  const [searchTerm, setSearchTerm] = useState(''); // 실제 검색에 사용되는 검색어
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    logisticsCompanies: [] as string[],
+    dateRange: {
+      startDate: '',
+      endDate: ''
+    },
+    status: [] as string[], // 내륙운송중, 배송중, 한국도착
+  });
   
   // location state에서 initialPackingListData 확인 (공장→물류창고에서 전달된 데이터)
   useEffect(() => {
@@ -91,6 +106,221 @@ export function ShippingHistory() {
   useEffect(() => {
     loadPackingLists();
   }, []);
+
+  // 필터 옵션 동적 추출
+  const filterOptions = useMemo(() => {
+    const logisticsCompaniesSet = new Set<string>();
+    
+    // 먼저 정의된 모든 물류회사 추가
+    LOGISTICS_COMPANIES.forEach(company => {
+      logisticsCompaniesSet.add(company);
+    });
+    
+    // 실제 데이터에서도 물류회사 추가 (정의되지 않은 것도 포함하기 위해)
+    packingListItems.forEach(item => {
+      if (item.isFirstRow && item.logisticsCompany) {
+        logisticsCompaniesSet.add(item.logisticsCompany);
+      }
+    });
+    
+    return {
+      logisticsCompanies: Array.from(logisticsCompaniesSet).sort(),
+    };
+  }, [packingListItems]);
+
+  // 검색 실행 핸들러 (엔터키 또는 검색 버튼 클릭 시)
+  const handleSearch = () => {
+    const trimmedSearch = inputSearchTerm.trim();
+    setSearchTerm(trimmedSearch);
+  };
+
+  // 입력 필드 변경 핸들러 (실제 검색은 실행하지 않음)
+  const handleSearchInputChange = (value: string) => {
+    setInputSearchTerm(value);
+  };
+
+  // 엔터키 입력 핸들러
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+    }
+  };
+
+  // 필터 토글 핸들러
+  const toggleFilter = (category: 'logisticsCompanies' | 'status', value: string) => {
+    setFilters(prev => {
+      const current = prev[category];
+      const newValues = current.includes(value)
+        ? current.filter(v => v !== value)
+        : [...current, value];
+      return { ...prev, [category]: newValues };
+    });
+  };
+
+  // 날짜 범위 필터 변경 핸들러
+  const handleDateRangeChange = (field: 'startDate' | 'endDate', value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      dateRange: {
+        ...prev.dateRange,
+        [field]: value,
+      },
+    }));
+  };
+
+  // 모든 필터 초기화
+  const clearAllFilters = () => {
+    setFilters({
+      logisticsCompanies: [],
+      dateRange: {
+        startDate: '',
+        endDate: '',
+      },
+      status: [],
+    });
+  };
+
+  // 활성 필터 개수
+  const activeFilterCount = useMemo(() => {
+    let count = filters.logisticsCompanies.length + filters.status.length;
+    if (filters.dateRange.startDate || filters.dateRange.endDate) {
+      count += 1;
+    }
+    return count;
+  }, [filters]);
+
+  // 필터링된 패킹리스트 아이템
+  const filteredPackingListItems = useMemo(() => {
+    let filtered = packingListItems;
+
+    // 검색어 필터
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(item => {
+        // 코드 검색
+        if (item.code.toLowerCase().includes(searchLower)) return true;
+        // 물류회사 검색 (첫 번째 행만 체크)
+        if (item.isFirstRow && item.logisticsCompany?.toLowerCase().includes(searchLower)) return true;
+        // 제품명 검색
+        if (item.productName?.toLowerCase().includes(searchLower)) return true;
+        return false;
+      });
+    }
+
+    // 물류회사 필터
+    if (filters.logisticsCompanies.length > 0) {
+      filtered = filtered.filter(item => {
+        if (!item.isFirstRow) return true; // 첫 번째 행만 체크
+        return item.logisticsCompany ? filters.logisticsCompanies.includes(item.logisticsCompany) : false;
+      });
+    }
+
+    // 날짜 범위 필터 (그룹 단위로 필터링)
+    if (filters.dateRange.startDate || filters.dateRange.endDate) {
+      const filteredGroupIds = new Set<string>();
+      
+      // 원본 데이터 기준으로 그룹별로 분류하여 날짜 확인
+      const groupMap = new Map<string, PackingListItem[]>();
+      packingListItems.forEach(item => {
+        const groupId = getGroupId(item.id);
+        if (!groupMap.has(groupId)) {
+          groupMap.set(groupId, []);
+        }
+        groupMap.get(groupId)!.push(item);
+      });
+      
+      const startDateStr = filters.dateRange.startDate ? filters.dateRange.startDate : null;
+      const endDateStr = filters.dateRange.endDate ? filters.dateRange.endDate : null;
+      
+      groupMap.forEach((items, groupId) => {
+        // 그룹의 첫 번째 아이템에서 날짜 가져오기
+        const firstItem = items.find(item => item.isFirstRow);
+        if (!firstItem || !firstItem.date) return;
+        
+        // 날짜 문자열 직접 비교 (YYYY-MM-DD 형식이므로 문자열 비교로 시간대 문제 방지)
+        const itemDateStr = firstItem.date.split('T')[0]; // 시간 부분 제거 (YYYY-MM-DD만 추출)
+        
+        let shouldInclude = true;
+        
+        // 시작일 체크: itemDate가 시작일보다 작으면 제외
+        if (startDateStr && itemDateStr < startDateStr) {
+          shouldInclude = false;
+        }
+        
+        // 종료일 체크: itemDate가 종료일보다 크면 제외 (종료일 포함)
+        if (shouldInclude && endDateStr && itemDateStr > endDateStr) {
+          shouldInclude = false;
+        }
+        
+        // 필터 조건을 만족하면 그룹 ID 추가
+        if (shouldInclude) {
+          filteredGroupIds.add(groupId);
+        }
+      });
+      
+      // 필터링된 그룹에 속한 아이템만 포함
+      filtered = filtered.filter(item => {
+        const groupId = getGroupId(item.id);
+        return filteredGroupIds.has(groupId);
+      });
+    }
+
+    // 상태 필터 (내륙운송중, 배송중, 한국도착)
+    if (filters.status.length > 0) {
+      const filteredGroupIds = new Set<string>();
+      
+      // 그룹별로 분류하여 상태 확인
+      const groupMap = new Map<string, PackingListItem[]>();
+      packingListItems.forEach(item => {
+        const groupId = getGroupId(item.id);
+        if (!groupMap.has(groupId)) {
+          groupMap.set(groupId, []);
+        }
+        groupMap.get(groupId)!.push(item);
+      });
+      
+      groupMap.forEach((items, groupId) => {
+        // 그룹의 첫 번째 아이템에서 물류창고 도착일 가져오기
+        const firstItem = items.find(item => item.isFirstRow);
+        if (!firstItem) return;
+        
+        // 물류창고 도착일 확인
+        const hasWarehouseArrivalDate = firstItem.warehouseArrivalDate && firstItem.warehouseArrivalDate.trim() !== '';
+        
+        // 한국도착일이 하나라도 있는지 확인 (그룹 내 모든 아이템 체크)
+        const hasKoreaArrivalDate = items.some(item => 
+          item.koreaArrivalDate && item.koreaArrivalDate.length > 0
+        );
+        
+        let status = '';
+        
+        // 우선순위 1: 한국도착일이 하나라도 있으면 "한국도착"
+        if (hasKoreaArrivalDate) {
+          status = '한국도착';
+        } 
+        // 우선순위 2: 물류창고 도착일이 있으면 "배송중"
+        else if (hasWarehouseArrivalDate) {
+          status = '배송중';
+        }
+        // 우선순위 3: 물류창고 도착일이 없으면 "내륙운송중"
+        else {
+          status = '내륙운송중';
+        }
+        
+        if (filters.status.includes(status)) {
+          filteredGroupIds.add(groupId);
+        }
+      });
+      
+      filtered = filtered.filter(item => {
+        const groupId = getGroupId(item.id);
+        return filteredGroupIds.has(groupId);
+      });
+    }
+
+    return filtered;
+  }, [packingListItems, searchTerm, filters]);
 
   const handleProductNameClick = (purchaseOrderId?: string) => {
     if (purchaseOrderId) {
@@ -616,6 +846,134 @@ export function ShippingHistory() {
         <p className="text-gray-600">발송된 상품의 패킹 정보를 확인할 수 있습니다</p>
       </div>
 
+      {/* 검색 및 필터 */}
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex gap-2">
+          <SearchBar
+            value={inputSearchTerm}
+            onChange={handleSearchInputChange}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="패킹리스트 코드, 물류회사, 제품명으로 검색..."
+          />
+          <button
+            onClick={handleSearch}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium whitespace-nowrap"
+          >
+            검색
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <div className="relative">
+            <button
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+                activeFilterCount > 0
+                  ? 'border-purple-600 bg-purple-50 text-purple-700'
+                  : 'border-gray-300 bg-white hover:bg-gray-50'
+              }`}
+            >
+              <Filter className="w-5 h-5" />
+              <span>필터{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</span>
+            </button>
+
+            {/* Filter Dropdown Panel */}
+            {isFilterOpen && (
+              <div className="absolute top-full left-0 mt-2 w-[600px] bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+                <div className="p-3">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-gray-900 text-sm font-semibold">필터 옵션</h3>
+                    <div className="flex items-center gap-2">
+                      {activeFilterCount > 0 && (
+                        <button
+                          onClick={clearAllFilters}
+                          className="text-xs text-purple-600 hover:text-purple-700"
+                        >
+                          전체 초기화
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setIsFilterOpen(false)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                      >
+                        <X className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Filter Groups */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* 물류회사 필터 */}
+                    <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                      <h4 className="text-xs text-blue-900 mb-2 pb-1.5 border-b border-blue-300 font-semibold">물류회사</h4>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                        {filterOptions.logisticsCompanies.length === 0 ? (
+                          <p className="text-xs text-gray-500">등록된 물류회사가 없습니다</p>
+                        ) : (
+                          filterOptions.logisticsCompanies.map(company => (
+                            <label key={company} className="flex items-center gap-1.5 cursor-pointer hover:bg-blue-100 p-1 rounded">
+                              <input
+                                type="checkbox"
+                                checked={filters.logisticsCompanies.includes(company)}
+                                onChange={() => toggleFilter('logisticsCompanies', company)}
+                                className="w-3.5 h-3.5 accent-blue-600 cursor-pointer"
+                              />
+                              <span className="text-xs text-gray-700">{company}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 상태 필터 */}
+                    <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                      <h4 className="text-xs text-green-900 mb-2 pb-1.5 border-b border-green-300 font-semibold">상태</h4>
+                      <div className="space-y-1.5">
+                        {['내륙운송중', '배송중', '한국도착'].map(status => (
+                          <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-green-100 p-1 rounded">
+                            <input
+                              type="checkbox"
+                              checked={filters.status.includes(status)}
+                              onChange={() => toggleFilter('status', status)}
+                              className="w-3.5 h-3.5 accent-green-600 cursor-pointer"
+                            />
+                            <span className="text-xs text-gray-700">{status}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 날짜 범위 필터 */}
+                  <div className="mt-4 bg-purple-50 rounded-lg p-3 border border-purple-200">
+                    <h4 className="text-xs text-purple-900 mb-2 pb-1.5 border-b border-purple-300 font-semibold">발송일 범위</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">시작일</label>
+                        <input
+                          type="date"
+                          value={filters.dateRange.startDate}
+                          onChange={(e) => handleDateRangeChange('startDate', e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">종료일</label>
+                        <input
+                          type="date"
+                          value={filters.dateRange.endDate}
+                          onChange={(e) => handleDateRangeChange('endDate', e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* 패킹 리스트 생성 모달 */}
       <PackingListCreateModal
         isOpen={isCreateModalOpen}
@@ -673,19 +1031,31 @@ export function ShippingHistory() {
           <div className="text-gray-500">로딩 중...</div>
         </div>
       ) : (
-        <PackingListTable
-          items={packingListItems}
-          isSuperAdmin={isSuperAdmin}
-          isAllSelected={isAllSelected}
-          onToggleAll={toggleAllCodes}
-          onToggleCode={toggleCode}
-          isCodeSelected={isCodeSelected}
-          onItemUpdate={handleItemUpdate}
-          onDomesticInvoiceChange={handleDomesticInvoiceChange}
-          onKoreaArrivalChange={handleKoreaArrivalChange}
-          onProductNameClick={handleProductNameClick}
-          onImageClick={setSelectedInvoiceImage}
-        />
+        <>
+          {filteredPackingListItems.length === 0 ? (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+              <p className="text-gray-500">
+                {searchTerm.trim() || activeFilterCount > 0
+                  ? '검색 결과가 없습니다.'
+                  : '패킹리스트가 없습니다.'}
+              </p>
+            </div>
+          ) : (
+            <PackingListTable
+              items={filteredPackingListItems}
+              isSuperAdmin={isSuperAdmin}
+              isAllSelected={isAllSelected}
+              onToggleAll={toggleAllCodes}
+              onToggleCode={toggleCode}
+              isCodeSelected={isCodeSelected}
+              onItemUpdate={handleItemUpdate}
+              onDomesticInvoiceChange={handleDomesticInvoiceChange}
+              onKoreaArrivalChange={handleKoreaArrivalChange}
+              onProductNameClick={handleProductNameClick}
+              onImageClick={setSelectedInvoiceImage}
+            />
+          )}
+        </>
       )}
     </div>
   );
