@@ -282,7 +282,7 @@ export class PaymentRequestService {
       if (po) {
         enriched.source_info = {
           po_number: po.po_number,
-          product_name: po.product_name || null,
+          product_name: po.product_name || undefined,
         };
       }
     } else if (request.source_type === 'packing_list') {

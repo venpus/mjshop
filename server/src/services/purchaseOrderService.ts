@@ -214,7 +214,7 @@ export class PurchaseOrderService {
     // admin_cost_paid와 admin_cost_paid_date 업데이트
     const updateData: UpdatePurchaseOrderDTO = {
       admin_cost_paid: adminCostPaid,
-      admin_cost_paid_date: adminCostPaid ? getKSTDateString() : null,
+      admin_cost_paid_date: adminCostPaid ? getKSTDateString() : undefined,
     };
 
     const purchaseOrder = await this.repository.update(id, updateData);
