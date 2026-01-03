@@ -23,6 +23,9 @@ interface ProductInfoSectionProps {
   weight: string;
   packaging: number;
   finalUnitPrice?: number; // 최종 예상 단가
+  shippingQuantity?: number; // 배송중 수량 (패킹리스트 출고 수량 - 한국도착 수량)
+  koreaArrivedQuantity?: number; // 한국도착 수량
+  packingListShippingCost?: number; // 패킹리스트 배송비
   
   // 날짜 정보
   orderDate: string;
@@ -60,6 +63,9 @@ export function ProductInfoSection({
   weight,
   packaging,
   finalUnitPrice,
+  shippingQuantity,
+  koreaArrivedQuantity,
+  packingListShippingCost,
   orderDate,
   deliveryDate,
   isOrderConfirmed,
@@ -406,12 +412,23 @@ export function ProductInfoSection({
                   <div>
                     <span className="text-gray-700 text-sm font-semibold block mb-2">최종 예상 단가</span>
                     <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg px-5 py-4 shadow-lg ring-2 ring-purple-300 ring-offset-2 ring-offset-white w-fit">
-                      <span className="text-3xl font-extrabold text-white drop-shadow-sm">
-                        ¥{finalUnitPrice.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-3xl font-extrabold text-white drop-shadow-sm">
+                          ¥{finalUnitPrice.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                        {/* 패킹리스트 출고 수량이 0이면 표시 */}
+                        {((shippingQuantity || 0) + (koreaArrivedQuantity || 0)) === 0 ? (
+                          <span className="text-xs text-white/90">(계산 미완성, 출고대기)</span>
+                        ) : (
+                          /* 패킹리스트 출고가 있지만 배송비가 없으면 표시 */
+                          (packingListShippingCost === undefined || packingListShippingCost === 0) && (
+                            <span className="text-xs text-white/90">(계산 미완성, 배송비 입력 전)</span>
+                          )
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

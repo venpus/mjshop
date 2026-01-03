@@ -1164,5 +1164,37 @@ export class PurchaseOrderController {
       });
     }
   };
+
+  /**
+   * A레벨 관리자 비용 지불 완료 상태 업데이트
+   * PUT /api/purchase-orders/:id/admin-cost-paid
+   */
+  updateAdminCostPaid = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { admin_cost_paid } = req.body;
+
+      if (typeof admin_cost_paid !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          error: 'admin_cost_paid는 boolean 값이어야 합니다.',
+        });
+      }
+
+      const purchaseOrder = await this.service.updateAdminCostPaid(id, admin_cost_paid);
+
+      res.json({
+        success: true,
+        data: purchaseOrder,
+        message: 'A레벨 관리자 비용 지불 완료 상태가 업데이트되었습니다.',
+      });
+    } catch (error: any) {
+      console.error('A레벨 관리자 비용 지불 완료 상태 업데이트 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '상태 업데이트에 실패했습니다.',
+      });
+    }
+  };
 }
 

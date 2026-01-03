@@ -44,6 +44,8 @@ interface PurchaseOrderRow extends RowDataPacket {
   advance_payment_date: Date | null;
   balance_payment_amount: number | null;
   balance_payment_date: Date | null;
+  admin_cost_paid: boolean;
+  admin_cost_paid_date: Date | null;
   created_at: Date;
   updated_at: Date;
   created_by: string | null;
@@ -77,6 +79,7 @@ export class PurchaseOrderRepository {
         po.shipping_cost, po.warehouse_shipping_cost, po.commission_rate, po.commission_type,
         po.advance_payment_rate, po.advance_payment_amount, po.advance_payment_date,
         po.balance_payment_amount, po.balance_payment_date,
+        po.admin_cost_paid, po.admin_cost_paid_date,
         po.created_at, po.updated_at, po.created_by, po.updated_by,
         COALESCE(summary.factory_shipped_quantity, 0) AS factory_shipped_quantity,
         COALESCE(summary.unshipped_quantity, 0) AS unshipped_quantity,
@@ -273,6 +276,7 @@ export class PurchaseOrderRepository {
               shipping_cost, warehouse_shipping_cost, commission_rate, commission_type,
               advance_payment_rate, advance_payment_amount, advance_payment_date,
               balance_payment_amount, balance_payment_date,
+              admin_cost_paid, admin_cost_paid_date,
               created_at, updated_at, created_by, updated_by
        FROM purchase_orders
        WHERE id = ?`,
@@ -516,6 +520,14 @@ export class PurchaseOrderRepository {
       updates.push('balance_payment_date = ?');
       values.push(data.balance_payment_date || null);
     }
+    if (data.admin_cost_paid !== undefined) {
+      updates.push('admin_cost_paid = ?');
+      values.push(data.admin_cost_paid ? 1 : 0);
+    }
+    if (data.admin_cost_paid_date !== undefined) {
+      updates.push('admin_cost_paid_date = ?');
+      values.push(data.admin_cost_paid_date || null);
+    }
     if (data.updated_by !== undefined) {
       updates.push('updated_by = ?');
       values.push(data.updated_by || null);
@@ -632,6 +644,8 @@ export class PurchaseOrderRepository {
       advance_payment_date: row.advance_payment_date,
       balance_payment_amount: row.balance_payment_amount ? Number(row.balance_payment_amount) : null,
       balance_payment_date: row.balance_payment_date,
+      admin_cost_paid: row.admin_cost_paid ? Boolean(row.admin_cost_paid) : false,
+      admin_cost_paid_date: row.admin_cost_paid_date,
       created_at: row.created_at,
       updated_at: row.updated_at,
       created_by: row.created_by,

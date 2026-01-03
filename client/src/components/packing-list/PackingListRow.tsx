@@ -65,7 +65,7 @@ export function PackingListRow({
           {item.totalQuantity.toLocaleString()}개
         </td>
         {/* 한국도착일 (제품별로 표시) */}
-        <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle">
+        <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '200px' }}>
           <KoreaArrivalCell
             item={item}
             onKoreaArrivalChange={onKoreaArrivalChange}
@@ -154,7 +154,7 @@ export function PackingListRow({
         />
       </td>
       {/* 한국도착일 */}
-      <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle">
+      <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '200px' }}>
         <KoreaArrivalCell
           item={item}
           onKoreaArrivalChange={onKoreaArrivalChange}

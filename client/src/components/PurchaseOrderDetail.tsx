@@ -130,6 +130,9 @@ export function PurchaseOrderDetail({
   const [warehouseShippingCost, setWarehouseShippingCost] = useState(0);
   // 패킹리스트 배송비 (서버에서 가져온 값)
   const [packingListShippingCost, setPackingListShippingCost] = useState(0);
+  // 패킹리스트 출고 수량 정보
+  const [shippingQuantity, setShippingQuantity] = useState<number | undefined>(undefined);
+  const [koreaArrivedQuantity, setKoreaArrivedQuantity] = useState<number | undefined>(undefined);
   const [commissionRate, setCommissionRate] = useState(0);
   const [commissionType, setCommissionType] = useState("");
   const [optionCost, setOptionCost] = useState(0);
@@ -562,7 +565,7 @@ export function PurchaseOrderDetail({
         // 원본 데이터는 모든 데이터가 로드된 후 별도 useEffect에서 설정됨 (아래 참조)
       }
       
-      // 패킹리스트 배송비 가져오기
+      // 패킹리스트 배송비 및 출고 수량 정보 가져오기
       if (orderId && orderId !== 'new') {
         getShippingCostByPurchaseOrder(orderId)
           .then((shippingCostData) => {
@@ -573,17 +576,38 @@ export function PurchaseOrderDetail({
                 shippingCostData.ordered_quantity
               );
               setPackingListShippingCost(packingListCost);
-            } else {
-              setPackingListShippingCost(0);
-            }
+    } else {
+      setPackingListShippingCost(0);
+      setShippingQuantity(undefined);
+      setKoreaArrivedQuantity(undefined);
+    }
           })
           .catch((error) => {
             console.error('패킹리스트 배송비 조회 오류:', error);
             setPackingListShippingCost(0);
           });
+        
+        // 패킹리스트 출고 수량 정보 가져오기
+        getShippingSummaryByPurchaseOrder(orderId)
+          .then((shippingSummary) => {
+            if (shippingSummary) {
+              setShippingQuantity(shippingSummary.shipping_quantity);
+              setKoreaArrivedQuantity(shippingSummary.arrived_quantity);
+            } else {
+              setShippingQuantity(0);
+              setKoreaArrivedQuantity(0);
+            }
+          })
+          .catch((error) => {
+            console.error('패킹리스트 출고 수량 조회 오류:', error);
+            setShippingQuantity(0);
+            setKoreaArrivedQuantity(0);
+          });
       }
     } else {
       setPackingListShippingCost(0);
+      setShippingQuantity(undefined);
+      setKoreaArrivedQuantity(undefined);
     }
   }, [order, orderId, hookSetOriginalData]);
 
@@ -1123,6 +1147,9 @@ export function PurchaseOrderDetail({
           packagingSize={productPackagingSize}
           packaging={packaging}
           finalUnitPrice={expectedFinalUnitPrice}
+          shippingQuantity={shippingQuantity}
+          koreaArrivedQuantity={koreaArrivedQuantity}
+          packingListShippingCost={packingListShippingCost}
           orderDate={orderDate}
           deliveryDate={deliveryDate}
           isOrderConfirmed={isOrderConfirmed}
@@ -1327,6 +1354,8 @@ export function PurchaseOrderDetail({
         packagingSize={productPackagingSize || ''}
         packaging={packaging}
         finalUnitPrice={expectedFinalUnitPrice}
+        shippingQuantity={shippingQuantity}
+        koreaArrivedQuantity={koreaArrivedQuantity}
         orderDate={orderDate}
         deliveryDate={deliveryDate}
         isOrderConfirmed={isOrderConfirmed}

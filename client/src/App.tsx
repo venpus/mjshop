@@ -7,7 +7,9 @@ import { Products } from './components/Products';
 import { Orders } from './components/Orders';
 import { Shipping } from './components/Shipping';
 import { Payment } from './components/Payment';
+import { PaymentHistory } from './components/payment/PaymentHistory';
 import { Inventory } from './components/Inventory';
+import { StockManagement } from './components/inventory/StockManagement';
 import { PurchaseOrders } from './components/PurchaseOrders';
 import { PurchaseOrderDetail } from './components/PurchaseOrderDetail';
 import { ShippingHistory } from './components/ShippingHistory';
@@ -215,7 +217,8 @@ function AdminLayout() {
           <Route path="/orders" element={<Orders />} />
           <Route path="/shipping" element={<Shipping />} />
           <Route path="/payment" element={<Payment />} />
-          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/payment-history" element={<PaymentHistory />} />
+          <Route path="/inventory" element={<StockManagement />} />
           <Route path="/purchase-orders" element={
             (user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin' || user?.level === 'B0: 중국Admin') ? (
               <PurchaseOrders onViewDetail={handleViewOrderDetail} />
@@ -255,9 +258,17 @@ function PurchaseOrderDetailWrapper({ onBack }: { onBack: () => void }) {
   const returnPage = searchParams.get('returnPage');
   const returnItemsPerPage = searchParams.get('returnItemsPerPage');
   const returnSearch = searchParams.get('returnSearch');
+  const returnPath = searchParams.get('returnPath'); // 결제내역 등 다른 페이지에서 온 경우
 
   // 목록으로 돌아가기 핸들러 (페이지 정보 및 검색어 포함)
   const handleBackWithPage = () => {
+    // returnPath가 있으면 해당 경로로 이동 (결제내역 등)
+    if (returnPath) {
+      navigate(decodeURIComponent(returnPath));
+      return;
+    }
+
+    // 기본: 발주관리 목록으로 이동
     let url = '/admin/purchase-orders';
     const params = new URLSearchParams();
     if (returnPage) {

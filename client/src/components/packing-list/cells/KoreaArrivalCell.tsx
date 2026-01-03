@@ -33,7 +33,7 @@ export function KoreaArrivalCell({
   };
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 min-w-[180px]">
       {item.koreaArrivalDate && item.koreaArrivalDate.length > 0 ? (
         item.koreaArrivalDate.map((koreaArrival, dateIndex) => (
           <div key={dateIndex} className="flex items-center gap-1">
@@ -41,7 +41,7 @@ export function KoreaArrivalCell({
               type="date"
               value={koreaArrival.date || ''}
               onChange={(e) => handleDateChange(dateIndex, e.target.value)}
-              className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
+              className="flex-1 min-w-[120px] px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
             />
             <input
               type="text"
@@ -53,7 +53,7 @@ export function KoreaArrivalCell({
             <button
               type="button"
               onClick={() => handleDelete(dateIndex)}
-              className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+              className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors flex-shrink-0"
               title="삭제"
             >
               <X className="w-4 h-4" />
@@ -66,7 +66,7 @@ export function KoreaArrivalCell({
       <button
         type="button"
         onClick={handleAdd}
-        className="p-1 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded border border-purple-300 transition-colors flex items-center justify-center"
+        className="p-1 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded border border-purple-300 transition-colors flex items-center justify-center flex-shrink-0"
         title="추가"
       >
         <Plus className="w-4 h-4" />

@@ -750,7 +750,7 @@ export function ShippingHistory() {
   }, [isDirty, packingListItems, originalPackingListItems, isGroupChanged, loadPackingLists]);
 
   return (
-    <div className="p-8">
+    <div className="p-8 overflow-x-auto">
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">

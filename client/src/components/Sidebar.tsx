@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
   LayoutDashboard,
-  Package,
   ShoppingCart,
   Truck,
   CreditCard,
@@ -14,7 +13,6 @@ import {
   Store,
   FileText,
   PackageSearch,
-  DollarSign,
   Users,
   Image as ImageIcon,
   ClipboardList,
@@ -33,6 +31,7 @@ type PageType =
   | "orders"
   | "shipping"
   | "payment"
+  | "payment-history"
   | "inventory"
   | "purchase-orders"
   | "shipping-history"
@@ -162,6 +161,18 @@ export function Sidebar({
                 {!isCollapsed && <span>{t('menu.packingList')}</span>}
               </button>
               <button
+                onClick={() => onPageChange("payment-history")}
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
+                  currentPage === "payment-history"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+                title={isCollapsed ? "결제내역" : undefined}
+              >
+                <FileText className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
+                {!isCollapsed && <span>결제내역</span>}
+              </button>
+              <button
                 onClick={() => onPageChange("materials")}
                 className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
                   currentPage === "materials"
@@ -184,18 +195,6 @@ export function Sidebar({
               >
                 <Folder className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
                 {!isCollapsed && <span>{t('menu.projects')}</span>}
-              </button>
-              <button
-                onClick={() => onPageChange("china-payment")}
-                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === "china-payment"
-                    ? "bg-purple-50 text-purple-600"
-                    : "text-gray-600 hover:bg-gray-50"
-                }`}
-                title={isCollapsed ? t('menu.chinaPayment') : undefined}
-              >
-                <DollarSign className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>{t('menu.chinaPayment')}</span>}
               </button>
               <button
                 onClick={() => onPageChange("gallery")}

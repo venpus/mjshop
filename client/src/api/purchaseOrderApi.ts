@@ -85,3 +85,32 @@ export function getFullImageUrl(imageUrl: string | null | undefined): string {
   return `${SERVER_BASE_URL}${imageUrl}`;
 }
 
+/**
+ * A레벨 관리자 비용 지불 완료 상태 업데이트
+ */
+export async function updateAdminCostPaid(
+  orderId: string,
+  adminCostPaid: boolean
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}/admin-cost-paid`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({
+      admin_cost_paid: adminCostPaid,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'A레벨 관리자 비용 지불 완료 상태 업데이트에 실패했습니다.');
+  }
+
+  const data = await response.json();
+  if (!data.success) {
+    throw new Error(data.error || 'A레벨 관리자 비용 지불 완료 상태 업데이트에 실패했습니다.');
+  }
+}
+

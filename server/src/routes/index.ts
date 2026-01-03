@@ -6,6 +6,7 @@ import materialRoutes from './materials.js';
 import logisticsOptionsRoutes from './logisticsOptions.js';
 import packingListRoutes from './packingLists.js';
 import projectRoutes from './projects.js';
+import paymentRequestRoutes from './paymentRequests.js';
 
 const router = Router();
 
@@ -17,6 +18,7 @@ router.use('/materials', materialRoutes);
 router.use('/logistics-options', logisticsOptionsRoutes);
 router.use('/packing-lists', packingListRoutes);
 router.use('/projects', projectRoutes);
+router.use('/payment-requests', paymentRequestRoutes);
 
 router.get('/', (req, res) => {
   res.json({ 

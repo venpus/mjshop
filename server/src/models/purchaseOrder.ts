@@ -43,6 +43,8 @@ export interface PurchaseOrder {
   advance_payment_date: Date | null;
   balance_payment_amount: number | null;
   balance_payment_date: Date | null;
+  admin_cost_paid: boolean;
+  admin_cost_paid_date: Date | null;
   created_at: Date;
   updated_at: Date;
   created_by: string | null;
@@ -130,6 +132,8 @@ export interface UpdatePurchaseOrderDTO {
   advance_payment_date?: string;
   balance_payment_amount?: number;
   balance_payment_date?: string;
+  admin_cost_paid?: boolean;
+  admin_cost_paid_date?: string;
   updated_by?: string;
 }
 

@@ -8,6 +8,7 @@ import {
   ReorderPurchaseOrderDTO,
 } from '../models/purchaseOrder.js';
 import { RowDataPacket } from 'mysql2';
+import { getKSTDateString } from '../utils/dateUtils.js';
 
 export class PurchaseOrderService {
   private repository: PurchaseOrderRepository;
@@ -160,14 +161,63 @@ export class PurchaseOrderService {
       throw new Error('발주를 찾을 수 없습니다.');
     }
 
+    // 결제 상태 자동 계산 (payment_status가 명시적으로 전달되지 않은 경우)
+    let calculatedPaymentStatus: '미결제' | '선금결제' | '완료' | undefined = undefined;
+    if (data.payment_status === undefined) {
+      // 선금/잔금 날짜 기준으로 결제 상태 자동 계산
+      // data에서 날짜가 전달된 경우 사용하고, 없으면 기존 값 사용
+      const advancePaymentDate = data.advance_payment_date !== undefined 
+        ? (data.advance_payment_date && data.advance_payment_date.trim() !== '' ? data.advance_payment_date : null)
+        : (existingPurchaseOrder.advance_payment_date ? existingPurchaseOrder.advance_payment_date.toISOString().split('T')[0] : null);
+      const balancePaymentDate = data.balance_payment_date !== undefined 
+        ? (data.balance_payment_date && data.balance_payment_date.trim() !== '' ? data.balance_payment_date : null)
+        : (existingPurchaseOrder.balance_payment_date ? existingPurchaseOrder.balance_payment_date.toISOString().split('T')[0] : null);
+
+      if (advancePaymentDate && balancePaymentDate) {
+        // 선금과 잔금 날짜가 모두 있으면 '완료'
+        calculatedPaymentStatus = '완료';
+      } else if (advancePaymentDate) {
+        // 선금 날짜만 있으면 '선금결제'
+        calculatedPaymentStatus = '선금결제';
+      } else {
+        // 둘 다 없으면 '미결제'
+        calculatedPaymentStatus = '미결제';
+      }
+    }
+
     // 발주 수정
     const updateData: UpdatePurchaseOrderDTO = {
       ...data,
+      // payment_status가 명시적으로 전달되지 않은 경우에만 자동 계산된 값 사용
+      payment_status: data.payment_status !== undefined ? data.payment_status : calculatedPaymentStatus,
       updated_by: updatedBy,
     };
 
     const purchaseOrder = await this.repository.update(id, updateData);
 
+    return this.enrichPurchaseOrder(purchaseOrder);
+  }
+
+  /**
+   * A레벨 관리자 비용 지불 완료 상태 업데이트
+   */
+  async updateAdminCostPaid(
+    id: string,
+    adminCostPaid: boolean
+  ): Promise<PurchaseOrderPublic> {
+    // 발주 존재 확인
+    const existingPurchaseOrder = await this.repository.findById(id);
+    if (!existingPurchaseOrder) {
+      throw new Error('발주를 찾을 수 없습니다.');
+    }
+
+    // admin_cost_paid와 admin_cost_paid_date 업데이트
+    const updateData: UpdatePurchaseOrderDTO = {
+      admin_cost_paid: adminCostPaid,
+      admin_cost_paid_date: adminCostPaid ? getKSTDateString() : null,
+    };
+
+    const purchaseOrder = await this.repository.update(id, updateData);
     return this.enrichPurchaseOrder(purchaseOrder);
   }
 

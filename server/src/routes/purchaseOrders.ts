@@ -20,6 +20,9 @@ router.post('/', purchaseOrderController.createPurchaseOrder);
 // 발주 수정
 router.put('/:id', purchaseOrderController.updatePurchaseOrder);
 
+// A레벨 관리자 비용 지불 완료 상태 업데이트
+router.put('/:id/admin-cost-paid', purchaseOrderController.updateAdminCostPaid);
+
 // 발주 재주문
 router.post('/:id/reorder', purchaseOrderController.reorderPurchaseOrder);
 

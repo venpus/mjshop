@@ -56,7 +56,7 @@ interface PurchaseOrder {
   commissionRate: number; // 수수료율
   shippingCost: number; // 배송비
   warehouseShippingCost: number; // 창고 배송비
-  factoryStatus: '출고대기' | '배송중' | '수령완료';
+  factoryStatus: '출고대기' | '배송중' | '수령완료'; // 출고상태 (현재 주석 처리됨 - 추후 사용 예정)
   workStatus: '작업대기' | '작업중' | '완료';
   deliveryStatus: '대기중' | '배송중' | '내륙운송중' | '항공운송중' | '해운운송중' | '통관및 배달' | '한국도착';
   paymentStatus: '미결제' | '선금결제' | '완료';
@@ -97,8 +97,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const [inputSearchTerm, setInputSearchTerm] = useState(searchFromUrl); // 입력 필드에 표시되는 검색어
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState({
-    factoryStatus: [] as string[],
-    workStatus: [] as string[],
+    // factoryStatus: [] as string[], // 출고상태 필터 (주석 처리 - 추후 사용 예정)
+    // workStatus: [] as string[], // 작업상태 필터 (제거됨)
     deliveryStatus: [] as string[],
     paymentStatus: [] as string[],
     orderStatus: [] as string[],
@@ -121,10 +121,19 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     try {
       setIsLoading(true);
       
+      // 필터가 활성화되어 있는지 확인
+      const hasActiveFilters = 
+        filters.deliveryStatus.length > 0 || 
+        filters.paymentStatus.length > 0 || 
+        filters.orderStatus.length > 0;
+      
       // 페이징 및 검색 파라미터 추가
       const params = new URLSearchParams();
-      params.set('page', currentPage.toString());
-      params.set('limit', itemsPerPage.toString());
+      // 필터가 활성화되어 있으면 전체 데이터를 가져오기 위해 limit을 설정하지 않음 (또는 매우 큰 값)
+      if (!hasActiveFilters) {
+        params.set('page', currentPage.toString());
+        params.set('limit', itemsPerPage.toString());
+      }
       if (searchTerm.trim()) {
         params.set('search', searchTerm.trim());
       }
@@ -150,7 +159,6 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
         
         // 서버 응답을 클라이언트 PurchaseOrder 인터페이스로 변환
         const convertedOrders: PurchaseOrder[] = data.data.map((po: any) => {
-          console.log(`[PurchaseOrders] 발주 ID: ${po.id}, product.main_image: ${po.product?.main_image}, product.size: ${po.product?.size}, product.weight: ${po.product?.weight}, po.size: ${po.size}, po.weight: ${po.weight}`);
           return {
             id: po.id,
             poNumber: po.po_number,
@@ -168,11 +176,12 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             size: po.product?.size || po.size || '',
             weight: po.product?.weight || po.weight || '',
             packaging: po.packaging || 0,
-            // 업체 출고 상태 계산: factory_shipped_quantity와 ordered_quantity를 기반으로 계산
-            factoryStatus: calculateFactoryStatusFromQuantity(
-              po.factory_shipped_quantity !== undefined ? Number(po.factory_shipped_quantity) : 0,
-              po.quantity || 0
-            ),
+            // 업체 출고 상태 계산: factory_shipped_quantity와 ordered_quantity를 기반으로 계산 (주석 처리 - 추후 사용 예정)
+            // factoryStatus: calculateFactoryStatusFromQuantity(
+            //   po.factory_shipped_quantity !== undefined ? Number(po.factory_shipped_quantity) : 0,
+            //   po.quantity || 0
+            // ),
+            factoryStatus: '출고대기' as const, // 임시 값 (주석 처리된 코드를 복원하면 제거)
             // 작업 상태 계산: work_start_date와 work_end_date를 기반으로 계산
             workStatus: calculateWorkStatus(
               po.work_start_date ? formatDateForInput(po.work_start_date) : null,
@@ -185,7 +194,16 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
               po.shipping_quantity !== undefined ? Number(po.shipping_quantity) : 0,
               po.delivery_status || '대기중'
             ),
-            paymentStatus: po.payment_status || '미결제',
+            // 결제 상태 정규화: 유효한 값만 허용하고, 그 외는 '미결제'로 변환
+            paymentStatus: (() => {
+              const status = po.payment_status;
+              if (!status || typeof status !== 'string') return '미결제';
+              const normalizedStatus = status.trim();
+              if (['미결제', '선금결제', '완료'].includes(normalizedStatus)) {
+                return normalizedStatus;
+              }
+              return '미결제';
+            })(),
             // order_status가 있으면 사용, 없으면 is_confirmed 기반으로 계산 (기존 데이터 호환성)
             orderStatus: po.order_status || (po.is_confirmed ? '발주확인' : '발주 대기'),
             date: formatDateForInput(po.order_date),
@@ -262,13 +280,18 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
   // 상태 필터만 클라이언트 측에서 적용 (검색은 서버 사이드에서 처리)
   const filteredPurchaseOrders = purchaseOrders.filter(po => {
-    const matchesFactoryStatus = filters.factoryStatus.length === 0 || filters.factoryStatus.includes(po.factoryStatus);
-    const matchesWorkStatus = filters.workStatus.length === 0 || filters.workStatus.includes(po.workStatus);
+    // const matchesFactoryStatus = filters.factoryStatus.length === 0 || filters.factoryStatus.includes(po.factoryStatus); // 출고상태 필터 (주석 처리 - 추후 사용 예정)
+    // const matchesWorkStatus = filters.workStatus.length === 0 || filters.workStatus.includes(po.workStatus); // 작업상태 필터 (제거됨)
     const matchesDeliveryStatus = filters.deliveryStatus.length === 0 || filters.deliveryStatus.includes(po.deliveryStatus);
+    
+    // 결제 상태 필터링: 필터가 비어있으면 모든 항목 표시, 아니면 선택된 필터와 일치하는 항목만 표시
+    // paymentStatus는 항상 '미결제', '선금결제', '완료' 중 하나로 정규화되어 있음
     const matchesPaymentStatus = filters.paymentStatus.length === 0 || filters.paymentStatus.includes(po.paymentStatus);
+    
+    
     const matchesOrderStatus = filters.orderStatus.length === 0 || filters.orderStatus.includes(po.orderStatus);
     
-    return matchesFactoryStatus && matchesWorkStatus && matchesDeliveryStatus && matchesPaymentStatus && matchesOrderStatus;
+    return /* matchesFactoryStatus && */ /* matchesWorkStatus && */ matchesDeliveryStatus && matchesPaymentStatus && matchesOrderStatus;
   });
 
   const statusOptions = ['전체', '출고대기', '배송중', '수령완료', '작업대기', '작업중', '완료', '공장출고', '중국운송중', '항공운송중', '해운운송중', '통관및 배달', '한국도착'];
@@ -277,8 +300,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   // 검색은 서버 사이드에서 처리되므로, 검색어가 있을 때는 서버에서 받은 결과를 그대로 사용
   // 상태 필터만 클라이언트 측에서 적용
   const hasActiveStatusFilters = 
-    filters.factoryStatus.length > 0 || 
-    filters.workStatus.length > 0 || 
+    // filters.factoryStatus.length > 0 || // 출고상태 필터 (주석 처리 - 추후 사용 예정)
+    // filters.workStatus.length > 0 || // 작업상태 필터 (제거됨)
     filters.deliveryStatus.length > 0 || 
     filters.paymentStatus.length > 0 || 
     filters.orderStatus.length > 0;
@@ -369,7 +392,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   useEffect(() => {
     loadPurchaseOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, itemsPerPage, searchTerm]); // 페이지, itemsPerPage, 검색어 변경 시 다시 로드
+  }, [currentPage, itemsPerPage, searchTerm, filters]); // 페이지, itemsPerPage, 검색어, 필터 변경 시 다시 로드
 
   const handleMouseMove = (e: React.MouseEvent) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
@@ -501,6 +524,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       const newValues = current.includes(value)
         ? current.filter(v => v !== value)
         : [...current, value];
+      // 필터 변경 시 첫 페이지로 리셋
+      setCurrentPage(1);
       return { ...prev, [category]: newValues };
     });
   };
@@ -508,8 +533,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   // 모든 필터 초기화
   const clearAllFilters = () => {
     setFilters({
-      factoryStatus: [],
-      workStatus: [],
+      // factoryStatus: [], // 출고상태 필터 (주석 처리 - 추후 사용 예정)
+      // workStatus: [], // 작업상태 필터 (제거됨)
       deliveryStatus: [],
       paymentStatus: [],
       orderStatus: [],
@@ -572,7 +597,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
             {/* Filter Dropdown Panel */}
             {isFilterOpen && (
-              <div className="absolute top-full right-0 mt-2 w-[850px] bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+              <div className="absolute top-full left-0 mt-2 w-[850px] bg-white rounded-lg shadow-xl border border-gray-200 z-50">
                 <div className="p-3">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-gray-900 text-sm">필터 옵션</h3>
@@ -595,7 +620,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                   </div>
 
                   {/* Filter Groups - Grid Layout */}
-                  <div className="grid grid-cols-5 gap-3">
+                  <div className="grid grid-cols-4 gap-3">
                     {/* 발주 상태 */}
                     <div className="bg-indigo-50 rounded-lg p-2.5 border border-indigo-200">
                       <h4 className="text-xs text-indigo-900 mb-2 pb-1.5 border-b border-indigo-300">발주 상태</h4>
@@ -614,8 +639,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                       </div>
                     </div>
 
-                    {/* 업체출고 상태 */}
-                    <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-200">
+                    {/* 업체출고 상태 필터 (주석 처리 - 추후 사용 예정) */}
+                    {/* <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-200">
                       <h4 className="text-xs text-blue-900 mb-2 pb-1.5 border-b border-blue-300">업체출고 상태</h4>
                       <div className="space-y-1.5">
                         {['출고대기', '배송중', '수령완료'].map(status => (
@@ -630,25 +655,9 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                           </label>
                         ))}
                       </div>
-                    </div>
+                    </div> */}
 
-                    {/* 작업 상태 */}
-                    <div className="bg-green-50 rounded-lg p-2.5 border border-green-200">
-                      <h4 className="text-xs text-green-900 mb-2 pb-1.5 border-b border-green-300">작업 상태</h4>
-                      <div className="space-y-1.5">
-                        {['작업대기', '작업중', '완료'].map(status => (
-                          <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-green-100 p-1 rounded">
-                            <input
-                              type="checkbox"
-                              checked={filters.workStatus.includes(status)}
-                              onChange={() => toggleFilter('workStatus', status)}
-                              className="w-3.5 h-3.5 accent-green-600 cursor-pointer"
-                            />
-                            <span className="text-xs text-gray-700">{status}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
+                    {/* 작업 상태 필터 (제거됨) */}
 
                     {/* 배송 상태 */}
                     <div className="bg-purple-50 rounded-lg p-2.5 border border-purple-200">
@@ -750,7 +759,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">미발송 수량</th>
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">배송중 수량</th>
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">한국도착 수량</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">상태</th>
+                {/* 출고상태 열 (주석 처리 - 추후 사용 예정) */}
+                {/* <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">출고상태</th> */}
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">결제</th>
                 <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">관리</th>
               </tr>
@@ -857,7 +867,20 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     </td>
                     <td className="px-4 py-2 text-center text-gray-600">{po.quantity}개</td>
                     <td className="px-4 py-2 text-center text-gray-900">¥{finalPaymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="px-4 py-2 text-center text-gray-900 bg-yellow-100">¥{finalUnitPrice.toFixed(2)}</td>
+                    <td className="px-4 py-2 text-center text-gray-900 bg-yellow-100">
+                      <div className="flex flex-col gap-0.5">
+                        <span>¥{finalUnitPrice.toFixed(2)}</span>
+                        {/* 패킹리스트 출고 수량이 0이면 표시 */}
+                        {((po.shippingQuantity || 0) + (po.koreaArrivedQuantity || 0)) === 0 ? (
+                          <span className="text-xs text-red-500">(계산 미완성, 출고대기)</span>
+                        ) : (
+                          /* 패킹리스트 출고가 있지만 배송비가 없으면 표시 */
+                          (po.packingListShippingCost === undefined || po.packingListShippingCost === 0) && (
+                            <span className="text-xs text-red-500">(계산 미완성, 배송비 입력 전)</span>
+                          )
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-2 text-center text-gray-600">{po.size ? `${po.size}cm` : '-'}</td>
                     <td className="px-4 py-2 text-center text-gray-600">{po.weight ? `${po.weight}g` : '-'}</td>
                     <td className="px-4 py-2 text-center text-gray-600">{po.packaging.toLocaleString()}개</td>
@@ -873,7 +896,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     <td className="px-4 py-2 text-center text-gray-600">
                       {po.koreaArrivedQuantity !== undefined ? `${po.koreaArrivedQuantity}개` : '-'}
                     </td>
-                    <td className="px-4 py-2 text-center">
+                    {/* 출고상태 열 (주석 처리 - 추후 사용 예정) */}
+                    {/* <td className="px-4 py-2 text-center">
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-center gap-1.5">
                           <span className="text-gray-600 text-xs whitespace-nowrap font-bold">업체출고:</span>
@@ -907,8 +931,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                             }}
                           />
                         </div>
-                        {/* 배송 상태 배지 (임시 주석처리) */}
-                        {/* <div className="flex items-center justify-center gap-1.5">
+                        <div className="flex items-center justify-center gap-1.5">
                           <span className="text-gray-600 text-xs whitespace-nowrap font-bold">배송:</span>
                           <StatusBadge 
                             status={po.deliveryStatus} 
@@ -919,9 +942,9 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                               onViewDetail(po.id, 'delivery');
                             }}
                           />
-                        </div> */}
+                        </div>
                       </div>
-                    </td>
+                    </td> */}
                     <td className="px-4 py-2 text-center">
                       <StatusBadge status={po.paymentStatus} type="payment" size="sm" />
                     </td>
