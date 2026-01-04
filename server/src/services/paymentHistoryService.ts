@@ -50,6 +50,8 @@ export interface PaymentHistoryItem {
   };
   unit_price?: number;
   back_margin?: number; // 추가단가
+  expected_final_unit_price?: number; // 최종 예상단가 (계산된 값)
+  final_payment_amount?: number; // 발주금액 (계산된 값)
   quantity?: number;
   commission_rate?: number;
   shipping_cost?: number;
@@ -61,6 +63,7 @@ export interface PaymentHistoryItem {
   order_date?: string | null; // 발주일 (정렬용)
   created_at?: string | null; // 생성일 (정렬용)
   // 패킹리스트 상세 정보
+  logistics_company?: string; // 물류회사
   pl_shipping_cost?: number;
   wk_payment_date?: string | null;
   calculated_weight?: number | null;
@@ -69,6 +72,7 @@ export interface PaymentHistoryItem {
   shipping_cost_difference?: number; // 실중량 배송비 - 비율 배송비 차액
   shipment_date?: string | null; // 발송일 (정렬용)
   pl_created_at?: string | null; // 패킹리스트 생성일 (정렬용)
+  packing_list_ids?: string; // 패킹리스트 ID 목록 (쉼표로 구분)
 }
 
 export interface PaymentHistoryFilter {
@@ -371,7 +375,9 @@ export class PaymentHistoryService {
             : null,
         };
 
-        itemsMap.set(itemId, item);
+        if (item) {
+          itemsMap.set(itemId, item);
+        }
       }
     }
 
@@ -468,7 +474,7 @@ export class PaymentHistoryService {
       }
 
       // 패킹리스트 ID 목록 가져오기
-      const packingListIds = row.packing_list_ids ? row.packing_list_ids.split(',').map(id => id.trim()) : [];
+      const packingListIds = row.packing_list_ids ? row.packing_list_ids.split(',').map((id: string) => id.trim()) : [];
 
       // 지급요청 정보 조회 (패킹리스트 코드에 속한 모든 패킹리스트 ID에 대해 조회)
       let pendingRequest = null;
@@ -583,7 +589,7 @@ export class PaymentHistoryService {
         source_type: 'packing_list',
         source_id: row.code, // 패킹리스트 코드를 source_id로 사용
         packing_code: row.code,
-        logistics_company: (row as any).logistics_company || undefined, // 물류회사
+        logistics_company: row.logistics_company || undefined, // 물류회사
         po_number: row.po_numbers || undefined, // 발주코드 (여러 개일 수 있음)
         po_numbers_with_quantities: poNumbersWithQuantities, // 발주코드:수량 형식 (예: "PO001:10|PO002:5")
         payment_type: 'shipping',
