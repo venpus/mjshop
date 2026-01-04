@@ -848,7 +848,7 @@ export function ShippingHistory() {
 
       {/* 검색 및 필터 */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <SearchBar
             value={inputSearchTerm}
             onChange={handleSearchInputChange}
@@ -861,6 +861,7 @@ export function ShippingHistory() {
           >
             검색
           </button>
+          
         </div>
         <div className="flex gap-2">
           <div className="relative">
@@ -875,7 +876,7 @@ export function ShippingHistory() {
               <Filter className="w-5 h-5" />
               <span>필터{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</span>
             </button>
-
+                
             {/* Filter Dropdown Panel */}
             {isFilterOpen && (
               <div className="absolute top-full left-0 mt-2 w-[600px] bg-white rounded-lg shadow-xl border border-gray-200 z-50">
@@ -971,6 +972,9 @@ export function ShippingHistory() {
               </div>
             )}
           </div>
+          <span className="text-red-600 text-sm whitespace-nowrap">
+            (Shift + 마우스 스크롤로 좌우 이동이 가능합니다)
+          </span>
         </div>
       </div>
 

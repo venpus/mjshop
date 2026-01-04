@@ -171,7 +171,7 @@ export function PackingListTable({
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="border-collapse w-full" style={{ minWidth: '2400px' }}>
+        <table className="border-collapse w-full" style={{ minWidth: '2800px' }}>
           <PackingListHeader
             isSuperAdmin={isSuperAdmin}
             isAllSelected={isAllSelected}
