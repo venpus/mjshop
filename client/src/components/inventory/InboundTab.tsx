@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getAllPackingLists, type PackingListWithItems } from '../../api/packingListApi';
-import { InboundTable } from './InboundTable';
+import { InboundCardGrid } from './InboundCardGrid';
 import { SearchBar } from '../ui/search-bar';
 
 export interface InboundItem {
@@ -244,8 +244,8 @@ export function InboundTab() {
         </button>
       </div>
 
-      {/* 입고 목록 테이블 */}
-      <InboundTable groups={filteredGroups} />
+      {/* 입고 목록 카드 */}
+      <InboundCardGrid groups={filteredGroups} />
     </div>
   );
 }

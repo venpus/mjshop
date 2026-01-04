@@ -10,6 +10,7 @@ import { Payment } from './components/Payment';
 import { PaymentHistory } from './components/payment/PaymentHistory';
 import { Inventory } from './components/Inventory';
 import { StockManagement } from './components/inventory/StockManagement';
+import { StockDetail } from './components/inventory/StockDetail';
 import { PurchaseOrders } from './components/PurchaseOrders';
 import { PurchaseOrderDetail } from './components/PurchaseOrderDetail';
 import { ShippingHistory } from './components/ShippingHistory';
@@ -19,6 +20,7 @@ import { Gallery } from './components/Gallery';
 import { ChinaWarehouse } from './components/ChinaWarehouse';
 import { Invoice } from './components/Invoice';
 import { AdminAccount } from './components/AdminAccount';
+import { PermissionManagement } from './components/PermissionManagement';
 import { Materials } from './components/Materials';
 import { MaterialDetail } from './components/materials/MaterialDetail';
 import { PackagingWork } from './components/PackagingWork';
@@ -26,11 +28,13 @@ import { Projects } from './components/Projects';
 import { ProjectDetail } from './components/ProjectDetail';
 import { Login } from './components/Login';
 import { useAuth } from './contexts/AuthContext';
+import { usePermission } from './contexts/PermissionContext';
 import { LanguageProvider, useLanguage, Language } from './contexts/LanguageContext';
 
 // 메인 레이아웃 컴포넌트
 function AdminLayout() {
   const { logout, user } = useAuth();
+  const { hasPermission } = usePermission();
   const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -218,33 +222,101 @@ function AdminLayout() {
           <Route path="/shipping" element={<Shipping />} />
           <Route path="/payment" element={<Payment />} />
           <Route path="/payment-history" element={
-            (user?.level === 'A-SuperAdmin') ? (
+            hasPermission('payment-history', 'read') ? (
               <PaymentHistory />
             ) : (
               <Navigate to="/admin/dashboard" replace />
             )
           } />
           <Route path="/inventory" element={<StockManagement />} />
+          <Route path="/inventory/:groupKey" element={<StockDetail />} />
           <Route path="/purchase-orders" element={
-            (user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin' || user?.level === 'B0: 중국Admin') ? (
+            hasPermission('purchase-orders', 'read') ? (
               <PurchaseOrders onViewDetail={handleViewOrderDetail} />
             ) : (
               <Navigate to="/admin/dashboard" replace />
             )
           } />
-          <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailWrapper onBack={handleBackToPurchaseOrders} />} />
-          <Route path="/shipping-history" element={<ShippingHistory />} />
+          <Route path="/purchase-orders/:id" element={
+            hasPermission('purchase-orders', 'read') ? (
+              <PurchaseOrderDetailWrapper onBack={handleBackToPurchaseOrders} />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
+          <Route path="/shipping-history" element={
+            hasPermission('shipping-history', 'read') ? (
+              <ShippingHistory />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
           <Route path="/china-payment" element={<ChinaPayment />} />
           <Route path="/members" element={<Members />} />
-          <Route path="/gallery" element={<Gallery />} />
-          <Route path="/china-warehouse" element={<ChinaWarehouse />} />
-          <Route path="/invoice" element={<Invoice />} />
-          <Route path="/materials" element={<Materials />} />
-          <Route path="/materials/:id" element={<MaterialDetailWrapper />} />
-          <Route path="/packaging-work" element={<PackagingWork />} />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/projects/:id" element={<ProjectDetailWrapper />} />
+          <Route path="/gallery" element={
+            hasPermission('gallery', 'read') ? (
+              <Gallery />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
+          <Route path="/china-warehouse" element={
+            hasPermission('china-warehouse', 'read') ? (
+              <ChinaWarehouse />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
+          <Route path="/invoice" element={
+            hasPermission('invoice', 'read') ? (
+              <Invoice />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
+          <Route path="/materials" element={
+            hasPermission('materials', 'read') ? (
+              <Materials />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
+          <Route path="/materials/:id" element={
+            hasPermission('materials', 'read') ? (
+              <MaterialDetailWrapper />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
+          <Route path="/packaging-work" element={
+            hasPermission('packaging-work', 'read') ? (
+              <PackagingWork />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
+          <Route path="/projects" element={
+            hasPermission('projects', 'read') ? (
+              <Projects />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
+          <Route path="/projects/:id" element={
+            hasPermission('projects', 'read') ? (
+              <ProjectDetailWrapper />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
           <Route path="/admin-account" element={<AdminAccount />} />
+          <Route path="/permissions" element={
+            (user?.level === 'A-SuperAdmin') ? (
+              <PermissionManagement />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
         </Routes>
       </main>
     </div>

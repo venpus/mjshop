@@ -22,6 +22,7 @@ interface PaymentHistoryRowProps {
   isAdminLevelA: boolean;
   onRefresh?: () => void;
   onViewOrderDetail?: (orderId: string) => void; // 발주 상세 보기 핸들러
+  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
 }
 
 /**
@@ -35,7 +36,9 @@ export function PaymentHistoryRow({
   isAdminLevelA,
   onRefresh,
   onViewOrderDetail,
+  userLevel,
 }: PaymentHistoryRowProps) {
+  const isLevelC = userLevel === 'C0: 한국Admin';
   // A레벨 관리자 비용 지불 완료 상태 (로컬 상태)
   const [adminCostPaid, setAdminCostPaid] = useState(item.admin_cost_paid || false);
   const [adminCostPaidDate, setAdminCostPaidDate] = useState(item.admin_cost_paid_date || null);
@@ -616,42 +619,46 @@ export function PaymentHistoryRow({
               )}
             </div>
           </td>
-          <td className="px-4 py-3 text-sm text-gray-900">
-            <div className="flex items-center justify-end gap-3">
-              <span className="text-right">
-                {item.admin_total_cost ? `¥${item.admin_total_cost.toLocaleString()}` : '-'}
-              </span>
-              {item.source_type === 'purchase_order' && item.admin_total_cost && (
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={adminCostPaid}
-                    onChange={handleAdminCostPaidChange}
-                    disabled={isUpdating}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                  <span className="ml-2 text-xs text-gray-600">지불완료</span>
-                </label>
-              )}
-            </div>
-          </td>
-          <td className="px-4 py-3 text-sm text-gray-900">
-            {item.source_type === 'purchase_order' && item.admin_total_cost ? (
-              adminCostPaid && adminCostPaidDate ? (
-                <span className="text-gray-700">
-                  {formatDateKST(adminCostPaidDate)}
-                </span>
-              ) : (
-                <span className="text-gray-400">-</span>
-              )
-            ) : (
-              <span className="text-gray-400">-</span>
-            )}
-          </td>
+          {!isLevelC && (
+            <>
+              <td className="px-4 py-3 text-sm text-gray-900">
+                <div className="flex items-center justify-end gap-3">
+                  <span className="text-right">
+                    {item.admin_total_cost ? `¥${item.admin_total_cost.toLocaleString()}` : '-'}
+                  </span>
+                  {item.source_type === 'purchase_order' && item.admin_total_cost && (
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={adminCostPaid}
+                        onChange={handleAdminCostPaidChange}
+                        disabled={isUpdating}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      <span className="ml-2 text-xs text-gray-600">지불완료</span>
+                    </label>
+                  )}
+                </div>
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-900">
+                {item.source_type === 'purchase_order' && item.admin_total_cost ? (
+                  adminCostPaid && adminCostPaidDate ? (
+                    <span className="text-gray-700">
+                      {formatDateKST(adminCostPaidDate)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )
+                ) : (
+                  <span className="text-gray-400">-</span>
+                )}
+              </td>
+            </>
+          )}
         </tr>
         {isExpanded && (
           <tr>
-            <td colSpan={11} className="px-4 py-4 bg-gray-50">
+            <td colSpan={isLevelC ? 9 : 11} className="px-4 py-4 bg-gray-50">
               <PaymentHistoryDetail item={item} />
             </td>
           </tr>
@@ -699,12 +706,12 @@ export function PaymentHistoryRow({
         </td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-2">
-            <label className="flex items-center cursor-pointer">
+            <label className={`flex items-center ${isLevelC ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
               <input
                 type="checkbox"
                 checked={isPaymentRequestChecked}
                 onChange={handlePaymentRequestCheckboxChange}
-                disabled={isUpdatingPaymentRequest || (item.payment_request?.status === '완료')}
+                disabled={isLevelC || isUpdatingPaymentRequest || (item.payment_request?.status === '완료')}
                 className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </label>
@@ -749,12 +756,12 @@ export function PaymentHistoryRow({
         </td>
         <td className="px-4 py-3 text-sm text-gray-900">
           <div className="flex items-center gap-2">
-            <label className="flex items-center cursor-pointer">
+            <label className={`flex items-center ${isLevelC ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
               <input
                 type="checkbox"
                 checked={isPaymentDateChecked}
                 onChange={handlePaymentDateCheckboxChange}
-                disabled={isUpdatingPaymentDate}
+                disabled={isLevelC || isUpdatingPaymentDate}
                 className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </label>
@@ -765,38 +772,42 @@ export function PaymentHistoryRow({
             )}
           </div>
         </td>
-        <td className="px-4 py-3 text-sm text-gray-900 text-right">
-          {item.shipping_cost_difference ? `¥${item.shipping_cost_difference.toLocaleString()}` : '-'}
-        </td>
-        <td className="px-4 py-3">
-          {/* 패킹리스트의 A레벨 관리자 비용 지불완료 체크박스 */}
-          {item.shipping_cost_difference ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={adminCostPaid}
-                onChange={handlePackingListAdminCostPaidChange}
-                disabled={isUpdating}
-                className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-              />
-              <span className="ml-2 text-xs text-gray-600">지불완료</span>
-            </div>
-          ) : (
-            <span className="text-gray-400">-</span>
-          )}
-        </td>
-        <td className="px-4 py-3 text-sm text-gray-900">
-          {/* 패킹리스트의 A레벨 관리자 비용 지불 날짜 */}
-          {adminCostPaid && adminCostPaidDate ? (
-            <span className="text-gray-700">{formatDateKST(adminCostPaidDate)}</span>
-          ) : (
-            <span className="text-gray-400">-</span>
-          )}
-        </td>
+        {!isLevelC && (
+          <>
+            <td className="px-4 py-3 text-sm text-gray-900 text-right">
+              {item.shipping_cost_difference ? `¥${item.shipping_cost_difference.toLocaleString()}` : '-'}
+            </td>
+            <td className="px-4 py-3">
+              {/* 패킹리스트의 A레벨 관리자 비용 지불완료 체크박스 */}
+              {item.shipping_cost_difference ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={adminCostPaid}
+                    onChange={handlePackingListAdminCostPaidChange}
+                    disabled={isUpdating}
+                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  />
+                  <span className="ml-2 text-xs text-gray-600">지불완료</span>
+                </div>
+              ) : (
+                <span className="text-gray-400">-</span>
+              )}
+            </td>
+            <td className="px-4 py-3 text-sm text-gray-900">
+              {/* 패킹리스트의 A레벨 관리자 비용 지불 날짜 */}
+              {adminCostPaid && adminCostPaidDate ? (
+                <span className="text-gray-700">{formatDateKST(adminCostPaidDate)}</span>
+              ) : (
+                <span className="text-gray-400">-</span>
+              )}
+            </td>
+          </>
+        )}
       </tr>
       {isExpanded && (
         <tr>
-          <td colSpan={14} className="px-4 py-4 bg-gray-50">
+          <td colSpan={isLevelC ? 11 : 14} className="px-4 py-4 bg-gray-50">
             <PaymentHistoryDetail item={item} />
           </td>
         </tr>

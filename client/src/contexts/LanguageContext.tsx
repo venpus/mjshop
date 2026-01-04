@@ -50,6 +50,7 @@ const translations: Record<Language, Record<string, string>> = {
     'menu.inventory': '재고 관리',
     'menu.members': '회원 관리',
     'menu.adminAccount': '관리자 계정 관리',
+    'menu.permissions': '권한 관리',
     
     // 로그인
     'login.title': '관리자 로그인',
@@ -106,6 +107,7 @@ const translations: Record<Language, Record<string, string>> = {
     'menu.inventory': '库存管理',
     'menu.members': '会员管理',
     'menu.adminAccount': '管理员账户管理',
+    'menu.permissions': '权限管理',
     
     // 로그인
     'login.title': '管理员登录',
@@ -155,6 +157,7 @@ const translations: Record<Language, Record<string, string>> = {
     'menu.inventory': 'Inventory',
     'menu.members': 'Members',
     'menu.adminAccount': 'Admin Account Management',
+    'menu.permissions': 'Permissions',
     
     // 로그인
     'login.title': 'Admin Login',

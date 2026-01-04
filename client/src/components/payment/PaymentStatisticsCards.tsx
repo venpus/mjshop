@@ -33,12 +33,14 @@ interface PaymentStatistics {
 
 interface PaymentStatisticsCardsProps {
   refreshTrigger?: number; // 새로고침 트리거
+  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
 }
 
 /**
  * 결제 통계 카드 컴포넌트
  */
-export function PaymentStatisticsCards({ refreshTrigger }: PaymentStatisticsCardsProps) {
+export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentStatisticsCardsProps) {
+  const isLevelC = userLevel === 'C0: 한국Admin';
   const [statistics, setStatistics] = useState<PaymentStatistics>({
     paidAmount: 0,
     pendingAmount: 0,
@@ -407,44 +409,46 @@ export function PaymentStatisticsCards({ refreshTrigger }: PaymentStatisticsCard
         </div>
       </div>
 
-      {/* 두 번째 줄: A레벨 관리자 비용 관련 카드들 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* A레벨 관리자 추가 비용 총계 */}
-        <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
-          <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">A레벨 관리자 추가 비용 총계</h3>
-          {isLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <p className="text-2xl font-bold text-gray-400">-</p>
-            </div>
-          ) : (
-            renderAdminCostDetail(statistics.adminCostTotal, statistics.adminCostDetail, 'text-indigo-600')
-          )}
-        </div>
+      {/* 두 번째 줄: A레벨 관리자 비용 관련 카드들 (C0 레벨은 숨김) */}
+      {!isLevelC && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* A레벨 관리자 추가 비용 총계 */}
+          <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
+            <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">A레벨 관리자 추가 비용 총계</h3>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-32">
+                <p className="text-2xl font-bold text-gray-400">-</p>
+              </div>
+            ) : (
+              renderAdminCostDetail(statistics.adminCostTotal, statistics.adminCostDetail, 'text-indigo-600')
+            )}
+          </div>
 
-        {/* A레벨 관리자 지급예정 비용 */}
-        <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
-          <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">A레벨 관리자 지급예정 비용</h3>
-          {isLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <p className="text-2xl font-bold text-gray-400">-</p>
-            </div>
-          ) : (
-            renderAdminCostDetail(statistics.adminCostPending, statistics.adminCostPendingDetail, 'text-yellow-600')
-          )}
-        </div>
+          {/* A레벨 관리자 지급예정 비용 */}
+          <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
+            <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">A레벨 관리자 지급예정 비용</h3>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-32">
+                <p className="text-2xl font-bold text-gray-400">-</p>
+              </div>
+            ) : (
+              renderAdminCostDetail(statistics.adminCostPending, statistics.adminCostPendingDetail, 'text-yellow-600')
+            )}
+          </div>
 
-        {/* A레벨 관리자 지급완료 비용 */}
-        <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
-          <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">A레벨 관리자 지급완료 비용</h3>
-          {isLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <p className="text-2xl font-bold text-gray-400">-</p>
-            </div>
-          ) : (
-            renderAdminCostDetail(statistics.adminCostPaid, statistics.adminCostPaidDetail, 'text-green-600')
-          )}
+          {/* A레벨 관리자 지급완료 비용 */}
+          <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
+            <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">A레벨 관리자 지급완료 비용</h3>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-32">
+                <p className="text-2xl font-bold text-gray-400">-</p>
+              </div>
+            ) : (
+              renderAdminCostDetail(statistics.adminCostPaid, statistics.adminCostPaidDetail, 'text-green-600')
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -66,6 +66,7 @@ import { useWorkItemHandlers } from "../hooks/useWorkItemHandlers";
 import { useLogisticsHandlers } from "../hooks/useLogisticsHandlers";
 import { useCostItemHandlers } from "../hooks/useCostItemHandlers";
 import { useAuth } from "../contexts/AuthContext";
+import { usePermission } from "../contexts/PermissionContext";
 import { formatDateForInput } from "../utils/dateUtils";
 import { convertFactoryShipmentsToFormData } from "../utils/packingListTransform";
 
@@ -85,7 +86,10 @@ export function PurchaseOrderDetail({
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
   const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
   const { user } = useAuth();
+  const { hasPermission } = usePermission();
   const isSuperAdmin = user?.level === 'A-SuperAdmin';
+  const canWrite = hasPermission('purchase-orders', 'write');
+  const canDelete = hasPermission('purchase-orders', 'delete');
   const navigate = useNavigate();
   
   // 새 발주인지 확인
@@ -614,9 +618,23 @@ export function PurchaseOrderDetail({
   // initialTab이 변경되면 activeTab 업데이트
   useEffect(() => {
     if (initialTab) {
-      setActiveTab(initialTab);
+      // C0 레벨일 때 factory나 work 탭은 cost로 변경
+      const isLevelC = user?.level === 'C0: 한국Admin';
+      if (isLevelC && (initialTab === 'factory' || initialTab === 'work')) {
+        setActiveTab('cost');
+      } else {
+        setActiveTab(initialTab);
+      }
     }
-  }, [initialTab, orderId]);
+  }, [initialTab, orderId, user?.level]);
+
+  // C0 레벨일 때 activeTab이 factory나 work면 cost로 변경
+  useEffect(() => {
+    const isLevelC = user?.level === 'C0: 한국Admin';
+    if (isLevelC && (activeTab === 'factory' || activeTab === 'work')) {
+      setActiveTab('cost');
+    }
+  }, [user?.level, activeTab]);
 
   // autoSave가 true이고 데이터 로드가 완료되면 자동으로 저장
   const autoSaveExecutedRef = useRef(false);
@@ -1154,7 +1172,7 @@ export function PurchaseOrderDetail({
           deliveryDate={deliveryDate}
           isOrderConfirmed={isOrderConfirmed}
           orderStatus={orderStatus}
-          isEditable={true}
+          isEditable={canWrite}
           onPackagingChange={setPackaging}
           onOrderDateChange={setOrderDate}
           onDeliveryDateChange={setDeliveryDate}
@@ -1167,6 +1185,7 @@ export function PurchaseOrderDetail({
           onSizeChange={setProductSize}
           onWeightChange={setProductWeight}
           onPackagingSizeChange={setProductPackagingSize}
+          userLevel={user?.level}
           currentFactoryStatus={currentFactoryStatus}
           totalShippedQuantity={totalShippedQuantity}
           totalReturnQuantity={totalReturnQuantity}
@@ -1200,6 +1219,7 @@ export function PurchaseOrderDetail({
             <TabNavigation
               activeTab={activeTab}
               onTabChange={setActiveTab}
+              userLevel={user?.level}
             />
 
             {/* 탭 콘텐츠 */}
@@ -1213,6 +1233,7 @@ export function PurchaseOrderDetail({
                 basicCostTotal={basicCostTotal}
                 isSuperAdmin={isSuperAdmin}
                 userLevel={user?.level}
+                canWrite={canWrite}
                 onSetUnitPrice={setUnitPrice}
                 onSetBackMargin={setBackMargin}
                 onSetQuantity={setQuantity}
@@ -1366,9 +1387,12 @@ export function PurchaseOrderDetail({
         onOrderConfirmedChange={handleOrderConfirmedChange}
         onCancelOrder={handleCancelOrder}
         onProductClick={undefined}
+        isEditable={canWrite}
+        onProductNameChange={setProductName}
         onSizeChange={setProductSize}
         onWeightChange={setProductWeight}
         onPackagingSizeChange={setProductPackagingSize}
+        userLevel={user?.level}
         onPhotoGalleryClick={handlePhotoGalleryClick}
         onImageClick={() => setIsImageModalOpen(true)}
         currentFactoryStatus={currentFactoryStatus}
@@ -1403,6 +1427,7 @@ export function PurchaseOrderDetail({
             <TabNavigation
               activeTab={activeTab}
               onTabChange={setActiveTab}
+              userLevel={user?.level}
             />
 
             {/* 탭 콘텐츠 */}
@@ -1416,6 +1441,7 @@ export function PurchaseOrderDetail({
                 basicCostTotal={basicCostTotal}
                 isSuperAdmin={isSuperAdmin}
                 userLevel={user?.level}
+                canWrite={canWrite}
                 onSetUnitPrice={setUnitPrice}
                 onSetBackMargin={setBackMargin}
                 onSetQuantity={setQuantity}
@@ -1516,6 +1542,7 @@ export function PurchaseOrderDetail({
         poNumber={order!.poNumber}
         onClose={() => setIsImageModalOpen(false)}
         onOpenGallery={() => setIsPhotoGalleryOpen(true)}
+        onMainImageUpload={handleMainImageUpload}
       />
 
       {/* 업체 출고 이미지 모달 */}
@@ -1546,7 +1573,6 @@ export function PurchaseOrderDetail({
           setProductGalleryImages([]);
         }}
         onImageClick={(imageUrl) => setSelectedGalleryImage(imageUrl)}
-        images={productGalleryImages}
         onImagesUpdated={handlePhotoGalleryClick}
       />
 

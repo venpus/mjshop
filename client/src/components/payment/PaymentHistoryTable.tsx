@@ -22,13 +22,15 @@ interface PaymentHistoryTableProps {
   // type: 'all' | 'purchase-orders' | 'packing-lists';
   type: 'purchase-orders' | 'packing-lists';
   onStatisticsRefresh?: () => void; // 통계 카드 새로고침 콜백
+  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
 }
 
 /**
  * 결제내역 테이블 컴포넌트
  */
-export function PaymentHistoryTable({ type, onStatisticsRefresh }: PaymentHistoryTableProps) {
+export function PaymentHistoryTable({ type, onStatisticsRefresh, userLevel }: PaymentHistoryTableProps) {
   const { user } = useAuth();
+  const isLevelC = userLevel === 'C0: 한국Admin';
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'pending'>('all');
   const [monthFilter, setMonthFilter] = useState<string>(''); // YYYY-MM 형식
@@ -396,15 +398,19 @@ export function PaymentHistoryTable({ type, onStatisticsRefresh }: PaymentHistor
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       지급 날짜
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      A레벨 관리자 비용
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      지불완료
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      지불 날짜
-                    </th>
+                    {!isLevelC && (
+                      <>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          A레벨 관리자 비용
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          지불완료
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          지불 날짜
+                        </th>
+                      </>
+                    )}
                   </>
                 ) : (
                   <>
@@ -441,12 +447,16 @@ export function PaymentHistoryTable({ type, onStatisticsRefresh }: PaymentHistor
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       잔금 지급 상태
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      A레벨 관리자 비용
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      지불 날짜
-                    </th>
+                    {!isLevelC && (
+                      <>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          A레벨 관리자 비용
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          지불 날짜
+                        </th>
+                      </>
+                    )}
                   </>
                 )}
               </tr>
@@ -454,13 +464,13 @@ export function PaymentHistoryTable({ type, onStatisticsRefresh }: PaymentHistor
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={type === 'packing-lists' ? 14 : 14} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={type === 'packing-lists' ? (isLevelC ? 11 : 14) : (isLevelC ? 11 : 14)} className="px-4 py-8 text-center text-gray-500">
                     로딩 중...
                   </td>
                 </tr>
               ) : displayData.length === 0 ? (
                 <tr>
-                  <td colSpan={type === 'packing-lists' ? 14 : 14} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={type === 'packing-lists' ? (isLevelC ? 11 : 14) : (isLevelC ? 11 : 14)} className="px-4 py-8 text-center text-gray-500">
                     결제 내역이 없습니다.
                   </td>
                 </tr>
@@ -481,6 +491,7 @@ export function PaymentHistoryTable({ type, onStatisticsRefresh }: PaymentHistor
                       }
                     }}
                     onViewOrderDetail={(orderId) => setSelectedOrderId(orderId)}
+                    userLevel={userLevel}
                   />
                 ))
               )}

@@ -41,6 +41,7 @@ interface HeaderSectionProps {
   onWeightChange?: (value: string) => void;
   onPackagingSizeChange?: (value: string) => void;
   onMainImageUpload?: (file: File) => Promise<void>;
+  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
 
   // ProgressStatusSection props
   currentFactoryStatus: string;
@@ -97,6 +98,7 @@ export function HeaderSection({
   onWeightChange,
   onPackagingSizeChange,
   onMainImageUpload,
+  userLevel,
 }: HeaderSectionProps) {
   return (
     <>
@@ -144,6 +146,7 @@ export function HeaderSection({
             onSizeChange={onSizeChange}
             onWeightChange={onWeightChange}
             onPackagingSizeChange={onPackagingSizeChange}
+            userLevel={userLevel}
           />
         </div>
 

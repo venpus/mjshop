@@ -20,6 +20,7 @@ interface CostPaymentTabProps {
   basicCostTotal: number;
   isSuperAdmin: boolean; // A 레벨 관리자 여부
   userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin'; // 사용자 레벨
+  canWrite?: boolean; // 쓰기 권한 여부
   onSetUnitPrice: (value: number) => void;
   onSetBackMargin: (value: number) => void;
   onSetQuantity: (value: number) => void;
@@ -73,6 +74,7 @@ export function CostPaymentTab({
   basicCostTotal,
   isSuperAdmin,
   userLevel,
+  canWrite = true, // 기본값은 true (하위 호환성)
   onSetUnitPrice,
   onSetBackMargin,
   onSetQuantity,
@@ -120,8 +122,8 @@ export function CostPaymentTab({
   const normalLaborCostItems = laborCostItems.filter(item => !item.isAdminOnly);
   const adminOnlyLaborCostItems = laborCostItems.filter(item => item.isAdminOnly);
   
-  // 항목 추가 버튼 표시 여부: C 레벨은 표시 안 함
-  const canAddItems = isLevelA || isLevelSorB;
+  // 항목 추가 버튼 표시 여부: C 레벨은 표시 안 함, 쓰기 권한도 체크
+  const canAddItems = (isLevelA || isLevelSorB) && canWrite;
   return (
     <div className="space-y-4">
       {/* Cost sections in columns */}
@@ -166,7 +168,8 @@ export function CostPaymentTab({
                       onSetUnitPrice(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
                     }}
                     step="0.01"
-                    className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    disabled={!canWrite}
+                    className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   />
                 </div>
               </div>
@@ -190,7 +193,8 @@ export function CostPaymentTab({
                       onSetBackMargin(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
                     }}
                     step="0.01"
-                    className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    disabled={!canWrite}
+                    className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   />
                 </div>
               </div>
@@ -206,7 +210,8 @@ export function CostPaymentTab({
                   onChange={(e) =>
                     onSetQuantity(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)
                   }
-                  className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  disabled={!canWrite}
+                  className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 />
                 <span className="text-gray-500 text-xs min-w-[16px]">개</span>
               </div>
@@ -221,7 +226,8 @@ export function CostPaymentTab({
                   onChange={(e) =>
                     onHandleCommissionTypeChange(e.target.value)
                   }
-                  className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  disabled={!canWrite}
+                  className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 >
                   {commissionOptions.map((opt) => (
                     <option key={opt.label} value={opt.label}>
@@ -271,7 +277,8 @@ export function CostPaymentTab({
                     onSetShippingCost(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
                   }}
                   step="0.01"
-                  className="w-24 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  disabled={!canWrite}
+                  className={`w-24 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 />
               </div>
             </div>
@@ -292,7 +299,8 @@ export function CostPaymentTab({
                     onSetWarehouseShippingCost(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
                   }}
                   step="0.01"
-                  className="w-24 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  disabled={!canWrite}
+                  className={`w-24 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 />
               </div>
             </div>
@@ -319,178 +327,73 @@ export function CostPaymentTab({
               ¥{totalOptionCost.toFixed(2)}
             </span>
           </h4>
-          {isLevelC ? (
-            // C 레벨은 항목 목록 숨김
-            <div className="text-sm text-gray-500 text-center py-4">
-              합계만 표시됩니다
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* 일반 영역 (S, B 레벨도 입력 가능) */}
-              <div className="space-y-2">
-                <div className="text-xs font-semibold text-gray-600 mb-2">일반 항목</div>
-                {normalOptionItems.map((item) => {
+          <div className="space-y-4">
+            {/* 일반 항목 (모든 레벨에서 읽기 전용으로 표시) */}
+            <div className="space-y-2">
+              {!isLevelC && <div className="text-xs font-semibold text-gray-600 mb-2">일반 항목</div>}
+              {normalOptionItems.map((item) => {
                   const calculatedCost = item.unit_price * item.quantity;
-                  // 일반 항목은 A, S, B 레벨 모두 수정 가능
-                  const isEditable = isLevelA || isLevelSorB;
+                  // 읽기 전용으로 변경 (항목과 결과값만 표시)
                   return (
                     <div key={item.id} className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        value={item.name}
-                        onChange={(e) =>
-                          onUpdateOptionItemName(item.id, e.target.value)
-                        }
-                        placeholder="항목명"
-                        disabled={!isEditable}
-                        className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isEditable ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                      />
+                      <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700">
+                        {item.name || '항목명'}
+                      </div>
                       <span className="text-gray-500 text-xs">¥</span>
-                      <input
-                        type="number"
-                        value={formatNumberForInput(item.unit_price)}
-                        onChange={(e) => {
-                          const processedValue = handleNumberInput(e.target.value);
-                          if (processedValue !== e.target.value) {
-                            e.target.value = processedValue;
-                          }
-                          onUpdateOptionItemUnitPrice(
-                            item.id,
-                            processedValue === "" ? 0 : parseFloat(processedValue) || 0,
-                          );
-                        }}
-                        step="0.01"
-                        placeholder="단가"
-                        disabled={!isEditable}
-                        className={`w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isEditable ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                      />
+                      <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                        {item.unit_price.toFixed(2)}
+                      </div>
                       <span className="text-gray-500 text-xs">×</span>
-                      <input
-                        type="number"
-                        value={formatNumberForInput(item.quantity)}
-                        onChange={(e) => {
-                          const processedValue = handleNumberInput(e.target.value);
-                          if (processedValue !== e.target.value) {
-                            e.target.value = processedValue;
-                          }
-                          onUpdateOptionItemQuantity(
-                            item.id,
-                            processedValue === "" ? 0 : parseFloat(processedValue) || 0,
-                          );
-                        }}
-                        step="0.01"
-                        placeholder="수량"
-                        disabled={!isEditable}
-                        className={`w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isEditable ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                      />
+                      <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                        {item.quantity.toFixed(2)}
+                      </div>
                       <span className="text-gray-500 text-xs">=</span>
                       <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
                         ¥{calculatedCost.toFixed(2)}
                       </div>
-                      {isEditable && (
-                        <button
-                          onClick={() => onRemoveOptionItem(item.id)}
-                          className="text-red-500 hover:text-red-700 flex-shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
                     </div>
                   );
                 })}
-                {canAddItems && (
-                  <button
-                    onClick={() => onAddOptionItem(false)}
-                    className="flex items-center gap-1 px-2 py-1.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-xs w-full justify-center mt-2"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>일반 항목 추가</span>
-                  </button>
-                )}
               </div>
 
-              {/* A레벨 전용 영역 (A 레벨만 볼 수 있음) */}
-              {isLevelA && (
-                <div className="space-y-2 pt-2 border-t border-blue-200">
+            {/* A레벨 전용 영역 (A 레벨과 C0 레벨에서 볼 수 있음) */}
+            {(isLevelA || isLevelC) && (
+              <div className={`space-y-2 ${isLevelA ? 'pt-2 border-t border-blue-200' : ''}`}>
+                {isLevelA && (
                   <div className="text-xs font-semibold text-blue-600 mb-2 flex items-center gap-1">
                     <span className="text-blue-600 text-xs font-semibold px-1.5 py-0.5 bg-blue-100 rounded">A</span>
                     <span>A 레벨 관리자 전용</span>
                   </div>
-                  {adminOnlyOptionItems.map((item) => {
-                    const calculatedCost = item.unit_price * item.quantity;
-                    // A 레벨 전용 항목은 A 레벨만 수정 가능
-                    return (
-                      <div key={item.id} className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded p-1">
+                )}
+                {adminOnlyOptionItems.map((item) => {
+                  const calculatedCost = item.unit_price * item.quantity;
+                  // 읽기 전용으로 변경 (항목과 결과값만 표시)
+                  return (
+                    <div key={item.id} className={`flex items-center gap-1.5 ${isLevelA ? 'bg-blue-50 border border-blue-200 rounded p-1' : ''}`}>
+                      {isLevelA && (
                         <span className="text-blue-600 text-xs font-semibold px-1" title="A 레벨 관리자 전용">A</span>
-                        <input
-                          type="text"
-                          value={item.name}
-                          onChange={(e) =>
-                            onUpdateOptionItemName(item.id, e.target.value)
-                          }
-                          placeholder="항목명"
-                          className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                        <span className="text-gray-500 text-xs">¥</span>
-                        <input
-                          type="number"
-                          value={formatNumberForInput(item.unit_price)}
-                          onChange={(e) => {
-                            const processedValue = handleNumberInput(e.target.value);
-                            if (processedValue !== e.target.value) {
-                              e.target.value = processedValue;
-                            }
-                            onUpdateOptionItemUnitPrice(
-                              item.id,
-                              processedValue === "" ? 0 : parseFloat(processedValue) || 0,
-                            );
-                          }}
-                          step="0.01"
-                          placeholder="단가"
-                          className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                        <span className="text-gray-500 text-xs">×</span>
-                        <input
-                          type="number"
-                          value={formatNumberForInput(item.quantity)}
-                          onChange={(e) => {
-                            const processedValue = handleNumberInput(e.target.value);
-                            if (processedValue !== e.target.value) {
-                              e.target.value = processedValue;
-                            }
-                            onUpdateOptionItemQuantity(
-                              item.id,
-                              processedValue === "" ? 0 : parseFloat(processedValue) || 0,
-                            );
-                          }}
-                          step="0.01"
-                          placeholder="수량"
-                          className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                        <span className="text-gray-500 text-xs">=</span>
-                        <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
-                          ¥{calculatedCost.toFixed(2)}
-                        </div>
-                        <button
-                          onClick={() => onRemoveOptionItem(item.id)}
-                          className="text-red-500 hover:text-red-700 flex-shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      )}
+                      <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700">
+                        {item.name || '항목명'}
                       </div>
-                    );
-                  })}
-                  <button
-                    onClick={() => onAddOptionItem(true)}
-                    className="flex items-center gap-1 px-2 py-1.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs w-full justify-center mt-2"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>A 레벨 전용 항목 추가</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+                      <span className="text-gray-500 text-xs">¥</span>
+                      <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                        {item.unit_price.toFixed(2)}
+                      </div>
+                      <span className="text-gray-500 text-xs">×</span>
+                      <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                        {item.quantity.toFixed(2)}
+                      </div>
+                      <span className="text-gray-500 text-xs">=</span>
+                      <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                        ¥{calculatedCost.toFixed(2)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 인건비 */}
@@ -501,178 +404,73 @@ export function CostPaymentTab({
               ¥{totalLaborCost.toFixed(2)}
             </span>
           </h4>
-          {isLevelC ? (
-            // C 레벨은 항목 목록 숨김
-            <div className="text-sm text-gray-500 text-center py-4">
-              합계만 표시됩니다
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* 일반 영역 (S, B 레벨도 입력 가능) */}
-              <div className="space-y-2">
-                <div className="text-xs font-semibold text-gray-600 mb-2">일반 항목</div>
-                {normalLaborCostItems.map((item) => {
-                  const calculatedCost = item.unit_price * item.quantity;
-                  // 일반 항목은 A, S, B 레벨 모두 수정 가능
-                  const isEditable = isLevelA || isLevelSorB;
-                  return (
-                    <div key={item.id} className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        value={item.name}
-                        onChange={(e) =>
-                          onUpdateLaborCostItemName(item.id, e.target.value)
-                        }
-                        placeholder="항목명"
-                        disabled={!isEditable}
-                        className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isEditable ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                      />
-                      <span className="text-gray-500 text-xs">¥</span>
-                      <input
-                        type="number"
-                        value={formatNumberForInput(item.unit_price)}
-                        onChange={(e) => {
-                          const processedValue = handleNumberInput(e.target.value);
-                          if (processedValue !== e.target.value) {
-                            e.target.value = processedValue;
-                          }
-                          onUpdateLaborCostItemUnitPrice(
-                            item.id,
-                            processedValue === "" ? 0 : parseFloat(processedValue) || 0,
-                          );
-                        }}
-                        step="0.01"
-                        placeholder="단가"
-                        disabled={!isEditable}
-                        className={`w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isEditable ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                      />
-                      <span className="text-gray-500 text-xs">×</span>
-                      <input
-                        type="number"
-                        value={formatNumberForInput(item.quantity)}
-                        onChange={(e) => {
-                          const processedValue = handleNumberInput(e.target.value);
-                          if (processedValue !== e.target.value) {
-                            e.target.value = processedValue;
-                          }
-                          onUpdateLaborCostItemQuantity(
-                            item.id,
-                            processedValue === "" ? 0 : parseFloat(processedValue) || 0,
-                          );
-                        }}
-                        step="0.01"
-                        placeholder="수량"
-                        disabled={!isEditable}
-                        className={`w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${!isEditable ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                      />
-                      <span className="text-gray-500 text-xs">=</span>
-                      <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
-                        ¥{calculatedCost.toFixed(2)}
-                      </div>
-                      {isEditable && (
-                        <button
-                          onClick={() => onRemoveLaborCostItem(item.id)}
-                          className="text-red-500 hover:text-red-700 flex-shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+          <div className="space-y-4">
+            {/* 일반 항목 (모든 레벨에서 읽기 전용으로 표시) */}
+            <div className="space-y-2">
+              {!isLevelC && <div className="text-xs font-semibold text-gray-600 mb-2">일반 항목</div>}
+              {normalLaborCostItems.map((item) => {
+                const calculatedCost = item.unit_price * item.quantity;
+                // 읽기 전용으로 변경 (항목과 결과값만 표시)
+                return (
+                  <div key={item.id} className="flex items-center gap-1.5">
+                    <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700">
+                      {item.name || '항목명'}
                     </div>
-                  );
-                })}
-                {canAddItems && (
-                  <button
-                    onClick={() => onAddLaborCostItem(false)}
-                    className="flex items-center gap-1 px-2 py-1.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-xs w-full justify-center mt-2"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>일반 항목 추가</span>
-                  </button>
-                )}
-              </div>
-
-              {/* A레벨 전용 영역 (A 레벨만 볼 수 있음) */}
-              {isLevelA && (
-                <div className="space-y-2 pt-2 border-t border-blue-200">
-                  <div className="text-xs font-semibold text-blue-600 mb-2 flex items-center gap-1">
-                    <span className="text-blue-600 text-xs font-semibold px-1.5 py-0.5 bg-blue-100 rounded">A</span>
-                    <span>A 레벨 관리자 전용</span>
+                    <span className="text-gray-500 text-xs">¥</span>
+                    <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                      {item.unit_price.toFixed(2)}
+                    </div>
+                    <span className="text-gray-500 text-xs">×</span>
+                    <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                      {item.quantity.toFixed(2)}
+                    </div>
+                    <span className="text-gray-500 text-xs">=</span>
+                    <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                      ¥{calculatedCost.toFixed(2)}
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+
+              {/* A레벨 전용 영역 (A 레벨과 C0 레벨에서 볼 수 있음) */}
+              {(isLevelA || isLevelC) && (
+                <div className={`space-y-2 ${isLevelA ? 'pt-2 border-t border-blue-200' : ''}`}>
+                  {isLevelA && (
+                    <div className="text-xs font-semibold text-blue-600 mb-2 flex items-center gap-1">
+                      <span className="text-blue-600 text-xs font-semibold px-1.5 py-0.5 bg-blue-100 rounded">A</span>
+                      <span>A 레벨 관리자 전용</span>
+                    </div>
+                  )}
                   {adminOnlyLaborCostItems.map((item) => {
                     const calculatedCost = item.unit_price * item.quantity;
-                    // A 레벨 전용 항목은 A 레벨만 수정 가능
+                    // 읽기 전용으로 변경 (항목과 결과값만 표시)
                     return (
-                      <div key={item.id} className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded p-1">
-                        <span className="text-blue-600 text-xs font-semibold px-1" title="A 레벨 관리자 전용">A</span>
-                        <input
-                          type="text"
-                          value={item.name}
-                          onChange={(e) =>
-                            onUpdateLaborCostItemName(item.id, e.target.value)
-                          }
-                          placeholder="항목명"
-                          className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
+                      <div key={item.id} className={`flex items-center gap-1.5 ${isLevelA ? 'bg-blue-50 border border-blue-200 rounded p-1' : ''}`}>
+                        {isLevelA && (
+                          <span className="text-blue-600 text-xs font-semibold px-1" title="A 레벨 관리자 전용">A</span>
+                        )}
+                        <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700">
+                          {item.name || '항목명'}
+                        </div>
                         <span className="text-gray-500 text-xs">¥</span>
-                        <input
-                          type="number"
-                          value={formatNumberForInput(item.unit_price)}
-                          onChange={(e) => {
-                            const processedValue = handleNumberInput(e.target.value);
-                            if (processedValue !== e.target.value) {
-                              e.target.value = processedValue;
-                            }
-                            onUpdateLaborCostItemUnitPrice(
-                              item.id,
-                              processedValue === "" ? 0 : parseFloat(processedValue) || 0,
-                            );
-                          }}
-                          step="0.01"
-                          placeholder="단가"
-                          className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
+                        <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                          {item.unit_price.toFixed(2)}
+                        </div>
                         <span className="text-gray-500 text-xs">×</span>
-                        <input
-                          type="number"
-                          value={formatNumberForInput(item.quantity)}
-                          onChange={(e) => {
-                            const processedValue = handleNumberInput(e.target.value);
-                            if (processedValue !== e.target.value) {
-                              e.target.value = processedValue;
-                            }
-                            onUpdateLaborCostItemQuantity(
-                              item.id,
-                              processedValue === "" ? 0 : parseFloat(processedValue) || 0,
-                            );
-                          }}
-                          step="0.01"
-                          placeholder="수량"
-                          className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
+                        <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                          {item.quantity.toFixed(2)}
+                        </div>
                         <span className="text-gray-500 text-xs">=</span>
                         <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
                           ¥{calculatedCost.toFixed(2)}
                         </div>
-                        <button
-                          onClick={() => onRemoveLaborCostItem(item.id)}
-                          className="text-red-500 hover:text-red-700 flex-shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
                       </div>
                     );
                   })}
-                  <button
-                    onClick={() => onAddLaborCostItem(true)}
-                    className="flex items-center gap-1 px-2 py-1.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs w-full justify-center mt-2"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>A 레벨 전용 항목 추가</span>
-                  </button>
                 </div>
               )}
-            </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -703,7 +501,8 @@ export function CostPaymentTab({
                         min="0"
                         max="100"
                         step="1"
-                        className="w-20 px-3 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        disabled={!canWrite}
+                        className={`w-20 px-3 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
                       <span className="text-sm text-gray-600">%</span>
                     </div>
@@ -726,7 +525,8 @@ export function CostPaymentTab({
                     onChange={(e) =>
                       onSetAdvancePaymentDate(e.target.value)
                     }
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    disabled={!canWrite}
+                    className={`px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   />
                 </div>
               </div>
@@ -753,7 +553,8 @@ export function CostPaymentTab({
                     onChange={(e) =>
                       onSetBalancePaymentDate(e.target.value)
                     }
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    disabled={!canWrite}
+                    className={`px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   />
                 </div>
               </div>

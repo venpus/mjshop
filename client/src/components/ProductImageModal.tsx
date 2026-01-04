@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { X, Download, Images } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { X, Download, Images, Upload } from "lucide-react";
 
 interface ProductImageModalProps {
   isOpen: boolean;
@@ -8,6 +8,7 @@ interface ProductImageModalProps {
   poNumber: string;
   onClose: () => void;
   onOpenGallery: () => void;
+  onMainImageUpload?: (file: File) => Promise<void>;
 }
 
 export function ProductImageModal({
@@ -17,7 +18,9 @@ export function ProductImageModal({
   poNumber,
   onClose,
   onOpenGallery,
+  onMainImageUpload,
 }: ProductImageModalProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // ESC 키로 모달 닫기
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -54,6 +57,38 @@ export function ProductImageModal({
     }
   };
 
+  const handleImageChangeClick = () => {
+    if (onMainImageUpload) {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 이미지 파일 검증
+    if (!file.type.startsWith('image/')) {
+      alert('이미지 파일만 업로드할 수 있습니다.');
+      return;
+    }
+
+    if (onMainImageUpload) {
+      try {
+        await onMainImageUpload(file);
+        // 업로드 성공 후 모달 닫기
+        onClose();
+      } catch (error: any) {
+        alert(error.message || '이미지 업로드에 실패했습니다.');
+      }
+    }
+
+    // input 초기화 (같은 파일을 다시 선택할 수 있도록)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   // 고해상도 이미지 URL (Unsplash 이미지 크기 변경)
   const highResImageUrl = imageUrl.replace("w=400", "w=1200");
 
@@ -83,6 +118,16 @@ export function ProductImageModal({
 
         {/* 버튼 그룹 */}
         <div className="absolute -bottom-16 left-0 right-0 flex justify-center gap-3">
+          {onMainImageUpload && (
+            <button
+              onClick={handleImageChangeClick}
+              className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-lg"
+            >
+              <Upload className="w-5 h-5" />
+              <span>이미지 변경</span>
+            </button>
+          )}
+
           <button
             onClick={handleDownloadImage}
             className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-lg"
@@ -102,6 +147,17 @@ export function ProductImageModal({
             <span>사진모아보기</span>
           </button>
         </div>
+
+        {/* 파일 입력 (hidden) */}
+        {onMainImageUpload && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        )}
       </div>
     </div>
   );

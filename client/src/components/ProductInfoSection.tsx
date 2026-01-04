@@ -53,6 +53,9 @@ interface ProductInfoSectionProps {
   onWeightChange?: (value: string) => void;
   onPackagingSizeChange?: (value: string) => void;
   packagingSize?: string;
+  
+  // 사용자 레벨 (C0 레벨에서 발주확인 체크박스와 취소 버튼 숨김용)
+  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
 }
 
 export function ProductInfoSection({
@@ -85,6 +88,7 @@ export function ProductInfoSection({
   onWeightChange,
   onPackagingSizeChange,
   packagingSize,
+  userLevel,
 }: ProductInfoSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -145,7 +149,7 @@ export function ProductInfoSection({
       // 이미지가 있으면 크게 보기
       onImageClick();
     } else if (onMainImageUpload) {
-      // 이미지가 없고 업로드 핸들러가 있으면 파일 선택
+      // 이미지가 없고 업로드 핸들러가 있으면 파일 선택 (새 발주인 경우)
       fileInputRef.current?.click();
     }
   };
@@ -210,32 +214,34 @@ export function ProductInfoSection({
           </button>
         </div>
 
-        {/* 발주 컨펌 체크박스 */}
-        <label
-          className={`flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer transition-all ${
-            isOrderConfirmed
-              ? "bg-green-100 border-2 border-green-500"
-              : "bg-orange-100 border-2 border-orange-500"
-          } ${orderStatus === '취소됨' ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          <input
-            type="checkbox"
-            checked={isOrderConfirmed}
-            onChange={(e) => onOrderConfirmedChange(e.target.checked)}
-            disabled={orderStatus === '취소됨'}
-            className="w-5 h-5 cursor-pointer accent-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-          <span
-            className={`font-semibold ${
-              isOrderConfirmed ? "text-green-800" : "text-orange-800"
-            }`}
+        {/* 발주 컨펌 체크박스 (C0 레벨에서는 숨김) */}
+        {userLevel !== 'C0: 한국Admin' && (
+          <label
+            className={`flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer transition-all ${
+              isOrderConfirmed
+                ? "bg-green-100 border-2 border-green-500"
+                : "bg-orange-100 border-2 border-orange-500"
+            } ${orderStatus === '취소됨' ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            {isOrderConfirmed ? "발주 컨펌" : "발주 컨펌 대기"}
-          </span>
-        </label>
+            <input
+              type="checkbox"
+              checked={isOrderConfirmed}
+              onChange={(e) => onOrderConfirmedChange(e.target.checked)}
+              disabled={orderStatus === '취소됨'}
+              className="w-5 h-5 cursor-pointer accent-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+            <span
+              className={`font-semibold ${
+                isOrderConfirmed ? "text-green-800" : "text-orange-800"
+              }`}
+            >
+              {isOrderConfirmed ? "발주 컨펌" : "발주 컨펌 대기"}
+            </span>
+          </label>
+        )}
         
-        {/* 취소 버튼 */}
-        {orderStatus !== '취소됨' && (
+        {/* 취소 버튼 (C0 레벨에서는 숨김) */}
+        {userLevel !== 'C0: 한국Admin' && orderStatus !== '취소됨' && (
           <button
             onClick={onCancelOrder}
             className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold"
@@ -249,7 +255,7 @@ export function ProductInfoSection({
         <div className="relative">
           <div
             className={`w-32 h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 transition-opacity relative group ${
-              onMainImageUpload ? 'cursor-pointer hover:opacity-90' : productImage ? 'cursor-pointer hover:opacity-90' : ''
+              productImage ? 'cursor-pointer hover:opacity-90' : ''
             }`}
             onClick={handleImageClick}
           >
@@ -263,7 +269,7 @@ export function ProductInfoSection({
                 <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none"></div>
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <span className="text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity bg-black bg-opacity-50 px-2 py-1 rounded">
-                    {onMainImageUpload ? '클릭하여 변경' : '크게 보기'}
+                    크게 보기
                   </span>
                 </div>
               </>
@@ -271,23 +277,23 @@ export function ProductInfoSection({
               <>
                 <Image className="w-12 h-12 text-gray-400" />
                 {onMainImageUpload && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                    <span className="text-xs text-gray-500">이미지 업로드</span>
-                  </div>
+                  <>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                      <span className="text-xs text-gray-500">이미지 업로드</span>
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </>
                 )}
               </>
             )}
           </div>
-          {onMainImageUpload && (
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          )}
         </div>
 
         <div className="flex-1 grid grid-cols-2 gap-6">

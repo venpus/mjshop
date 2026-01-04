@@ -53,10 +53,6 @@ export function PaymentHistory() {
     updateUrlTab(tab);
   };
 
-  // A레벨 관리자만 접근 가능
-  if (user?.level !== 'A-SuperAdmin') {
-    return <Navigate to="/admin/dashboard" replace />;
-  }
 
   const handleStatisticsRefresh = () => {
     setStatisticsRefreshTrigger((prev) => prev + 1);
@@ -70,7 +66,7 @@ export function PaymentHistory() {
       </div>
 
       {/* 통계 카드 */}
-      <PaymentStatisticsCards refreshTrigger={statisticsRefreshTrigger} />
+      <PaymentStatisticsCards refreshTrigger={statisticsRefreshTrigger} userLevel={user?.level} />
 
       {/* 탭 */}
       <div className="border-b border-gray-200 mb-6">
@@ -131,6 +127,7 @@ export function PaymentHistory() {
             // type={activeTab === 'all' ? 'all' : activeTab === 'purchase-orders' ? 'purchase-orders' : 'packing-lists'}
             type={activeTab === 'purchase-orders' ? 'purchase-orders' : 'packing-lists'}
             onStatisticsRefresh={handleStatisticsRefresh}
+            userLevel={user?.level}
           />
         )}
       </div>

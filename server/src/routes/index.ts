@@ -7,6 +7,8 @@ import logisticsOptionsRoutes from './logisticsOptions.js';
 import packingListRoutes from './packingLists.js';
 import projectRoutes from './projects.js';
 import paymentRequestRoutes from './paymentRequests.js';
+import permissionRoutes from './permissions.js';
+import stockOutboundRoutes from './stockOutbound.js';
 
 const router = Router();
 
@@ -19,6 +21,8 @@ router.use('/logistics-options', logisticsOptionsRoutes);
 router.use('/packing-lists', packingListRoutes);
 router.use('/projects', projectRoutes);
 router.use('/payment-requests', paymentRequestRoutes);
+router.use('/permissions', permissionRoutes);
+router.use('/stock-outbound', stockOutboundRoutes);
 
 router.get('/', (req, res) => {
   res.json({ 
