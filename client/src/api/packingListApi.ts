@@ -213,6 +213,35 @@ export async function updatePackingList(id: number, data: UpdatePackingListReque
   return result.data;
 }
 
+/**
+ * A레벨 관리자 비용 지불 완료 상태 업데이트
+ */
+export async function updatePackingListAdminCostPaid(
+  id: number,
+  adminCostPaid: boolean
+): Promise<PackingList> {
+  const response = await fetch(`${API_BASE_URL}/packing-lists/${id}/admin-cost-paid`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ admin_cost_paid: adminCostPaid }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'A레벨 관리자 비용 지불 완료 상태 업데이트에 실패했습니다.');
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'A레벨 관리자 비용 지불 완료 상태 업데이트에 실패했습니다.');
+  }
+
+  return result.data;
+}
+
 // 패킹리스트 삭제
 export async function deletePackingList(id: number): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/packing-lists/${id}`, {

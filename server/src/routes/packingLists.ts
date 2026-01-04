@@ -19,6 +19,9 @@ router.post('/', controller.createPackingList);
 // 패킹리스트 수정
 router.put('/:id', controller.updatePackingList);
 
+// A레벨 관리자 비용 지불 완료 상태 업데이트
+router.put('/:id/admin-cost-paid', controller.updateAdminCostPaid);
+
 // 패킹리스트 삭제
 router.delete('/:id', controller.deletePackingList);
 

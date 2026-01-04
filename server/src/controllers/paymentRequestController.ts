@@ -120,10 +120,18 @@ export class PaymentRequestController {
       const requestedBy = (req as any).user?.id;
 
       // 필수 필드 검증
-      if (!data.source_type || !data.source_id || !data.payment_type || !data.amount) {
+      if (!data.source_type || !data.source_id || !data.payment_type || data.amount === undefined || data.amount === null) {
         return res.status(400).json({
           success: false,
           error: '필수 필드가 누락되었습니다.',
+        });
+      }
+      
+      // amount가 0보다 커야 함
+      if (data.amount <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: '지급 금액은 0보다 커야 합니다.',
         });
       }
 

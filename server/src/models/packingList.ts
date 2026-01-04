@@ -12,6 +12,8 @@ export interface PackingList {
   shipping_cost: number;
   payment_date: Date | null;
   wk_payment_date: Date | null;
+  admin_cost_paid: boolean;
+  admin_cost_paid_date: Date | null;
   created_at: Date;
   updated_at: Date;
   created_by: string | null;
@@ -83,6 +85,8 @@ export interface UpdatePackingListDTO {
   shipping_cost?: number;
   payment_date?: string;
   wk_payment_date?: string;
+  admin_cost_paid?: boolean;
+  admin_cost_paid_date?: string;
   updated_by?: string;
 }
 

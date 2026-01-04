@@ -169,6 +169,53 @@ export class PackingListController {
   };
 
   /**
+   * A레벨 관리자 비용 지불 완료 상태 업데이트
+   * PUT /api/packing-lists/:id/admin-cost-paid
+   */
+  updateAdminCostPaid = async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          error: '올바른 ID 형식이 아닙니다.',
+        });
+      }
+
+      const { admin_cost_paid } = req.body;
+
+      if (typeof admin_cost_paid !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          error: 'admin_cost_paid는 boolean 값이어야 합니다.',
+        });
+      }
+
+      const packingList = await this.service.updateAdminCostPaid(id, admin_cost_paid);
+
+      res.json({
+        success: true,
+        data: packingList,
+        message: 'A레벨 관리자 비용 지불 완료 상태가 업데이트되었습니다.',
+      });
+    } catch (error: any) {
+      console.error('A레벨 관리자 비용 지불 완료 상태 업데이트 오류:', error);
+
+      if (error.message.includes('찾을 수 없습니다')) {
+        return res.status(404).json({
+          success: false,
+          error: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: error.message || 'A레벨 관리자 비용 지불 완료 상태 업데이트 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  /**
    * 패킹리스트 삭제
    * DELETE /api/packing-lists/:id
    */

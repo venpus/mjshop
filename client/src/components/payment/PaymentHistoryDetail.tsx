@@ -7,6 +7,7 @@ import {
   calculateFinalPaymentAmount,
 } from '../../utils/purchaseOrderCalculations';
 import { formatDateKST } from '../../utils/dateUtils';
+import { getFullImageUrl } from '../../api/purchaseOrderApi';
 
 interface PaymentHistoryDetailProps {
   item: PaymentHistoryItem;
@@ -174,50 +175,86 @@ export function PaymentHistoryDetail({ item }: PaymentHistoryDetailProps) {
       <div className="space-y-3">
         <div className="text-sm font-medium text-gray-700 mb-3">패킹리스트 상세 내역</div>
         
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-gray-600">패킹코드:</span>
-            <span className="ml-2 font-medium">{item.packing_code}</span>
-          </div>
-          <div>
-            <span className="text-gray-600">배송비:</span>
-            <span className="ml-2 font-medium">¥{item.pl_shipping_cost?.toLocaleString() || 0}</span>
-          </div>
-        </div>
-
-        <div className="border-t border-gray-200 pt-3 mt-3">
-          <div className="text-sm font-medium text-gray-700 mb-2">배송비 계산</div>
-          <div className="space-y-1 text-sm">
-            {item.weight_ratio && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">비율:</span>
-                <span>{item.weight_ratio}%</span>
+        {/* 배송상품 정보 섹션 */}
+        <div className="border border-gray-200 rounded-lg p-4">
+          <div className="text-sm font-medium text-gray-700 mb-3">배송상품 정보</div>
+          <div className="space-y-4">
+            {item.po_numbers_with_quantities ? (
+              item.po_numbers_with_quantities.split('|').map((poInfo, index) => {
+                const parts = poInfo.split(':');
+                const poNumber = parts[0];
+                const totalQuantity = parts[1]; // 총수량
+                const productName = parts[2] || '';
+                const productImage = parts[3] || '';
+                const entryQuantity = parts[4] || ''; // 입수량
+                const boxCount = parts[5] || ''; // 박스수
+                const unit = parts[6] || '박스'; // 포장 단위
+                
+                return (
+                  <div key={index} className="flex items-start gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    {/* 상품사진 */}
+                    <div className="flex-shrink-0">
+                      {productImage ? (
+                        <img
+                          src={getFullImageUrl(productImage)}
+                          alt={productName || poNumber}
+                          className="w-20 h-20 object-cover rounded border border-gray-200"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent && !parent.querySelector('.image-error')) {
+                              const errorDiv = document.createElement('div');
+                              errorDiv.className = 'image-error w-20 h-20 bg-gray-100 rounded border border-gray-200 flex items-center justify-center text-gray-400 text-xs';
+                              errorDiv.textContent = '이미지 없음';
+                              parent.appendChild(errorDiv);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <div className="w-20 h-20 bg-gray-100 rounded border border-gray-200 flex items-center justify-center text-gray-400 text-xs">
+                          이미지 없음
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* 상품 정보 */}
+                    <div className="flex-1 space-y-1">
+                      <div>
+                        <span className="text-xs text-gray-500">상품명:</span>
+                        <span className="ml-2 text-sm font-medium text-gray-900">{productName || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-500">발주코드:</span>
+                        <span className="ml-2 text-sm font-medium text-gray-900">{poNumber}</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <div>
+                          <span className="text-xs text-gray-500">한박스 입수량:</span>
+                          <span className="ml-2 text-sm text-gray-700">{entryQuantity || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-xs text-gray-500">박스수:</span>
+                          <span className="ml-2 text-sm text-gray-700">{boxCount ? `${boxCount}${unit}` : '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-xs text-gray-500">총수량:</span>
+                          <span className="ml-2 text-sm font-medium text-purple-600">{totalQuantity}개</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : item.po_number ? (
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="text-sm text-gray-600">발주코드: <span className="font-medium">{item.po_number}</span></div>
+              </div>
+            ) : (
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-center text-gray-400">
+                발주 정보가 없습니다.
               </div>
             )}
-            {item.calculated_weight && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">비율 중량:</span>
-                <span>{item.calculated_weight.toFixed(2)}kg</span>
-              </div>
-            )}
-            {item.actual_weight && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">실중량:</span>
-                <span>{item.actual_weight.toFixed(2)}kg</span>
-              </div>
-            )}
-            {item.shipping_cost_difference !== undefined && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">차액:</span>
-                <span className={item.shipping_cost_difference >= 0 ? 'text-red-600' : 'text-blue-600'}>
-                  ¥{item.shipping_cost_difference.toFixed(2)}
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between pt-2 border-t border-gray-200">
-              <span className="text-gray-600">WK 결제일:</span>
-              <span>{item.wk_payment_date ? formatDateKST(item.wk_payment_date) : '미지급'}</span>
-            </div>
           </div>
         </div>
       </div>

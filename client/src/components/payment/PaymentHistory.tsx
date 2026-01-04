@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { FileText, Package, List } from 'lucide-react';
 import { PaymentRequestList } from './PaymentRequestList';
 import { PaymentHistoryTable } from './PaymentHistoryTable';
 import { PaymentStatisticsCards } from './PaymentStatisticsCards';
+import { useAuth } from '../../contexts/AuthContext';
 
 // type TabType = 'all' | 'purchase-orders' | 'packing-lists' | 'requests';
 type TabType = 'purchase-orders' | 'packing-lists' | 'requests';
@@ -11,8 +13,50 @@ type TabType = 'purchase-orders' | 'packing-lists' | 'requests';
  * 결제내역 메인 컴포넌트
  */
 export function PaymentHistory() {
-  const [activeTab, setActiveTab] = useState<TabType>('purchase-orders');
+  const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // URL 쿼리 파라미터에서 탭 정보 읽기
+  const searchParams = new URLSearchParams(location.search);
+  const tabFromUrl = searchParams.get('tab') as TabType | null;
+  const validTabs: TabType[] = ['purchase-orders', 'packing-lists', 'requests'];
+  const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'purchase-orders';
+  
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [statisticsRefreshTrigger, setStatisticsRefreshTrigger] = useState(0);
+
+  // 초기 마운트 시 URL에서 탭 정보 읽기
+  useEffect(() => {
+    const currentTab = searchParams.get('tab') as TabType | null;
+    if (currentTab && validTabs.includes(currentTab)) {
+      setActiveTab(currentTab);
+    } else if (!currentTab) {
+      // URL에 탭 정보가 없으면 기본 탭을 URL에 추가
+      const params = new URLSearchParams(location.search);
+      params.set('tab', 'purchase-orders');
+      navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 초기 마운트 시에만 실행
+
+  // URL에 탭 정보 업데이트
+  const updateUrlTab = (tab: TabType) => {
+    const params = new URLSearchParams(location.search);
+    params.set('tab', tab);
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+  };
+
+  // 탭 변경 핸들러
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    updateUrlTab(tab);
+  };
+
+  // A레벨 관리자만 접근 가능
+  if (user?.level !== 'A-SuperAdmin') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
 
   const handleStatisticsRefresh = () => {
     setStatisticsRefreshTrigger((prev) => prev + 1);
@@ -43,7 +87,7 @@ export function PaymentHistory() {
             전체 보기
           </button> */}
           <button
-            onClick={() => setActiveTab('purchase-orders')}
+            onClick={() => handleTabChange('purchase-orders')}
             className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
               activeTab === 'purchase-orders'
                 ? 'border-purple-500 text-purple-600'
@@ -54,7 +98,7 @@ export function PaymentHistory() {
             발주관리
           </button>
           <button
-            onClick={() => setActiveTab('packing-lists')}
+            onClick={() => handleTabChange('packing-lists')}
             className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
               activeTab === 'packing-lists'
                 ? 'border-purple-500 text-purple-600'
@@ -65,7 +109,7 @@ export function PaymentHistory() {
             패킹리스트
           </button>
           <button
-            onClick={() => setActiveTab('requests')}
+            onClick={() => handleTabChange('requests')}
             className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
               activeTab === 'requests'
                 ? 'border-purple-500 text-purple-600'

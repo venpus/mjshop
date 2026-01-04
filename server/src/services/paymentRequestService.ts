@@ -260,9 +260,17 @@ export class PaymentRequestService {
         });
       }
     } else if (sourceType === 'packing_list') {
-      await this.plRepository.update(parseInt(sourceId), {
-        wk_payment_date: paymentDate,
-      });
+      // 패킹리스트 ID로 패킹리스트 조회하여 코드 가져오기
+      const packingList = await this.plRepository.findById(parseInt(sourceId));
+      if (packingList) {
+        // 같은 코드를 가진 모든 패킹리스트의 wk_payment_date 업데이트
+        await this.plRepository.updateWkPaymentDateByCode(packingList.code, paymentDate);
+      } else {
+        // 패킹리스트를 찾을 수 없는 경우, ID로 직접 업데이트
+        await this.plRepository.update(parseInt(sourceId), {
+          wk_payment_date: paymentDate,
+        });
+      }
     }
   }
 

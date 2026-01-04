@@ -160,18 +160,20 @@ export function Sidebar({
                 <PackageSearch className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
                 {!isCollapsed && <span>{t('menu.packingList')}</span>}
               </button>
-              <button
-                onClick={() => onPageChange("payment-history")}
-                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === "payment-history"
-                    ? "bg-purple-50 text-purple-600"
-                    : "text-gray-600 hover:bg-gray-50"
-                }`}
-                title={isCollapsed ? "결제내역" : undefined}
-              >
-                <FileText className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                {!isCollapsed && <span>결제내역</span>}
-              </button>
+              {user?.level === 'A-SuperAdmin' && (
+                <button
+                  onClick={() => onPageChange("payment-history")}
+                  className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
+                    currentPage === "payment-history"
+                      ? "bg-purple-50 text-purple-600"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                  title={isCollapsed ? "결제내역" : undefined}
+                >
+                  <FileText className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
+                  {!isCollapsed && <span>결제내역</span>}
+                </button>
+              )}
               <button
                 onClick={() => onPageChange("materials")}
                 className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${

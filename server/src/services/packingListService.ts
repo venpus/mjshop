@@ -369,5 +369,36 @@ export class PackingListService {
   async getShippingSummaryByPurchaseOrder(purchaseOrderId: string): Promise<PurchaseOrderShippingSummary | null> {
     return this.repository.getShippingSummaryByPurchaseOrder(purchaseOrderId);
   }
+
+  /**
+   * A레벨 관리자 비용 지불 완료 상태 업데이트
+   */
+  async updateAdminCostPaid(
+    id: number,
+    adminCostPaid: boolean
+  ): Promise<PackingList> {
+    // 패킹리스트 존재 확인
+    const existingPackingList = await this.repository.findById(id);
+    if (!existingPackingList) {
+      throw new Error('패킹리스트를 찾을 수 없습니다.');
+    }
+
+    // 같은 코드를 가진 모든 패킹리스트의 admin_cost_paid와 admin_cost_paid_date 업데이트
+    const { getKSTDateString } = await import('../utils/dateUtils.js');
+    const adminCostPaidDate = adminCostPaid ? getKSTDateString() : null;
+    
+    await this.repository.updateAdminCostPaidByCode(
+      existingPackingList.code,
+      adminCostPaid,
+      adminCostPaidDate
+    );
+
+    // 업데이트된 패킹리스트 반환
+    const updated = await this.repository.findById(id);
+    if (!updated) {
+      throw new Error('패킹리스트를 찾을 수 없습니다.');
+    }
+    return updated;
+  }
 }
 

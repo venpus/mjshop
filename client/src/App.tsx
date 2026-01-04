@@ -217,7 +217,13 @@ function AdminLayout() {
           <Route path="/orders" element={<Orders />} />
           <Route path="/shipping" element={<Shipping />} />
           <Route path="/payment" element={<Payment />} />
-          <Route path="/payment-history" element={<PaymentHistory />} />
+          <Route path="/payment-history" element={
+            (user?.level === 'A-SuperAdmin') ? (
+              <PaymentHistory />
+            ) : (
+              <Navigate to="/admin/dashboard" replace />
+            )
+          } />
           <Route path="/inventory" element={<StockManagement />} />
           <Route path="/purchase-orders" element={
             (user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin' || user?.level === 'B0: 중국Admin') ? (

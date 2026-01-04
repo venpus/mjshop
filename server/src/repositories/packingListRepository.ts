@@ -34,6 +34,8 @@ interface PackingListRow extends RowDataPacket {
   shipping_cost: number;
   payment_date: Date | null;
   wk_payment_date: Date | null;
+  admin_cost_paid: boolean;
+  admin_cost_paid_date: Date | null;
   created_at: Date;
   updated_at: Date;
   created_by: string | null;
@@ -87,7 +89,8 @@ export class PackingListRepository {
     const [rows] = await pool.execute<PackingListRow[]>(
       `SELECT id, code, shipment_date, logistics_company, warehouse_arrival_date,
               actual_weight, weight_ratio, calculated_weight, shipping_cost,
-              payment_date, wk_payment_date, created_at, updated_at, created_by, updated_by
+              payment_date, wk_payment_date, admin_cost_paid, admin_cost_paid_date,
+              created_at, updated_at, created_by, updated_by
        FROM packing_lists
        ORDER BY shipment_date DESC, created_at DESC`
     );
@@ -102,7 +105,8 @@ export class PackingListRepository {
     const [rows] = await pool.execute<PackingListRow[]>(
       `SELECT id, code, shipment_date, logistics_company, warehouse_arrival_date,
               actual_weight, weight_ratio, calculated_weight, shipping_cost,
-              payment_date, wk_payment_date, created_at, updated_at, created_by, updated_by
+              payment_date, wk_payment_date, admin_cost_paid, admin_cost_paid_date,
+              created_at, updated_at, created_by, updated_by
        FROM packing_lists
        WHERE id = ?`,
       [id]
@@ -122,7 +126,8 @@ export class PackingListRepository {
     const [rows] = await pool.execute<PackingListRow[]>(
       `SELECT id, code, shipment_date, logistics_company, warehouse_arrival_date,
               actual_weight, weight_ratio, calculated_weight, shipping_cost,
-              payment_date, wk_payment_date, created_at, updated_at, created_by, updated_by
+              payment_date, wk_payment_date, admin_cost_paid, admin_cost_paid_date,
+              created_at, updated_at, created_by, updated_by
        FROM packing_lists
        WHERE code = ?
        ORDER BY shipment_date DESC, created_at DESC
@@ -138,13 +143,78 @@ export class PackingListRepository {
   }
 
   /**
+   * 코드로 모든 패킹리스트 조회
+   */
+  async findAllByCode(code: string): Promise<PackingList[]> {
+    const [rows] = await pool.execute<PackingListRow[]>(
+      `SELECT id, code, shipment_date, logistics_company, warehouse_arrival_date,
+              actual_weight, weight_ratio, calculated_weight, shipping_cost,
+              payment_date, wk_payment_date, admin_cost_paid, admin_cost_paid_date,
+              created_at, updated_at, created_by, updated_by
+       FROM packing_lists
+       WHERE code = ?
+       ORDER BY shipment_date DESC, created_at DESC`,
+      [code]
+    );
+
+    return rows.map(this.mapRowToPackingList);
+  }
+
+  /**
+   * 코드로 모든 패킹리스트의 wk_payment_date 일괄 업데이트
+   */
+  async updateWkPaymentDateByCode(code: string, wkPaymentDate: string | null): Promise<number> {
+    let wkPaymentDateValue: string | null = null;
+    if (wkPaymentDate) {
+      if (typeof wkPaymentDate === 'string') {
+        wkPaymentDateValue = wkPaymentDate.split('T')[0];
+      } else {
+        wkPaymentDateValue = wkPaymentDate;
+      }
+    }
+
+    const [result] = await pool.execute<ResultSetHeader>(
+      `UPDATE packing_lists 
+       SET wk_payment_date = ?
+       WHERE code = ?`,
+      [wkPaymentDateValue, code]
+    );
+
+    return result.affectedRows;
+  }
+
+  /**
+   * 코드로 모든 패킹리스트의 admin_cost_paid와 admin_cost_paid_date 일괄 업데이트
+   */
+  async updateAdminCostPaidByCode(code: string, adminCostPaid: boolean, adminCostPaidDate: string | null): Promise<number> {
+    let adminCostPaidDateValue: string | null = null;
+    if (adminCostPaidDate) {
+      if (typeof adminCostPaidDate === 'string') {
+        adminCostPaidDateValue = adminCostPaidDate.split('T')[0];
+      } else {
+        adminCostPaidDateValue = adminCostPaidDate;
+      }
+    }
+
+    const [result] = await pool.execute<ResultSetHeader>(
+      `UPDATE packing_lists 
+       SET admin_cost_paid = ?, admin_cost_paid_date = ?
+       WHERE code = ?`,
+      [adminCostPaid ? 1 : 0, adminCostPaidDateValue, code]
+    );
+
+    return result.affectedRows;
+  }
+
+  /**
    * 코드와 날짜로 패킹리스트 조회 (중복 체크용)
    */
   async findByCodeAndDate(code: string, shipmentDate: string): Promise<PackingList | null> {
     const [rows] = await pool.execute<PackingListRow[]>(
       `SELECT id, code, shipment_date, logistics_company, warehouse_arrival_date,
               actual_weight, weight_ratio, calculated_weight, shipping_cost,
-              payment_date, wk_payment_date, created_at, updated_at, created_by, updated_by
+              payment_date, wk_payment_date, admin_cost_paid, admin_cost_paid_date,
+              created_at, updated_at, created_by, updated_by
        FROM packing_lists
        WHERE code = ? AND shipment_date = ?`,
       [code, shipmentDate]
@@ -272,6 +342,23 @@ export class PackingListRepository {
         }
       }
       values.push(wkPaymentDate);
+    }
+    if (data.admin_cost_paid !== undefined) {
+      updates.push('admin_cost_paid = ?');
+      values.push(data.admin_cost_paid ? 1 : 0);
+    }
+    if (data.admin_cost_paid_date !== undefined) {
+      updates.push('admin_cost_paid_date = ?');
+      // 날짜 형식 변환: ISO 8601 형식을 'YYYY-MM-DD' 형식으로 변환
+      let adminCostPaidDate: string | null = null;
+      if (data.admin_cost_paid_date) {
+        if (typeof data.admin_cost_paid_date === 'string') {
+          adminCostPaidDate = data.admin_cost_paid_date.split('T')[0];
+        } else {
+          adminCostPaidDate = data.admin_cost_paid_date;
+        }
+      }
+      values.push(adminCostPaidDate);
     }
     if (data.updated_by !== undefined) {
       updates.push('updated_by = ?');
@@ -1053,6 +1140,8 @@ export class PackingListRepository {
       shipping_cost: row.shipping_cost,
       payment_date: row.payment_date,
       wk_payment_date: row.wk_payment_date,
+      admin_cost_paid: row.admin_cost_paid ? Boolean(row.admin_cost_paid) : false,
+      admin_cost_paid_date: row.admin_cost_paid_date,
       created_at: row.created_at,
       updated_at: row.updated_at,
       created_by: row.created_by,

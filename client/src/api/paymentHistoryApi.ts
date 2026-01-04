@@ -16,7 +16,9 @@ export interface PaymentHistoryItem {
   source_type: 'purchase_order' | 'packing_list';
   source_id: string;
   po_number?: string;
+  po_numbers_with_quantities?: string; // 발주코드:수량 형식 (예: "PO001:10|PO002:5")
   packing_code?: string;
+  logistics_company?: string; // 물류회사
   product_name?: string;
   product_main_image?: string | null; // 상품 사진
   payment_type?: 'advance' | 'balance' | 'shipping'; // 패킹리스트용
@@ -47,6 +49,8 @@ export interface PaymentHistoryItem {
   };
   unit_price?: number;
   back_margin?: number; // 추가단가
+  expected_final_unit_price?: number; // 최종 예상단가 (계산된 값)
+  final_payment_amount?: number; // 발주금액 (계산된 값)
   quantity?: number;
   commission_rate?: number;
   shipping_cost?: number;
@@ -66,6 +70,7 @@ export interface PaymentHistoryItem {
   shipping_cost_difference?: number; // 실중량 배송비 - 비율 배송비 차액
   shipment_date?: string | null; // 발송일 (정렬용)
   pl_created_at?: string | null; // 패킹리스트 생성일 (정렬용)
+  packing_list_ids?: string; // 패킹리스트 ID 목록 (쉼표로 구분)
 }
 
 export interface PaymentHistoryFilter {

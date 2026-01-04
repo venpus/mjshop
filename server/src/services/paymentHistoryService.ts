@@ -163,6 +163,7 @@ export class PaymentHistoryService {
         po.balance_payment_date,
         po.unit_price,
         po.back_margin,
+        po.expected_final_unit_price,
         po.quantity,
         po.commission_rate,
         po.shipping_cost,
@@ -232,6 +233,56 @@ export class PaymentHistoryService {
       const backMarginTotal = backMargin * quantity; // 추가단가 * 수량
       const adminTotalCost = backMarginTotal + adminCostTotal;
 
+      // 옵션 비용과 인건비 합계 계산 (발주관리와 동일: 모든 항목 포함)
+      const [allCostItems] = await pool.execute<RowDataPacket[]>(
+        `SELECT item_type, SUM(cost) as total_cost
+         FROM po_cost_items
+         WHERE purchase_order_id = ?
+         GROUP BY item_type`,
+        [row.id]
+      );
+
+      let totalOptionCost = 0;
+      let totalLaborCost = 0;
+      for (const costItem of allCostItems) {
+        if (costItem.item_type === 'option') {
+          totalOptionCost += Number(costItem.total_cost) || 0;
+        } else if (costItem.item_type === 'labor') {
+          totalLaborCost += Number(costItem.total_cost) || 0;
+        }
+      }
+
+      // 패킹리스트 배송비 계산 (발주관리와 동일: v_purchase_order_packing_shipping_cost 뷰 사용)
+      const [packingListShippingData] = await pool.execute<RowDataPacket[]>(
+        `SELECT purchase_order_id, ordered_quantity, total_shipping_cost, 
+                total_shipped_quantity, unit_shipping_cost
+         FROM v_purchase_order_packing_shipping_cost
+         WHERE purchase_order_id = ?`,
+        [row.id]
+      );
+      
+      let packingListShippingCost = 0;
+      if (packingListShippingData.length > 0 && packingListShippingData[0]) {
+        const unitShippingCost = Number(packingListShippingData[0].unit_shipping_cost) || 0;
+        const orderedQuantity = Number(packingListShippingData[0].ordered_quantity) || 0;
+        
+        // 발주 수량 × 단위당 배송비로 총 배송비 계산 (발주관리와 동일)
+        packingListShippingCost = unitShippingCost * orderedQuantity;
+      }
+
+      // 발주금액 계산 (발주관리 화면과 동일한 방식)
+      const unitPrice = Number(row.unit_price) || 0;
+      const commissionRate = Number(row.commission_rate) || 0;
+      const orderUnitPrice = unitPrice + backMargin; // 발주단가
+      const basicCostTotal = orderUnitPrice * quantity * (1 + commissionRate / 100); // 기본 비용 총액
+      const shippingCostTotal = (Number(row.shipping_cost) || 0) + (Number(row.warehouse_shipping_cost) || 0); // 배송비 총액
+      const finalPaymentAmount = basicCostTotal + shippingCostTotal + totalOptionCost + totalLaborCost; // 발주금액
+
+      // 최종 예상단가 계산 (발주관리 화면과 동일한 방식)
+      const expectedFinalUnitPrice = quantity > 0 
+        ? (finalPaymentAmount + packingListShippingCost) / quantity 
+        : 0;
+
       // 발주별로 하나의 항목으로 통합
       const itemId = String(row.id);
       let item = itemsMap.get(itemId);
@@ -300,6 +351,8 @@ export class PaymentHistoryService {
             : undefined,
           unit_price: Number(row.unit_price),
           back_margin: row.back_margin ? Number(row.back_margin) : undefined,
+          expected_final_unit_price: expectedFinalUnitPrice > 0 ? expectedFinalUnitPrice : undefined,
+          final_payment_amount: finalPaymentAmount > 0 ? finalPaymentAmount : undefined,
           quantity: row.quantity,
           commission_rate: Number(row.commission_rate),
           shipping_cost: Number(row.shipping_cost),
@@ -339,6 +392,7 @@ export class PaymentHistoryService {
     let query = `
       SELECT 
         pl.code,
+        MAX(pl.logistics_company) as logistics_company,
         GROUP_CONCAT(DISTINCT po.po_number ORDER BY po.po_number SEPARATOR ', ') as po_numbers,
         SUM(pl.actual_weight) as total_actual_weight,
         AVG(pl.weight_ratio) as avg_weight_ratio,
@@ -349,6 +403,8 @@ export class PaymentHistoryService {
         MAX(pl.shipment_date) as latest_shipment_date,
         MIN(pl.created_at) as earliest_created_at,
         MAX(pl.created_at) as latest_created_at,
+        MAX(pl.admin_cost_paid) as admin_cost_paid,
+        MAX(pl.admin_cost_paid_date) as admin_cost_paid_date,
         GROUP_CONCAT(DISTINCT pl.id ORDER BY pl.id SEPARATOR ',') as packing_list_ids
       FROM packing_lists pl
       LEFT JOIN packing_list_items pli ON pl.id = pli.packing_list_id
@@ -411,12 +467,14 @@ export class PaymentHistoryService {
         if (filter.status === 'pending' && status !== 'pending') continue;
       }
 
+      // 패킹리스트 ID 목록 가져오기
+      const packingListIds = row.packing_list_ids ? row.packing_list_ids.split(',').map(id => id.trim()) : [];
+
       // 지급요청 정보 조회 (패킹리스트 코드에 속한 모든 패킹리스트 ID에 대해 조회)
       let pendingRequest = null;
       try {
-        const packingListIds = row.packing_list_ids ? row.packing_list_ids.split(',') : [];
         for (const plId of packingListIds) {
-          const requests = await this.prRepository.findBySource('packing_list', plId.trim(), 'shipping');
+          const requests = await this.prRepository.findBySource('packing_list', plId, 'shipping');
           const foundRequest = requests.find((r) => r.status === '요청중');
           if (foundRequest) {
             pendingRequest = foundRequest;
@@ -425,6 +483,79 @@ export class PaymentHistoryService {
         }
       } catch (error) {
         console.error(`패킹리스트 지급요청 조회 오류 (Code: ${row.code}):`, error);
+      }
+
+      // 발주별 상품 정보 및 수량 계산
+      let poNumbersWithQuantities: string | undefined = undefined;
+      const poDetailsMap = new Map<string, { 
+        quantity: number; 
+        product_name: string; 
+        product_main_image: string | null;
+        entry_quantity: string | null;
+        box_count: number;
+        unit: string;
+        total_quantity: number;
+      }>();
+      
+      try {
+        for (const plId of packingListIds) {
+          const [poRows] = await pool.execute<RowDataPacket[]>(
+            `SELECT 
+              po.po_number, 
+              po.product_name, 
+              po.product_main_image,
+              GROUP_CONCAT(DISTINCT pli.entry_quantity ORDER BY pli.id SEPARATOR ' / ') as entry_quantities,
+              SUM(pli.box_count) as total_box_count,
+              GROUP_CONCAT(DISTINCT pli.unit ORDER BY pli.id SEPARATOR ', ') as units,
+              SUM(pli.total_quantity) as total_qty
+             FROM packing_list_items pli
+             INNER JOIN purchase_orders po ON pli.purchase_order_id = po.id
+             WHERE pli.packing_list_id = ?
+             GROUP BY po.po_number, po.product_name, po.product_main_image`,
+            [plId]
+          );
+          
+          for (const poRow of poRows) {
+            const poNumber = poRow.po_number;
+            const qty = Number(poRow.total_qty) || 0;
+            const productName = poRow.product_name || '';
+            const productImage = poRow.product_main_image || null;
+            const entryQuantity = poRow.entry_quantities || null;
+            const boxCount = Number(poRow.total_box_count) || 0;
+            const unit = poRow.units || '박스';
+            
+            const existing = poDetailsMap.get(poNumber);
+            if (existing) {
+              existing.quantity += qty;
+              existing.total_quantity += qty;
+              existing.box_count += boxCount;
+            } else {
+              poDetailsMap.set(poNumber, {
+                quantity: qty,
+                total_quantity: qty,
+                product_name: productName,
+                product_main_image: productImage,
+                entry_quantity: entryQuantity,
+                box_count: boxCount,
+                unit: unit,
+              });
+            }
+          }
+        }
+        
+        if (poDetailsMap.size > 0) {
+          poNumbersWithQuantities = Array.from(poDetailsMap.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([poNumber, details]) => {
+              // 형식: PO001:총수량:상품명:이미지URL:입수량:박스수:포장단위
+              const entryQty = details.entry_quantity || '';
+              const unit = details.unit || '박스';
+              return `${poNumber}:${details.total_quantity}:${details.product_name}:${details.product_main_image || ''}:${entryQty}:${details.box_count}:${unit}`;
+            })
+            .join('|');
+        }
+      } catch (error) {
+        console.error(`발주별 상품 정보 및 수량 계산 오류 (Code: ${row.code}):`, error);
       }
 
       // 배송비 차액 계산 (합계 기준)
@@ -452,7 +583,9 @@ export class PaymentHistoryService {
         source_type: 'packing_list',
         source_id: row.code, // 패킹리스트 코드를 source_id로 사용
         packing_code: row.code,
+        logistics_company: (row as any).logistics_company || undefined, // 물류회사
         po_number: row.po_numbers || undefined, // 발주코드 (여러 개일 수 있음)
+        po_numbers_with_quantities: poNumbersWithQuantities, // 발주코드:수량 형식 (예: "PO001:10|PO002:5")
         payment_type: 'shipping',
         amount: totalShippingCost,
         payment_date: row.latest_payment_date
@@ -466,6 +599,7 @@ export class PaymentHistoryService {
               status: pendingRequest.status,
             }
           : undefined,
+        packing_list_ids: row.packing_list_ids || undefined, // 패킹리스트 ID 목록 (쉼표로 구분)
         pl_shipping_cost: totalShippingCost,
         wk_payment_date: row.latest_payment_date
           ? formatDateToKSTString(row.latest_payment_date)
@@ -479,6 +613,10 @@ export class PaymentHistoryService {
           : null,
         pl_created_at: row.latest_created_at
           ? formatDateToKSTString(row.latest_created_at)
+          : null,
+        admin_cost_paid: row.admin_cost_paid ? Boolean(row.admin_cost_paid) : false,
+        admin_cost_paid_date: row.admin_cost_paid_date
+          ? formatDateToKSTString(row.admin_cost_paid_date)
           : null,
       });
     }

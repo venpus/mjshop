@@ -153,14 +153,17 @@ export function PaymentHistoryTable({ type, onStatisticsRefresh }: PaymentHistor
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       패킹리스트 코드
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      물류회사
+                    </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      실중량
+                      실중량 (kg)
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       비율
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      중량
+                      중량 (kg)
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       배송비
@@ -199,6 +202,15 @@ export function PaymentHistoryTable({ type, onStatisticsRefresh }: PaymentHistor
                       발주코드
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      최종 예상단가
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      발주량
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      총금액
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       선금
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -223,13 +235,13 @@ export function PaymentHistoryTable({ type, onStatisticsRefresh }: PaymentHistor
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={type === 'packing-lists' ? 13 : 11} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={type === 'packing-lists' ? 14 : 14} className="px-4 py-8 text-center text-gray-500">
                     로딩 중...
                   </td>
                 </tr>
               ) : displayData.length === 0 ? (
                 <tr>
-                  <td colSpan={type === 'packing-lists' ? 13 : 11} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={type === 'packing-lists' ? 14 : 14} className="px-4 py-8 text-center text-gray-500">
                     결제 내역이 없습니다.
                   </td>
                 </tr>
