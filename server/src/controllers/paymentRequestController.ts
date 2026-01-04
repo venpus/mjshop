@@ -290,6 +290,7 @@ export class PaymentRequestController {
         start_date: req.query.start_date as string | undefined,
         end_date: req.query.end_date as string | undefined,
         search: req.query.search as string | undefined,
+        include_all_orders: req.query.include_all_orders === 'true', // 월별 통계용: 선금/잔금 조건 없이 모든 발주 포함
       };
 
       const history = await this.historyService.getPaymentHistory(filter);

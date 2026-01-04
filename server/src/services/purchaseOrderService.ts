@@ -136,13 +136,20 @@ export class PurchaseOrderService {
     const poId = await this.repository.generateNextId();
     const poNumber = await this.repository.generateNextPoNumber();
 
+    // order_unit_price 자동 계산 (unit_price + back_margin)
+    const calculatedOrderUnitPrice = (data.unit_price || 0) + (data.back_margin || 0);
+
     // 발주 생성
     const purchaseOrderData: CreatePurchaseOrderDTO = {
       ...data,
+      order_unit_price: calculatedOrderUnitPrice > 0 ? calculatedOrderUnitPrice : undefined,
       created_by: createdBy,
     };
 
     const purchaseOrder = await this.repository.create(purchaseOrderData, poId, poNumber);
+
+    // expected_final_unit_price 계산 및 업데이트 (생성 후 cost_items가 없을 수 있으므로 별도 처리)
+    await this.calculateAndUpdateExpectedFinalUnitPrice(purchaseOrder.id);
 
     return this.enrichPurchaseOrder(purchaseOrder);
   }
@@ -185,15 +192,39 @@ export class PurchaseOrderService {
       }
     }
 
+    // order_unit_price 자동 계산 (unit_price 또는 back_margin이 변경된 경우)
+    let calculatedOrderUnitPrice: number | undefined = undefined;
+    const unitPrice = data.unit_price !== undefined ? data.unit_price : existingPurchaseOrder.unit_price;
+    const backMargin = data.back_margin !== undefined ? data.back_margin : existingPurchaseOrder.back_margin;
+    if (unitPrice !== undefined || backMargin !== undefined) {
+      calculatedOrderUnitPrice = (unitPrice || 0) + (backMargin || 0);
+    }
+
     // 발주 수정
     const updateData: UpdatePurchaseOrderDTO = {
       ...data,
       // payment_status가 명시적으로 전달되지 않은 경우에만 자동 계산된 값 사용
       payment_status: data.payment_status !== undefined ? data.payment_status : calculatedPaymentStatus,
+      // order_unit_price 자동 계산
+      order_unit_price: calculatedOrderUnitPrice !== undefined ? calculatedOrderUnitPrice : data.order_unit_price,
       updated_by: updatedBy,
     };
 
     const purchaseOrder = await this.repository.update(id, updateData);
+
+    // expected_final_unit_price 계산 및 업데이트 (관련 필드가 변경된 경우)
+    const shouldRecalculateExpectedFinalUnitPrice = 
+      data.unit_price !== undefined ||
+      data.back_margin !== undefined ||
+      data.quantity !== undefined ||
+      data.commission_rate !== undefined ||
+      data.shipping_cost !== undefined ||
+      data.warehouse_shipping_cost !== undefined ||
+      calculatedOrderUnitPrice !== undefined;
+
+    if (shouldRecalculateExpectedFinalUnitPrice) {
+      await this.calculateAndUpdateExpectedFinalUnitPrice(id);
+    }
 
     return this.enrichPurchaseOrder(purchaseOrder);
   }
@@ -439,6 +470,73 @@ export class PurchaseOrderService {
   }
 
   /**
+   * expected_final_unit_price 계산 및 업데이트 (public 메서드 - 패킹리스트 서비스에서 호출 가능)
+   */
+  async recalculateExpectedFinalUnitPrice(purchaseOrderId: string): Promise<void> {
+    await this.calculateAndUpdateExpectedFinalUnitPrice(purchaseOrderId);
+  }
+
+  /**
+   * expected_final_unit_price 계산 및 업데이트
+   */
+  private async calculateAndUpdateExpectedFinalUnitPrice(purchaseOrderId: string): Promise<void> {
+    try {
+      const po = await this.repository.findById(purchaseOrderId);
+      if (!po || !po.quantity || po.quantity <= 0) {
+        return;
+      }
+
+      // 옵션 비용과 인건비 합계 계산
+      const costItems = await this.repository.findCostItemsByPoId(purchaseOrderId);
+      const totalOptionCost = costItems
+        .filter(item => item.item_type === 'option')
+        .reduce((sum, item) => sum + item.cost, 0);
+      const totalLaborCost = costItems
+        .filter(item => item.item_type === 'labor')
+        .reduce((sum, item) => sum + item.cost, 0);
+
+      // 발주단가 계산
+      const orderUnitPrice = po.order_unit_price || ((po.unit_price || 0) + (po.back_margin || 0));
+      
+      // 기본 비용 총액 계산
+      const commissionRate = po.commission_rate || 0;
+      const basicCostTotal = orderUnitPrice * po.quantity * (1 + commissionRate / 100);
+      
+      // 배송비 총액
+      const shippingCostTotal = (po.shipping_cost || 0) + (po.warehouse_shipping_cost || 0);
+      
+      // 최종 결제 금액
+      const finalPaymentAmount = basicCostTotal + shippingCostTotal + totalOptionCost + totalLaborCost;
+
+      // 패킹리스트 배송비 계산 (v_purchase_order_packing_shipping_cost 뷰 사용)
+      const [packingListShippingData] = await pool.execute<RowDataPacket[]>(
+        `SELECT purchase_order_id, ordered_quantity, unit_shipping_cost
+         FROM v_purchase_order_packing_shipping_cost
+         WHERE purchase_order_id = ?`,
+        [purchaseOrderId]
+      );
+      
+      let packingListShippingCost = 0;
+      if (packingListShippingData.length > 0 && packingListShippingData[0]) {
+        const unitShippingCost = Number(packingListShippingData[0].unit_shipping_cost) || 0;
+        const orderedQuantity = Number(packingListShippingData[0].ordered_quantity) || 0;
+        packingListShippingCost = unitShippingCost * orderedQuantity;
+      }
+
+      // 최종 예상단가 계산
+      const expectedFinalUnitPrice = (finalPaymentAmount + packingListShippingCost) / po.quantity;
+
+      // DB 업데이트
+      await this.repository.update(purchaseOrderId, {
+        expected_final_unit_price: expectedFinalUnitPrice > 0 ? expectedFinalUnitPrice : undefined,
+      });
+    } catch (error) {
+      console.error(`expected_final_unit_price 계산 오류 (발주 ID: ${purchaseOrderId}):`, error);
+      // 계산 실패해도 발주 생성/수정은 계속 진행
+    }
+  }
+
+  /**
    * PurchaseOrder를 PurchaseOrderPublic으로 변환 (공급업체 및 상품 정보 포함)
    */
   private async enrichPurchaseOrder(po: PurchaseOrder): Promise<PurchaseOrderPublic> {
@@ -498,6 +596,9 @@ export class PurchaseOrderService {
     }
 
     await this.repository.saveCostItems(purchaseOrderId, items, preserveAdminOnlyItems);
+
+    // 비용 항목 저장 후 expected_final_unit_price 재계산
+    await this.calculateAndUpdateExpectedFinalUnitPrice(purchaseOrderId);
   }
 
   /**

@@ -83,6 +83,7 @@ export interface PaymentHistoryFilter {
   start_date?: string;
   end_date?: string;
   search?: string;
+  include_all_orders?: boolean; // 월별 통계용: 선금/잔금 조건 없이 모든 발주 포함
 }
 
 export class PaymentHistoryService {
@@ -178,9 +179,14 @@ export class PaymentHistoryService {
         po.order_date,
         po.created_at
       FROM purchase_orders po
-      WHERE (po.advance_payment_amount > 0 OR po.balance_payment_amount > 0)
+      WHERE 1=1
     `;
     const params: any[] = [];
+
+    // 선금/잔금 조건 (월별 통계용이 아닌 경우에만 적용)
+    if (!filter?.include_all_orders) {
+      query += ` AND (po.advance_payment_amount > 0 OR po.balance_payment_amount > 0)`;
+    }
 
     // 검색어 필터
     if (filter?.search) {
@@ -189,23 +195,15 @@ export class PaymentHistoryService {
       params.push(searchPattern, searchPattern);
     }
 
-    // 기간 필터
+    // 기간 필터 (발주일자 기준)
     if (filter?.start_date) {
-      query += ` AND (
-        po.advance_payment_date >= ? OR 
-        po.balance_payment_date >= ? OR
-        (po.advance_payment_date IS NULL AND po.balance_payment_date IS NULL AND po.order_date >= ?)
-      )`;
-      params.push(filter.start_date, filter.start_date, filter.start_date);
+      query += ` AND po.order_date >= ?`;
+      params.push(filter.start_date);
     }
 
     if (filter?.end_date) {
-      query += ` AND (
-        po.advance_payment_date <= ? OR 
-        po.balance_payment_date <= ? OR
-        (po.advance_payment_date IS NULL AND po.balance_payment_date IS NULL AND po.order_date <= ?)
-      )`;
-      params.push(filter.end_date, filter.end_date, filter.end_date);
+      query += ` AND po.order_date <= ?`;
+      params.push(filter.end_date);
     }
 
     const [rows] = await pool.execute<RowDataPacket[]>(query, params);
@@ -420,42 +418,34 @@ export class PaymentHistoryService {
       GROUP BY pl.code
     `;
     const params: any[] = [];
+    const havingConditions: string[] = [];
 
-    // 검색어 필터
+    // 검색어 필터 (HAVING 절에서 처리)
     if (filter?.search) {
-      query += ' HAVING pl.code LIKE ?';
+      havingConditions.push('pl.code LIKE ?');
       params.push(`%${filter.search}%`);
     }
 
-    // 기간 필터
+    // 기간 필터 (HAVING 절에서 처리)
     if (filter?.start_date) {
-      if (filter?.search) {
-        query += ` AND (
-          MAX(pl.wk_payment_date) >= ? OR
-          (MAX(pl.wk_payment_date) IS NULL AND MAX(pl.shipment_date) >= ?)
-        )`;
-      } else {
-        query += ` HAVING (
-          MAX(pl.wk_payment_date) >= ? OR
-          (MAX(pl.wk_payment_date) IS NULL AND MAX(pl.shipment_date) >= ?)
-        )`;
-      }
+      havingConditions.push(`(
+        MAX(pl.wk_payment_date) >= ? OR
+        (MAX(pl.wk_payment_date) IS NULL AND MAX(pl.shipment_date) >= ?)
+      )`);
       params.push(filter.start_date, filter.start_date);
     }
 
     if (filter?.end_date) {
-      if (filter?.search || filter?.start_date) {
-        query += ` AND (
-          MAX(pl.wk_payment_date) <= ? OR
-          (MAX(pl.wk_payment_date) IS NULL AND MAX(pl.shipment_date) <= ?)
-        )`;
-      } else {
-        query += ` HAVING (
-          MAX(pl.wk_payment_date) <= ? OR
-          (MAX(pl.wk_payment_date) IS NULL AND MAX(pl.shipment_date) <= ?)
-        )`;
-      }
+      havingConditions.push(`(
+        MAX(pl.wk_payment_date) <= ? OR
+        (MAX(pl.wk_payment_date) IS NULL AND MAX(pl.shipment_date) <= ?)
+      )`);
       params.push(filter.end_date, filter.end_date);
+    }
+
+    // HAVING 절 추가
+    if (havingConditions.length > 0) {
+      query += ` HAVING ${havingConditions.join(' AND ')}`;
     }
 
     // 정렬: 최신 발송일 기준

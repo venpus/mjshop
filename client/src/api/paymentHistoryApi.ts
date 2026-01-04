@@ -80,6 +80,7 @@ export interface PaymentHistoryFilter {
   start_date?: string;
   end_date?: string;
   search?: string;
+  include_all_orders?: boolean; // 월별 통계용: 선금/잔금 조건 없이 모든 발주 포함
 }
 
 // 결제내역 조회
@@ -92,6 +93,7 @@ export async function getPaymentHistory(
   if (filter?.start_date) params.append('start_date', filter.start_date);
   if (filter?.end_date) params.append('end_date', filter.end_date);
   if (filter?.search) params.append('search', filter.search);
+  if (filter?.include_all_orders) params.append('include_all_orders', 'true');
   // 캐시 방지를 위한 타임스탬프 추가
   params.append('_t', Date.now().toString());
 

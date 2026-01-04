@@ -1,5 +1,6 @@
 import { PackingListRepository } from '../repositories/packingListRepository.js';
 import { pool } from '../config/database.js';
+import { RowDataPacket } from 'mysql2';
 import {
   PackingList,
   PackingListItem,
@@ -24,6 +25,60 @@ export class PackingListService {
 
   constructor() {
     this.repository = new PackingListRepository();
+  }
+
+  /**
+   * 패킹리스트와 관련된 발주 ID 목록 조회
+   */
+  private async getRelatedPurchaseOrderIds(packingListId: number): Promise<string[]> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT DISTINCT purchase_order_id 
+       FROM packing_list_items 
+       WHERE packing_list_id = ? AND purchase_order_id IS NOT NULL`,
+      [packingListId]
+    );
+    return rows.map(row => String(row.purchase_order_id));
+  }
+
+  /**
+   * 패킹리스트 코드와 관련된 발주 ID 목록 조회
+   */
+  private async getRelatedPurchaseOrderIdsByCode(packingListCode: string): Promise<string[]> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT DISTINCT pli.purchase_order_id 
+       FROM packing_list_items pli
+       INNER JOIN packing_lists pl ON pli.packing_list_id = pl.id
+       WHERE pl.code = ? AND pli.purchase_order_id IS NOT NULL`,
+      [packingListCode]
+    );
+    return rows.map(row => String(row.purchase_order_id));
+  }
+
+  /**
+   * 관련 발주들의 expected_final_unit_price 재계산
+   */
+  private async recalculateRelatedPurchaseOrders(purchaseOrderIds: string[]): Promise<void> {
+    if (purchaseOrderIds.length === 0) {
+      return;
+    }
+
+    try {
+      const { PurchaseOrderService } = await import('./purchaseOrderService.js');
+      const poService = new PurchaseOrderService();
+
+      // 각 발주에 대해 비동기로 재계산 (병렬 처리)
+      await Promise.all(
+        purchaseOrderIds.map(poId => 
+          poService.recalculateExpectedFinalUnitPrice(poId).catch(error => {
+            console.error(`발주 ${poId}의 expected_final_unit_price 재계산 오류:`, error);
+            // 개별 발주 재계산 실패해도 다른 발주는 계속 처리
+          })
+        )
+      );
+    } catch (error) {
+      console.error('관련 발주들의 expected_final_unit_price 재계산 오류:', error);
+      // 재계산 실패해도 패킹리스트 작업은 계속 진행
+    }
   }
 
   /**
@@ -96,7 +151,12 @@ export class PackingListService {
    */
   async createPackingList(data: CreatePackingListDTO): Promise<PackingList> {
     // 중복 체크 제거: 같은 날짜와 코드라도 제품별 수량이 다르면 별도의 패킹리스트로 인식
-    return this.repository.create(data);
+    const packingList = await this.repository.create(data);
+    
+    // 패킹리스트 생성 후 관련 발주들의 expected_final_unit_price 재계산
+    // (아직 아이템이 없을 수 있으므로 아이템 생성 시에도 재계산됨)
+    
+    return packingList;
   }
 
   /**
@@ -108,8 +168,19 @@ export class PackingListService {
       throw new Error('패킹리스트를 찾을 수 없습니다.');
     }
 
+    // 배송비가 변경되는지 확인
+    const shippingCostChanged = data.shipping_cost !== undefined && data.shipping_cost !== existing.shipping_cost;
+
     // 중복 체크 제거: 같은 날짜와 코드라도 제품별 수량이 다르면 별도의 패킹리스트로 인식
-    return this.repository.update(id, data);
+    const updated = await this.repository.update(id, data);
+
+    // 배송비가 변경된 경우 관련 발주들의 expected_final_unit_price 재계산
+    if (shippingCostChanged) {
+      const purchaseOrderIds = await this.getRelatedPurchaseOrderIds(id);
+      await this.recalculateRelatedPurchaseOrders(purchaseOrderIds);
+    }
+
+    return updated;
   }
 
   /**
@@ -121,7 +192,13 @@ export class PackingListService {
       throw new Error('패킹리스트를 찾을 수 없습니다.');
     }
 
+    // 삭제 전에 관련 발주 ID 목록 조회
+    const purchaseOrderIds = await this.getRelatedPurchaseOrderIds(id);
+
     await this.repository.delete(id);
+
+    // 삭제 후 관련 발주들의 expected_final_unit_price 재계산
+    await this.recalculateRelatedPurchaseOrders(purchaseOrderIds);
   }
 
   /**
@@ -181,6 +258,12 @@ export class PackingListService {
         }
 
         await connection.commit();
+        
+        // 아이템 생성 후 관련 발주들의 expected_final_unit_price 재계산
+        if (data.purchase_order_id) {
+          await this.recalculateRelatedPurchaseOrders([data.purchase_order_id]);
+        }
+        
         return item;
       } catch (error) {
         await connection.rollback();
@@ -196,7 +279,14 @@ export class PackingListService {
       throw new Error('공장→물류창고 출고 항목 생성 시 발주 ID가 필요합니다.');
     }
 
-    return this.repository.createItem(data);
+    const item = await this.repository.createItem(data);
+    
+    // 발주가 연결된 경우 관련 발주들의 expected_final_unit_price 재계산
+    if (data.purchase_order_id) {
+      await this.recalculateRelatedPurchaseOrders([data.purchase_order_id]);
+    }
+    
+    return item;
   }
 
   /**
@@ -247,6 +337,13 @@ export class PackingListService {
         const item = await this.repository.updateItemWithConnection(id, data, connection);
 
         await connection.commit();
+        
+        // 아이템 수정 후 관련 발주들의 expected_final_unit_price 재계산
+        const finalPurchaseOrderId = purchaseOrderId || existing.purchase_order_id;
+        if (finalPurchaseOrderId) {
+          await this.recalculateRelatedPurchaseOrders([String(finalPurchaseOrderId)]);
+        }
+        
         return item;
       } catch (error) {
         await connection.rollback();
@@ -257,7 +354,17 @@ export class PackingListService {
     }
 
     // 수량이 변경되지 않거나 발주가 연결되지 않은 경우 기존 로직 사용
-    return this.repository.updateItem(id, data);
+    const item = await this.repository.updateItem(id, data);
+    
+    // 발주가 연결된 경우 관련 발주들의 expected_final_unit_price 재계산
+    const finalPurchaseOrderId = data.purchase_order_id !== undefined 
+      ? data.purchase_order_id 
+      : existing.purchase_order_id;
+    if (finalPurchaseOrderId) {
+      await this.recalculateRelatedPurchaseOrders([String(finalPurchaseOrderId)]);
+    }
+    
+    return item;
   }
 
   /**
@@ -269,7 +376,15 @@ export class PackingListService {
       throw new Error('패킹리스트 아이템을 찾을 수 없습니다.');
     }
 
+    // 삭제 전에 관련 발주 ID 확인
+    const purchaseOrderId = existing.purchase_order_id;
+
     await this.repository.deleteItem(id);
+
+    // 삭제 후 관련 발주들의 expected_final_unit_price 재계산
+    if (purchaseOrderId) {
+      await this.recalculateRelatedPurchaseOrders([String(purchaseOrderId)]);
+    }
   }
 
   /**
