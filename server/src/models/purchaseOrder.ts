@@ -84,6 +84,7 @@ export interface CreatePurchaseOrderDTO {
   product_small_pack_count?: number;
   product_box_count?: number;
   unit_price: number;
+  back_margin?: number | null;
   order_unit_price?: number;
   quantity: number;
   size?: string; // 스냅샷 필드 (유지)
