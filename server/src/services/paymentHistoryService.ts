@@ -19,6 +19,7 @@ export interface PaymentHistoryItem {
   source_type: 'purchase_order' | 'packing_list';
   source_id: string;
   po_number?: string;
+  po_numbers_with_quantities?: string; // 발주코드:수량 형식 (예: "PO001:10|PO002:5")
   packing_code?: string;
   product_name?: string;
   product_main_image?: string | null; // 상품 사진
