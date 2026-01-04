@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { getGroupId } from '../../utils/packingListUtils';
+import { getGroupId, calculateShippingCostByLogisticsCompany } from '../../utils/packingListUtils';
 import type { PackingListItem, DomesticInvoice } from './types';
 import { PackingListHeader } from './PackingListHeader';
 import { PackingListRow } from './PackingListRow';
@@ -93,7 +93,19 @@ export function PackingListTable({
   };
 
   const handleLogisticsCompanyChange = (groupId: string, logisticsCompany: string) => {
-    onItemUpdate(groupId, (item) => ({ ...item, logisticsCompany }));
+    onItemUpdate(groupId, (item) => {
+      const updatedItem = { ...item, logisticsCompany };
+      // 물류회사 변경 시 배송비 자동 계산
+      const calculatedShippingCost = calculateShippingCostByLogisticsCompany(
+        logisticsCompany,
+        item.calculatedWeight,
+        item.actualWeight
+      );
+      if (calculatedShippingCost !== '') {
+        updatedItem.shippingCost = calculatedShippingCost;
+      }
+      return updatedItem;
+    });
   };
 
   const handleWarehouseArrivalDateChange = (groupId: string, date: string) => {
@@ -109,11 +121,39 @@ export function PackingListTable({
   };
 
   const handleActualWeightChange = (groupId: string, actualWeight: string, calculatedWeight: string) => {
-    onItemUpdate(groupId, (item) => ({ ...item, actualWeight, calculatedWeight }));
+    onItemUpdate(groupId, (item) => {
+      const updatedItem = { ...item, actualWeight, calculatedWeight };
+      // 중량 변경 시 배송비 자동 계산 (물류회사가 선택되어 있는 경우)
+      if (item.logisticsCompany && item.logisticsCompany !== '') {
+        const calculatedShippingCost = calculateShippingCostByLogisticsCompany(
+          item.logisticsCompany,
+          calculatedWeight,
+          actualWeight
+        );
+        if (calculatedShippingCost !== '') {
+          updatedItem.shippingCost = calculatedShippingCost;
+        }
+      }
+      return updatedItem;
+    });
   };
 
   const handleWeightRatioChange = (groupId: string, weightRatio: '0%' | '5%' | '10%' | '15%' | '20%' | '', calculatedWeight: string) => {
-    onItemUpdate(groupId, (item) => ({ ...item, weightRatio, calculatedWeight }));
+    onItemUpdate(groupId, (item) => {
+      const updatedItem = { ...item, weightRatio, calculatedWeight };
+      // 비율 변경 시 배송비 자동 계산 (물류회사가 선택되어 있는 경우)
+      if (item.logisticsCompany && item.logisticsCompany !== '') {
+        const calculatedShippingCost = calculateShippingCostByLogisticsCompany(
+          item.logisticsCompany,
+          calculatedWeight,
+          item.actualWeight
+        );
+        if (calculatedShippingCost !== '') {
+          updatedItem.shippingCost = calculatedShippingCost;
+        }
+      }
+      return updatedItem;
+    });
   };
 
   const handleShippingCostChange = (groupId: string, shippingCost: string) => {

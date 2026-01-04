@@ -15,6 +15,60 @@ export function calculateWeight(actualWeight: string, weightRatio: string): stri
 }
 
 /**
+ * 물류회사와 중량을 기반으로 배송비 계산
+ * @param logisticsCompany 물류회사 ('위해-한사장', '광저우-비전', '위해-비전', '정상해운')
+ * @param calculatedWeight 계산된 중량 (우선 사용)
+ * @param actualWeight 실중량 (calculatedWeight가 없을 때 사용)
+ * @returns 계산된 배송비 (문자열, 소수점 두자리)
+ */
+export function calculateShippingCostByLogisticsCompany(
+  logisticsCompany: string,
+  calculatedWeight: string,
+  actualWeight: string
+): string {
+  // 정상해운은 항상 0
+  if (logisticsCompany === '정상해운') {
+    return '0';
+  }
+
+  // 물류회사가 없으면 계산하지 않음
+  if (!logisticsCompany || logisticsCompany === '') {
+    return '';
+  }
+
+  // 중량 우선순위: calculatedWeight > actualWeight
+  const weightStr = calculatedWeight || actualWeight;
+  if (!weightStr) {
+    return '';
+  }
+
+  // 중량 숫자 추출
+  const weightNum = parseFloat(weightStr.replace(/[^0-9.]/g, '')) || 0;
+  if (weightNum <= 0) {
+    return '';
+  }
+
+  // 물류회사별 배송비 계산
+  let shippingCost = 0;
+  switch (logisticsCompany) {
+    case '위해-한사장':
+      shippingCost = weightNum * 30;
+      break;
+    case '광저우-비전':
+      shippingCost = weightNum * 29.8; // 29 + 0.8
+      break;
+    case '위해-비전':
+      shippingCost = weightNum * 29;
+      break;
+    default:
+      return '';
+  }
+
+  // 소수점 두자리까지 반환
+  return shippingCost.toFixed(2);
+}
+
+/**
  * PackingListItem을 PackingListFormData로 변환하는 함수
  */
 export function convertItemToFormData(items: PackingListItem[]): PackingListFormData | null {
