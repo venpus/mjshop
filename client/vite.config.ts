@@ -23,5 +23,12 @@ export default defineConfig({
     },
     // 청크 크기 경고 임계값을 600KB로 증가 (현재 최대 청크가 약 1.2MB이므로)
     chunkSizeWarningLimit: 600,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // 프로덕션 빌드에서 console.log 제거
+        drop_debugger: true, // debugger 제거
+      },
+    },
   },
 })

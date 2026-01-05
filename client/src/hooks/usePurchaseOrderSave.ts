@@ -50,7 +50,7 @@ interface OriginalData {
 interface UsePurchaseOrderSaveProps {
   order: PurchaseOrder | null;
   isSuperAdmin?: boolean; // A 레벨 관리자 여부
-  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin'; // 사용자 레벨
+  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자'; // 사용자 레벨
   orderId: string;
   unitPrice: number;
   backMargin: number;

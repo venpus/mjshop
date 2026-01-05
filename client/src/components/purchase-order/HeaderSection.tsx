@@ -41,7 +41,7 @@ interface HeaderSectionProps {
   onWeightChange?: (value: string) => void;
   onPackagingSizeChange?: (value: string) => void;
   onMainImageUpload?: (file: File) => Promise<void>;
-  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
+  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
 
   // ProgressStatusSection props
   currentFactoryStatus: string;

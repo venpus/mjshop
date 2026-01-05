@@ -1,6 +1,6 @@
 // 관리자 계정 타입 정의
 
-export type AdminLevel = 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
+export type AdminLevel = 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
 
 export interface AdminAccount {
   id: string;

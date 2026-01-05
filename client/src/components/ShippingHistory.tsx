@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { PackageSearch, Plus, Edit, Download, Trash2, Save, Filter, X } from 'lucide-react';
+import { PackageSearch, Plus, Edit, Trash2, Save, Filter, X } from 'lucide-react';
 import { SearchBar } from './ui/search-bar';
 import { PackingListCreateModal, type PackingListFormData } from './PackingListCreateModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,7 +11,8 @@ import { convertItemToFormData, getGroupId } from '../utils/packingListUtils';
 import type { PackingListItem } from './packing-list/types';
 import { LOGISTICS_COMPANIES } from './packing-list/types';
 import {
-  getAllPackingLists, 
+  getAllPackingLists,
+  getPackingListsByMonth,
   createPackingList, 
   updatePackingList, 
   createPackingListItem, 
@@ -33,6 +34,14 @@ export function ShippingHistory() {
   const location = useLocation();
   const { user } = useAuth();
   const isSuperAdmin = user?.level === 'A-SuperAdmin';
+  // D0 레벨 체크 (실제 값은 'D0: 비전 담당자')
+  const isD0Level = user?.level === 'D0: 비전 담당자';
+  // C0 레벨 체크
+  const isC0Level = user?.level === 'C0: 한국Admin';
+  // A레벨, C0 레벨, D0 레벨만 코드 링크 표시
+  const showCodeLink = user?.level === 'A-SuperAdmin' || isC0Level || isD0Level;
+  // C0 레벨, D0 레벨일 때 실중량, 비율, 중량, 배송비, 지급일, WK결제일 숨김
+  const hideSensitiveColumns = isC0Level || isD0Level;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingCodeDate, setEditingCodeDate] = useState<string | null>(null); // code-date 조합
@@ -43,6 +52,18 @@ export function ShippingHistory() {
   const [error, setError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false); // 변경사항이 있는지 여부
   const [isSaving, setIsSaving] = useState(false); // 저장 중인지 여부
+  
+  // 월별 필터 상태
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1;
+  const [selectedYearMonth, setSelectedYearMonth] = useState<string>(
+    `${currentYear}-${currentMonth.toString().padStart(2, '0')}`
+  );
+  const [showAllMonths, setShowAllMonths] = useState<boolean>(false); // 전체 보기 옵션
+  
+  // 선택된 년/월 파싱
+  const [selectedYear, selectedMonth] = selectedYearMonth.split('-').map(Number);
   
   // 검색/필터 상태
   const [inputSearchTerm, setInputSearchTerm] = useState(''); // 입력 필드에 표시되는 검색어
@@ -79,20 +100,29 @@ export function ShippingHistory() {
   } = usePackingListSelection(packingListItems);
 
   // 데이터 로드
-  const loadPackingLists = async () => {
+  const loadPackingLists = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      console.log('[비율 로드] 패킹리스트 로드 시작');
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+      
+      console.log('[ShippingHistory] 데이터 로드 시작 - 사용자 레벨:', user?.level);
+      console.log('[ShippingHistory] 조회 조건 - yearMonth:', selectedYearMonth, 'showAllMonths:', showAllMonths);
+      
+      // 월별 조회 또는 전체 조회
+      const packingListsPromise = showAllMonths
+        ? getAllPackingLists()
+        : getPackingListsByMonth(selectedYear, selectedMonth);
       
       // 패킹리스트와 발주 목록을 병렬로 로드
       const [serverData, purchaseOrdersResponse] = await Promise.all([
-        getAllPackingLists(),
+        packingListsPromise,
         fetch(`${API_BASE_URL}/purchase-orders`, {
           credentials: 'include',
         }),
       ]);
+      
+      console.log('[ShippingHistory] 패킹리스트 데이터 로드 완료:', Array.isArray(serverData) ? `${serverData.length}개` : '데이터 없음');
       
       // 발주 목록 파싱
       let purchaseOrders: Array<{ id: string; product_main_image: string | null }> = [];
@@ -104,50 +134,58 @@ export function ShippingHistory() {
             product_main_image: po.product_main_image || null,
           }));
         }
+      } else {
+        console.warn('[ShippingHistory] 발주 목록 로드 실패:', purchaseOrdersResponse.status);
       }
       
-      console.log('[비율 로드] 서버에서 받은 데이터 (발송일 순서):', 
-        serverData.map(pl => `ID:${pl.id} Code:${pl.code} Date:${pl.shipment_date}`).join(', ')
-      );
       const transformedItems = transformServerToClient(serverData, purchaseOrders);
-      console.log('[비율 로드] 변환 후 정렬 확인 (발송일 순서):', 
-        transformedItems.map(item => `ID:${item.id} Code:${item.code} Date:${item.date}`).join(', ')
-      );
+      console.log('[ShippingHistory] 변환된 아이템 수:', transformedItems.length);
       setPackingListItems(transformedItems);
       setOriginalPackingListItems(JSON.parse(JSON.stringify(transformedItems))); // 깊은 복사로 원본 저장
       setIsDirty(false); // 로드 후 변경사항 없음
     } catch (err: any) {
-      console.error('패킹리스트 로드 오류:', err);
+      console.error('[ShippingHistory] 패킹리스트 로드 오류:', err);
+      console.error('[ShippingHistory] 오류 상세:', {
+        message: err.message,
+        stack: err.stack,
+        userLevel: user?.level,
+      });
       setError(err.message || '패킹리스트를 불러오는 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedYearMonth, showAllMonths, user?.level]);
 
   useEffect(() => {
     loadPackingLists();
-  }, []);
+  }, [loadPackingLists]);
 
   // 필터 옵션 동적 추출
   const filterOptions = useMemo(() => {
     const logisticsCompaniesSet = new Set<string>();
     
-    // 먼저 정의된 모든 물류회사 추가
-    LOGISTICS_COMPANIES.forEach(company => {
-      logisticsCompaniesSet.add(company);
-    });
-    
-    // 실제 데이터에서도 물류회사 추가 (정의되지 않은 것도 포함하기 위해)
-    packingListItems.forEach(item => {
-      if (item.isFirstRow && item.logisticsCompany) {
-        logisticsCompaniesSet.add(item.logisticsCompany);
-      }
-    });
+    // D0 레벨 관리자는 "광저우-비전"과 "위해-비전"만 필터 옵션에 표시
+    if (isD0Level) {
+      logisticsCompaniesSet.add('광저우-비전');
+      logisticsCompaniesSet.add('위해-비전');
+    } else {
+      // 먼저 정의된 모든 물류회사 추가
+      LOGISTICS_COMPANIES.forEach(company => {
+        logisticsCompaniesSet.add(company);
+      });
+      
+      // 실제 데이터에서도 물류회사 추가 (정의되지 않은 것도 포함하기 위해)
+      packingListItems.forEach(item => {
+        if (item.isFirstRow && item.logisticsCompany) {
+          logisticsCompaniesSet.add(item.logisticsCompany);
+        }
+      });
+    }
     
     return {
       logisticsCompanies: Array.from(logisticsCompaniesSet).sort(),
     };
-  }, [packingListItems]);
+  }, [packingListItems, user]);
 
   // 검색 실행 핸들러 (엔터키 또는 검색 버튼 클릭 시)
   const handleSearch = () => {
@@ -215,6 +253,40 @@ export function ShippingHistory() {
   const filteredPackingListItems = useMemo(() => {
     let filtered = packingListItems;
 
+    // D0 레벨 관리자는 물류회사가 "광저우-비전" 또는 "위해-비전"인 목록만 표시
+    if (isD0Level) {
+      const filteredGroupIds = new Set<string>();
+      
+      // 그룹별로 분류하여 물류회사 확인
+      const groupMap = new Map<string, PackingListItem[]>();
+      packingListItems.forEach(item => {
+        const groupId = getGroupId(item.id);
+        if (!groupMap.has(groupId)) {
+          groupMap.set(groupId, []);
+        }
+        groupMap.get(groupId)!.push(item);
+      });
+      
+      groupMap.forEach((items, groupId) => {
+        // 그룹의 첫 번째 아이템에서 물류회사 가져오기
+        const firstItem = items.find(item => item.isFirstRow);
+        if (!firstItem) return;
+        
+        // 물류회사가 "광저우-비전" 또는 "위해-비전"인 경우만 포함
+        // 물류회사가 null, undefined, 빈 문자열인 경우는 제외
+        const logisticsCompany = firstItem.logisticsCompany?.trim();
+        if (logisticsCompany === '광저우-비전' || logisticsCompany === '위해-비전') {
+          filteredGroupIds.add(groupId);
+        }
+      });
+      
+      // 필터링된 그룹에 속한 아이템만 포함
+      filtered = filtered.filter(item => {
+        const groupId = getGroupId(item.id);
+        return filteredGroupIds.has(groupId);
+      });
+    }
+
     // 검색어 필터
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
@@ -229,8 +301,8 @@ export function ShippingHistory() {
       });
     }
 
-    // 물류회사 필터
-    if (filters.logisticsCompanies.length > 0) {
+    // 물류회사 필터 (D0 레벨이 아닐 때만 적용)
+    if (!isD0Level && filters.logisticsCompanies.length > 0) {
       filtered = filtered.filter(item => {
         if (!item.isFirstRow) return true; // 첫 번째 행만 체크
         return item.logisticsCompany ? filters.logisticsCompanies.includes(item.logisticsCompany) : false;
@@ -341,11 +413,26 @@ export function ShippingHistory() {
     }
 
     return filtered;
-  }, [packingListItems, searchTerm, filters]);
+  }, [packingListItems, searchTerm, filters, user]);
+
+  // 코드 클릭 시 패킹리스트 상세 화면으로 이동하는 핸들러
+  const handleCodeClick = (code: string, date: string) => {
+    // code와 date로 패킹리스트 ID 찾기
+    const codeDateKey = `${code}-${date}`;
+    const packingListId = getPackingListIdFromCode(packingListItems, codeDateKey);
+    
+    if (!packingListId) {
+      alert('패킹리스트를 찾을 수 없습니다.');
+      return;
+    }
+    
+    // 패킹리스트 상세 화면으로 이동 (변경사항 확인)
+    safeNavigate(`/admin/packing-lists/${packingListId}`);
+  };
 
   const handleProductNameClick = (purchaseOrderId?: string) => {
     if (purchaseOrderId) {
-      navigate(`/admin/purchase-orders/${purchaseOrderId}`);
+      safeNavigate(`/admin/purchase-orders/${purchaseOrderId}`);
     }
   };
 
@@ -462,6 +549,36 @@ export function ShippingHistory() {
       checkForChanges();
     }
   }, [packingListItems, originalPackingListItems, checkForChanges]);
+
+  // 브라우저 닫기/새로고침 시 변경사항 경고
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = ''; // Chrome에서 메시지 표시를 위해 필요
+        return ''; // 일부 브라우저에서 필요
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty]);
+
+  // 안전한 네비게이션 함수 (변경사항이 있을 때 확인)
+  const safeNavigate = useCallback((path: string) => {
+    if (isDirty) {
+      const confirmed = window.confirm(
+        '저장하지 않은 변경사항이 있습니다. 정말로 이동하시겠습니까?\n\n변경사항은 저장되지 않습니다.'
+      );
+      if (!confirmed) {
+        return false; // 이동 취소
+      }
+    }
+    navigate(path);
+    return true;
+  }, [isDirty, navigate]);
 
   // 내륙송장 변경 핸들러 (로컬 상태만 업데이트, 저장은 저장 버튼으로)
   const handleDomesticInvoiceChange = useCallback((groupId: string, invoices: import('./packing-list/types').DomesticInvoice[]) => {
@@ -621,8 +738,6 @@ export function ShippingHistory() {
         return isGroupChanged(groupId, packingListItems, originalPackingListItems);
       });
 
-      console.log(`[저장] 변경된 그룹 수: ${changedGroups.length} / 전체 그룹 수: ${groupMap.size}`);
-
       // 변경된 그룹만 저장
       for (const [groupId, items] of changedGroups) {
         const firstItem = items.find(item => item.isFirstRow);
@@ -644,23 +759,18 @@ export function ShippingHistory() {
 
         // 패킹리스트 메인 필드 업데이트
         // weight_ratio 처리: 빈 문자열이면 null, 그 외에는 숫자로 변환
-        console.log('[비율 저장] firstItem.weightRatio:', firstItem.weightRatio, 'packingListId:', packingListId);
         let weightRatioValue: number | null | undefined = undefined;
         if (firstItem.weightRatio === '') {
           weightRatioValue = null;
-          console.log('[비율 저장] 빈 문자열 → null');
         } else if (firstItem.weightRatio) {
           const numericValue = parseFloat(firstItem.weightRatio.replace('%', ''));
           weightRatioValue = isNaN(numericValue) ? null : numericValue;
-          console.log('[비율 저장] 변환:', firstItem.weightRatio, '→', numericValue, '→', weightRatioValue);
         }
         // weight_ratio는 항상 업데이트해야 하므로 undefined가 아닌 값을 보장
         // undefined면 null로 설정하여 명시적으로 null로 업데이트
         if (weightRatioValue === undefined) {
           weightRatioValue = null;
-          console.log('[비율 저장] undefined → null로 설정');
         }
-        console.log('[비율 저장] 서버에 전송할 값:', weightRatioValue);
         
         await updatePackingList(packingListId, {
           logistics_company: firstItem.logisticsCompany || undefined,
@@ -672,8 +782,6 @@ export function ShippingHistory() {
           payment_date: firstItem.paymentDate || undefined,
           wk_payment_date: firstItem.wkPaymentDate || undefined,
         });
-        
-        console.log('[비율 저장] 서버 업데이트 완료');
 
         // 내륙송장 업데이트
         const currentPackingList = await getPackingListById(packingListId);
@@ -770,6 +878,8 @@ export function ShippingHistory() {
     }
   }, [isDirty, packingListItems, originalPackingListItems, isGroupChanged, loadPackingLists]);
 
+
+
   return (
     <div className="p-8 overflow-x-auto">
       <div className="mb-6">
@@ -825,16 +935,6 @@ export function ShippingHistory() {
                   수정하기
                 </button>
                 <button
-                  onClick={() => {
-                    // TODO: 내보내기 기능 구현
-                    alert(`${selectedKeys.size}개의 항목을 내보냅니다.`);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  내보내기
-                </button>
-                <button
                   onClick={handleDeletePackingLists}
                   className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 >
@@ -843,13 +943,15 @@ export function ShippingHistory() {
                 </button>
               </>
             )}
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              패킹 리스트 생성
-            </button>
+            {!isD0Level && (
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                패킹 리스트 생성
+              </button>
+            )}
             <button
               onClick={handleSave}
               disabled={!isDirty || isSaving}
@@ -869,7 +971,7 @@ export function ShippingHistory() {
 
       {/* 검색 및 필터 */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-1">
           <SearchBar
             value={inputSearchTerm}
             onChange={handleSearchInputChange}
@@ -883,23 +985,75 @@ export function ShippingHistory() {
             검색
           </button>
           
+          {/* 월별 필터 */}
+          <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 bg-white">
+            <label className="text-sm text-gray-600 whitespace-nowrap">기간:</label>
+            {showAllMonths ? (
+              <button
+                onClick={() => setShowAllMonths(false)}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                전체 보기
+              </button>
+            ) : (
+              <>
+                <select
+                  value={selectedYearMonth}
+                  onChange={(e) => {
+                    setSelectedYearMonth(e.target.value);
+                    setShowAllMonths(false);
+                  }}
+                  className="border-0 focus:outline-none focus:ring-0 text-sm font-medium cursor-pointer min-w-[130px]"
+                >
+                  {(() => {
+                    const options: Array<{ value: string; label: string }> = [];
+                    
+                    // 최근 5년간의 모든 월 생성 (최신순)
+                    for (let yearOffset = 0; yearOffset < 5; yearOffset++) {
+                      const year = currentYear - yearOffset;
+                      const maxMonth = year === currentYear ? currentMonth : 12;
+                      
+                      for (let month = maxMonth; month >= 1; month--) {
+                        const yearMonth = `${year}-${month.toString().padStart(2, '0')}`;
+                        const displayText = `${year}년${month}월`;
+                        options.push({ value: yearMonth, label: displayText });
+                      }
+                    }
+                    
+                    return options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ));
+                  })()}
+                </select>
+                <button
+                  onClick={() => setShowAllMonths(true)}
+                  className="text-xs text-gray-500 hover:text-gray-700 ml-2 whitespace-nowrap"
+                >
+                  전체 보기
+                </button>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex gap-2">
-          <div className="relative">
-            <button
-              onClick={() => setIsFilterOpen(!isFilterOpen)}
-              className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
-                activeFilterCount > 0
-                  ? 'border-purple-600 bg-purple-50 text-purple-700'
-                  : 'border-gray-300 bg-white hover:bg-gray-50'
-              }`}
-            >
-              <Filter className="w-5 h-5" />
-              <span>필터{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</span>
-            </button>
-                
-            {/* Filter Dropdown Panel */}
-            {isFilterOpen && (
+        {!isD0Level && (
+          <div className="flex gap-2">
+            <div className="relative">
+              <button
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+                  activeFilterCount > 0
+                    ? 'border-purple-600 bg-purple-50 text-purple-700'
+                    : 'border-gray-300 bg-white hover:bg-gray-50'
+                }`}
+              >
+                <Filter className="w-5 h-5" />
+                <span>필터{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</span>
+              </button>
+                    
+              {/* Filter Dropdown Panel */}
+              {isFilterOpen && (
               <div className="absolute top-full left-0 mt-2 w-[600px] bg-white rounded-lg shadow-xl border border-gray-200 z-50">
                 <div className="p-3">
                   <div className="flex items-center justify-between mb-3">
@@ -991,14 +1145,16 @@ export function ShippingHistory() {
                   </div>
                 </div>
               </div>
-            )}
+              )}
+            </div>
+            
           </div>
-          <span className="text-red-600 text-sm whitespace-nowrap">
-            (Shift + 마우스 스크롤로 좌우 이동이 가능합니다)
-          </span>
-        </div>
+        )}
+        <span className="text-red-600 text-sm whitespace-nowrap">
+              (Shift + 마우스 스크롤로 좌우 이동이 가능합니다)
+            </span>
       </div>
-
+            
       {/* 패킹 리스트 생성 모달 */}
       <PackingListCreateModal
         isOpen={isCreateModalOpen}
@@ -1078,6 +1234,9 @@ export function ShippingHistory() {
               onKoreaArrivalChange={handleKoreaArrivalChange}
               onProductNameClick={handleProductNameClick}
               onImageClick={setSelectedInvoiceImage}
+              showCodeLink={showCodeLink}
+              onCodeClick={handleCodeClick}
+              hideSensitiveColumns={hideSensitiveColumns}
             />
           )}
         </>

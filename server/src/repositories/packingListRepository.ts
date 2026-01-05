@@ -19,6 +19,9 @@ import {
   DomesticInvoiceWithImages,
   PurchaseOrderShippingCost,
   PurchaseOrderShippingSummary,
+  OverseasInvoice,
+  CreateOverseasInvoiceDTO,
+  UpdateOverseasInvoiceDTO,
 } from '../models/packingList.js';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
@@ -34,12 +37,23 @@ interface PackingListRow extends RowDataPacket {
   shipping_cost: number;
   payment_date: Date | null;
   wk_payment_date: Date | null;
+  repackaging_requirements: string | null;
   admin_cost_paid: boolean;
   admin_cost_paid_date: Date | null;
   created_at: Date;
   updated_at: Date;
   created_by: string | null;
   updated_by: string | null;
+}
+
+interface OverseasInvoiceRow extends RowDataPacket {
+  id: number;
+  packing_list_id: number;
+  invoice_number: string;
+  status: string;
+  inspection_quantity: number;
+  created_at: Date;
+  updated_at: Date;
 }
 
 interface PackingListItemRow extends RowDataPacket {
@@ -89,10 +103,28 @@ export class PackingListRepository {
     const [rows] = await pool.execute<PackingListRow[]>(
       `SELECT id, code, shipment_date, logistics_company, warehouse_arrival_date,
               actual_weight, weight_ratio, calculated_weight, shipping_cost,
-              payment_date, wk_payment_date, admin_cost_paid, admin_cost_paid_date,
+              payment_date, wk_payment_date, repackaging_requirements, admin_cost_paid, admin_cost_paid_date,
               created_at, updated_at, created_by, updated_by
        FROM packing_lists
        ORDER BY shipment_date DESC, created_at DESC`
+    );
+
+    return rows.map(this.mapRowToPackingList);
+  }
+
+  /**
+   * 월별 패킹리스트 조회
+   */
+  async findByMonth(year: number, month: number): Promise<PackingList[]> {
+    const [rows] = await pool.execute<PackingListRow[]>(
+      `SELECT id, code, shipment_date, logistics_company, warehouse_arrival_date,
+              actual_weight, weight_ratio, calculated_weight, shipping_cost,
+              payment_date, wk_payment_date, repackaging_requirements, admin_cost_paid, admin_cost_paid_date,
+              created_at, updated_at, created_by, updated_by
+       FROM packing_lists
+       WHERE YEAR(shipment_date) = ? AND MONTH(shipment_date) = ?
+       ORDER BY shipment_date DESC, created_at DESC`,
+      [year, month]
     );
 
     return rows.map(this.mapRowToPackingList);
@@ -105,7 +137,7 @@ export class PackingListRepository {
     const [rows] = await pool.execute<PackingListRow[]>(
       `SELECT id, code, shipment_date, logistics_company, warehouse_arrival_date,
               actual_weight, weight_ratio, calculated_weight, shipping_cost,
-              payment_date, wk_payment_date, admin_cost_paid, admin_cost_paid_date,
+              payment_date, wk_payment_date, repackaging_requirements, admin_cost_paid, admin_cost_paid_date,
               created_at, updated_at, created_by, updated_by
        FROM packing_lists
        WHERE id = ?`,
@@ -126,7 +158,7 @@ export class PackingListRepository {
     const [rows] = await pool.execute<PackingListRow[]>(
       `SELECT id, code, shipment_date, logistics_company, warehouse_arrival_date,
               actual_weight, weight_ratio, calculated_weight, shipping_cost,
-              payment_date, wk_payment_date, admin_cost_paid, admin_cost_paid_date,
+              payment_date, wk_payment_date, repackaging_requirements, admin_cost_paid, admin_cost_paid_date,
               created_at, updated_at, created_by, updated_by
        FROM packing_lists
        WHERE code = ?
@@ -149,7 +181,7 @@ export class PackingListRepository {
     const [rows] = await pool.execute<PackingListRow[]>(
       `SELECT id, code, shipment_date, logistics_company, warehouse_arrival_date,
               actual_weight, weight_ratio, calculated_weight, shipping_cost,
-              payment_date, wk_payment_date, admin_cost_paid, admin_cost_paid_date,
+              payment_date, wk_payment_date, repackaging_requirements, admin_cost_paid, admin_cost_paid_date,
               created_at, updated_at, created_by, updated_by
        FROM packing_lists
        WHERE code = ?
@@ -765,9 +797,13 @@ export class PackingListRepository {
       })
     );
 
+    // 해외송장 조회
+    const overseasInvoices = await this.findOverseasInvoicesByPackingListId(id);
+
     return {
       ...packingList,
       items: itemsWithDetails,
+      overseas_invoices: overseasInvoices,
     };
   }
 
@@ -1125,6 +1161,137 @@ export class PackingListRepository {
     return rows[0] as PurchaseOrderShippingSummary;
   }
 
+  /**
+   * 패킹리스트의 해외송장 조회
+   */
+  async findOverseasInvoicesByPackingListId(packingListId: number): Promise<OverseasInvoice[]> {
+    const [rows] = await pool.execute<OverseasInvoiceRow[]>(
+      `SELECT id, packing_list_id, invoice_number, status, inspection_quantity, created_at, updated_at
+       FROM packing_list_overseas_invoices
+       WHERE packing_list_id = ?
+       ORDER BY id ASC`,
+      [packingListId]
+    );
+
+    return rows.map(this.mapRowToOverseasInvoice);
+  }
+
+  /**
+   * 해외송장 생성
+   */
+  async createOverseasInvoice(data: CreateOverseasInvoiceDTO): Promise<OverseasInvoice> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      `INSERT INTO packing_list_overseas_invoices (packing_list_id, invoice_number, status, inspection_quantity)
+       VALUES (?, ?, ?, ?)`,
+      [
+        data.packing_list_id,
+        data.invoice_number,
+        data.status || '출발대기',
+        data.inspection_quantity || 0,
+      ]
+    );
+
+    const invoice = await this.findOverseasInvoiceById(result.insertId);
+    if (!invoice) {
+      throw new Error('해외송장 생성 후 조회에 실패했습니다.');
+    }
+    return invoice;
+  }
+
+  /**
+   * 해외송장 ID로 조회
+   */
+  async findOverseasInvoiceById(id: number): Promise<OverseasInvoice | null> {
+    const [rows] = await pool.execute<OverseasInvoiceRow[]>(
+      `SELECT id, packing_list_id, invoice_number, status, inspection_quantity, created_at, updated_at
+       FROM packing_list_overseas_invoices
+       WHERE id = ?`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    return this.mapRowToOverseasInvoice(rows[0]);
+  }
+
+  /**
+   * 해외송장 수정
+   */
+  async updateOverseasInvoice(id: number, data: UpdateOverseasInvoiceDTO): Promise<OverseasInvoice> {
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (data.invoice_number !== undefined) {
+      updates.push('invoice_number = ?');
+      values.push(data.invoice_number);
+    }
+    if (data.status !== undefined) {
+      updates.push('status = ?');
+      values.push(data.status);
+    }
+    if (data.inspection_quantity !== undefined) {
+      updates.push('inspection_quantity = ?');
+      values.push(data.inspection_quantity);
+    }
+
+    if (updates.length === 0) {
+      const invoice = await this.findOverseasInvoiceById(id);
+      if (!invoice) {
+        throw new Error('해외송장을 찾을 수 없습니다.');
+      }
+      return invoice;
+    }
+
+    values.push(id);
+
+    await pool.execute<ResultSetHeader>(
+      `UPDATE packing_list_overseas_invoices
+       SET ${updates.join(', ')}
+       WHERE id = ?`,
+      values
+    );
+
+    const invoice = await this.findOverseasInvoiceById(id);
+    if (!invoice) {
+      throw new Error('해외송장 수정 후 조회에 실패했습니다.');
+    }
+    return invoice;
+  }
+
+  /**
+   * 해외송장 삭제
+   */
+  async deleteOverseasInvoice(id: number): Promise<void> {
+    await pool.execute(
+      'DELETE FROM packing_list_overseas_invoices WHERE id = ?',
+      [id]
+    );
+  }
+
+  /**
+   * 패킹리스트의 모든 해외송장 삭제
+   */
+  async deleteOverseasInvoicesByPackingListId(packingListId: number): Promise<void> {
+    await pool.execute(
+      'DELETE FROM packing_list_overseas_invoices WHERE packing_list_id = ?',
+      [packingListId]
+    );
+  }
+
+  /**
+   * 재포장 요구사항 업데이트
+   */
+  async updateRepackagingRequirements(packingListId: number, repackagingRequirements: string | null): Promise<void> {
+    await pool.execute<ResultSetHeader>(
+      `UPDATE packing_lists
+       SET repackaging_requirements = ?
+       WHERE id = ?`,
+      [repackagingRequirements, packingListId]
+    );
+  }
+
   // 매핑 함수들
   private mapRowToPackingList(row: PackingListRow): PackingList {
     console.log('[비율 로드 - 서버] mapRowToPackingList, row.weight_ratio:', row.weight_ratio, 'packingListId:', row.id);
@@ -1140,12 +1307,25 @@ export class PackingListRepository {
       shipping_cost: row.shipping_cost,
       payment_date: row.payment_date,
       wk_payment_date: row.wk_payment_date,
+      repackaging_requirements: row.repackaging_requirements,
       admin_cost_paid: row.admin_cost_paid ? Boolean(row.admin_cost_paid) : false,
       admin_cost_paid_date: row.admin_cost_paid_date,
       created_at: row.created_at,
       updated_at: row.updated_at,
       created_by: row.created_by,
       updated_by: row.updated_by,
+    };
+  }
+
+  private mapRowToOverseasInvoice(row: OverseasInvoiceRow): OverseasInvoice {
+    return {
+      id: row.id,
+      packing_list_id: row.packing_list_id,
+      invoice_number: row.invoice_number,
+      status: row.status as '출발대기' | '배송중' | '도착완료',
+      inspection_quantity: row.inspection_quantity,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
     };
   }
 

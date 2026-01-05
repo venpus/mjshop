@@ -22,6 +22,12 @@ router.put('/:id', controller.updatePackingList);
 // A레벨 관리자 비용 지불 완료 상태 업데이트
 router.put('/:id/admin-cost-paid', controller.updateAdminCostPaid);
 
+// 재포장 요구사항 업데이트
+router.put('/:id/repackaging-requirements', controller.updateRepackagingRequirements);
+
+// 해외송장 일괄 저장/업데이트
+router.put('/:id/overseas-invoices', controller.saveOverseasInvoices);
+
 // 패킹리스트 삭제
 router.delete('/:id', controller.deletePackingList);
 

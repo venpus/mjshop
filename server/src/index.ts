@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
+import { logger } from './utils/logger.js';
 
 // 환경 변수 로드
 dotenv.config();
@@ -31,14 +32,14 @@ app.use(express.urlencoded({ extended: true })); // URL 인코딩된 본문 파�
 // 정적 파일 서빙 (업로드된 이미지)
 // index.ts는 src/index.ts에 있으므로, ../uploads는 server/uploads를 가리킴
 const uploadsPath = path.join(__dirname, '../uploads');
-console.log('📁 정적 파일 서빙 경로:', uploadsPath);
-console.log('📁 경로 존재 여부:', fs.existsSync(uploadsPath));
+logger.debug('📁 정적 파일 서빙 경로:', uploadsPath);
+logger.debug('📁 경로 존재 여부:', fs.existsSync(uploadsPath));
 if (fs.existsSync(uploadsPath)) {
   const productsPath = path.join(uploadsPath, 'products');
-  console.log('📁 products 폴더 존재 여부:', fs.existsSync(productsPath));
+  logger.debug('📁 products 폴더 존재 여부:', fs.existsSync(productsPath));
   if (fs.existsSync(productsPath)) {
     const dirs = fs.readdirSync(productsPath).filter(f => fs.statSync(path.join(productsPath, f)).isDirectory());
-    console.log('📁 상품 폴더 목록:', dirs.slice(0, 5));
+    logger.debug('📁 상품 폴더 목록:', dirs.slice(0, 5));
   }
 }
 
@@ -59,7 +60,7 @@ app.use((req, res) => {
 
 // 에러 핸들러
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
+  logger.error('Error:', err);
   res.status(500).json({ 
     error: 'Internal Server Error',
     message: process.env.NODE_ENV === 'development' ? err.message : '서버 오류가 발생했습니다.'
@@ -74,7 +75,7 @@ async function startServer() {
     const connected = await testConnection();
     
     if (!connected) {
-      console.error('❌ 데이터베이스 연결에 실패했습니다. 서버를 시작할 수 없습니다.');
+      logger.error('❌ 데이터베이스 연결에 실패했습니다. 서버를 시작할 수 없습니다.');
       process.exit(1);
     }
 
@@ -85,12 +86,12 @@ async function startServer() {
 
     // 서버 시작
     app.listen(PORT, () => {
-      console.log(`🚀 서버가 포트 ${PORT}에서 실행 중입니다.`);
-      console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`📸 이미지 예시 URL: http://localhost:${PORT}/uploads/products/P001/001.png`);
+      logger.info(`🚀 서버가 포트 ${PORT}에서 실행 중입니다.`);
+      logger.info(`📍 Health check: http://localhost:${PORT}/api/health`);
+      logger.debug(`📸 이미지 예시 URL: http://localhost:${PORT}/uploads/products/P001/001.png`);
     });
   } catch (error) {
-    console.error('서버 시작 실패:', error);
+    logger.error('서버 시작 실패:', error);
     process.exit(1);
   }
 }

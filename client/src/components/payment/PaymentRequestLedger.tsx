@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, CheckCircle, Clock, Calendar } from 'lucide-react';
+import { ChevronDown, ChevronRight, CheckCircle, Clock, Calendar, FileDown } from 'lucide-react';
 import {
   PaymentRequest,
   getAllPaymentRequests,
@@ -9,6 +9,7 @@ import {
 import { PaymentRequestStatusBadge } from './PaymentRequestStatusBadge';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDateKST, getLocalDateString } from '../../utils/dateUtils';
+import { printPaymentRequestLedger } from '../../utils/printUtils';
 
 interface PaymentRequestLedgerProps {
   onRefresh?: () => void;
@@ -195,6 +196,15 @@ export function PaymentRequestLedger({ onRefresh }: PaymentRequestLedgerProps) {
     return group.totals.advance + group.totals.balance + group.totals.shipping;
   };
 
+  const handlePrintPDF = (group: DateGroup) => {
+    try {
+      printPaymentRequestLedger(group);
+    } catch (error: any) {
+      console.error('인쇄 오류:', error);
+      alert(error.message || '인쇄에 실패했습니다.');
+    }
+  };
+
   if (isLoading) {
     return <div className="text-center py-8 text-gray-500">로딩 중...</div>;
   }
@@ -258,8 +268,18 @@ export function PaymentRequestLedger({ onRefresh }: PaymentRequestLedgerProps) {
                   </div>
                 </div>
 
-                {/* 상태 및 액션 버튼 */}
+                {/* PDF 인쇄 버튼, 상태 및 액션 버튼 */}
                 <div className="flex items-center gap-3">
+                  {/* PDF 인쇄 버튼 */}
+                  <button
+                    onClick={() => handlePrintPDF(group)}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 transition-colors"
+                    title="PDF로 인쇄"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    PDF
+                  </button>
+
                   <div className="flex items-center gap-2">
                     {group.allCompleted ? (
                       <>

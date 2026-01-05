@@ -5,7 +5,7 @@ interface AdminAccount {
   name: string;
   phone: string;
   email: string;
-  level: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
+  level: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
 }
 
 interface AdminAccountDeleteDialogProps {

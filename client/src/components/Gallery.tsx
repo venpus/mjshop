@@ -3,16 +3,28 @@ import { Image as ImageIcon, Package, FolderOpen } from 'lucide-react';
 import { ProductFolderView, ProductFolder } from './gallery/ProductFolderView';
 import { ImageGridView } from './gallery/ImageGridView';
 import { getAllPurchaseOrders, getAllPurchaseOrderImages, PurchaseOrderImage, getFullImageUrl } from '../api/purchaseOrderApi';
+import { useAuth } from '../contexts/AuthContext';
 
 type TabType = 'products' | 'accessories' | 'projects';
 
 export function Gallery() {
+  const { user } = useAuth();
+  const isLevelC0 = user?.level === 'C0: 한국Admin';
   const [activeTab, setActiveTab] = useState<TabType>('products');
   const [folders, setFolders] = useState<ProductFolder[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<ProductFolder | null>(null);
   const [images, setImages] = useState<PurchaseOrderImage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingImages, setIsLoadingImages] = useState(false);
+
+  // C0 레벨 관리자는 악세서리/프로젝트 탭 접근 불가
+  useEffect(() => {
+    if (isLevelC0 && (activeTab === 'accessories' || activeTab === 'projects')) {
+      setActiveTab('products');
+      setSelectedFolder(null);
+      setImages([]);
+    }
+  }, [isLevelC0, activeTab]);
 
   // 발주 상품 폴더 로드
   useEffect(() => {
@@ -135,40 +147,46 @@ export function Gallery() {
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600" />
               )}
             </button>
-            <button
-              onClick={() => {
-                setActiveTab('accessories');
-                setSelectedFolder(null);
-                setImages([]);
-              }}
-              className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-                activeTab === 'accessories'
-                  ? 'text-purple-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              악세서리
-              {activeTab === 'accessories' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600" />
-              )}
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('projects');
-                setSelectedFolder(null);
-                setImages([]);
-              }}
-              className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-                activeTab === 'projects'
-                  ? 'text-purple-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              프로젝트 관리
-              {activeTab === 'projects' && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600" />
-              )}
-            </button>
+            {/* C0 레벨 관리자는 악세서리 탭 숨김 */}
+            {!isLevelC0 && (
+              <button
+                onClick={() => {
+                  setActiveTab('accessories');
+                  setSelectedFolder(null);
+                  setImages([]);
+                }}
+                className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                  activeTab === 'accessories'
+                    ? 'text-purple-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                악세서리
+                {activeTab === 'accessories' && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600" />
+                )}
+              </button>
+            )}
+            {/* C0 레벨 관리자는 프로젝트 관리 탭 숨김 */}
+            {!isLevelC0 && (
+              <button
+                onClick={() => {
+                  setActiveTab('projects');
+                  setSelectedFolder(null);
+                  setImages([]);
+                }}
+                className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                  activeTab === 'projects'
+                    ? 'text-purple-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                프로젝트 관리
+                {activeTab === 'projects' && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600" />
+                )}
+              </button>
+            )}
           </nav>
         </div>
 
@@ -203,7 +221,8 @@ export function Gallery() {
             </>
           )}
 
-          {activeTab === 'accessories' && (
+          {/* C0 레벨 관리자는 악세서리 탭 접근 불가 */}
+          {!isLevelC0 && activeTab === 'accessories' && (
             <div className="flex flex-col items-center justify-center py-16 text-gray-500">
               <Package className="w-16 h-16 mb-4 text-gray-400" />
               <p className="text-lg">악세서리 갤러리 준비 중입니다.</p>
@@ -211,7 +230,8 @@ export function Gallery() {
             </div>
           )}
 
-          {activeTab === 'projects' && (
+          {/* C0 레벨 관리자는 프로젝트 관리 탭 접근 불가 */}
+          {!isLevelC0 && activeTab === 'projects' && (
             <div className="flex flex-col items-center justify-center py-16 text-gray-500">
               <FolderOpen className="w-16 h-16 mb-4 text-gray-400" />
               <p className="text-lg">프로젝트 갤러리 준비 중입니다.</p>

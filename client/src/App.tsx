@@ -14,6 +14,7 @@ import { StockDetail } from './components/inventory/StockDetail';
 import { PurchaseOrders } from './components/PurchaseOrders';
 import { PurchaseOrderDetail } from './components/PurchaseOrderDetail';
 import { ShippingHistory } from './components/ShippingHistory';
+import { PackingListDetail } from './components/PackingListDetail';
 import { ChinaPayment } from './components/ChinaPayment';
 import { Members } from './components/Members';
 import { Gallery } from './components/Gallery';
@@ -117,10 +118,11 @@ function AdminLayout() {
       return <>{children}</>;
     }
     
-    if (hasPermission(resource, permissionType)) {
+    const hasPerm = hasPermission(resource, permissionType);
+    
+    if (hasPerm) {
       return <>{children}</>;
     }
-    
     return <Navigate to="/admin/dashboard" replace />;
   };
 
@@ -232,89 +234,109 @@ function AdminLayout() {
 
         {/* Routes */}
         <Routes>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/products" element={
-            (user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin') ? (
-              <Products onNavigateToPurchaseOrder={handleViewOrderDetail} />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
-          } />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/shipping" element={<Shipping />} />
-          <Route path="/payment" element={<Payment />} />
-          <Route path="/payment-history" element={
-            <PermissionCheckWrapper resource="payment-history" permissionType="read">
-              <PaymentHistory />
-            </PermissionCheckWrapper>
-          } />
-          <Route path="/inventory" element={<StockManagement />} />
-          <Route path="/inventory/:groupKey" element={<StockDetail />} />
-          <Route path="/purchase-orders" element={
-            <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
-              <PurchaseOrders onViewDetail={handleViewOrderDetail} />
-            </PermissionCheckWrapper>
-          } />
-          <Route path="/purchase-orders/:id" element={
-            <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
-              <PurchaseOrderDetailWrapper onBack={handleBackToPurchaseOrders} />
-            </PermissionCheckWrapper>
-          } />
-          <Route path="/shipping-history" element={
-            <PermissionCheckWrapper resource="shipping-history" permissionType="read">
-              <ShippingHistory />
-            </PermissionCheckWrapper>
-          } />
-          <Route path="/china-payment" element={<ChinaPayment />} />
-          <Route path="/members" element={<Members />} />
-          <Route path="/gallery" element={
-            <PermissionCheckWrapper resource="gallery" permissionType="read">
-              <Gallery />
-            </PermissionCheckWrapper>
-          } />
-          <Route path="/china-warehouse" element={
-            <PermissionCheckWrapper resource="china-warehouse" permissionType="read">
-              <ChinaWarehouse />
-            </PermissionCheckWrapper>
-          } />
-          <Route path="/invoice" element={
-            <PermissionCheckWrapper resource="invoice" permissionType="read">
-              <Invoice />
-            </PermissionCheckWrapper>
-          } />
-          <Route path="/materials" element={
-            <PermissionCheckWrapper resource="materials" permissionType="read">
-              <Materials />
-            </PermissionCheckWrapper>
-          } />
-          <Route path="/materials/:id" element={
-            <PermissionCheckWrapper resource="materials" permissionType="read">
-              <MaterialDetailWrapper />
-            </PermissionCheckWrapper>
-          } />
-          <Route path="/packaging-work" element={
-            <PermissionCheckWrapper resource="packaging-work" permissionType="read">
-              <PackagingWork />
-            </PermissionCheckWrapper>
-          } />
-          <Route path="/projects" element={
-            <PermissionCheckWrapper resource="projects" permissionType="read">
-              <Projects />
-            </PermissionCheckWrapper>
-          } />
-          <Route path="/projects/:id" element={
-            <PermissionCheckWrapper resource="projects" permissionType="read">
-              <ProjectDetailWrapper />
-            </PermissionCheckWrapper>
-          } />
-          <Route path="/admin-account" element={<AdminAccount />} />
-          <Route path="/permissions" element={
-            (user?.level === 'A-SuperAdmin') ? (
-              <PermissionManagement />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
-          } />
+          {/* D0 레벨 관리자는 패킹리스트 관련 페이지만 접근 가능 */}
+          {user?.level === 'D0: 비전 담당자' ? (
+            <>
+              <Route path="/shipping-history" element={
+                <PermissionCheckWrapper resource="shipping-history" permissionType="read">
+                  <ShippingHistory />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/packing-lists/:id" element={
+                <PackingListDetail />
+              } />
+              <Route path="*" element={<Navigate to="/admin/shipping-history" replace />} />
+            </>
+          ) : (
+            <>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/products" element={
+                (user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin') ? (
+                  <Products onNavigateToPurchaseOrder={handleViewOrderDetail} />
+                ) : (
+                  <Navigate to="/admin/dashboard" replace />
+                )
+              } />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/shipping" element={<Shipping />} />
+              <Route path="/payment" element={<Payment />} />
+              <Route path="/payment-history" element={
+                <PermissionCheckWrapper resource="payment-history" permissionType="read">
+                  <PaymentHistory />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/inventory" element={<StockManagement />} />
+              <Route path="/inventory/:groupKey" element={<StockDetail />} />
+              <Route path="/purchase-orders" element={
+                <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
+                  <PurchaseOrders onViewDetail={handleViewOrderDetail} />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/purchase-orders/:id" element={
+                <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
+                  <PurchaseOrderDetailWrapper onBack={handleBackToPurchaseOrders} />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/shipping-history" element={
+                <PermissionCheckWrapper resource="shipping-history" permissionType="read">
+                  <ShippingHistory />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/packing-lists/:id" element={
+                <PackingListDetail />
+              } />
+              <Route path="/china-payment" element={<ChinaPayment />} />
+              <Route path="/members" element={<Members />} />
+              <Route path="/gallery" element={
+                <PermissionCheckWrapper resource="gallery" permissionType="read">
+                  <Gallery />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/china-warehouse" element={
+                <PermissionCheckWrapper resource="china-warehouse" permissionType="read">
+                  <ChinaWarehouse />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/invoice" element={
+                <PermissionCheckWrapper resource="invoice" permissionType="read">
+                  <Invoice />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/materials" element={
+                <PermissionCheckWrapper resource="materials" permissionType="read">
+                  <Materials />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/materials/:id" element={
+                <PermissionCheckWrapper resource="materials" permissionType="read">
+                  <MaterialDetailWrapper />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/packaging-work" element={
+                <PermissionCheckWrapper resource="packaging-work" permissionType="read">
+                  <PackagingWork />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/projects" element={
+                <PermissionCheckWrapper resource="projects" permissionType="read">
+                  <Projects />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/projects/:id" element={
+                <PermissionCheckWrapper resource="projects" permissionType="read">
+                  <ProjectDetailWrapper />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/admin-account" element={<AdminAccount />} />
+              <Route path="/permissions" element={
+                (user?.level === 'A-SuperAdmin') ? (
+                  <PermissionManagement />
+                ) : (
+                  <Navigate to="/admin/dashboard" replace />
+                )
+              } />
+            </>
+          )}
         </Routes>
       </main>
     </div>
@@ -372,11 +394,9 @@ function PurchaseOrderDetailWrapper({ onBack }: { onBack: () => void }) {
 
 // MaterialDetail 래퍼 (URL 파라미터 처리)
 function MaterialDetailWrapper() {
-  console.log('MaterialDetailWrapper is rendering');
   try {
     return <MaterialDetail />;
   } catch (error) {
-    console.error('Error in MaterialDetailWrapper:', error);
     return <div>Error loading material detail</div>;
   }
 }
@@ -391,10 +411,31 @@ function ProjectDetailWrapper() {
   }
 }
 
+// 로그인 후 리다이렉트 컴포넌트
+function LoginRedirect() {
+  const { user } = useAuth();
+  // D0 레벨 관리자는 패킹리스트 페이지로 리다이렉트
+  if (user?.level === 'D0: 비전 담당자') {
+    return <Navigate to="/admin/shipping-history" replace />;
+  }
+  return <Navigate to="/admin/dashboard" replace />;
+}
+
+// 루트 경로 리다이렉트 컴포넌트
+function RootRedirect() {
+  const { user } = useAuth();
+  // D0 레벨 관리자는 패킹리스트 페이지로 리다이렉트
+  if (user?.level === 'D0: 비전 담당자') {
+    return <Navigate to="/admin/shipping-history" replace />;
+  }
+  return <Navigate to="/admin/dashboard" replace />;
+}
+
 // Protected Route 컴포넌트
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
-
+  const location = useLocation();
+  
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -417,6 +458,7 @@ function AppContent() {
   const { isAuthenticated, isLoading, login } = useAuth();
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const location = useLocation();
 
   const handleLogin = async (id: string, password: string) => {
     setIsLoggingIn(true);
@@ -450,7 +492,7 @@ function AppContent() {
         path="/login"
         element={
           isAuthenticated ? (
-            <Navigate to="/admin/dashboard" replace />
+            <LoginRedirect />
           ) : (
             <Login onLogin={handleLogin} isLoading={isLoggingIn} error={loginError} />
           )
@@ -468,10 +510,10 @@ function AppContent() {
       />
 
       {/* 루트 경로 리다이렉트 */}
-      <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/" element={<RootRedirect />} />
 
       {/* 404 - 존재하지 않는 경로 */}
-      <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="*" element={<RootRedirect />} />
     </Routes>
   );
 }

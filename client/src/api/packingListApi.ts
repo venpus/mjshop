@@ -129,6 +129,26 @@ export async function getAllPackingLists(): Promise<PackingListWithItems[]> {
   return data.success ? data.data : [];
 }
 
+// 월별 패킹리스트 조회
+export async function getPackingListsByMonth(
+  year: number,
+  month: number
+): Promise<PackingListWithItems[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/packing-lists?year=${year}&month=${month}`,
+    {
+      credentials: 'include',
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('패킹리스트 조회에 실패했습니다.');
+  }
+
+  const data = await response.json();
+  return data.success ? data.data : [];
+}
+
 // ID로 패킹리스트 조회
 export async function getPackingListById(id: number): Promise<PackingListWithItems | null> {
   const response = await fetch(`${API_BASE_URL}/packing-lists/${id}`, {

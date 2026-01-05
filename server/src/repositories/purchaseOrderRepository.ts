@@ -1,6 +1,7 @@
 import { pool } from '../config/database.js';
 import { PurchaseOrder, CreatePurchaseOrderDTO, UpdatePurchaseOrderDTO } from '../models/purchaseOrder.js';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { randomUUID } from 'crypto';
 
 interface PurchaseOrderRow extends RowDataPacket {
   id: string;
@@ -295,6 +296,7 @@ export class PurchaseOrderRepository {
    */
   async create(data: CreatePurchaseOrderDTO, poId: string, poNumber: string): Promise<PurchaseOrder> {
     const {
+      product_id,
       product_name,
       product_name_chinese,
       product_category,
@@ -316,6 +318,14 @@ export class PurchaseOrderRepository {
       created_by,
     } = data;
 
+    // product_id 처리:
+    // - 제공되면 그대로 사용 (재발주 시 원본 product_id 복사)
+    // - 제공되지 않으면 UUID로 자동 생성 (새 발주 생성 시)
+    // - 명시적으로 null로 전달된 경우에만 null 사용
+    const finalProductId = product_id !== undefined 
+      ? product_id 
+      : randomUUID(); // 새 발주 생성 시 UUID 자동 생성
+
     await pool.execute<ResultSetHeader>(
       `INSERT INTO purchase_orders
        (id, po_number, product_id,
@@ -328,7 +338,7 @@ export class PurchaseOrderRepository {
       [
         poId,
         poNumber,
-        null, // product_id는 더 이상 사용하지 않음
+        finalProductId,
         product_name,
         product_name_chinese || null,
         product_category || '봉제',

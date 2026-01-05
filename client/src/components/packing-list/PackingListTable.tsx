@@ -16,15 +16,21 @@ interface PackingListTableProps {
   onKoreaArrivalChange?: (itemId: string, koreaArrivalDates: Array<{ id?: number; date: string; quantity: string }>) => void;
   onProductNameClick?: (purchaseOrderId?: string) => void;
   onImageClick?: (imageUrl: string) => void;
+  showCodeLink: boolean; // A레벨과 D0 레벨만 코드 링크 표시
+  onCodeClick?: (code: string, date: string) => void; // 코드 클릭 시 상세 화면으로 이동하는 핸들러
+  hideSensitiveColumns: boolean; // C0 레벨, D0 레벨일 때 실중량, 비율, 중량, 배송비, 지급일, WK결제일 숨김
 }
 
 /**
- * 열 개수 계산 (A 등급이면 비율과 중량 열 포함)
+ * 열 개수 계산 (A 등급이면 비율과 중량 열 포함, C0 레벨/D0 레벨이면 실중량/비율/중량/배송비/지급일/WK결제일 제외)
  */
-function getColumnCount(isSuperAdmin: boolean): number {
+function getColumnCount(isSuperAdmin: boolean, hideSensitiveColumns: boolean): number {
   let count = 19; // 기본 열 개수 (체크박스 제외)
   if (!isSuperAdmin) {
     count -= 2; // 비율과 중량 열 제외
+  }
+  if (hideSensitiveColumns) {
+    count -= 4; // 실중량, 배송비, 지급일, WK결제일 열 제외
   }
   return count;
 }
@@ -41,6 +47,9 @@ export function PackingListTable({
   onKoreaArrivalChange,
   onProductNameClick,
   onImageClick,
+  showCodeLink,
+  onCodeClick,
+  hideSensitiveColumns,
 }: PackingListTableProps) {
   // 그룹별로 아이템들을 나누기 (순서 유지)
   const groupedItems = useMemo(() => {
@@ -176,11 +185,12 @@ export function PackingListTable({
             isSuperAdmin={isSuperAdmin}
             isAllSelected={isAllSelected}
             onToggleAll={onToggleAll}
+            hideSensitiveColumns={hideSensitiveColumns}
           />
           <tbody className="bg-white divide-y divide-gray-200">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={getColumnCount(isSuperAdmin)} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={getColumnCount(isSuperAdmin, hideSensitiveColumns)} className="px-4 py-8 text-center text-gray-500">
                   패킹리스트 데이터가 없습니다.
                 </td>
               </tr>
@@ -210,6 +220,9 @@ export function PackingListTable({
                     onWkPaymentDateChange={handleWkPaymentDateChange}
                     onProductNameClick={onProductNameClick}
                     onImageClick={onImageClick}
+                    showCodeLink={showCodeLink}
+                    onCodeClick={onCodeClick}
+                    hideSensitiveColumns={hideSensitiveColumns}
                   />
                 );
               })

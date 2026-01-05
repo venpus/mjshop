@@ -2,12 +2,14 @@ interface PackingListHeaderProps {
   isSuperAdmin: boolean;
   isAllSelected: boolean;
   onToggleAll: (checked: boolean) => void;
+  hideSensitiveColumns: boolean; // C0 레벨, D0 레벨일 때 실중량, 비율, 중량, 배송비, 지급일, WK결제일 숨김
 }
 
 export function PackingListHeader({
   isSuperAdmin,
   isAllSelected,
   onToggleAll,
+  hideSensitiveColumns,
 }: PackingListHeaderProps) {
   return (
     <thead>
@@ -53,28 +55,33 @@ export function PackingListHeader({
         <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200" style={{ minWidth: '220px' }}>
           한국도착일
         </th>
-        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200" style={{ minWidth: '100px' }}>
-          실중량
-        </th>
-        {isSuperAdmin && (
+        {/* 실중량, 비율, 중량, 배송비, 지급일, WK결제일 - C0 레벨, D0 레벨일 때 숨김 */}
+        {!hideSensitiveColumns && (
           <>
-            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200" style={{ minWidth: '80px' }}>
-              비율
-            </th>
             <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200" style={{ minWidth: '100px' }}>
-              중량
+              실중량
+            </th>
+            {isSuperAdmin && (
+              <>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200" style={{ minWidth: '80px' }}>
+                  비율
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200" style={{ minWidth: '100px' }}>
+                  중량
+                </th>
+              </>
+            )}
+            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200" style={{ minWidth: '100px' }}>
+              배송비
+            </th>
+            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200" style={{ minWidth: '120px' }}>
+              지급일
+            </th>
+            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider" style={{ minWidth: '120px' }}>
+              WK결제일
             </th>
           </>
         )}
-        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200" style={{ minWidth: '100px' }}>
-          배송비
-        </th>
-        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200" style={{ minWidth: '120px' }}>
-          지급일
-        </th>
-        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider" style={{ minWidth: '120px' }}>
-          WK결제일
-        </th>
       </tr>
     </thead>
   );

@@ -26,6 +26,9 @@ interface PackingListRowProps {
   onWkPaymentDateChange: (groupId: string, date: string) => void;
   onProductNameClick?: (purchaseOrderId?: string) => void;
   onImageClick?: (imageUrl: string) => void;
+  showCodeLink: boolean; // A레벨과 D0 레벨만 코드 링크 표시
+  onCodeClick?: (code: string, date: string) => void; // 코드 클릭 시 상세 화면으로 이동하는 핸들러
+  hideSensitiveColumns: boolean; // C0 레벨, D0 레벨일 때 실중량, 비율, 중량, 배송비, 지급일, WK결제일 숨김
 }
 
 export function PackingListRow({
@@ -47,6 +50,9 @@ export function PackingListRow({
   onWkPaymentDateChange,
   onProductNameClick,
   onImageClick,
+  showCodeLink,
+  onCodeClick,
+  hideSensitiveColumns,
 }: PackingListRowProps) {
   const isMultipleProducts = groupSize > 1;
   const groupId = getGroupId(item.id);
@@ -71,6 +77,7 @@ export function PackingListRow({
             onKoreaArrivalChange={onKoreaArrivalChange}
           />
         </td>
+        {/* 담당자 확인 열 (두 번째 행 이후에는 표시하지 않음) */}
       </tr>
     );
   }
@@ -93,11 +100,24 @@ export function PackingListRow({
       </td>
       {/* 코드 */}
       <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '100px' }}>
-        {item.code}
+        {showCodeLink && onCodeClick ? (
+          <button
+            onClick={() => onCodeClick(item.code, item.date)}
+            className="text-blue-600 hover:text-blue-800 hover:underline font-medium transition-colors"
+          >
+            {item.code}
+          </button>
+        ) : (
+          item.code
+        )}
       </td>
       {/* 제품 */}
       <td className="px-4 py-3 text-sm text-center border-r border-gray-200" style={{ minWidth: '200px' }}>
-        <ProductCell item={item} onProductNameClick={onProductNameClick} />
+        <ProductCell 
+          item={item} 
+          onProductNameClick={onProductNameClick}
+          canClickProductName={!hideSensitiveColumns} // A레벨만 클릭 가능, C0 레벨, D0 레벨은 불가
+        />
       </td>
       {/* 입수량 */}
       <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200" style={{ minWidth: '80px' }}>
@@ -133,16 +153,25 @@ export function PackingListRow({
       </td>
       {/* 물류회사 */}
       <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '140px' }}>
-        <select
-          value={item.logisticsCompany || ''}
-          onChange={(e) => onLogisticsCompanyChange(groupId, e.target.value)}
-          className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
-        >
-          <option value="">선택</option>
-          {LOGISTICS_COMPANIES.map((company: string) => (
-            <option key={company} value={company}>{company}</option>
-          ))}
-        </select>
+        {hideSensitiveColumns ? (
+          // C0 레벨, D0 레벨: 읽기 전용으로 표시하고 "광저우-비전"과 "위해-비전"만 표시 (D0 레벨만 해당)
+          <div className="text-gray-900">
+            {item.logisticsCompany === '광저우-비전' || item.logisticsCompany === '위해-비전' 
+              ? item.logisticsCompany 
+              : '-'}
+          </div>
+        ) : (
+          <select
+            value={item.logisticsCompany || ''}
+            onChange={(e) => onLogisticsCompanyChange(groupId, e.target.value)}
+            className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
+          >
+            <option value="">선택</option>
+            {LOGISTICS_COMPANIES.map((company: string) => (
+              <option key={company} value={company}>{company}</option>
+            ))}
+          </select>
+        )}
       </td>
       {/* 물류창고 도착일 */}
       <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '140px' }}>
@@ -160,41 +189,49 @@ export function PackingListRow({
           onKoreaArrivalChange={onKoreaArrivalChange}
         />
       </td>
-      {/* 실중량, 비율, 중량 */}
-      <WeightCell
-        item={item}
-        groupId={groupId}
-        isSuperAdmin={isSuperAdmin}
-        rowSpan={isMultipleProducts ? groupSize : undefined}
-        onActualWeightChange={onActualWeightChange}
-        onWeightRatioChange={onWeightRatioChange}
-      />
-      {/* 배송비 */}
-      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '100px' }}>
-        <ShippingCostCell
+      {/* 실중량, 비율, 중량 - C0 레벨, D0 레벨일 때 숨김 */}
+      {!hideSensitiveColumns && (
+        <WeightCell
           item={item}
           groupId={groupId}
-          onShippingCostChange={onShippingCostChange}
+          isSuperAdmin={isSuperAdmin}
+          rowSpan={isMultipleProducts ? groupSize : undefined}
+          onActualWeightChange={onActualWeightChange}
+          onWeightRatioChange={onWeightRatioChange}
         />
-      </td>
-      {/* 지급일 */}
-      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '120px' }}>
-        <input
-          type="date"
-          value={item.paymentDate}
-          onChange={(e) => onPaymentDateChange(groupId, e.target.value)}
-          className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
-        />
-      </td>
-      {/* WK결제일 */}
-      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 align-middle" style={{ minWidth: '120px' }}>
-        <input
-          type="date"
-          value={item.wkPaymentDate}
-          onChange={(e) => onWkPaymentDateChange(groupId, e.target.value)}
-          className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
-        />
-      </td>
+      )}
+      {/* 배송비 - C0 레벨, D0 레벨일 때 숨김 */}
+      {!hideSensitiveColumns && (
+        <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '100px' }}>
+          <ShippingCostCell
+            item={item}
+            groupId={groupId}
+            onShippingCostChange={onShippingCostChange}
+          />
+        </td>
+      )}
+      {/* 지급일 - C0 레벨, D0 레벨일 때 숨김 */}
+      {!hideSensitiveColumns && (
+        <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '120px' }}>
+          <input
+            type="date"
+            value={item.paymentDate}
+            onChange={(e) => onPaymentDateChange(groupId, e.target.value)}
+            className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
+          />
+        </td>
+      )}
+      {/* WK결제일 - C0 레벨, D0 레벨일 때 숨김 */}
+      {!hideSensitiveColumns && (
+        <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 align-middle" style={{ minWidth: '120px' }}>
+          <input
+            type="date"
+            value={item.wkPaymentDate}
+            onChange={(e) => onWkPaymentDateChange(groupId, e.target.value)}
+            className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
+          />
+        </td>
+      )}
     </tr>
   );
 }

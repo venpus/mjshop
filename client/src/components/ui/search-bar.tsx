@@ -5,6 +5,8 @@ export interface SearchBarProps {
   value: string;
   /** 검색어 변경 핸들러 */
   onChange: (value: string) => void;
+  /** 키보드 이벤트 핸들러 */
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   /** 플레이스홀더 텍스트 */
   placeholder?: string;
   /** 추가 클래스명 */

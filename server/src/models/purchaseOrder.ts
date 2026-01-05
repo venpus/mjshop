@@ -71,7 +71,8 @@ export interface PurchaseOrderPublic extends PurchaseOrder {
 }
 
 export interface CreatePurchaseOrderDTO {
-  // product_id 제거 - 더 이상 필수가 아님
+  // product_id: 제공되면 사용, 없으면 UUID로 자동 생성
+  product_id?: string | null;
   // 상품 정보 직접 입력
   product_name: string;
   product_name_chinese?: string;

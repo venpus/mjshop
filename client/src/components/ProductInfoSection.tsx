@@ -55,7 +55,7 @@ interface ProductInfoSectionProps {
   packagingSize?: string;
   
   // 사용자 레벨 (C0 레벨에서 발주확인 체크박스와 취소 버튼 숨김용)
-  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
+  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
 }
 
 export function ProductInfoSection({

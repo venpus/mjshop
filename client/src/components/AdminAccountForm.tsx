@@ -7,7 +7,7 @@ export interface AdminAccountFormData {
   name: string;
   phone: string;
   email: string;
-  level: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
+  level: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
   password?: string; // 계정 생성 시 필수, 수정 시 선택
 }
 
@@ -235,6 +235,7 @@ export function AdminAccountForm({
                   <option value="S: Admin">S: Admin</option>
                   <option value="B0: 중국Admin">B0: 중국Admin</option>
                   <option value="C0: 한국Admin">C0: 한국Admin</option>
+                  <option value="D0: 비전 담당자">D0: 비전 담당자</option>
                 </select>
               </div>
             )}

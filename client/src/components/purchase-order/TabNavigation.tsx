@@ -1,7 +1,7 @@
 interface TabNavigationProps {
   activeTab: "cost" | "factory" | "work" | "delivery";
   onTabChange: (tab: "cost" | "factory" | "work" | "delivery") => void;
-  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
+  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
 }
 
 export function TabNavigation({

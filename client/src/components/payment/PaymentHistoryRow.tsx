@@ -21,8 +21,10 @@ interface PaymentHistoryRowProps {
   ) => void;
   isAdminLevelA: boolean;
   onRefresh?: () => void;
+  onItemUpdate?: (itemId: string, updates: Partial<PaymentHistoryItem>) => void; // 특정 item만 업데이트
+  onStatisticsRefresh?: () => void; // 통계 카드만 업데이트
   onViewOrderDetail?: (orderId: string) => void; // 발주 상세 보기 핸들러
-  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
+  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
 }
 
 /**
@@ -35,6 +37,8 @@ export function PaymentHistoryRow({
   onRequestPayment,
   isAdminLevelA,
   onRefresh,
+  onItemUpdate,
+  onStatisticsRefresh,
   onViewOrderDetail,
   userLevel,
 }: PaymentHistoryRowProps) {
@@ -188,7 +192,7 @@ export function PaymentHistoryRow({
     }
   };
 
-  // 지급요청 취소 핸들러
+  // 지급요청 취소 핸들러 (낙관적 업데이트 적용)
   const handleCancelRequest = async (
     requestId: number,
     paymentType: 'advance' | 'balance' | 'shipping'
@@ -207,20 +211,56 @@ export function PaymentHistoryRow({
     }
 
     try {
+      // 기존 요청 정보 저장 (롤백용)
+      let previousRequest;
+      if (paymentType === 'advance') {
+        previousRequest = item.advance_payment_request;
+      } else if (paymentType === 'balance') {
+        previousRequest = item.balance_payment_request;
+      } else {
+        previousRequest = item.payment_request;
+      }
+
       await deletePaymentRequest(requestId);
-      if (onRefresh) {
-        onRefresh();
+
+      // 부모 컴포넌트의 item 업데이트
+      if (onItemUpdate) {
+        if (paymentType === 'advance') {
+          onItemUpdate(item.id, {
+            advance_payment_request: undefined,
+          });
+        } else if (paymentType === 'balance') {
+          onItemUpdate(item.id, {
+            balance_payment_request: undefined,
+          });
+        } else {
+          // shipping (패킹리스트)
+          onItemUpdate(item.id, {
+            payment_request: undefined,
+          });
+        }
+      }
+
+      // 통계 카드만 업데이트 (전체 리로드 없이)
+      if (onStatisticsRefresh) {
+        onStatisticsRefresh();
       }
     } catch (error: any) {
       alert(error.message || '지급요청 취소에 실패했습니다.');
+      // 실패 시 롤백은 필요 없음 (삭제는 이미 완료되었거나 실패한 상태)
     }
   };
 
-  // 패킹리스트 지급요청 체크박스 변경 핸들러
+  // 패킹리스트 지급요청 체크박스 변경 핸들러 (낙관적 업데이트 적용)
   const handlePaymentRequestCheckboxChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (item.source_type !== 'packing_list') return;
     
     const checked = e.target.checked;
+    const previousChecked = isPaymentRequestChecked;
+    const previousPaymentRequest = item.payment_request;
+    
+    // 낙관적 업데이트: 즉시 UI 업데이트
+    setIsPaymentRequestChecked(checked);
     setIsUpdatingPaymentRequest(true);
     
     try {
@@ -236,6 +276,7 @@ export function PaymentHistoryRow({
           throw new Error('배송비가 없어 지급요청을 생성할 수 없습니다.');
         }
         
+        let createdRequest;
         if (packingListIds.length === 0) {
           // ID가 없으면 코드로 조회
           const packingList = await getPackingListByCode(item.packing_code || item.source_id);
@@ -243,7 +284,7 @@ export function PaymentHistoryRow({
             throw new Error('패킹리스트를 찾을 수 없습니다.');
           }
           
-          await createPaymentRequest({
+          createdRequest = await createPaymentRequest({
             source_type: 'packing_list',
             source_id: String(packingList.id), // 패킹리스트 ID로 전달
             payment_type: 'shipping',
@@ -256,42 +297,72 @@ export function PaymentHistoryRow({
             throw new Error('패킹리스트 ID를 찾을 수 없습니다.');
           }
           
-          await createPaymentRequest({
+          createdRequest = await createPaymentRequest({
             source_type: 'packing_list',
             source_id: firstPackingListId, // 패킹리스트 ID로 전달
             payment_type: 'shipping',
             amount: item.pl_shipping_cost,
           });
         }
+        
+        // API 응답으로 부모 컴포넌트의 item 업데이트
+        if (onItemUpdate) {
+          onItemUpdate(item.id, {
+            payment_request: {
+              id: createdRequest.id,
+              request_number: createdRequest.request_number,
+              status: createdRequest.status,
+            },
+          });
+        }
       } else {
         // 체크 해제: 지급요청 삭제
         if (item.payment_request) {
           await deletePaymentRequest(item.payment_request.id);
+          
+          // 부모 컴포넌트의 item 업데이트
+          if (onItemUpdate) {
+            onItemUpdate(item.id, {
+              payment_request: undefined,
+            });
+          }
         }
       }
       
-      setIsPaymentRequestChecked(checked);
-      if (onRefresh) {
-        setTimeout(() => {
-          onRefresh();
-        }, 300);
+      // 통계 카드만 업데이트 (전체 리로드 없이)
+      if (onStatisticsRefresh) {
+        onStatisticsRefresh();
       }
     } catch (error: any) {
+      // 실패 시 롤백
       alert(error.message || '지급요청 처리에 실패했습니다.');
-      setIsPaymentRequestChecked(!checked); // 롤백
+      setIsPaymentRequestChecked(previousChecked);
+      // 부모 컴포넌트도 롤백
+      if (onItemUpdate && previousPaymentRequest) {
+        onItemUpdate(item.id, {
+          payment_request: previousPaymentRequest,
+        });
+      }
     } finally {
       setIsUpdatingPaymentRequest(false);
     }
   };
 
-  // 패킹리스트 지급 날짜 체크박스 변경 핸들러
+  // 패킹리스트 지급 날짜 체크박스 변경 핸들러 (낙관적 업데이트 적용)
   const handlePaymentDateCheckboxChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (item.source_type !== 'packing_list') return;
     
     const checked = e.target.checked;
+    const previousChecked = isPaymentDateChecked;
+    const previousPaymentDate = item.wk_payment_date;
+    
+    // 낙관적 업데이트: 즉시 UI 업데이트
+    setIsPaymentDateChecked(checked);
     setIsUpdatingPaymentDate(true);
     
     try {
+      const today = checked ? getLocalDateString() : null;
+      
       // 패킹리스트 ID 목록 가져오기
       const packingListIds = item.packing_list_ids 
         ? item.packing_list_ids.split(',').map(id => id.trim()).filter(id => id)
@@ -306,17 +377,14 @@ export function PaymentHistoryRow({
         
         // 체크: 지급완료 처리 (날짜 저장)
         if (checked) {
-          const today = getLocalDateString();
           await updatePackingList(packingList.id, {
             wk_payment_date: today,
           });
-          setPaymentDate(today);
         } else {
           // 체크 해제: 지급완료 취소 (날짜 삭제)
           await updatePackingList(packingList.id, {
             wk_payment_date: null,
           });
-          setPaymentDate(null);
         }
       } else {
         // 모든 패킹리스트 ID에 대해 업데이트
@@ -325,7 +393,6 @@ export function PaymentHistoryRow({
           if (isNaN(id)) return;
           
           if (checked) {
-            const today = getLocalDateString();
             await updatePackingList(id, {
               wk_payment_date: today,
             });
@@ -337,29 +404,39 @@ export function PaymentHistoryRow({
         });
         
         await Promise.all(updatePromises);
-        
-        if (checked) {
-          setPaymentDate(getLocalDateString());
-        } else {
-          setPaymentDate(null);
-        }
       }
       
-      setIsPaymentDateChecked(checked);
-      if (onRefresh) {
-        setTimeout(() => {
-          onRefresh();
-        }, 300);
+      // 로컬 상태 업데이트
+      setPaymentDate(today);
+      
+      // 부모 컴포넌트의 item 업데이트
+      if (onItemUpdate) {
+        onItemUpdate(item.id, {
+          wk_payment_date: today,
+        });
+      }
+      
+      // 통계 카드만 업데이트 (전체 리로드 없이)
+      if (onStatisticsRefresh) {
+        onStatisticsRefresh();
       }
     } catch (error: any) {
+      // 실패 시 롤백
       alert(error.message || '지급완료 처리에 실패했습니다.');
-      setIsPaymentDateChecked(!checked); // 롤백
+      setIsPaymentDateChecked(previousChecked);
+      setPaymentDate(previousPaymentDate);
+      // 부모 컴포넌트도 롤백
+      if (onItemUpdate) {
+        onItemUpdate(item.id, {
+          wk_payment_date: previousPaymentDate,
+        });
+      }
     } finally {
       setIsUpdatingPaymentDate(false);
     }
   };
 
-  // 지급완료 핸들러
+  // 지급완료 핸들러 (낙관적 업데이트 적용)
   const handleCompleteRequest = async (
     requestId: number,
     paymentType: 'advance' | 'balance' | 'shipping'
@@ -380,15 +457,48 @@ export function PaymentHistoryRow({
     try {
       // 오늘 날짜로 자동 설정
       const today = getLocalDateString();
-      await completePaymentRequest(requestId, {
+      const completedRequest = await completePaymentRequest(requestId, {
         payment_date: today,
       });
 
-      // 서버 데이터 업데이트를 위한 짧은 지연
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // 부모 컴포넌트의 item 업데이트
+      if (onItemUpdate) {
+        if (paymentType === 'advance') {
+          onItemUpdate(item.id, {
+            advance_payment_request: completedRequest ? {
+              id: completedRequest.id,
+              request_number: completedRequest.request_number,
+              status: completedRequest.status,
+            } : undefined,
+            advance_status: 'paid',
+            advance_payment_date: today,
+          });
+        } else if (paymentType === 'balance') {
+          onItemUpdate(item.id, {
+            balance_payment_request: completedRequest ? {
+              id: completedRequest.id,
+              request_number: completedRequest.request_number,
+              status: completedRequest.status,
+            } : undefined,
+            balance_status: 'paid',
+            balance_payment_date: today,
+          });
+        } else {
+          // shipping (패킹리스트)
+          onItemUpdate(item.id, {
+            payment_request: completedRequest ? {
+              id: completedRequest.id,
+              request_number: completedRequest.request_number,
+              status: completedRequest.status,
+            } : undefined,
+            wk_payment_date: today,
+          });
+        }
+      }
 
-      if (onRefresh) {
-        onRefresh();
+      // 통계 카드만 업데이트 (전체 리로드 없이)
+      if (onStatisticsRefresh) {
+        onStatisticsRefresh();
       }
     } catch (error: any) {
       alert(error.message || '지급완료 처리에 실패했습니다.');
@@ -706,12 +816,12 @@ export function PaymentHistoryRow({
         </td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-2">
-            <label className={`flex items-center ${isLevelC ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+            <label className={`flex items-center ${isLevelC || item.wk_payment_date ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
               <input
                 type="checkbox"
                 checked={isPaymentRequestChecked}
                 onChange={handlePaymentRequestCheckboxChange}
-                disabled={isLevelC || isUpdatingPaymentRequest || (item.payment_request?.status === '완료')}
+                disabled={isLevelC || isUpdatingPaymentRequest || (item.payment_request?.status === '완료') || !!item.wk_payment_date}
                 className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </label>
@@ -746,12 +856,18 @@ export function PaymentHistoryRow({
         <td className="px-4 py-3">
           <span
             className={`inline-flex px-2 py-1 rounded-full text-xs ${
-              item.status === 'paid'
+              item.wk_payment_date
                 ? 'bg-green-100 text-green-800'
+                : item.payment_request && item.payment_request.status === '요청중'
+                ? 'bg-blue-100 text-blue-800'
                 : 'bg-yellow-100 text-yellow-800'
             }`}
           >
-            {item.status === 'paid' ? '지급완료' : '지급대기'}
+            {item.wk_payment_date
+              ? '지급완료'
+              : item.payment_request && item.payment_request.status === '요청중'
+              ? '지급요청중'
+              : '지급대기'}
           </span>
         </td>
         <td className="px-4 py-3 text-sm text-gray-900">

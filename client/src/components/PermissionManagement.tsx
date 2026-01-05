@@ -29,8 +29,10 @@ const RESOURCES: { key: string; label: string; group: string }[] = [
 
 const ADMIN_LEVELS: { value: string; label: string }[] = [
   { value: 'A-SuperAdmin', label: 'A레벨' },
+  { value: 'S: Admin', label: 'S레벨' },
   { value: 'B0: 중국Admin', label: 'B0레벨' },
   { value: 'C0: 한국Admin', label: 'C0레벨' },
+  { value: 'D0: 비전 담당자', label: 'D0레벨' },
 ];
 
 interface PermissionData {
@@ -420,7 +422,7 @@ export function PermissionManagement() {
                 {Object.entries(groupedResources).map(([group, resources]) => (
                   <React.Fragment key={group}>
                     <tr className="bg-gray-100">
-                      <td colSpan={10} className="px-6 py-3 text-sm font-semibold text-gray-900">
+                      <td colSpan={ADMIN_LEVELS.length * 3 + 1} className="px-6 py-3 text-sm font-semibold text-gray-900">
                         {group}
                       </td>
                     </tr>

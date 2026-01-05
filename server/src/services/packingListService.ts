@@ -18,6 +18,9 @@ import {
   PackingListWithItems,
   PurchaseOrderShippingCost,
   PurchaseOrderShippingSummary,
+  OverseasInvoice,
+  CreateOverseasInvoiceDTO,
+  UpdateOverseasInvoiceDTO,
 } from '../models/packingList.js';
 
 export class PackingListService {
@@ -84,9 +87,13 @@ export class PackingListService {
   /**
    * 모든 패킹리스트 조회 (아이템 포함)
    * 발송일 기준 최신순으로 정렬
+   * @param year 연도 (선택사항)
+   * @param month 월 (1-12, 선택사항)
    */
-  async getAllPackingLists(): Promise<PackingListWithItems[]> {
-    const packingLists = await this.repository.findAll();
+  async getAllPackingLists(year?: number, month?: number): Promise<PackingListWithItems[]> {
+    const packingLists = year && month 
+      ? await this.repository.findByMonth(year, month)
+      : await this.repository.findAll();
     // 아이템 포함하여 조회
     const results = await Promise.all(
       packingLists.map((pl) => this.repository.findWithItems(pl.id))
@@ -514,6 +521,37 @@ export class PackingListService {
       throw new Error('패킹리스트를 찾을 수 없습니다.');
     }
     return updated;
+  }
+
+  /**
+   * 재포장 요구사항 업데이트
+   */
+  async updateRepackagingRequirements(packingListId: number, repackagingRequirements: string | null): Promise<void> {
+    await this.repository.updateRepackagingRequirements(packingListId, repackagingRequirements);
+  }
+
+  /**
+   * 해외송장 일괄 저장/업데이트
+   */
+  async saveOverseasInvoices(packingListId: number, invoices: Array<CreateOverseasInvoiceDTO | (UpdateOverseasInvoiceDTO & { id?: number })>): Promise<OverseasInvoice[]> {
+    // 기존 해외송장 삭제
+    await this.repository.deleteOverseasInvoicesByPackingListId(packingListId);
+
+    // 새로운 해외송장 생성
+    const savedInvoices: OverseasInvoice[] = [];
+    for (const invoice of invoices) {
+      if (invoice.invoice_number && invoice.invoice_number.trim() !== '') {
+        const created = await this.repository.createOverseasInvoice({
+          packing_list_id: packingListId,
+          invoice_number: invoice.invoice_number,
+          status: invoice.status || '출발대기',
+          inspection_quantity: invoice.inspection_quantity || 0,
+        });
+        savedInvoices.push(created);
+      }
+    }
+
+    return savedInvoices;
   }
 }
 

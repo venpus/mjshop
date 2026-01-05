@@ -380,6 +380,7 @@ export class PaymentRequestService {
         enriched.source_info = {
           po_number: po.po_number,
           product_name: po.product_name || undefined,
+          product_image: po.product_main_image || undefined,
         };
       }
     } else if (request.source_type === 'packing_list') {
@@ -387,6 +388,8 @@ export class PaymentRequestService {
       if (pl) {
         enriched.source_info = {
           packing_code: pl.code,
+          shipping_date: pl.shipment_date ? 
+            new Date(pl.shipment_date).toISOString().split('T')[0] : undefined,
         };
       }
     }

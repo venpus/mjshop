@@ -72,14 +72,23 @@ interface PurchaseOrder {
 }
 
 export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
+  console.log('[PurchaseOrders] 컴포넌트 렌더링 시작');
   const { user } = useAuth();
   const isSuperAdmin = user?.level === 'A-SuperAdmin';
   const location = useLocation();
   const navigate = useNavigate();
   
+  console.log('[PurchaseOrders] 현재 경로:', location.pathname);
+  console.log('[PurchaseOrders] user:', user);
+  
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [totalItems, setTotalItems] = useState(0); // 전체 발주 개수 (서버에서 받음)
   const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    console.log('[PurchaseOrders] useEffect 실행 - 컴포넌트 마운트 또는 경로 변경');
+    console.log('[PurchaseOrders] location.pathname:', location.pathname);
+  }, [location.pathname]);
   const [statusFilter, setStatusFilter] = useState<string>('전체');
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });

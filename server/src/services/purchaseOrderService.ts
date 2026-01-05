@@ -272,9 +272,11 @@ export class PurchaseOrderService {
 
     // 새 발주 기본 정보 생성
     // - 수량, 단가, 날짜는 사용자 입력값 사용
+    // - product_id: 원본 발주의 product_id를 그대로 복사
     // - 상품정보: 사이즈, 무게, 포장 박스 사이즈, 소포장 개수 복제
     // - 가공/포장 탭(work_items): 작업 항목 및 이미지 복제
     const newOrderData: CreatePurchaseOrderDTO = {
+      product_id: sourceOrder.product_id || undefined, // 원본의 product_id 복사
       product_name: sourceOrder.product_name,
       product_name_chinese: sourceOrder.product_name_chinese || undefined,
       product_category: sourceOrder.product_category,

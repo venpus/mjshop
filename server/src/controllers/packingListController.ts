@@ -18,6 +18,7 @@ import {
   deletePackingListInvoiceImage,
 } from '../utils/upload.js';
 import path from 'path';
+import { logger } from '../utils/logger.js';
 
 export class PackingListController {
   private service: PackingListService;
@@ -28,17 +29,36 @@ export class PackingListController {
 
   /**
    * 모든 패킹리스트 조회
-   * GET /api/packing-lists
+   * GET /api/packing-lists?year=2024&month=12
    */
   getAllPackingLists = async (req: Request, res: Response) => {
     try {
-      const packingLists = await this.service.getAllPackingLists();
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
+      
+      // year와 month가 모두 제공되거나 모두 없는 경우만 허용
+      if ((year && !month) || (!year && month)) {
+        return res.status(400).json({
+          success: false,
+          error: 'year와 month는 함께 제공되어야 합니다.',
+        });
+      }
+      
+      // month 유효성 검사 (1-12)
+      if (month && (month < 1 || month > 12)) {
+        return res.status(400).json({
+          success: false,
+          error: 'month는 1부터 12 사이의 값이어야 합니다.',
+        });
+      }
+      
+      const packingLists = await this.service.getAllPackingLists(year, month);
       res.json({
         success: true,
         data: packingLists,
       });
     } catch (error) {
-      console.error('패킹리스트 조회 오류:', error);
+      logger.error('패킹리스트 조회 오류:', error);
       res.status(500).json({
         success: false,
         error: '패킹리스트 조회 중 오류가 발생했습니다.',
@@ -73,7 +93,7 @@ export class PackingListController {
         data: packingList,
       });
     } catch (error) {
-      console.error('패킹리스트 조회 오류:', error);
+      logger.error('패킹리스트 조회 오류:', error);
       res.status(500).json({
         success: false,
         error: '패킹리스트 조회 중 오류가 발생했습니다.',
@@ -101,7 +121,7 @@ export class PackingListController {
         data: packingList,
       });
     } catch (error) {
-      console.error('패킹리스트 조회 오류:', error);
+      logger.error('패킹리스트 조회 오류:', error);
       res.status(500).json({
         success: false,
         error: '패킹리스트 조회 중 오류가 발생했습니다.',
@@ -131,7 +151,7 @@ export class PackingListController {
         data: packingList,
       });
     } catch (error: any) {
-      console.error('패킹리스트 생성 오류:', error);
+      logger.error('패킹리스트 생성 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message || '패킹리스트 생성 중 오류가 발생했습니다.',
@@ -160,7 +180,7 @@ export class PackingListController {
         data: packingList,
       });
     } catch (error: any) {
-      console.error('패킹리스트 수정 오류:', error);
+      logger.error('패킹리스트 수정 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message || '패킹리스트 수정 중 오류가 발생했습니다.',
@@ -199,7 +219,7 @@ export class PackingListController {
         message: 'A레벨 관리자 비용 지불 완료 상태가 업데이트되었습니다.',
       });
     } catch (error: any) {
-      console.error('A레벨 관리자 비용 지불 완료 상태 업데이트 오류:', error);
+      logger.error('A레벨 관리자 비용 지불 완료 상태 업데이트 오류:', error);
 
       if (error.message.includes('찾을 수 없습니다')) {
         return res.status(404).json({
@@ -235,7 +255,7 @@ export class PackingListController {
         message: '패킹리스트가 삭제되었습니다.',
       });
     } catch (error: any) {
-      console.error('패킹리스트 삭제 오류:', error);
+      logger.error('패킹리스트 삭제 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message || '패킹리스트 삭제 중 오류가 발생했습니다.',
@@ -276,7 +296,7 @@ export class PackingListController {
         data: item,
       });
     } catch (error: any) {
-      console.error('패킹리스트 아이템 생성 오류:', error);
+      logger.error('패킹리스트 아이템 생성 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message || '패킹리스트 아이템 생성 중 오류가 발생했습니다.',
@@ -305,7 +325,7 @@ export class PackingListController {
         data: item,
       });
     } catch (error: any) {
-      console.error('패킹리스트 아이템 수정 오류:', error);
+      logger.error('패킹리스트 아이템 수정 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message || '패킹리스트 아이템 수정 중 오류가 발생했습니다.',
@@ -333,7 +353,7 @@ export class PackingListController {
         message: '패킹리스트 아이템이 삭제되었습니다.',
       });
     } catch (error: any) {
-      console.error('패킹리스트 아이템 삭제 오류:', error);
+      logger.error('패킹리스트 아이템 삭제 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message || '패킹리스트 아이템 삭제 중 오류가 발생했습니다.',
@@ -368,7 +388,7 @@ export class PackingListController {
         data: invoice,
       });
     } catch (error: any) {
-      console.error('내륙송장 생성 오류:', error);
+      logger.error('내륙송장 생성 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message || '내륙송장 생성 중 오류가 발생했습니다.',
@@ -399,7 +419,7 @@ export class PackingListController {
         message: '내륙송장이 수정되었습니다.',
       });
     } catch (error: any) {
-      console.error('내륙송장 수정 오류:', error);
+      logger.error('내륙송장 수정 오류:', error);
       if (error.message.includes('찾을 수 없습니다')) {
         return res.status(404).json({
           success: false,
@@ -433,7 +453,7 @@ export class PackingListController {
         message: '내륙송장이 삭제되었습니다.',
       });
     } catch (error: any) {
-      console.error('내륙송장 삭제 오류:', error);
+      logger.error('내륙송장 삭제 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message || '내륙송장 삭제 중 오류가 발생했습니다.',
@@ -473,7 +493,7 @@ export class PackingListController {
         data: arrival,
       });
     } catch (error: any) {
-      console.error('한국도착일 생성 오류:', error);
+      logger.error('한국도착일 생성 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message || '한국도착일 생성 중 오류가 발생했습니다.',
@@ -502,7 +522,7 @@ export class PackingListController {
         data: arrival,
       });
     } catch (error: any) {
-      console.error('한국도착일 수정 오류:', error);
+      logger.error('한국도착일 수정 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message || '한국도착일 수정 중 오류가 발생했습니다.',
@@ -530,7 +550,7 @@ export class PackingListController {
         message: '한국도착일이 삭제되었습니다.',
       });
     } catch (error: any) {
-      console.error('한국도착일 삭제 오류:', error);
+      logger.error('한국도착일 삭제 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message || '한국도착일 삭제 중 오류가 발생했습니다.',
@@ -560,9 +580,9 @@ export class PackingListController {
         data: shippingCost,
       });
     } catch (error: any) {
-      console.error('배송비 조회 오류:', error);
-      console.error('오류 상세:', error.message);
-      console.error('오류 스택:', error.stack);
+      logger.error('배송비 조회 오류:', error);
+      logger.error('오류 상세:', error.message);
+      logger.error('오류 스택:', error.stack);
       res.status(500).json({
         success: false,
         error: error.message || '배송비 조회 중 오류가 발생했습니다.',
@@ -592,7 +612,7 @@ export class PackingListController {
         data: summary,
       });
     } catch (error) {
-      console.error('배송 수량 조회 오류:', error);
+      logger.error('배송 수량 조회 오류:', error);
       res.status(500).json({
         success: false,
         error: '배송 수량 조회 중 오류가 발생했습니다.',
@@ -674,7 +694,7 @@ export class PackingListController {
         },
       });
     } catch (error: any) {
-      console.error('내륙송장 이미지 업로드 오류:', error);
+      logger.error('내륙송장 이미지 업로드 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message || '내륙송장 이미지 업로드 중 오류가 발생했습니다.',
@@ -709,10 +729,78 @@ export class PackingListController {
         message: '이미지가 삭제되었습니다.',
       });
     } catch (error: any) {
-      console.error('내륙송장 이미지 삭제 오류:', error);
+      logger.error('내륙송장 이미지 삭제 오류:', error);
       res.status(500).json({
         success: false,
         error: error.message || '내륙송장 이미지 삭제 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 재포장 요구사항 업데이트
+   * PUT /api/packing-lists/:id/repackaging-requirements
+   */
+  updateRepackagingRequirements = async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          error: '유효하지 않은 패킹리스트 ID입니다.',
+        });
+      }
+
+      const { repackaging_requirements } = req.body;
+      await this.service.updateRepackagingRequirements(id, repackaging_requirements || null);
+
+      res.json({
+        success: true,
+        message: '재포장 요구사항이 업데이트되었습니다.',
+      });
+    } catch (error: any) {
+      logger.error('재포장 요구사항 업데이트 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '재포장 요구사항 업데이트 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 해외송장 일괄 저장/업데이트
+   * PUT /api/packing-lists/:id/overseas-invoices
+   */
+  saveOverseasInvoices = async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          error: '유효하지 않은 패킹리스트 ID입니다.',
+        });
+      }
+
+      const { overseas_invoices } = req.body;
+      if (!Array.isArray(overseas_invoices)) {
+        return res.status(400).json({
+          success: false,
+          error: '해외송장 데이터가 올바르지 않습니다.',
+        });
+      }
+
+      const savedInvoices = await this.service.saveOverseasInvoices(id, overseas_invoices);
+
+      res.json({
+        success: true,
+        data: savedInvoices,
+        message: '해외송장이 저장되었습니다.',
+      });
+    } catch (error: any) {
+      logger.error('해외송장 저장 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '해외송장 저장 중 오류가 발생했습니다.',
       });
     }
   };

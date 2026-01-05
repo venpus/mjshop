@@ -68,6 +68,7 @@ export function Sidebar({
   const isLevelA = user?.level === 'A-SuperAdmin';
   const isLevelB0 = user?.level === 'B0: 중국Admin';
   const isLevelC0 = user?.level === 'C0: 한국Admin';
+  const isLevelD0 = user?.level === 'D0: 비전 담당자';
   // A, B0, C0 레벨 관리자 (중국협업 메뉴 접근 가능) - 권한 시스템 적용 시 변경 필요
   const canAccessChinaCooperation = isLevelA || isLevelB0 || isLevelC0;
   // A, C0 레벨 관리자 (쇼핑몰 관리 메뉴 접근 가능)
@@ -90,19 +91,40 @@ export function Sidebar({
         )}
       </div>
       <nav className={`px-4 space-y-1 flex-1 overflow-y-auto ${isCollapsed ? 'px-2' : ''}`}>
-        {/* 대시보드 */}
-        <button
-          onClick={() => onPageChange("dashboard")}
-          className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
-            currentPage === "dashboard"
-              ? "bg-purple-50 text-purple-600"
-              : "text-gray-700 hover:bg-gray-50"
-          }`}
-          title={isCollapsed ? t('menu.dashboard') : undefined}
-        >
-          <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
-          {!isCollapsed && <span>{t('menu.dashboard')}</span>}
-        </button>
+        {/* D0 레벨 관리자는 패킹리스트 메뉴만 표시 */}
+        {isLevelD0 ? (
+          <>
+            {/* 패킹리스트 */}
+            {hasPermission('shipping-history', 'read') && (
+              <button
+                onClick={() => onPageChange("shipping-history")}
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
+                  currentPage === "shipping-history"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
+                title={isCollapsed ? t('menu.packingList') : undefined}
+              >
+                <PackageSearch className="w-5 h-5 flex-shrink-0" />
+                {!isCollapsed && <span>{t('menu.packingList')}</span>}
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            {/* 대시보드 */}
+            <button
+              onClick={() => onPageChange("dashboard")}
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
+                currentPage === "dashboard"
+                  ? "bg-purple-50 text-purple-600"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
+              title={isCollapsed ? t('menu.dashboard') : undefined}
+            >
+              <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
+              {!isCollapsed && <span>{t('menu.dashboard')}</span>}
+            </button>
 
         {/* 중국협업 메뉴 (A, B0, C0 레벨만 표시) */}
         {canAccessChinaCooperation && (
@@ -391,6 +413,8 @@ export function Sidebar({
             <Shield className="w-5 h-5 flex-shrink-0" />
             {!isCollapsed && <span>{t('menu.permissions')}</span>}
           </button>
+        )}
+          </>
         )}
       </nav>
     </aside>

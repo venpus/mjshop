@@ -36,10 +36,10 @@ export function ImageGridView({ images, productName, poNumber, productMainImage,
     const imageList: ImageItem[] = [];
     
     // 1. 상품 메인 이미지를 첫 번째로 추가
-    if (productMainImage) {
+    if (productMainImage && productMainImage.trim()) {
       imageList.push({
         id: 'main-image',
-        url: productMainImage,
+        url: productMainImage, // 이미 getFullImageUrl로 변환되어 있음
         type: 'main',
         label: '메인 이미지',
         isMainImage: true,
@@ -48,13 +48,15 @@ export function ImageGridView({ images, productName, poNumber, productMainImage,
     
     // 2. 발주 이미지들을 추가
     images.forEach((img) => {
-      imageList.push({
-        id: `po-${img.id}`,
-        url: img.url,
-        type: img.type,
-        label: IMAGE_TYPE_LABELS[img.type] || img.type,
-        isMainImage: false,
-      });
+      if (img.url && img.url.trim()) {
+        imageList.push({
+          id: `po-${img.id}`,
+          url: img.url, // 이미 getFullImageUrl로 변환되어 있을 수 있음
+          type: img.type,
+          label: IMAGE_TYPE_LABELS[img.type] || img.type,
+          isMainImage: false,
+        });
+      }
     });
     
     return imageList;
@@ -159,34 +161,61 @@ export function ImageGridView({ images, productName, poNumber, productMainImage,
       {/* 이미지 그리드 */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {allImages.map((image) => {
-          const fullUrl = getFullImageUrl(image.url);
+          // 이미지 URL 처리: 이미 전체 URL이면 그대로 사용, 아니면 변환
+          let fullUrl = image.url || '';
+          if (!fullUrl) {
+            console.warn('빈 이미지 URL:', image);
+            return null;
+          }
+          
+          // 이미 전체 URL이 아니면 변환 (상대 경로인 경우)
+          if (!fullUrl.startsWith('http://') && !fullUrl.startsWith('https://') && !fullUrl.startsWith('data:')) {
+            fullUrl = getFullImageUrl(fullUrl);
+          }
+          
           return (
             <div
               key={image.id}
               className="group relative bg-white rounded-lg border border-gray-200 hover:border-purple-300 hover:shadow-lg transition-all duration-200 overflow-hidden aspect-square cursor-pointer"
               onClick={() => setSelectedImage(fullUrl)}
             >
+              {/* 이미지 */}
               <img
                 src={fullUrl}
                 alt={`${productName} 이미지 ${image.id}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover bg-gray-100"
                 loading="lazy"
+                onLoad={() => {
+                  console.log('이미지 로드 성공:', fullUrl);
+                }}
                 onError={(e) => {
+                  console.error('이미지 로드 실패:', {
+                    url: fullUrl,
+                    originalUrl: image.url,
+                    imageId: image.id,
+                    isMainImage: image.isMainImage,
+                  });
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
                   const parent = target.parentElement;
-                  if (parent) {
-                    parent.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-gray-100"><svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>';
+                  if (parent && !parent.querySelector('.fallback-icon')) {
+                    const fallback = document.createElement('div');
+                    fallback.className = 'fallback-icon absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100';
+                    fallback.innerHTML = '<svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
+                    parent.appendChild(fallback);
                   }
                 }}
               />
 
-              {/* 오버레이 */}
-              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity duration-200 flex items-center justify-center gap-2">
+              {/* 오버레이 - 호버 시에만 표시 */}
+              <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-40 transition-opacity duration-200 flex items-center justify-center gap-2 pointer-events-none z-10">
                 <button
-                  onClick={(e) => handleDownload(e, image)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownload(e, image);
+                  }}
                   disabled={downloading === image.url}
-                  className="opacity-0 group-hover:opacity-100 bg-white text-gray-900 p-2 rounded-lg hover:bg-gray-100 transition-opacity disabled:opacity-50"
+                  className="opacity-0 group-hover:opacity-100 bg-white text-gray-900 p-2 rounded-lg hover:bg-gray-100 transition-opacity disabled:opacity-50 pointer-events-auto"
                   title="다운로드"
                 >
                   {downloading === image.url ? (
@@ -196,9 +225,12 @@ export function ImageGridView({ images, productName, poNumber, productMainImage,
                   )}
                 </button>
                 <button
-                  onClick={(e) => handleCopy(e, image)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopy(e, image);
+                  }}
                   disabled={copying === image.url}
-                  className="opacity-0 group-hover:opacity-100 bg-white text-gray-900 p-2 rounded-lg hover:bg-gray-100 transition-opacity disabled:opacity-50"
+                  className="opacity-0 group-hover:opacity-100 bg-white text-gray-900 p-2 rounded-lg hover:bg-gray-100 transition-opacity disabled:opacity-50 pointer-events-auto"
                   title="복사"
                 >
                   {copying === image.url ? (
@@ -210,7 +242,7 @@ export function ImageGridView({ images, productName, poNumber, productMainImage,
               </div>
 
               {/* 이미지 타입 라벨 */}
-              <div className="absolute top-2 left-2">
+              <div className="absolute top-2 left-2 z-20">
                 <span className={`text-white text-xs px-2 py-1 rounded ${
                   image.isMainImage ? 'bg-blue-500' : 'bg-purple-500'
                 }`}>

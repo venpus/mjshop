@@ -27,6 +27,8 @@ export interface PaymentRequestPublic extends PaymentRequest {
     po_number?: string;
     packing_code?: string;
     product_name?: string;
+    product_image?: string;
+    shipping_date?: string;
   };
   requester_name?: string;
   completer_name?: string;

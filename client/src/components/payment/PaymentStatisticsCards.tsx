@@ -33,7 +33,7 @@ interface PaymentStatistics {
 
 interface PaymentStatisticsCardsProps {
   refreshTrigger?: number; // 새로고침 트리거
-  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
+  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
 }
 
 /**

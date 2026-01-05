@@ -10,7 +10,7 @@ interface AdminAccount {
   name: string;
   phone: string;
   email: string;
-  level: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin';
+  level: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
   is_active: boolean;
 }
 
@@ -197,6 +197,8 @@ export function AdminAccount() {
         return 'bg-purple-100 text-purple-800';
       case 'C0: 한국Admin':
         return 'bg-blue-100 text-blue-800';
+      case 'D0: 비전 담당자':
+        return 'bg-green-100 text-green-800';
     }
   };
 
