@@ -6,6 +6,7 @@ import { PackingListCreateModal, type PackingListFormData } from './PackingListC
 import { useAuth } from '../contexts/AuthContext';
 import { GalleryImageModal } from './GalleryImageModal';
 import { PackingListTable } from './packing-list/PackingListTable';
+import { ExportButton } from './packing-list/ExportButton';
 import { usePackingListSelection } from '../hooks/usePackingListSelection';
 import { convertItemToFormData, getGroupId } from '../utils/packingListUtils';
 import type { PackingListItem } from './packing-list/types';
@@ -941,6 +942,12 @@ export function ShippingHistory() {
                   <Trash2 className="w-4 h-4" />
                   삭제
                 </button>
+                {isSuperAdmin && (
+                  <ExportButton
+                    selectedKeys={selectedKeys}
+                    packingListItems={packingListItems}
+                  />
+                )}
               </>
             )}
             {!isD0Level && (
