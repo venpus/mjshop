@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, X, Upload } from 'lucide-react';
 import type { PackingListItem, DomesticInvoice } from '../types';
-import { uploadDomesticInvoiceImages, deleteDomesticInvoiceImage } from '../../../api/packingListApi';
+import { uploadDomesticInvoiceImages, deleteDomesticInvoiceImage, createDomesticInvoice } from '../../../api/packingListApi';
 import { getGroupId } from '../../../utils/packingListUtils';
 import { ProductImagePreview } from '../../../components/ui/product-image-preview';
 
@@ -85,7 +85,6 @@ export function DomesticInvoiceCell({
       
       // 내륙송장이 아직 서버에 생성되지 않은 경우, 먼저 생성 (송장번호 없이도 가능)
       if (!invoiceId) {
-        const { createDomesticInvoice } = await import('../../../api/packingListApi');
         const newInvoice = await createDomesticInvoice(packingListId, {
           invoice_number: invoice?.number || '', // 송장번호가 없으면 빈 문자열
         });
