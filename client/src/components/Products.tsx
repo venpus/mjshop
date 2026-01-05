@@ -164,15 +164,26 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
   const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
-  // 이미지 URL을 전체 URL로 변환하는 헬퍼 함수
+  // 이미지 URL을 전체 URL로 변환하는 헬퍼 함수 (캐시 버스팅 포함)
   const getFullImageUrl = (imageUrl: string | null | undefined): string => {
     if (!imageUrl) return '';
+    
+    let fullUrl: string;
     // 이미 전체 URL인 경우 그대로 반환
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      return imageUrl;
+      fullUrl = imageUrl;
+    } else {
+      // 상대 경로인 경우 서버 베이스 URL 추가
+      fullUrl = `${SERVER_BASE_URL}${imageUrl}`;
     }
-    // 상대 경로인 경우 서버 베이스 URL 추가
-    return `${SERVER_BASE_URL}${imageUrl}`;
+    
+    // 캐시 버스팅: 이미 쿼리 파라미터가 있으면 추가하지 않음
+    if (!fullUrl.includes('?')) {
+      const cacheBuster = Math.floor(Date.now() / (1000 * 60 * 60 * 24)); // 일 단위
+      return `${fullUrl}?v=${cacheBuster}`;
+    }
+    
+    return fullUrl;
   };
 
   const handleSaveProduct = async (formData: ProductFormDataWithFiles) => {

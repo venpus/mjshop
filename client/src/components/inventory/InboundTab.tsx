@@ -92,13 +92,24 @@ export function InboundTab() {
     return products.find((p) => p.name === productName) || null;
   };
 
-  // 이미지 URL 변환
+  // 이미지 URL 변환 (캐시 버스팅 포함)
   const getFullImageUrl = (imageUrl: string | null | undefined): string => {
     if (!imageUrl) return '';
+    
+    let fullUrl: string;
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      return imageUrl;
+      fullUrl = imageUrl;
+    } else {
+      fullUrl = `${SERVER_BASE_URL}${imageUrl}`;
     }
-    return `${SERVER_BASE_URL}${imageUrl}`;
+    
+    // 캐시 버스팅: 이미 쿼리 파라미터가 있으면 추가하지 않음
+    if (!fullUrl.includes('?')) {
+      const cacheBuster = Math.floor(Date.now() / (1000 * 60 * 60 * 24)); // 일 단위
+      return `${fullUrl}?v=${cacheBuster}`;
+    }
+    
+    return fullUrl;
   };
 
   // 입고 데이터 변환 및 그룹화

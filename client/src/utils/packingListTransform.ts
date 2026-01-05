@@ -16,12 +16,25 @@ import type { FactoryShipment } from '../components/tabs/FactoryShippingTab';
 const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
 /**
- * 서버 이미지 URL을 전체 URL로 변환
+ * 서버 이미지 URL을 전체 URL로 변환 (캐시 버스팅 포함)
  */
 function getFullImageUrl(imageUrl: string | null | undefined): string {
   if (!imageUrl) return '';
-  if (imageUrl.startsWith('http')) return imageUrl;
-  return `${SERVER_BASE_URL}${imageUrl}`;
+  
+  let fullUrl: string;
+  if (imageUrl.startsWith('http')) {
+    fullUrl = imageUrl;
+  } else {
+    fullUrl = `${SERVER_BASE_URL}${imageUrl}`;
+  }
+  
+  // 캐시 버스팅: 이미 쿼리 파라미터가 있으면 추가하지 않음
+  if (!fullUrl.includes('?')) {
+    const cacheBuster = Math.floor(Date.now() / (1000 * 60 * 60 * 24)); // 일 단위
+    return `${fullUrl}?v=${cacheBuster}`;
+  }
+  
+  return fullUrl;
 }
 
 /**
