@@ -71,6 +71,7 @@ export interface PaymentHistoryItem {
   shipment_date?: string | null; // 발송일 (정렬용)
   pl_created_at?: string | null; // 패킹리스트 생성일 (정렬용)
   packing_list_ids?: string; // 패킹리스트 ID 목록 (쉼표로 구분)
+  korea_arrival_dates?: string[]; // 한국 도착일 목록
 }
 
 export interface PaymentHistoryFilter {

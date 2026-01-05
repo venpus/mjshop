@@ -74,6 +74,7 @@ export interface PaymentHistoryItem {
   shipment_date?: string | null; // 발송일 (정렬용)
   pl_created_at?: string | null; // 패킹리스트 생성일 (정렬용)
   packing_list_ids?: string; // 패킹리스트 ID 목록 (쉼표로 구분)
+  korea_arrival_dates?: string[]; // 한국 도착일 목록
 }
 
 export interface PaymentHistoryFilter {
@@ -467,6 +468,27 @@ export class PaymentHistoryService {
       // 패킹리스트 ID 목록 가져오기
       const packingListIds = row.packing_list_ids ? row.packing_list_ids.split(',').map((id: string) => id.trim()) : [];
 
+      // 한국 도착일 조회 (패킹리스트 코드에 속한 모든 패킹리스트의 아이템들의 한국 도착일)
+      let koreaArrivalDates: string[] = [];
+      try {
+        if (packingListIds.length > 0) {
+          const placeholders = packingListIds.map(() => '?').join(',');
+          const [koreaArrivalRows] = await pool.execute<RowDataPacket[]>(
+            `SELECT DISTINCT ka.arrival_date
+             FROM packing_list_korea_arrivals ka
+             INNER JOIN packing_list_items pli ON ka.packing_list_item_id = pli.id
+             WHERE pli.packing_list_id IN (${placeholders})
+             ORDER BY ka.arrival_date ASC`,
+            packingListIds
+          );
+          koreaArrivalDates = koreaArrivalRows.map((r) => 
+            formatDateToKSTString(r.arrival_date)
+          );
+        }
+      } catch (error) {
+        console.error(`한국 도착일 조회 오류 (Code: ${row.code}):`, error);
+      }
+
       // 지급요청 정보 조회 (패킹리스트 코드에 속한 모든 패킹리스트 ID에 대해 조회)
       let pendingRequest = null;
       try {
@@ -615,6 +637,7 @@ export class PaymentHistoryService {
         admin_cost_paid_date: row.admin_cost_paid_date
           ? formatDateToKSTString(row.admin_cost_paid_date)
           : null,
+        korea_arrival_dates: koreaArrivalDates.length > 0 ? koreaArrivalDates : undefined,
       });
     }
 

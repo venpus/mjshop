@@ -802,6 +802,19 @@ export function PaymentHistoryRow({
         <td className="px-4 py-3 text-sm text-gray-900">
           {item.logistics_company || '-'}
         </td>
+        <td className="px-4 py-3 text-sm text-gray-900">
+          {item.korea_arrival_dates && item.korea_arrival_dates.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              {item.korea_arrival_dates.map((date, idx) => (
+                <span key={idx} className="text-gray-700">
+                  {date}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </td>
         <td className="px-4 py-3 text-sm text-gray-900 text-right">
           {item.actual_weight ? `${item.actual_weight.toLocaleString()}kg` : '-'}
         </td>

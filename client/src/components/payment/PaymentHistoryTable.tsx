@@ -569,6 +569,9 @@ export function PaymentHistoryTable({ type, onStatisticsRefresh, userLevel }: Pa
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       물류회사
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      한국 도착일
+                    </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       실중량 (kg)
                     </th>
@@ -656,13 +659,13 @@ export function PaymentHistoryTable({ type, onStatisticsRefresh, userLevel }: Pa
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={type === 'packing-lists' ? (isLevelC ? 11 : 14) : (isLevelC ? 11 : 14)} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={type === 'packing-lists' ? (isLevelC ? 12 : 15) : (isLevelC ? 11 : 14)} className="px-4 py-8 text-center text-gray-500">
                     로딩 중...
                   </td>
                 </tr>
               ) : displayData.length === 0 ? (
                 <tr>
-                  <td colSpan={type === 'packing-lists' ? (isLevelC ? 11 : 14) : (isLevelC ? 11 : 14)} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={type === 'packing-lists' ? (isLevelC ? 12 : 15) : (isLevelC ? 11 : 14)} className="px-4 py-8 text-center text-gray-500">
                     결제 내역이 없습니다.
                   </td>
                 </tr>

@@ -107,10 +107,10 @@ export function ShippingHistory() {
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
       
       console.log('[ShippingHistory] 데이터 로드 시작 - 사용자 레벨:', user?.level);
-      console.log('[ShippingHistory] 조회 조건 - yearMonth:', selectedYearMonth, 'showAllMonths:', showAllMonths);
+      console.log('[ShippingHistory] 조회 조건 - yearMonth:', selectedYearMonth, 'showAllMonths:', showAllMonths, 'searchTerm:', searchTerm);
       
-      // 월별 조회 또는 전체 조회
-      const packingListsPromise = showAllMonths
+      // 검색어가 있으면 전체 데이터를 로드, 없으면 월별 필터 적용
+      const packingListsPromise = (searchTerm.trim() || showAllMonths)
         ? getAllPackingLists()
         : getPackingListsByMonth(selectedYear, selectedMonth);
       
@@ -154,7 +154,7 @@ export function ShippingHistory() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYearMonth, showAllMonths, user?.level]);
+  }, [selectedYearMonth, showAllMonths, searchTerm, user?.level]);
 
   useEffect(() => {
     loadPackingLists();
