@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { PackageSearch, Plus, Edit, Trash2, Save, Filter, X } from 'lucide-react';
+import { PackageSearch, Plus, Edit, Trash2, Save, Filter, X, Calendar } from 'lucide-react';
 import { SearchBar } from './ui/search-bar';
 import { PackingListCreateModal, type PackingListFormData } from './PackingListCreateModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -984,58 +984,75 @@ export function ShippingHistory() {
           >
             검색
           </button>
-          
-          {/* 월별 필터 */}
-          <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 bg-white">
-            <label className="text-sm text-gray-600 whitespace-nowrap">기간:</label>
-            {showAllMonths ? (
-              <button
-                onClick={() => setShowAllMonths(false)}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
-                전체 보기
-              </button>
-            ) : (
-              <>
-                <select
-                  value={selectedYearMonth}
-                  onChange={(e) => {
-                    setSelectedYearMonth(e.target.value);
-                    setShowAllMonths(false);
-                  }}
-                  className="border-0 focus:outline-none focus:ring-0 text-sm font-medium cursor-pointer min-w-[130px]"
-                >
-                  {(() => {
-                    const options: Array<{ value: string; label: string }> = [];
-                    
-                    // 최근 5년간의 모든 월 생성 (최신순)
-                    for (let yearOffset = 0; yearOffset < 5; yearOffset++) {
-                      const year = currentYear - yearOffset;
-                      const maxMonth = year === currentYear ? currentMonth : 12;
-                      
-                      for (let month = maxMonth; month >= 1; month--) {
-                        const yearMonth = `${year}-${month.toString().padStart(2, '0')}`;
-                        const displayText = `${year}년${month}월`;
-                        options.push({ value: yearMonth, label: displayText });
-                      }
-                    }
-                    
-                    return options.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ));
-                  })()}
-                </select>
-                <button
-                  onClick={() => setShowAllMonths(true)}
-                  className="text-xs text-gray-500 hover:text-gray-700 ml-2 whitespace-nowrap"
-                >
-                  전체 보기
-                </button>
-              </>
-            )}
+        </div>
+        
+        {/* 월별 필터 섹션 */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg px-4 py-3 shadow-sm">
+            <div className="flex items-center justify-center w-10 h-10 bg-blue-500 rounded-lg">
+              <Calendar className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">기간 선택:</label>
+                {showAllMonths ? (
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-md font-medium text-sm">
+                      전체 보기
+                    </span>
+                    <button
+                      onClick={() => setShowAllMonths(false)}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium underline"
+                    >
+                      월별로 보기
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedYearMonth}
+                      onChange={(e) => {
+                        setSelectedYearMonth(e.target.value);
+                        setShowAllMonths(false);
+                      }}
+                      className="px-3 py-1.5 border-2 border-blue-400 bg-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium cursor-pointer min-w-[140px] shadow-sm"
+                    >
+                      {(() => {
+                        const options: Array<{ value: string; label: string }> = [];
+                        
+                        // 최근 5년간의 모든 월 생성 (최신순)
+                        for (let yearOffset = 0; yearOffset < 5; yearOffset++) {
+                          const year = currentYear - yearOffset;
+                          const maxMonth = year === currentYear ? currentMonth : 12;
+                          
+                          for (let month = maxMonth; month >= 1; month--) {
+                            const yearMonth = `${year}-${month.toString().padStart(2, '0')}`;
+                            const displayText = `${year}년${month}월`;
+                            options.push({ value: yearMonth, label: displayText });
+                          }
+                        }
+                        
+                        return options.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ));
+                      })()}
+                    </select>
+                    <button
+                      onClick={() => setShowAllMonths(true)}
+                      className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors whitespace-nowrap border border-gray-300"
+                    >
+                      전체 보기
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
+          <p className="text-xs text-gray-500 ml-14">
+            💡 월별 페이지, 또는 전체 보기가 가능합니다
+          </p>
         </div>
         {!isD0Level && (
           <div className="flex gap-2">
