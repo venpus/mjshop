@@ -45,12 +45,18 @@ interface Product {
   stock: number;
 }
 
+interface PurchaseOrder {
+  id: string;
+  product_main_image: string | null;
+}
+
 export function InboundTab() {
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
   const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
   const [packingLists, setPackingLists] = useState<PackingListWithItems[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [inputSearchTerm, setInputSearchTerm] = useState('');
@@ -61,10 +67,13 @@ export function InboundTab() {
       try {
         setIsLoading(true);
         
-        // 패킹리스트와 상품 데이터 병렬 로드
-        const [packingListsData, productsResponse] = await Promise.all([
+        // 패킹리스트, 상품, 발주 데이터 병렬 로드
+        const [packingListsData, productsResponse, purchaseOrdersResponse] = await Promise.all([
           getAllPackingLists(),
           fetch(`${API_BASE_URL}/products`, {
+            credentials: 'include',
+          }),
+          fetch(`${API_BASE_URL}/purchase-orders`, {
             credentials: 'include',
           }),
         ]);
@@ -75,6 +84,18 @@ export function InboundTab() {
           const productsData = await productsResponse.json();
           if (productsData.success) {
             setProducts(productsData.data || []);
+          }
+        }
+
+        if (purchaseOrdersResponse.ok) {
+          const purchaseOrdersData = await purchaseOrdersResponse.json();
+          if (purchaseOrdersData.success) {
+            // 발주 목록에서 id와 product_main_image만 추출
+            const orders = (purchaseOrdersData.data || []).map((po: any) => ({
+              id: po.id,
+              product_main_image: po.product_main_image || null,
+            }));
+            setPurchaseOrders(orders);
           }
         }
       } catch (error) {
@@ -90,6 +111,12 @@ export function InboundTab() {
   // 상품명으로 상품 정보 찾기
   const findProductByName = (productName: string): Product | null => {
     return products.find((p) => p.name === productName) || null;
+  };
+
+  // 발주 ID로 발주 정보 찾기
+  const findPurchaseOrderById = (purchaseOrderId: string | null): PurchaseOrder | null => {
+    if (!purchaseOrderId) return null;
+    return purchaseOrders.find((po) => po.id === purchaseOrderId) || null;
   };
 
   // 이미지 URL 변환 (캐시 버스팅 포함)
@@ -122,14 +149,23 @@ export function InboundTab() {
         if (item.korea_arrivals && item.korea_arrivals.length > 0) {
           // 상품 정보 찾기 (상품명으로 매칭)
           const product = findProductByName(item.product_name);
+          const purchaseOrder = findPurchaseOrderById(item.purchase_order_id);
 
           item.korea_arrivals.forEach((arrival) => {
+            // 발주의 product_main_image를 우선 사용, 없으면 products 테이블, 마지막으로 패킹리스트 아이템의 이미지
+            let productImage = '';
+            if (purchaseOrder?.product_main_image) {
+              productImage = getFullImageUrl(purchaseOrder.product_main_image);
+            } else if (product?.main_image) {
+              productImage = getFullImageUrl(product.main_image);
+            } else if (item.product_image_url) {
+              productImage = getFullImageUrl(item.product_image_url);
+            }
+
             items.push({
               id: `${item.id}-${arrival.id}`,
               arrivalDate: arrival.arrival_date,
-              productImage: product?.main_image 
-                ? getFullImageUrl(product.main_image)
-                : (item.product_image_url ? getFullImageUrl(item.product_image_url) : ''),
+              productImage: productImage,
               productName: item.product_name,
               purchaseOrderId: item.purchase_order_id,
               logisticsCompany: packingList.logistics_company || '',

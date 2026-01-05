@@ -23,6 +23,11 @@ interface Product {
   main_image: string | null;
 }
 
+interface PurchaseOrder {
+  id: string;
+  product_main_image: string | null;
+}
+
 export function StockDetail() {
   const { groupKey: encodedGroupKey } = useParams<{ groupKey: string }>();
   const navigate = useNavigate();
@@ -31,6 +36,7 @@ export function StockDetail() {
 
   const [packingLists, setPackingLists] = useState<PackingListWithItems[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [outboundRecords, setOutboundRecords] = useState<StockOutboundRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'inbound' | 'outbound'>('inbound');
@@ -63,15 +69,24 @@ export function StockDetail() {
     return products.find((p) => p.name === productName) || null;
   };
 
+  // 발주 ID로 발주 정보 찾기
+  const findPurchaseOrderById = (purchaseOrderId: string | null): PurchaseOrder | null => {
+    if (!purchaseOrderId) return null;
+    return purchaseOrders.find((po) => po.id === purchaseOrderId) || null;
+  };
+
   // 데이터 로드
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
 
-        const [packingListsData, productsResponse, outboundRecordsData] = await Promise.all([
+        const [packingListsData, productsResponse, purchaseOrdersResponse, outboundRecordsData] = await Promise.all([
           getAllPackingLists(),
           fetch(`${API_BASE_URL}/products`, {
+            credentials: 'include',
+          }),
+          fetch(`${API_BASE_URL}/purchase-orders`, {
             credentials: 'include',
           }),
           groupKey ? getOutboundRecordsByGroupKey(groupKey).catch(() => []) : Promise.resolve([]),
@@ -83,6 +98,18 @@ export function StockDetail() {
           const productsData = await productsResponse.json();
           if (productsData.success) {
             setProducts(productsData.data || []);
+          }
+        }
+
+        if (purchaseOrdersResponse.ok) {
+          const purchaseOrdersData = await purchaseOrdersResponse.json();
+          if (purchaseOrdersData.success) {
+            // 발주 목록에서 id와 product_main_image만 추출
+            const orders = (purchaseOrdersData.data || []).map((po: any) => ({
+              id: po.id,
+              product_main_image: po.product_main_image || null,
+            }));
+            setPurchaseOrders(orders);
           }
         }
 
@@ -120,16 +147,23 @@ export function StockDetail() {
           item.korea_arrivals.length > 0
         ) {
           const product = findProductByName(item.product_name);
+          const purchaseOrder = findPurchaseOrderById(item.purchase_order_id);
 
           item.korea_arrivals.forEach((arrival) => {
+            // 발주의 product_main_image를 우선 사용, 없으면 products 테이블, 마지막으로 패킹리스트 아이템의 이미지
+            let productImage = '';
+            if (purchaseOrder?.product_main_image) {
+              productImage = getFullImageUrl(purchaseOrder.product_main_image);
+            } else if (product?.main_image) {
+              productImage = getFullImageUrl(product.main_image);
+            } else if (item.product_image_url) {
+              productImage = getFullImageUrl(item.product_image_url);
+            }
+
             items.push({
               id: `${item.id}-${arrival.id}`,
               arrivalDate: arrival.arrival_date,
-              productImage: product?.main_image
-                ? getFullImageUrl(product.main_image)
-                : item.product_image_url
-                  ? getFullImageUrl(item.product_image_url)
-                  : '',
+              productImage: productImage,
               productName: item.product_name,
               purchaseOrderId: item.purchase_order_id,
               logisticsCompany: packingList.logistics_company || '',

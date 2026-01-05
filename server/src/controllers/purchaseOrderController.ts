@@ -921,19 +921,29 @@ export class PurchaseOrderController {
         updated_by: (req as any).user?.id,
       });
 
-      // product_id가 있으면 products 테이블의 main_image도 함께 업데이트
+      // product_id가 있고 실제 products 테이블에 존재하는 경우에만 업데이트
       if (purchaseOrder.product_id) {
         try {
           const { ProductService } = await import('../services/productService.js');
+          const { ProductRepository } = await import('../repositories/productRepository.js');
           const productService = new ProductService();
-          await productService.updateProduct(
-            purchaseOrder.product_id,
-            {
-              main_image: imageUrl,
-            },
-            (req as any).user?.id
-          );
-          console.log(`[uploadMainImage] products 테이블 업데이트 완료 - 상품 ID: ${purchaseOrder.product_id}, 이미지 URL: ${imageUrl}`);
+          const productRepository = new ProductRepository();
+          
+          // product_id가 실제로 products 테이블에 존재하는지 확인
+          const productExists = await productRepository.existsById(purchaseOrder.product_id);
+          
+          if (productExists) {
+            await productService.updateProduct(
+              purchaseOrder.product_id,
+              {
+                main_image: imageUrl,
+              },
+              (req as any).user?.id
+            );
+            console.log(`[uploadMainImage] products 테이블 업데이트 완료 - 상품 ID: ${purchaseOrder.product_id}, 이미지 URL: ${imageUrl}`);
+          } else {
+            console.log(`[uploadMainImage] products 테이블 업데이트 스킵 - 상품 ID가 존재하지 않음: ${purchaseOrder.product_id}`);
+          }
         } catch (productError: any) {
           // products 테이블 업데이트 실패해도 발주 업데이트는 성공한 것으로 처리
           console.error(`[uploadMainImage] products 테이블 업데이트 실패 - 상품 ID: ${purchaseOrder.product_id}`, productError);

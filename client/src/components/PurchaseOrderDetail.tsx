@@ -942,9 +942,15 @@ export function PurchaseOrderDetail({
 
       const result = await response.json();
       if (result.success && result.data?.imageUrl) {
-        const imageUrl = result.data.imageUrl.startsWith('http') 
+        let imageUrl = result.data.imageUrl.startsWith('http') 
           ? result.data.imageUrl 
           : `${SERVER_BASE_URL}${result.data.imageUrl}`;
+        
+        // 이미지 업로드 직후 즉시 반영되도록 타임스탬프 추가 (캐시 버스팅)
+        const timestamp = Date.now();
+        const separator = imageUrl.includes('?') ? '&' : '?';
+        imageUrl = `${imageUrl}${separator}t=${timestamp}`;
+        
         setProductImage(imageUrl);
         
         // 발주 데이터 재로드하여 최신 이미지 URL 반영

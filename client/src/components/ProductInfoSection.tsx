@@ -9,7 +9,7 @@ import {
   DollarSign,
   Upload,
 } from "lucide-react";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { handleNumberInput } from "../utils/numberInputUtils";
 
 interface ProductInfoSectionProps {
@@ -121,6 +121,16 @@ export function ProductInfoSection({
       setPackagingDepth('');
     }
   }, [packagingSize]);
+
+  // 이미지 URL에 타임스탬프 추가 (캐시 버스팅)
+  // 이미지 URL이 변경될 때마다 새로운 타임스탬프를 추가하여 브라우저 캐시 무효화
+  const imageUrlWithTimestamp = useMemo(() => {
+    if (!productImage) return '';
+    // 기존 타임스탬프 파라미터 제거
+    const urlWithoutTimestamp = productImage.split(/[?&]_t=/)[0];
+    const separator = urlWithoutTimestamp.includes('?') ? '&' : '?';
+    return `${urlWithoutTimestamp}${separator}_t=${Date.now()}`;
+  }, [productImage]);
 
   // 포장 박스 사이즈 변경 핸들러
   const handlePackagingSizeChange = (newWidth: string, newHeight: string, newDepth: string) => {
@@ -262,7 +272,7 @@ export function ProductInfoSection({
             {productImage ? (
               <>
                 <img
-                  src={productImage}
+                  src={imageUrlWithTimestamp}
                   alt={productName}
                   className="w-full h-full object-cover"
                 />
