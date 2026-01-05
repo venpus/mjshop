@@ -481,9 +481,9 @@ export class PaymentHistoryService {
              ORDER BY ka.arrival_date ASC`,
             packingListIds
           );
-          koreaArrivalDates = koreaArrivalRows.map((r) => 
-            formatDateToKSTString(r.arrival_date)
-          );
+          koreaArrivalDates = koreaArrivalRows
+            .map((r) => formatDateToKSTString(r.arrival_date))
+            .filter((date): date is string => date !== null);
         }
       } catch (error) {
         console.error(`한국 도착일 조회 오류 (Code: ${row.code}):`, error);
