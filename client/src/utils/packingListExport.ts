@@ -9,6 +9,7 @@ export interface CodeGroupHeader {
   boxCount: number;       // 박스 수 (그룹 전체 박스 수)
   unit: '박스' | '마대';  // 단위
   totalQuantity: number;  // 총수량 (그룹 내 모든 제품의 totalQuantity 합계)
+  domesticInvoices: string[]; // 내륙송장 번호 배열
 }
 
 // 제품 세부 행 정보
@@ -74,12 +75,18 @@ function createCodeGroupHeader(
     return sum + item.totalQuantity;
   }, 0);
   
+  // 내륙송장 번호 추출 (첫 번째 아이템의 domesticInvoice 배열에서)
+  const domesticInvoices = (firstItem.domesticInvoice || [])
+    .map(invoice => invoice.number)
+    .filter(number => number && number.trim() !== ''); // 빈 문자열 제거
+  
   return {
     date: firstItem.date,
     code: firstItem.code,
     boxCount: totalBoxCount,
     unit: firstItem.unit,
-    totalQuantity: totalQuantity
+    totalQuantity: totalQuantity,
+    domesticInvoices: domesticInvoices
   };
 }
 
@@ -222,7 +229,40 @@ export async function createExcelFile(
     worksheet.mergeCells(currentRow, 1, currentRow, 4);
     currentRow++;
     
-    // 2. 세부 헤더 행
+    // 2. 내륙송장 행
+    const invoiceRowData: string[] = ['내륙송장:'];
+    
+    // 내륙송장이 있으면 각 송장번호를 별도 셀에 추가
+    if (group.header.domesticInvoices.length > 0) {
+      group.header.domesticInvoices.forEach(invoiceNumber => {
+        invoiceRowData.push(invoiceNumber);
+      });
+    } else {
+      // 내륙송장이 없으면 "(없음)" 표시
+      invoiceRowData.push('(없음)');
+    }
+    
+    const invoiceRow = worksheet.addRow(invoiceRowData);
+    
+    // 첫 번째 셀("내륙송장:") 스타일 적용
+    const firstCell = invoiceRow.getCell(1);
+    firstCell.font = { bold: true };
+    firstCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFF0F0F0' } // 연한 회색
+    };
+    firstCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    
+    // 송장번호 셀들 스타일 적용
+    for (let i = 2; i <= invoiceRowData.length; i++) {
+      const cell = invoiceRow.getCell(i);
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    }
+    
+    currentRow++;
+    
+    // 3. 세부 헤더 행
     const detailHeaderRow = worksheet.addRow([
       '제품명',
       '발주코드',
@@ -239,7 +279,7 @@ export async function createExcelFile(
     detailHeaderRow.alignment = { horizontal: 'center', vertical: 'middle' };
     currentRow++;
     
-    // 3. 세부 데이터 행
+    // 4. 세부 데이터 행
     group.details.forEach(detail => {
       // 발주코드 조회 (poNumberMap에서)
       const poNumber = detail.purchaseOrderId 
@@ -258,7 +298,7 @@ export async function createExcelFile(
       currentRow++;
     });
     
-    // 4. 코드 그룹 사이 빈 행 (마지막 그룹이 아니면)
+    // 5. 코드 그룹 사이 빈 행 (마지막 그룹이 아니면)
     if (groupIndex < codeGroups.length - 1) {
       worksheet.addRow([]);
       currentRow++;
