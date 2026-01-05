@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Menu, X, Globe, LogOut, User } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
@@ -34,7 +34,7 @@ import { LanguageProvider, useLanguage, Language } from './contexts/LanguageCont
 // 메인 레이아웃 컴포넌트
 function AdminLayout() {
   const { logout, user } = useAuth();
-  const { hasPermission } = usePermission();
+  const { hasPermission, isLoading: isPermissionLoading } = usePermission();
   const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -100,6 +100,28 @@ function AdminLayout() {
 
   const handleBackToPurchaseOrders = () => {
     navigate('/admin/purchase-orders');
+  };
+
+  // 권한 로딩 중일 때는 현재 페이지를 유지하기 위한 컴포넌트
+  const PermissionCheckWrapper = ({ 
+    resource, 
+    permissionType, 
+    children 
+  }: { 
+    resource: string; 
+    permissionType: 'read' | 'write' | 'delete';
+    children: ReactNode;
+  }) => {
+    if (isPermissionLoading) {
+      // 권한 로딩 중일 때는 현재 페이지를 유지 (로딩 화면 표시하지 않음)
+      return <>{children}</>;
+    }
+    
+    if (hasPermission(resource, permissionType)) {
+      return <>{children}</>;
+    }
+    
+    return <Navigate to="/admin/dashboard" replace />;
   };
 
   return (
@@ -222,92 +244,68 @@ function AdminLayout() {
           <Route path="/shipping" element={<Shipping />} />
           <Route path="/payment" element={<Payment />} />
           <Route path="/payment-history" element={
-            hasPermission('payment-history', 'read') ? (
+            <PermissionCheckWrapper resource="payment-history" permissionType="read">
               <PaymentHistory />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
+            </PermissionCheckWrapper>
           } />
           <Route path="/inventory" element={<StockManagement />} />
           <Route path="/inventory/:groupKey" element={<StockDetail />} />
           <Route path="/purchase-orders" element={
-            hasPermission('purchase-orders', 'read') ? (
+            <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
               <PurchaseOrders onViewDetail={handleViewOrderDetail} />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
+            </PermissionCheckWrapper>
           } />
           <Route path="/purchase-orders/:id" element={
-            hasPermission('purchase-orders', 'read') ? (
+            <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
               <PurchaseOrderDetailWrapper onBack={handleBackToPurchaseOrders} />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
+            </PermissionCheckWrapper>
           } />
           <Route path="/shipping-history" element={
-            hasPermission('shipping-history', 'read') ? (
+            <PermissionCheckWrapper resource="shipping-history" permissionType="read">
               <ShippingHistory />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
+            </PermissionCheckWrapper>
           } />
           <Route path="/china-payment" element={<ChinaPayment />} />
           <Route path="/members" element={<Members />} />
           <Route path="/gallery" element={
-            hasPermission('gallery', 'read') ? (
+            <PermissionCheckWrapper resource="gallery" permissionType="read">
               <Gallery />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
+            </PermissionCheckWrapper>
           } />
           <Route path="/china-warehouse" element={
-            hasPermission('china-warehouse', 'read') ? (
+            <PermissionCheckWrapper resource="china-warehouse" permissionType="read">
               <ChinaWarehouse />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
+            </PermissionCheckWrapper>
           } />
           <Route path="/invoice" element={
-            hasPermission('invoice', 'read') ? (
+            <PermissionCheckWrapper resource="invoice" permissionType="read">
               <Invoice />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
+            </PermissionCheckWrapper>
           } />
           <Route path="/materials" element={
-            hasPermission('materials', 'read') ? (
+            <PermissionCheckWrapper resource="materials" permissionType="read">
               <Materials />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
+            </PermissionCheckWrapper>
           } />
           <Route path="/materials/:id" element={
-            hasPermission('materials', 'read') ? (
+            <PermissionCheckWrapper resource="materials" permissionType="read">
               <MaterialDetailWrapper />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
+            </PermissionCheckWrapper>
           } />
           <Route path="/packaging-work" element={
-            hasPermission('packaging-work', 'read') ? (
+            <PermissionCheckWrapper resource="packaging-work" permissionType="read">
               <PackagingWork />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
+            </PermissionCheckWrapper>
           } />
           <Route path="/projects" element={
-            hasPermission('projects', 'read') ? (
+            <PermissionCheckWrapper resource="projects" permissionType="read">
               <Projects />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
+            </PermissionCheckWrapper>
           } />
           <Route path="/projects/:id" element={
-            hasPermission('projects', 'read') ? (
+            <PermissionCheckWrapper resource="projects" permissionType="read">
               <ProjectDetailWrapper />
-            ) : (
-              <Navigate to="/admin/dashboard" replace />
-            )
+            </PermissionCheckWrapper>
           } />
           <Route path="/admin-account" element={<AdminAccount />} />
           <Route path="/permissions" element={

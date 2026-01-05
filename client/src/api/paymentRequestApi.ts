@@ -233,6 +233,57 @@ export async function batchCompletePaymentRequests(
   return result.data;
 }
 
+// 지급해제 처리
+export async function revertPaymentRequest(id: number): Promise<PaymentRequest> {
+  const response = await fetch(`${API_BASE_URL}/payment-requests/${id}/revert`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || '지급해제 처리에 실패했습니다.');
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || '지급해제 처리에 실패했습니다.');
+  }
+
+  return result.data;
+}
+
+// 일괄 지급해제 처리
+export async function batchRevertPaymentRequests(
+  ids: number[]
+): Promise<{ affectedRows: number }> {
+  const response = await fetch(`${API_BASE_URL}/payment-requests/batch-revert`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({
+      ids,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || '일괄 지급해제 처리에 실패했습니다.');
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || '일괄 지급해제 처리에 실패했습니다.');
+  }
+
+  return result.data;
+}
+
 // 지급요청 삭제
 export async function deletePaymentRequest(id: number): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/payment-requests/${id}`, {

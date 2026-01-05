@@ -28,6 +28,12 @@ router.put('/:id/complete', controller.completePaymentRequest);
 // 일괄 지급완료 처리
 router.post('/batch-complete', controller.batchCompletePaymentRequests);
 
+// 지급해제 처리
+router.put('/:id/revert', controller.revertPaymentRequest);
+
+// 일괄 지급해제 처리
+router.post('/batch-revert', controller.batchRevertPaymentRequests);
+
 // 지급요청 삭제
 router.delete('/:id', controller.deletePaymentRequest);
 

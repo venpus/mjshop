@@ -256,6 +256,59 @@ export class PaymentRequestController {
   };
 
   /**
+   * 지급해제 처리
+   * PUT /api/payment-requests/:id/revert
+   */
+  revertPaymentRequest = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const reverted = await this.service.revertPaymentRequest(parseInt(id));
+
+      res.json({
+        success: true,
+        data: reverted,
+      });
+    } catch (error: any) {
+      console.error('지급해제 처리 오류:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message || '지급해제 처리 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 일괄 지급해제 처리
+   * POST /api/payment-requests/batch-revert
+   */
+  batchRevertPaymentRequests = async (req: Request, res: Response) => {
+    try {
+      const { ids } = req.body;
+
+      // 필수 필드 검증
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: '지급요청 ID 배열이 필요합니다.',
+        });
+      }
+
+      const affectedRows = await this.service.batchRevertPaymentRequests(ids);
+
+      res.json({
+        success: true,
+        data: { affectedRows },
+      });
+    } catch (error: any) {
+      console.error('일괄 지급해제 처리 오류:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message || '일괄 지급해제 처리 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  /**
    * 지급요청 삭제
    * DELETE /api/payment-requests/:id
    */

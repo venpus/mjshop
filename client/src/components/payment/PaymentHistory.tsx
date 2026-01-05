@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { FileText, Package, List } from 'lucide-react';
-import { PaymentRequestList } from './PaymentRequestList';
+import { FileText, Package, BookOpen } from 'lucide-react';
+import { PaymentRequestLedger } from './PaymentRequestLedger';
 import { PaymentHistoryTable } from './PaymentHistoryTable';
 import { PaymentStatisticsCards } from './PaymentStatisticsCards';
 import { useAuth } from '../../contexts/AuthContext';
 
 // type TabType = 'all' | 'purchase-orders' | 'packing-lists' | 'requests';
-type TabType = 'purchase-orders' | 'packing-lists' | 'requests';
+type TabType = 'purchase-orders' | 'packing-lists' | 'request-ledger';
 
 /**
  * 결제내역 메인 컴포넌트
@@ -20,8 +20,17 @@ export function PaymentHistory() {
   // URL 쿼리 파라미터에서 탭 정보 읽기
   const searchParams = new URLSearchParams(location.search);
   const tabFromUrl = searchParams.get('tab') as TabType | null;
-  const validTabs: TabType[] = ['purchase-orders', 'packing-lists', 'requests'];
+  const validTabs: TabType[] = ['purchase-orders', 'packing-lists', 'request-ledger'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'purchase-orders';
+  
+  // 기존 'requests' 탭을 'request-ledger'로 리다이렉트
+  useEffect(() => {
+    if (tabFromUrl === 'requests') {
+      const params = new URLSearchParams(location.search);
+      params.set('tab', 'request-ledger');
+      navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+    }
+  }, [location.search, navigate]);
   
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [statisticsRefreshTrigger, setStatisticsRefreshTrigger] = useState(0);
@@ -105,23 +114,23 @@ export function PaymentHistory() {
             패킹리스트
           </button>
           <button
-            onClick={() => handleTabChange('requests')}
+            onClick={() => handleTabChange('request-ledger')}
             className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-              activeTab === 'requests'
+              activeTab === 'request-ledger'
                 ? 'border-purple-500 text-purple-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            <List className="w-4 h-4" />
-            지급요청
+            <BookOpen className="w-4 h-4" />
+            지급요청 장부
           </button>
         </nav>
       </div>
 
       {/* 컨텐츠 */}
       <div>
-        {activeTab === 'requests' ? (
-          <PaymentRequestList onRefresh={handleStatisticsRefresh} />
+        {activeTab === 'request-ledger' ? (
+          <PaymentRequestLedger onRefresh={handleStatisticsRefresh} />
         ) : (
           <PaymentHistoryTable
             // type={activeTab === 'all' ? 'all' : activeTab === 'purchase-orders' ? 'purchase-orders' : 'packing-lists'}

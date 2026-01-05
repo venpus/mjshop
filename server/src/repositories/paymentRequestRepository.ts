@@ -259,6 +259,44 @@ export class PaymentRequestRepository {
   }
 
   /**
+   * 지급해제 처리 (완료 → 요청중)
+   */
+  async revert(id: number): Promise<PaymentRequest> {
+    await pool.execute<ResultSetHeader>(
+      `UPDATE payment_requests 
+       SET status = '요청중', payment_date = NULL, completed_by = NULL
+       WHERE id = ? AND status = '완료'`,
+      [id]
+    );
+
+    const reverted = await this.findById(id);
+    if (!reverted) {
+      throw new Error('지급해제 처리 후 조회 실패');
+    }
+
+    return reverted;
+  }
+
+  /**
+   * 일괄 지급해제 처리
+   */
+  async batchRevert(ids: number[]): Promise<number> {
+    if (ids.length === 0) {
+      return 0;
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const [result] = await pool.execute<ResultSetHeader>(
+      `UPDATE payment_requests 
+       SET status = '요청중', payment_date = NULL, completed_by = NULL
+       WHERE id IN (${placeholders}) AND status = '완료'`,
+      ids
+    );
+
+    return result.affectedRows;
+  }
+
+  /**
    * 지급요청 삭제
    */
   async delete(id: number): Promise<void> {

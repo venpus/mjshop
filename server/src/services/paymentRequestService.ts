@@ -197,6 +197,62 @@ export class PaymentRequestService {
   }
 
   /**
+   * 지급해제 처리 (완료 → 요청중)
+   */
+  async revertPaymentRequest(id: number): Promise<PaymentRequestPublic> {
+    const existing = await this.repository.findById(id);
+    if (!existing) {
+      throw new Error('지급요청을 찾을 수 없습니다.');
+    }
+
+    if (existing.status !== '완료') {
+      throw new Error('완료된 지급요청만 해제할 수 있습니다.');
+    }
+
+    const reverted = await this.repository.revert(id);
+
+    // 원본 데이터의 지급일 해제
+    await this.revertSourcePaymentDate(
+      existing.source_type,
+      existing.source_id,
+      existing.payment_type
+    );
+
+    return this.enrichPaymentRequest(reverted);
+  }
+
+  /**
+   * 일괄 지급해제 처리
+   */
+  async batchRevertPaymentRequests(ids: number[]): Promise<number> {
+    if (ids.length === 0) {
+      return 0;
+    }
+
+    // 모든 요청 조회하여 원본 데이터 업데이트
+    const requests = await Promise.all(
+      ids.map((id) => this.repository.findById(id))
+    );
+
+    const validRequests = requests.filter(
+      (r): r is PaymentRequest => r !== null && r.status === '완료'
+    );
+
+    const affectedRows = await this.repository.batchRevert(ids);
+
+    // 원본 데이터의 지급일 해제
+    for (const request of validRequests) {
+      await this.revertSourcePaymentDate(
+        request.source_type,
+        request.source_id,
+        request.payment_type
+      );
+    }
+
+    return affectedRows;
+  }
+
+  /**
    * 출처 데이터 검증
    */
   private async validateSource(
@@ -269,6 +325,39 @@ export class PaymentRequestService {
         // 패킹리스트를 찾을 수 없는 경우, ID로 직접 업데이트
         await this.plRepository.update(parseInt(sourceId), {
           wk_payment_date: paymentDate,
+        });
+      }
+    }
+  }
+
+  /**
+   * 원본 데이터의 지급일 해제 (null로 설정)
+   */
+  private async revertSourcePaymentDate(
+    sourceType: string,
+    sourceId: string,
+    paymentType: string
+  ): Promise<void> {
+    if (sourceType === 'purchase_order') {
+      if (paymentType === 'advance') {
+        await this.poRepository.update(sourceId, {
+          advance_payment_date: null,
+        });
+      } else if (paymentType === 'balance') {
+        await this.poRepository.update(sourceId, {
+          balance_payment_date: null,
+        });
+      }
+    } else if (sourceType === 'packing_list') {
+      // 패킹리스트 ID로 패킹리스트 조회하여 코드 가져오기
+      const packingList = await this.plRepository.findById(parseInt(sourceId));
+      if (packingList) {
+        // 같은 코드를 가진 모든 패킹리스트의 wk_payment_date 해제
+        await this.plRepository.updateWkPaymentDateByCode(packingList.code, null);
+      } else {
+        // 패킹리스트를 찾을 수 없는 경우, ID로 직접 업데이트
+        await this.plRepository.update(parseInt(sourceId), {
+          wk_payment_date: null,
         });
       }
     }
