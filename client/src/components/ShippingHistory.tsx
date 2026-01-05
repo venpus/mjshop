@@ -84,11 +84,32 @@ export function ShippingHistory() {
     setError(null);
     try {
       console.log('[비율 로드] 패킹리스트 로드 시작');
-      const serverData = await getAllPackingLists();
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+      
+      // 패킹리스트와 발주 목록을 병렬로 로드
+      const [serverData, purchaseOrdersResponse] = await Promise.all([
+        getAllPackingLists(),
+        fetch(`${API_BASE_URL}/purchase-orders`, {
+          credentials: 'include',
+        }),
+      ]);
+      
+      // 발주 목록 파싱
+      let purchaseOrders: Array<{ id: string; product_main_image: string | null }> = [];
+      if (purchaseOrdersResponse.ok) {
+        const purchaseOrdersData = await purchaseOrdersResponse.json();
+        if (purchaseOrdersData.success) {
+          purchaseOrders = (purchaseOrdersData.data || []).map((po: any) => ({
+            id: po.id,
+            product_main_image: po.product_main_image || null,
+          }));
+        }
+      }
+      
       console.log('[비율 로드] 서버에서 받은 데이터 (발송일 순서):', 
         serverData.map(pl => `ID:${pl.id} Code:${pl.code} Date:${pl.shipment_date}`).join(', ')
       );
-      const transformedItems = transformServerToClient(serverData);
+      const transformedItems = transformServerToClient(serverData, purchaseOrders);
       console.log('[비율 로드] 변환 후 정렬 확인 (발송일 순서):', 
         transformedItems.map(item => `ID:${item.id} Code:${item.code} Date:${item.date}`).join(', ')
       );

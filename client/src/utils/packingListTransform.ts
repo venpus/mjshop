@@ -71,9 +71,12 @@ function formatDateOnly(dateStr: string | Date | null | undefined): string {
 
 /**
  * 서버 데이터를 클라이언트 PackingListItem[]로 변환
+ * @param serverData 패킹리스트 서버 데이터
+ * @param purchaseOrders 발주 목록 (이미지 우선순위를 위해 사용, 선택사항)
  */
 export function transformServerToClient(
-  serverData: PackingListWithItems[]
+  serverData: PackingListWithItems[],
+  purchaseOrders?: Array<{ id: string; product_main_image: string | null }>
 ): PackingListItem[] {
   const clientItems: PackingListItem[] = [];
 
@@ -160,13 +163,26 @@ export function transformServerToClient(
       const isMultipleProducts = packingList.items!.length > 1;
       const isFirstRow = index === 0;
 
+      // 발주의 product_main_image를 우선 사용, 없으면 패킹리스트 아이템의 product_image_url 사용
+      let productImage = '';
+      if (purchaseOrders && item.purchase_order_id) {
+        const purchaseOrder = purchaseOrders.find(po => po.id === item.purchase_order_id);
+        if (purchaseOrder?.product_main_image) {
+          productImage = getFullImageUrl(purchaseOrder.product_main_image);
+        } else if (item.product_image_url) {
+          productImage = getFullImageUrl(item.product_image_url);
+        }
+      } else if (item.product_image_url) {
+        productImage = getFullImageUrl(item.product_image_url);
+      }
+
       clientItems.push({
         id: `${packingList.id}-${item.id}`,
         date: formatDateOnly(packingList.shipment_date),
         code: packingList.code,
         productName: item.product_name,
         purchaseOrderId: item.purchase_order_id || undefined,
-        productImage: getFullImageUrl(item.product_image_url),
+        productImage: productImage,
         entryQuantity: item.entry_quantity || '',
         boxCount: item.box_count.toString(),
         unit: item.unit,

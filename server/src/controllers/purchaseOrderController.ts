@@ -914,6 +914,20 @@ export class PurchaseOrderController {
       // 새 메인 이미지 저장
       const relativePath = await savePOMainImage(file.path, id);
       const imageUrl = getPOImageUrl(relativePath);
+      
+      // 파일 존재 확인 및 로깅
+      const { getPOImageFilePathFromUrl } = await import('../utils/upload.js');
+      const filePath = getPOImageFilePathFromUrl(imageUrl);
+      const fileExists = fs.existsSync(filePath);
+      console.log(`[uploadMainImage] 이미지 파일 저장 확인 - 발주 ID: ${id}`);
+      console.log(`[uploadMainImage] 상대 경로: ${relativePath}`);
+      console.log(`[uploadMainImage] 이미지 URL: ${imageUrl}`);
+      console.log(`[uploadMainImage] 파일 시스템 경로: ${filePath}`);
+      console.log(`[uploadMainImage] 파일 존재 여부: ${fileExists}`);
+      
+      if (!fileExists) {
+        console.error(`[uploadMainImage] ⚠️ 경고: 이미지 파일이 저장되지 않았습니다! 경로: ${filePath}`);
+      }
 
       // 발주 정보 업데이트 (product_main_image 필드)
       await this.service.updatePurchaseOrder(id, {
