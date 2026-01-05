@@ -130,9 +130,9 @@ export interface UpdatePurchaseOrderDTO {
   commission_type?: string;
   advance_payment_rate?: number;
   advance_payment_amount?: number;
-  advance_payment_date?: string;
+  advance_payment_date?: string | null;
   balance_payment_amount?: number;
-  balance_payment_date?: string;
+  balance_payment_date?: string | null;
   admin_cost_paid?: boolean;
   admin_cost_paid_date?: string;
   updated_by?: string;

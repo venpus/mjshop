@@ -84,7 +84,7 @@ export interface UpdatePackingListDTO {
   calculated_weight?: number;
   shipping_cost?: number;
   payment_date?: string;
-  wk_payment_date?: string;
+  wk_payment_date?: string | null;
   admin_cost_paid?: boolean;
   admin_cost_paid_date?: string;
   updated_by?: string;
