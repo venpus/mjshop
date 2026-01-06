@@ -69,17 +69,17 @@ export function PackingListRow({
     // 두 번째 행 이후: rowspan으로 병합된 열들은 생략하고 제품, 입수량, 총수량, 한국도착일만 표시
     return (
       <tr className="hover:bg-gray-50">
-        <td className="px-4 py-3 text-sm text-center border-r border-gray-200" style={{ minWidth: '200px' }}>
+        <td className="px-4 py-3 text-sm text-center border-r border-gray-200">
           <ProductCell item={item} onProductNameClick={onProductNameClick} />
         </td>
-        <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200" style={{ minWidth: '80px' }}>
+        <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 whitespace-nowrap">
           {item.entryQuantity || '-'}
         </td>
-        <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '100px' }}>
+        <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
           {item.totalQuantity.toLocaleString()}개
         </td>
         {/* 한국도착일 (제품별로 표시) */}
-        <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '220px' }}>
+        <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle">
           <KoreaArrivalCell
             item={item}
             onKoreaArrivalChange={onKoreaArrivalChange}
@@ -103,11 +103,11 @@ export function PackingListRow({
         />
       </td>
       {/* 발송일 */}
-      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '100px' }}>
+      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
         {item.date}
       </td>
       {/* 코드 */}
-      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '100px' }}>
+      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
         {showCodeLink && onCodeClick ? (
           <button
             onClick={() => onCodeClick(item.code, item.date)}
@@ -120,7 +120,7 @@ export function PackingListRow({
         )}
       </td>
       {/* 제품 */}
-      <td className="px-4 py-3 text-sm text-center border-r border-gray-200" style={{ minWidth: '200px' }}>
+      <td className="px-4 py-3 text-sm text-center border-r border-gray-200">
         <ProductCell 
           item={item} 
           onProductNameClick={onProductNameClick}
@@ -128,30 +128,30 @@ export function PackingListRow({
         />
       </td>
       {/* 입수량 */}
-      <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200" style={{ minWidth: '80px' }}>
+      <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 whitespace-nowrap">
         {item.entryQuantity || '-'}
       </td>
       {/* 박스수 */}
-      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '80px' }}>
+      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
         {item.boxCount || '-'}
       </td>
       {/* 단위 */}
-      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '100px' }}>
+      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
         <select
           value={item.unit || '박스'}
           onChange={(e) => onUnitChange(groupId, e.target.value as '박스' | '마대')}
-          className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
+          className="w-auto min-w-[60px] px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
         >
           <option value="박스">박스</option>
           <option value="마대">마대</option>
         </select>
       </td>
       {/* 총수량 */}
-      <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '100px' }}>
+      <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
         {item.totalQuantity.toLocaleString()}개
       </td>
       {/* 내륙송장 */}
-      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '200px' }}>
+      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle">
         <DomesticInvoiceCell
           item={item}
           groupId={groupId}
@@ -160,7 +160,7 @@ export function PackingListRow({
         />
       </td>
       {/* 물류회사 */}
-      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '140px' }}>
+      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
         {isC0Level || isD0Level ? (
           // C0 레벨, D0 레벨: 읽기 전용으로 표시
           // C0 레벨: DB에 저장된 모든 물류회사 표시
@@ -180,7 +180,7 @@ export function PackingListRow({
           <select
             value={item.logisticsCompany || ''}
             onChange={(e) => onLogisticsCompanyChange(groupId, e.target.value)}
-            className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
+            className="w-auto min-w-[120px] px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
             disabled={optionsLoading}
           >
             <option value="">선택</option>
@@ -191,7 +191,7 @@ export function PackingListRow({
         )}
       </td>
       {/* 물류창고 도착일 */}
-      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '140px' }}>
+      <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
         <input
           type="date"
           value={item.warehouseArrivalDate}
@@ -200,7 +200,7 @@ export function PackingListRow({
         />
       </td>
       {/* 한국도착일 */}
-      <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '200px' }}>
+      <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle">
         <KoreaArrivalCell
           item={item}
           onKoreaArrivalChange={onKoreaArrivalChange}
@@ -219,7 +219,7 @@ export function PackingListRow({
       )}
       {/* 배송비 - C0 레벨, D0 레벨일 때 숨김 */}
       {!hideSensitiveColumns && (
-        <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '100px' }}>
+        <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
           <ShippingCostCell
             item={item}
             groupId={groupId}
@@ -229,7 +229,7 @@ export function PackingListRow({
       )}
       {/* 지급일 - C0 레벨, D0 레벨일 때 숨김 */}
       {!hideSensitiveColumns && (
-        <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '120px' }}>
+        <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
           <input
             type="date"
             value={item.paymentDate}
@@ -240,7 +240,7 @@ export function PackingListRow({
       )}
       {/* WK결제일 - C0 레벨, D0 레벨일 때 숨김 */}
       {!hideSensitiveColumns && (
-        <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 align-middle" style={{ minWidth: '120px' }}>
+        <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 align-middle whitespace-nowrap">
           <input
             type="date"
             value={item.wkPaymentDate}

@@ -44,7 +44,7 @@ export function WeightCell({
   return (
     <>
       {/* 실중량 */}
-      <td rowSpan={rowSpan} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '100px' }}>
+      <td rowSpan={rowSpan} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
         <div className="flex items-center justify-center gap-1">
           <input
             type="text"
@@ -59,11 +59,11 @@ export function WeightCell({
       </td>
       {/* 비율 - A 등급만 보임 */}
       {isSuperAdmin && (
-        <td rowSpan={rowSpan} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '80px' }}>
+        <td rowSpan={rowSpan} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
           <select
             value={item.weightRatio || '0%'}
             onChange={handleWeightRatioChange}
-            className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
+            className="w-auto min-w-[50px] px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
           >
             {WEIGHT_RATIOS.map(ratio => (
               <option key={ratio} value={ratio}>{ratio}</option>
@@ -73,7 +73,7 @@ export function WeightCell({
       )}
       {/* 중량 - A 등급만 보임 */}
       {isSuperAdmin && (
-        <td rowSpan={rowSpan} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '100px' }}>
+        <td rowSpan={rowSpan} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
           {item.calculatedWeight ? `${item.calculatedWeight}kg` : '-'}
         </td>
       )}
