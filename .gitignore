@@ -7,7 +7,7 @@ dist/
 build/
 */dist/
 */build/
-APP/
+
 # Environment variables
 .env
 .env.local

@@ -450,6 +450,82 @@ export class PurchaseOrderService {
   }
 
   /**
+   * 일괄 컨펌
+   * @param orderIds 발주 ID 배열
+   * @param updatedBy 수정자 ID
+   */
+  async batchConfirmPurchaseOrders(orderIds: string[], updatedBy?: string): Promise<void> {
+    if (orderIds.length === 0) {
+      throw new Error('발주 ID가 필요합니다.');
+    }
+
+    // 발주 존재 확인
+    for (const id of orderIds) {
+      const order = await this.repository.findById(id);
+      if (!order) {
+        throw new Error(`발주를 찾을 수 없습니다: ${id}`);
+      }
+    }
+
+    // 일괄 업데이트
+    await this.repository.batchUpdateConfirmed(orderIds, true, updatedBy);
+  }
+
+  /**
+   * 일괄 컨펌 해제
+   * @param orderIds 발주 ID 배열
+   * @param updatedBy 수정자 ID
+   */
+  async batchUnconfirmPurchaseOrders(orderIds: string[], updatedBy?: string): Promise<void> {
+    if (orderIds.length === 0) {
+      throw new Error('발주 ID가 필요합니다.');
+    }
+
+    // 발주 존재 확인
+    for (const id of orderIds) {
+      const order = await this.repository.findById(id);
+      if (!order) {
+        throw new Error(`발주를 찾을 수 없습니다: ${id}`);
+      }
+    }
+
+    // 일괄 업데이트
+    await this.repository.batchUpdateConfirmed(orderIds, false, updatedBy);
+  }
+
+  /**
+   * 일괄 삭제
+   * @param orderIds 발주 ID 배열
+   */
+  async batchDeletePurchaseOrders(orderIds: string[]): Promise<void> {
+    if (orderIds.length === 0) {
+      throw new Error('발주 ID가 필요합니다.');
+    }
+
+    // 발주 존재 확인
+    for (const id of orderIds) {
+      const order = await this.repository.findById(id);
+      if (!order) {
+        throw new Error(`발주를 찾을 수 없습니다: ${id}`);
+      }
+    }
+
+    // 일괄 삭제 (DB)
+    await this.repository.batchDelete(orderIds);
+
+    // 파일 시스템에서 이미지 폴더 삭제
+    const { deletePOImageDir } = await import('../utils/upload.js');
+    for (const id of orderIds) {
+      try {
+        await deletePOImageDir(id);
+      } catch (error) {
+        // 폴더 삭제 실패해도 DB는 이미 삭제되었으므로 로그만 기록하고 계속 진행
+        console.error(`발주 이미지 폴더 삭제 실패: ${id}`, error);
+      }
+    }
+  }
+
+  /**
    * 발주 삭제
    */
   async deletePurchaseOrder(id: string): Promise<void> {

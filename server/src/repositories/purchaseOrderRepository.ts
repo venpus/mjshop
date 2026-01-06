@@ -564,6 +564,125 @@ export class PurchaseOrderRepository {
   /**
    * 발주 삭제
    */
+  /**
+   * 일괄 컨펌/컨펌 해제 업데이트
+   * @param orderIds 발주 ID 배열
+   * @param isConfirmed 컨펌 여부 (true: 컨펌, false: 컨펌 해제)
+   * @param updatedBy 수정자 ID
+   */
+  async batchUpdateConfirmed(orderIds: string[], isConfirmed: boolean, updatedBy?: string): Promise<void> {
+    if (orderIds.length === 0) {
+      return;
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // order_status도 함께 업데이트
+      const orderStatus = isConfirmed ? '발주확인' : '발주 대기';
+      const placeholders = orderIds.map(() => '?').join(',');
+      
+      const [result] = await connection.execute<ResultSetHeader>(
+        `UPDATE purchase_orders 
+         SET is_confirmed = ?, 
+             order_status = ?,
+             updated_by = ?,
+             updated_at = NOW()
+         WHERE id IN (${placeholders})`,
+        [isConfirmed, orderStatus, updatedBy || null, ...orderIds]
+      );
+
+      if (result.affectedRows !== orderIds.length) {
+        throw new Error(`일부 발주를 찾을 수 없습니다. (요청: ${orderIds.length}개, 업데이트: ${result.affectedRows}개)`);
+      }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  /**
+   * 일괄 삭제
+   * @param orderIds 발주 ID 배열
+   */
+  async batchDelete(orderIds: string[]): Promise<void> {
+    if (orderIds.length === 0) {
+      return;
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const placeholders = orderIds.map(() => '?').join(',');
+
+      // 관련 데이터 삭제 순서:
+      // 1. 이미지 삭제
+      await connection.execute(
+        `DELETE FROM po_images WHERE purchase_order_id IN (${placeholders})`,
+        orderIds
+      );
+
+      // 2. 비용 항목 삭제
+      await connection.execute(
+        `DELETE FROM po_cost_items WHERE purchase_order_id IN (${placeholders})`,
+        orderIds
+      );
+
+      // 3. 업체 출고 항목 삭제
+      await connection.execute(
+        `DELETE FROM factory_shipments WHERE purchase_order_id IN (${placeholders})`,
+        orderIds
+      );
+
+      // 4. 반품/교환 항목 삭제
+      await connection.execute(
+        `DELETE FROM return_exchanges WHERE purchase_order_id IN (${placeholders})`,
+        orderIds
+      );
+
+      // 5. 작업 항목 삭제
+      await connection.execute(
+        `DELETE FROM work_items WHERE purchase_order_id IN (${placeholders})`,
+        orderIds
+      );
+
+      // 6. 배송 세트 삭제
+      await connection.execute(
+        `DELETE FROM delivery_sets WHERE purchase_order_id IN (${placeholders})`,
+        orderIds
+      );
+
+      // 7. 메모 삭제
+      await connection.execute(
+        `DELETE FROM po_memos WHERE purchase_order_id IN (${placeholders})`,
+        orderIds
+      );
+
+      // 8. 발주 삭제
+      const [result] = await connection.execute<ResultSetHeader>(
+        `DELETE FROM purchase_orders WHERE id IN (${placeholders})`,
+        orderIds
+      );
+
+      if (result.affectedRows !== orderIds.length) {
+        throw new Error(`일부 발주를 찾을 수 없습니다. (요청: ${orderIds.length}개, 삭제: ${result.affectedRows}개)`);
+      }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   async delete(id: string): Promise<void> {
     await pool.execute('DELETE FROM purchase_orders WHERE id = ?', [id]);
   }

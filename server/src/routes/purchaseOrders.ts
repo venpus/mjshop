@@ -26,6 +26,11 @@ router.put('/:id/admin-cost-paid', purchaseOrderController.updateAdminCostPaid);
 // 발주 재주문
 router.post('/:id/reorder', purchaseOrderController.reorderPurchaseOrder);
 
+// 일괄 처리
+router.post('/batch/confirm', purchaseOrderController.batchConfirmPurchaseOrders);
+router.post('/batch/unconfirm', purchaseOrderController.batchUnconfirmPurchaseOrders);
+router.delete('/batch/delete', purchaseOrderController.batchDeletePurchaseOrders);
+
 // 발주 삭제
 router.delete('/:id', purchaseOrderController.deletePurchaseOrder);
 

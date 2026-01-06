@@ -326,6 +326,114 @@ export class PurchaseOrderController {
   };
 
   /**
+   * 일괄 컨펌
+   * POST /api/purchase-orders/batch/confirm
+   */
+  batchConfirmPurchaseOrders = async (req: Request, res: Response) => {
+    try {
+      const { orderIds } = req.body;
+
+      // 유효성 검사
+      if (!Array.isArray(orderIds) || orderIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: '발주 ID 배열이 필요합니다.',
+        });
+      }
+
+      await this.service.batchConfirmPurchaseOrders(
+        orderIds,
+        (req as any).user?.id || undefined
+      );
+
+      res.json({
+        success: true,
+        message: `${orderIds.length}개의 발주가 컨펌되었습니다.`,
+      });
+    } catch (error: any) {
+      console.error('일괄 컨펌 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '일괄 컨펌에 실패했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 일괄 컨펌 해제
+   * POST /api/purchase-orders/batch/unconfirm
+   */
+  batchUnconfirmPurchaseOrders = async (req: Request, res: Response) => {
+    try {
+      const { orderIds } = req.body;
+
+      // 유효성 검사
+      if (!Array.isArray(orderIds) || orderIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: '발주 ID 배열이 필요합니다.',
+        });
+      }
+
+      await this.service.batchUnconfirmPurchaseOrders(
+        orderIds,
+        (req as any).user?.id || undefined
+      );
+
+      res.json({
+        success: true,
+        message: `${orderIds.length}개의 발주 컨펌이 해제되었습니다.`,
+      });
+    } catch (error: any) {
+      console.error('일괄 컨펌 해제 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '일괄 컨펌 해제에 실패했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 일괄 삭제
+   * DELETE /api/purchase-orders/batch/delete
+   */
+  batchDeletePurchaseOrders = async (req: Request, res: Response) => {
+    try {
+      const { orderIds } = req.body;
+
+      // 유효성 검사
+      if (!Array.isArray(orderIds) || orderIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: '발주 ID 배열이 필요합니다.',
+        });
+      }
+
+      // 권한 확인 (A 레벨 관리자만 삭제 가능)
+      const user = (req as any).user;
+      if (!user || user.level !== 'A-SuperAdmin') {
+        return res.status(403).json({
+          success: false,
+          error: '발주 삭제 권한이 없습니다.',
+        });
+      }
+
+      await this.service.batchDeletePurchaseOrders(orderIds);
+
+      res.json({
+        success: true,
+        message: `${orderIds.length}개의 발주가 삭제되었습니다.`,
+      });
+    } catch (error: any) {
+      console.error('일괄 삭제 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '일괄 삭제에 실패했습니다.',
+      });
+    }
+  };
+
+  /**
    * 발주 삭제
    * DELETE /api/purchase-orders/:id
    */
