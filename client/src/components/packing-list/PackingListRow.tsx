@@ -1,6 +1,6 @@
 import { getGroupId } from '../../utils/packingListUtils';
 import type { PackingListItem, DomesticInvoice } from './types';
-import type { InlandCompany } from '../../hooks/useLogisticsOptions';
+import { LOGISTICS_COMPANIES } from './types';
 import { ProductCell } from './cells/ProductCell';
 import { DomesticInvoiceCell } from './cells/DomesticInvoiceCell';
 import { KoreaArrivalCell } from './cells/KoreaArrivalCell';
@@ -31,8 +31,6 @@ interface PackingListRowProps {
   hideSensitiveColumns: boolean; // C0 레벨, D0 레벨일 때 실중량, 비율, 중량, 배송비, 지급일, WK결제일 숨김
   isC0Level?: boolean; // C0 레벨 여부 (물류회사 읽기 전용 표시용)
   isD0Level?: boolean; // D0 레벨 여부 (물류회사 읽기 전용 표시용)
-  inlandCompanies: InlandCompany[]; // 내륙운송회사 목록
-  optionsLoading: boolean; // 물류 옵션 로딩 중 여부
 }
 
 export function PackingListRow({
@@ -59,8 +57,6 @@ export function PackingListRow({
   hideSensitiveColumns,
   isC0Level = false,
   isD0Level = false,
-  inlandCompanies,
-  optionsLoading,
 }: PackingListRowProps) {
   const isMultipleProducts = groupSize > 1;
   const groupId = getGroupId(item.id);
@@ -181,11 +177,10 @@ export function PackingListRow({
             value={item.logisticsCompany || ''}
             onChange={(e) => onLogisticsCompanyChange(groupId, e.target.value)}
             className="w-auto min-w-[120px] px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
-            disabled={optionsLoading}
           >
             <option value="">선택</option>
-            {inlandCompanies.map((company) => (
-              <option key={company.id} value={company.name}>{company.name}</option>
+            {LOGISTICS_COMPANIES.map((company) => (
+              <option key={company} value={company}>{company}</option>
             ))}
           </select>
         )}

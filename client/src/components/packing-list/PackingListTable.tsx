@@ -3,7 +3,6 @@ import { getGroupId, calculateShippingCostByLogisticsCompany } from '../../utils
 import type { PackingListItem, DomesticInvoice } from './types';
 import { PackingListHeader } from './PackingListHeader';
 import { PackingListRow } from './PackingListRow';
-import { useLogisticsOptions } from '../../hooks/useLogisticsOptions';
 
 interface PackingListTableProps {
   items: PackingListItem[];
@@ -56,9 +55,6 @@ export function PackingListTable({
   isC0Level = false,
   isD0Level = false,
 }: PackingListTableProps) {
-  // 물류회사 목록 로드
-  const { inlandCompanies, isLoading: optionsLoading } = useLogisticsOptions();
-  
   // 그룹별로 아이템들을 나누기 (순서 유지)
   const groupedItems = useMemo(() => {
     const groups: { [key: string]: PackingListItem[] } = {};
@@ -233,8 +229,6 @@ export function PackingListTable({
                     hideSensitiveColumns={hideSensitiveColumns}
                     isC0Level={isC0Level}
                     isD0Level={isD0Level}
-                    inlandCompanies={inlandCompanies}
-                    optionsLoading={optionsLoading}
                   />
                 );
               })
