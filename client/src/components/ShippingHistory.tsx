@@ -1261,6 +1261,8 @@ export function ShippingHistory() {
               showCodeLink={showCodeLink}
               onCodeClick={handleCodeClick}
               hideSensitiveColumns={hideSensitiveColumns}
+              isC0Level={isC0Level}
+              isD0Level={isD0Level}
             />
           )}
         </>

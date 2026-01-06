@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Search } from 'lucide-react';
 import { PurchaseOrderSearchModal } from './PurchaseOrderSearchModal';
 import type { PurchaseOrderWithUnshipped } from '../api/purchaseOrderApi';
+import { useLogisticsOptions } from '../hooks/useLogisticsOptions';
 
 interface PackingListCreateModalProps {
   isOpen: boolean;
@@ -68,6 +69,9 @@ export function PackingListCreateModal({
   });
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [searchingProductIndex, setSearchingProductIndex] = useState<number | null>(null);
+  
+  // 물류회사 목록 로드
+  const { inlandCompanies, isLoading: optionsLoading } = useLogisticsOptions();
 
   // 모달이 열릴 때 초기 데이터 설정
   useEffect(() => {
@@ -292,12 +296,12 @@ export function PackingListCreateModal({
                 value={formData.logisticsCompany}
                 onChange={(e) => setFormData({ ...formData, logisticsCompany: e.target.value })}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-sm"
+                disabled={optionsLoading}
               >
                 <option value="">선택하세요</option>
-                <option value="위해-한사장">위해-한사장</option>
-                <option value="광저우-비전">광저우-비전</option>
-                <option value="위해-비전">위해-비전</option>
-                <option value="정상해운">정상해운</option>
+                {inlandCompanies.map((company) => (
+                  <option key={company.id} value={company.name}>{company.name}</option>
+                ))}
               </select>
             </div>
           </div>

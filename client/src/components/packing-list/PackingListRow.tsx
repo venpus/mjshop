@@ -1,6 +1,6 @@
 import { getGroupId } from '../../utils/packingListUtils';
-import { LOGISTICS_COMPANIES } from './types';
 import type { PackingListItem, DomesticInvoice } from './types';
+import type { InlandCompany } from '../../hooks/useLogisticsOptions';
 import { ProductCell } from './cells/ProductCell';
 import { DomesticInvoiceCell } from './cells/DomesticInvoiceCell';
 import { KoreaArrivalCell } from './cells/KoreaArrivalCell';
@@ -29,6 +29,10 @@ interface PackingListRowProps {
   showCodeLink: boolean; // A레벨과 D0 레벨만 코드 링크 표시
   onCodeClick?: (code: string, date: string) => void; // 코드 클릭 시 상세 화면으로 이동하는 핸들러
   hideSensitiveColumns: boolean; // C0 레벨, D0 레벨일 때 실중량, 비율, 중량, 배송비, 지급일, WK결제일 숨김
+  isC0Level?: boolean; // C0 레벨 여부 (물류회사 읽기 전용 표시용)
+  isD0Level?: boolean; // D0 레벨 여부 (물류회사 읽기 전용 표시용)
+  inlandCompanies: InlandCompany[]; // 내륙운송회사 목록
+  optionsLoading: boolean; // 물류 옵션 로딩 중 여부
 }
 
 export function PackingListRow({
@@ -53,6 +57,10 @@ export function PackingListRow({
   showCodeLink,
   onCodeClick,
   hideSensitiveColumns,
+  isC0Level = false,
+  isD0Level = false,
+  inlandCompanies,
+  optionsLoading,
 }: PackingListRowProps) {
   const isMultipleProducts = groupSize > 1;
   const groupId = getGroupId(item.id);
@@ -153,22 +161,31 @@ export function PackingListRow({
       </td>
       {/* 물류회사 */}
       <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle" style={{ minWidth: '140px' }}>
-        {hideSensitiveColumns ? (
-          // C0 레벨, D0 레벨: 읽기 전용으로 표시하고 "광저우-비전"과 "위해-비전"만 표시 (D0 레벨만 해당)
+        {isC0Level || isD0Level ? (
+          // C0 레벨, D0 레벨: 읽기 전용으로 표시
+          // C0 레벨: DB에 저장된 모든 물류회사 표시
+          // D0 레벨: "광저우-비전"과 "위해-비전"만 표시
           <div className="text-gray-900">
-            {item.logisticsCompany === '광저우-비전' || item.logisticsCompany === '위해-비전' 
-              ? item.logisticsCompany 
-              : '-'}
+            {isD0Level ? (
+              // D0 레벨: "광저우-비전"과 "위해-비전"만 표시
+              item.logisticsCompany === '광저우-비전' || item.logisticsCompany === '위해-비전' 
+                ? item.logisticsCompany 
+                : '-'
+            ) : (
+              // C0 레벨: DB에 저장된 값 그대로 표시
+              item.logisticsCompany || '-'
+            )}
           </div>
         ) : (
           <select
             value={item.logisticsCompany || ''}
             onChange={(e) => onLogisticsCompanyChange(groupId, e.target.value)}
             className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
+            disabled={optionsLoading}
           >
             <option value="">선택</option>
-            {LOGISTICS_COMPANIES.map((company: string) => (
-              <option key={company} value={company}>{company}</option>
+            {inlandCompanies.map((company) => (
+              <option key={company.id} value={company.name}>{company.name}</option>
             ))}
           </select>
         )}

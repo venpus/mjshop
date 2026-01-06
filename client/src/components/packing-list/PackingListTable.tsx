@@ -3,6 +3,7 @@ import { getGroupId, calculateShippingCostByLogisticsCompany } from '../../utils
 import type { PackingListItem, DomesticInvoice } from './types';
 import { PackingListHeader } from './PackingListHeader';
 import { PackingListRow } from './PackingListRow';
+import { useLogisticsOptions } from '../../hooks/useLogisticsOptions';
 
 interface PackingListTableProps {
   items: PackingListItem[];
@@ -19,6 +20,8 @@ interface PackingListTableProps {
   showCodeLink: boolean; // A레벨과 D0 레벨만 코드 링크 표시
   onCodeClick?: (code: string, date: string) => void; // 코드 클릭 시 상세 화면으로 이동하는 핸들러
   hideSensitiveColumns: boolean; // C0 레벨, D0 레벨일 때 실중량, 비율, 중량, 배송비, 지급일, WK결제일 숨김
+  isC0Level?: boolean; // C0 레벨 여부 (물류회사 읽기 전용 표시용)
+  isD0Level?: boolean; // D0 레벨 여부 (물류회사 읽기 전용 표시용)
 }
 
 /**
@@ -50,7 +53,12 @@ export function PackingListTable({
   showCodeLink,
   onCodeClick,
   hideSensitiveColumns,
+  isC0Level = false,
+  isD0Level = false,
 }: PackingListTableProps) {
+  // 물류회사 목록 로드
+  const { inlandCompanies, isLoading: optionsLoading } = useLogisticsOptions();
+  
   // 그룹별로 아이템들을 나누기 (순서 유지)
   const groupedItems = useMemo(() => {
     const groups: { [key: string]: PackingListItem[] } = {};
@@ -223,6 +231,10 @@ export function PackingListTable({
                     showCodeLink={showCodeLink}
                     onCodeClick={onCodeClick}
                     hideSensitiveColumns={hideSensitiveColumns}
+                    isC0Level={isC0Level}
+                    isD0Level={isD0Level}
+                    inlandCompanies={inlandCompanies}
+                    optionsLoading={optionsLoading}
                   />
                 );
               })
