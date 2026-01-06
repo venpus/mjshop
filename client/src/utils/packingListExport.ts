@@ -38,8 +38,11 @@ function extractSelectedCodeGroups(
   const groupedByCode = new Map<string, PackingListItem[]>();
   
   selectedKeys.forEach(key => {
-    const [code, ...dateParts] = key.split('-');
-    const date = dateParts.join('-'); // 날짜에 하이픈이 있을 수 있으므로
+    // key 형식: "code::date" (예: "G26-1::2025-12-11")
+    const parts = key.split('::');
+    if (parts.length !== 2) return;
+    const code = parts[0];
+    const date = parts[1];
     
     const groupItems = packingListItems.filter(
       item => item.code === code && item.date === date

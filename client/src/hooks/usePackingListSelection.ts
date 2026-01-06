@@ -3,9 +3,10 @@ import type { PackingListItem } from '../components/packing-list/types';
 
 /**
  * 코드와 날짜를 조합하여 고유 키 생성
+ * 구분자로 "::"를 사용하여 코드에 하이픈이 포함된 경우에도 정확히 분리 가능
  */
 function getCodeDateKey(code: string, date: string): string {
-  return `${code}-${date}`;
+  return `${code}::${date}`;
 }
 
 /**
@@ -60,7 +61,7 @@ export function usePackingListSelection(items: PackingListItem[]) {
 
   // 선택된 키들을 코드-날짜 조합 배열로 반환 (하위 호환성)
   const selectedCodes = useMemo(() => {
-    return new Set(Array.from(selectedKeys).map(key => key.split('-')[0]));
+    return new Set(Array.from(selectedKeys).map(key => key.split('::')[0]));
   }, [selectedKeys]);
 
   return {

@@ -419,7 +419,7 @@ export function ShippingHistory() {
   // 코드 클릭 시 패킹리스트 상세 화면으로 이동하는 핸들러
   const handleCodeClick = (code: string, date: string) => {
     // code와 date로 패킹리스트 ID 찾기
-    const codeDateKey = `${code}-${date}`;
+    const codeDateKey = `${code}::${date}`;
     const packingListId = getPackingListIdFromCode(packingListItems, codeDateKey);
     
     if (!packingListId) {
@@ -897,14 +897,14 @@ export function ShippingHistory() {
                 <button
                   onClick={() => {
                     const firstKey = Array.from(selectedKeys)[0];
-                    // code-date 키에서 code와 date 추출 (첫 번째 하이픈 기준으로 분리)
-                    const firstDashIndex = firstKey.indexOf('-');
-                    if (firstDashIndex === -1) {
+                    // code::date 키에서 code와 date 추출
+                    const parts = firstKey.split('::');
+                    if (parts.length !== 2) {
                       alert('유효하지 않은 선택입니다.');
                       return;
                     }
-                    const code = firstKey.substring(0, firstDashIndex);
-                    const date = firstKey.substring(firstDashIndex + 1);
+                    const code = parts[0];
+                    const date = parts[1];
                     
                     const itemsToEdit = packingListItems.filter(item => item.code === code && item.date === date && item.isFirstRow);
                     
@@ -1190,11 +1190,11 @@ export function ShippingHistory() {
 
       {/* 패킹 리스트 수정 모달 */}
       {editingCodeDate && (() => {
-        // code-date 키에서 code와 date 추출 (첫 번째 하이픈 기준으로 분리)
-        const firstDashIndex = editingCodeDate.indexOf('-');
-        if (firstDashIndex === -1) return null;
-        const code = editingCodeDate.substring(0, firstDashIndex);
-        const date = editingCodeDate.substring(firstDashIndex + 1);
+        // code::date 키에서 code와 date 추출
+        const parts = editingCodeDate.split('::');
+        if (parts.length !== 2) return null;
+        const code = parts[0];
+        const date = parts[1];
         
         const firstItem = packingListItems.find(item => item.code === code && item.date === date && item.isFirstRow);
         if (!firstItem) return null;

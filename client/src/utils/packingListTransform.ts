@@ -422,19 +422,19 @@ export function getPackingListIdFromCode(
 ): number | null {
   if (clientItems.length === 0) return null;
 
-  // codeDateKey 형식: "code-date" (예: "F20-2025-12-11")
-  // 첫 번째 하이픈 위치를 찾아서 코드와 날짜를 분리
-  const firstDashIndex = codeDateKey.indexOf('-');
-  if (firstDashIndex === -1) return null;
+  // codeDateKey 형식: "code::date" (예: "F20::2025-12-11", "G26-1::2025-12-11")
+  // "::" 구분자로 코드와 날짜를 분리
+  const parts = codeDateKey.split('::');
+  if (parts.length !== 2) return null;
 
-  const code = codeDateKey.substring(0, firstDashIndex);
-  const date = codeDateKey.substring(firstDashIndex + 1); // 첫 번째 하이픈 이후가 날짜
+  const code = parts[0];
+  const date = parts[1];
 
   // id에서 packing_list_id 추출 (형식: "packingListId-itemId")
   const firstItem = clientItems.find((item) => item.code === code && item.date === date && item.isFirstRow);
   if (!firstItem) return null;
 
-  const parts = firstItem.id.split('-');
-  const packingListId = parseInt(parts[0]);
+  const idParts = firstItem.id.split('-');
+  const packingListId = parseInt(idParts[0]);
   return isNaN(packingListId) ? null : packingListId;
 }
