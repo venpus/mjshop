@@ -21,7 +21,7 @@ export interface BottomSheetProps {
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
-  height?: number; // 시트 높이 (기본값: 화면의 70%)
+  height?: number; // 시트 높이 (0.0-1.0: 화면 비율, 1.0 이상: 픽셀 값, 기본값: 0.7)
 }
 
 export function BottomSheet({
@@ -33,12 +33,17 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const screenHeight = Dimensions.get('window').height;
   const defaultHeight = screenHeight * 0.7;
-  const sheetHeight = height || defaultHeight;
+  // height가 1.0 이하면 비율로, 1.0 초과면 픽셀 값으로 처리
+  const sheetHeight = height 
+    ? (height <= 1.0 ? screenHeight * height : height)
+    : defaultHeight;
 
   const slideAnim = React.useRef(new Animated.Value(sheetHeight)).current;
 
   useEffect(() => {
     if (visible) {
+      // 모달이 열릴 때: 화면 밖에서 시작하여 화면 안으로 이동
+      slideAnim.setValue(sheetHeight);
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
@@ -46,13 +51,14 @@ export function BottomSheet({
         friction: 11,
       }).start();
     } else {
+      // 모달이 닫힐 때: 화면 안에서 화면 밖으로 이동
       Animated.timing(slideAnim, {
         toValue: sheetHeight,
         duration: 250,
         useNativeDriver: true,
       }).start();
     }
-  }, [visible, sheetHeight]);
+  }, [visible, sheetHeight, slideAnim]);
 
   return (
     <Modal
@@ -63,7 +69,7 @@ export function BottomSheet({
     >
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
+          <TouchableWithoutFeedback onPress={() => {}}>
             <Animated.View
               style={[
                 styles.sheet,
@@ -93,7 +99,9 @@ export function BottomSheet({
               )}
 
               {/* 내용 */}
-              <View style={styles.content}>{children}</View>
+              <View style={styles.content}>
+                {children}
+              </View>
             </Animated.View>
           </TouchableWithoutFeedback>
         </View>
@@ -158,7 +166,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: spacing.md,
   },
 });
 

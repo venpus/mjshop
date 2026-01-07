@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Platform, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Platform, StyleSheet, ViewStyle } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Input } from '../../common';
 import { colors, spacing } from '../../../constants';
@@ -18,6 +18,8 @@ export interface DateInputProps {
   editable?: boolean;
   minimumDate?: Date;
   maximumDate?: Date;
+  displayFormat?: 'default' | 'korean'; // 'default': YYYY-MM-DD, 'korean': YYYY년 MM월 DD일
+  containerStyle?: ViewStyle;
 }
 
 export function DateInput({
@@ -29,6 +31,8 @@ export function DateInput({
   editable = true,
   minimumDate,
   maximumDate,
+  displayFormat = 'default',
+  containerStyle,
 }: DateInputProps) {
   const [showPicker, setShowPicker] = useState(false);
 
@@ -37,6 +41,15 @@ export function DateInput({
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  const formatDisplayDate = (dateString: string): string => {
+    if (!dateString) return '';
+    if (displayFormat === 'korean') {
+      const [year, month, day] = dateString.split('-');
+      return `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
+    }
+    return dateString;
   };
 
   const parseDate = (dateString: string): Date => {
@@ -59,7 +72,7 @@ export function DateInput({
     }
   };
 
-  const displayValue = value || '';
+  const displayValue = displayFormat === 'korean' ? formatDisplayDate(value) : (value || '');
 
   if (!editable) {
     return (
@@ -74,7 +87,7 @@ export function DateInput({
   }
 
   return (
-    <View>
+    <View style={containerStyle}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
       <TouchableOpacity
         onPress={() => setShowPicker(true)}
@@ -82,7 +95,7 @@ export function DateInput({
       >
         <Input
           value={displayValue}
-          placeholder={placeholder}
+          placeholder={displayFormat === 'korean' ? 'YYYY년 MM월 DD일' : placeholder}
           editable={false}
           error={error}
           pointerEvents="none"
@@ -114,10 +127,10 @@ export function DateInput({
 
 const styles = StyleSheet.create({
   label: {
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '500',
     color: colors.gray700,
-    marginBottom: 8,
+    marginBottom: 2,
   },
   iosPickerContainer: {
     flexDirection: 'row',

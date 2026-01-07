@@ -16,7 +16,13 @@ import {
 } from 'react-native';
 import { Container, Header, Loading, ErrorDisplay, Button } from '../components/common';
 import { SaveStatusBar } from '../components/purchase-order/SaveStatusBar';
-import { Input, NumberInput, DateInput } from '../components/purchase-order/common';
+import { ProductInfoSection } from '../components/purchase-order/ProductInfoSection';
+import { ProductInfoEditModal, type ProductInfoEditData } from '../components/purchase-order/modals/ProductInfoEditModal';
+import { UnitPriceEditModal, type UnitPriceEditData } from '../components/purchase-order/modals/UnitPriceEditModal';
+import { ShippingEditModal, type ShippingEditData } from '../components/purchase-order/modals/ShippingEditModal';
+import { PaymentEditModal, type PaymentEditData } from '../components/purchase-order/modals/PaymentEditModal';
+import { CostItemsEditModal, type CostItemsEditData } from '../components/purchase-order/modals/CostItemsEditModal';
+import { Input, NumberInput, DateInput, Select } from '../components/purchase-order/common';
 import { useMenuDrawer } from '../contexts/MenuDrawerContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts';
@@ -31,6 +37,9 @@ import {
   calculateExpectedFinalUnitPrice,
   calculateFactoryStatusFromQuantity,
   calculateWorkStatus,
+  calculateCommissionAmount,
+  calculateAdvancePaymentAmount,
+  calculateBalancePaymentAmount,
 } from '../utils/purchaseOrderCalculations';
 import { usePurchaseOrderForm } from '../hooks/usePurchaseOrderForm';
 import { usePurchaseOrderSave } from '../hooks/usePurchaseOrderSave';
@@ -65,6 +74,9 @@ export default function PurchaseOrderDetailScreen({
   // 업체 출고 및 반품/교환 항목 상태
   const [factoryShipments, setFactoryShipments] = useState<FactoryShipment[]>([]);
   const [returnExchangeItems, setReturnExchangeItems] = useState<ReturnExchangeItem[]>([]);
+
+  // 편집 모달 상태
+  const [editingSection, setEditingSection] = useState<'product' | 'unitPrice' | 'shipping' | 'payment' | 'costItems' | null>(null);
 
   // 폼 상태 관리 Hook (항상 호출되어야 함)
   const {
@@ -123,6 +135,20 @@ export default function PurchaseOrderDetailScreen({
         setOptionItems(formattedOptionItems);
         setLaborCostItems(formattedLaborCostItems);
         
+        // 날짜 정규화 헬퍼 함수
+        const normalizeDateValue = (date: string | null | undefined): string => {
+          if (!date) return '';
+          // ISO 형식 (2026-01-05T16:00:00.000Z)을 YYYY-MM-DD로 변환
+          if (date.includes('T')) {
+            return date.split('T')[0];
+          }
+          // 이미 YYYY-MM-DD 형식이면 그대로 반환
+          if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return date;
+          }
+          return date;
+        };
+
         // 원본 데이터에 cost items 포함
         setOriginalData({
           unitPrice: data.unit_price || 0,
@@ -133,13 +159,13 @@ export default function PurchaseOrderDetailScreen({
           commissionRate: data.commission_rate || 0,
           commissionType: data.commission_type || '',
           advancePaymentRate: data.advance_payment_rate || 0,
-          advancePaymentDate: data.advance_payment_date || '',
-          balancePaymentDate: data.balance_payment_date || '',
+          advancePaymentDate: normalizeDateValue(data.advance_payment_date),
+          balancePaymentDate: normalizeDateValue(data.balance_payment_date),
           packaging: data.packaging || 0,
-          orderDate: data.order_date || '',
-          deliveryDate: data.delivery_date || '',
-          workStartDate: data.work_start_date || '',
-          workEndDate: data.work_end_date || '',
+          orderDate: normalizeDateValue(data.order_date),
+          deliveryDate: normalizeDateValue(data.delivery_date),
+          workStartDate: normalizeDateValue(data.work_start_date),
+          workEndDate: normalizeDateValue(data.work_end_date),
           isOrderConfirmed: data.is_confirmed || false,
           productName: data.product_name || '',
           productSize: data.size || '',
@@ -151,6 +177,20 @@ export default function PurchaseOrderDetailScreen({
       } catch (costErr) {
         console.error('비용 항목 로드 실패:', costErr);
         // 비용 항목 로드 실패는 치명적이지 않으므로 계속 진행
+        // 날짜 정규화 헬퍼 함수
+        const normalizeDateValue = (date: string | null | undefined): string => {
+          if (!date) return '';
+          // ISO 형식 (2026-01-05T16:00:00.000Z)을 YYYY-MM-DD로 변환
+          if (date.includes('T')) {
+            return date.split('T')[0];
+          }
+          // 이미 YYYY-MM-DD 형식이면 그대로 반환
+          if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return date;
+          }
+          return date;
+        };
+
         // 원본 데이터 설정 (cost items 없이)
         setOriginalData({
           unitPrice: data.unit_price || 0,
@@ -161,13 +201,13 @@ export default function PurchaseOrderDetailScreen({
           commissionRate: data.commission_rate || 0,
           commissionType: data.commission_type || '',
           advancePaymentRate: data.advance_payment_rate || 0,
-          advancePaymentDate: data.advance_payment_date || '',
-          balancePaymentDate: data.balance_payment_date || '',
+          advancePaymentDate: normalizeDateValue(data.advance_payment_date),
+          balancePaymentDate: normalizeDateValue(data.balance_payment_date),
           packaging: data.packaging || 0,
-          orderDate: data.order_date || '',
-          deliveryDate: data.delivery_date || '',
-          workStartDate: data.work_start_date || '',
-          workEndDate: data.work_end_date || '',
+          orderDate: normalizeDateValue(data.order_date),
+          deliveryDate: normalizeDateValue(data.delivery_date),
+          workStartDate: normalizeDateValue(data.work_start_date),
+          workEndDate: normalizeDateValue(data.work_end_date),
           isOrderConfirmed: data.is_confirmed || false,
           productName: data.product_name || '',
           productSize: data.size || '',
@@ -205,7 +245,7 @@ export default function PurchaseOrderDetailScreen({
               if (shouldRefreshList) {
                 navigation.navigate('PurchaseOrders', { shouldRefresh: true });
               } else {
-                navigation.goBack();
+    navigation.goBack();
               }
             },
           },
@@ -271,16 +311,66 @@ export default function PurchaseOrderDetailScreen({
     return () => backHandler.remove();
   }, [isDirty, navigation, shouldRefreshList, handleSave]);
 
+  // 권한 체크
+  const canWrite = true; // TODO: 실제 권한 체크 로직 추가
+
+  // 수수료 옵션
+  const commissionOptions = useMemo(() => [
+    { label: '5만위안 이상 재주문 5%', value: '5만위안 이상 재주문 5%', rate: 5 },
+    { label: '5만위안 이하 재주문 7%', value: '5만위안 이하 재주문 7%', rate: 7 },
+    { label: '5만위안 이상 신규주문 8%', value: '5만위안 이상 신규주문 8%', rate: 8 },
+    { label: '5만위안이하 신규주문 10%', value: '5만위안이하 신규주문 10%', rate: 10 },
+  ], []);
+
+  // 수수료 타입 변경 핸들러
+  const handleCommissionTypeChange = useCallback((value: string | number) => {
+    const selected = commissionOptions.find((opt) => opt.value === value);
+    if (selected) {
+      updateField('commissionType', selected.value);
+      updateField('commissionRate', selected.rate);
+    }
+  }, [commissionOptions, updateField]);
+
   // 총 비용 계산 (항상 호출되어야 함 - early return 전)
   const totalOptionCost = useMemo(() => calculateTotalOptionCost(optionItems), [optionItems]);
   const totalLaborCost = useMemo(() => calculateTotalLaborCost(laborCostItems), [laborCostItems]);
+
+  // 수수료 금액 계산
+  const commissionAmount = useMemo(() => {
+    return calculateCommissionAmount(
+      formData.unitPrice,
+      formData.quantity,
+      formData.commissionRate,
+      formData.backMargin
+    );
+  }, [formData.unitPrice, formData.quantity, formData.commissionRate, formData.backMargin]);
+
+  // 최종 결제 금액 계산
+  const finalPaymentAmountWithCosts = useMemo(() => {
+    return finalPaymentAmount + totalOptionCost + totalLaborCost;
+  }, [finalPaymentAmount, totalOptionCost, totalLaborCost]);
+
+  // 선금 금액 계산
+  const advancePaymentAmount = useMemo(() => {
+    return calculateAdvancePaymentAmount(
+      formData.unitPrice,
+      formData.quantity,
+      formData.advancePaymentRate,
+      formData.backMargin
+    );
+  }, [formData.unitPrice, formData.quantity, formData.advancePaymentRate, formData.backMargin]);
+
+  // 잔금 금액 계산
+  const balancePaymentAmount = useMemo(() => {
+    return calculateBalancePaymentAmount(finalPaymentAmountWithCosts, advancePaymentAmount);
+  }, [finalPaymentAmountWithCosts, advancePaymentAmount]);
 
   // 상태 계산 (order가 있을 때만)
   const factoryStatus = useMemo(() => {
     if (!order) return null;
     return order.factory_shipped_quantity !== undefined
-      ? calculateFactoryStatusFromQuantity(order.factory_shipped_quantity, order.quantity)
-      : null;
+    ? calculateFactoryStatusFromQuantity(order.factory_shipped_quantity, order.quantity)
+    : null;
   }, [order]);
 
   const workStatus = useMemo(() => {
@@ -381,6 +471,69 @@ export default function PurchaseOrderDetailScreen({
       isAdminOnly,
     };
     setLaborCostItems((prev) => [...prev, newItem]);
+  }, []);
+
+  // 메인 이미지 업로드 핸들러
+  const handleMainImageUpload = useCallback(async (uri: string) => {
+    try {
+      const { uploadPurchaseOrderMainImage } = await import('../api/purchaseOrderApi');
+      await uploadPurchaseOrderMainImage(id, uri);
+      
+      // 발주 데이터 재로드
+      await loadOrderDetail();
+      Alert.alert('성공', '이미지가 업로드되었습니다.');
+    } catch (error: any) {
+      console.error('메인 이미지 업로드 오류:', error);
+      Alert.alert('오류', error.message || '이미지 업로드에 실패했습니다.');
+    }
+  }, [id, loadOrderDetail]);
+
+  // 발주 컨펌 변경 핸들러
+  const handleOrderConfirmedChange = useCallback(async (confirmed: boolean) => {
+    try {
+      const { updatePurchaseOrder } = await import('../api/purchaseOrderApi');
+      await updatePurchaseOrder(id, { is_confirmed: confirmed });
+      
+      // 발주 데이터 재로드
+      await loadOrderDetail();
+      Alert.alert('성공', confirmed ? '발주가 컨펌되었습니다.' : '발주 컨펌이 해제되었습니다.');
+    } catch (error: any) {
+      console.error('발주 컨펌 변경 오류:', error);
+      Alert.alert('오류', error.message || '발주 컨펌 상태 변경에 실패했습니다.');
+    }
+  }, [id, loadOrderDetail]);
+
+  // 발주 취소 핸들러
+  const handleCancelOrder = useCallback(async () => {
+    Alert.alert(
+      '발주 취소',
+      '발주를 취소하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '확인',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { updatePurchaseOrder } = await import('../api/purchaseOrderApi');
+              await updatePurchaseOrder(id, { order_status: '취소됨' });
+              
+              // 발주 데이터 재로드
+              await loadOrderDetail();
+              Alert.alert('성공', '발주가 취소되었습니다.');
+            } catch (error: any) {
+              console.error('발주 취소 오류:', error);
+              Alert.alert('오류', error.message || '발주 취소에 실패했습니다.');
+            }
+          },
+        },
+      ]
+    );
+  }, [id, loadOrderDetail]);
+
+  // 사진첩 핸들러 (나중에 구현)
+  const handlePhotoGalleryClick = useCallback(() => {
+    Alert.alert('알림', '사진첩 기능은 준비 중입니다.');
   }, []);
 
   // 업체 출고 항목 핸들러
@@ -539,123 +692,182 @@ export default function PurchaseOrderDetailScreen({
     const isSuperAdmin = user?.level === 'A-SuperAdmin';
     
     return (
-      <View style={styles.tabContent}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>기본 정보</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>발주번호:</Text>
-            <Text style={styles.infoValue}>{order.po_number || '-'}</Text>
-          </View>
-          <DateInput
-            label="발주일"
-            value={formData.orderDate}
-            onChange={(value) => updateField('orderDate', value)}
-          />
-          <DateInput
-            label="납기일"
-            value={formData.deliveryDate}
-            onChange={(value) => updateField('deliveryDate', value)}
-          />
-          <NumberInput
-            label="수량"
-            value={formData.quantity}
-            onChange={(value) => updateField('quantity', value)}
-            min={0}
-            allowDecimals={false}
-          />
-        </View>
+    <View style={styles.tabContent}>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>단가 정보</Text>
-          <NumberInput
-            label="기본단가"
-            value={formData.unitPrice}
-            onChange={(value) => updateField('unitPrice', value)}
-            min={0}
-          />
-          <NumberInput
-            label="추가단가 (백마진)"
-            value={formData.backMargin}
-            onChange={(value) => updateField('backMargin', value)}
-            min={0}
-          />
+        {/* 단가 정보 카드 */}
+        <View style={[styles.section, styles.cardSection]}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>💰 단가 정보</Text>
+            <View style={styles.cardHeaderRight}>
+              <View style={styles.cardTotal}>
+                <Text style={styles.cardTotalLabel}>기본비용:</Text>
+                <Text style={styles.cardTotalValue}>
+                  ¥{basicCostTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+              {canWrite && (
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => setEditingSection('unitPrice')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.editButtonText}>✏️ 편집</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* 읽기 모드 - Text만 표시 */}
+          {isSuperAdmin && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>기본단가:</Text>
+              <Text style={styles.infoValue}>
+                ¥{(formData.unitPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </Text>
+            </View>
+          )}
+          {isSuperAdmin && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>추가단가 (백마진):</Text>
+              <Text style={styles.infoValue}>
+                ¥{(formData.backMargin || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </Text>
+            </View>
+          )}
+          
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>발주단가:</Text>
-            <Text style={styles.infoValue}>¥{orderUnitPrice.toLocaleString()}</Text>
-          </View>
-          <NumberInput
-            label="수수료율 (%)"
-            value={formData.commissionRate}
-            onChange={(value) => updateField('commissionRate', value)}
-            min={0}
-            max={100}
-          />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>비용 정보</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>기본비용:</Text>
-            <Text style={styles.infoValue}>¥{basicCostTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-          </View>
-          <NumberInput
-            label="배송비"
-            value={formData.shippingCost}
-            onChange={(value) => updateField('shippingCost', value)}
-            min={0}
-          />
-          <NumberInput
-            label="창고배송비"
-            value={formData.warehouseShippingCost}
-            onChange={(value) => updateField('warehouseShippingCost', value)}
-            min={0}
-          />
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>옵션비용:</Text>
-            <Text style={styles.infoValue}>¥{totalOptionCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>작업비용:</Text>
-            <Text style={styles.infoValue}>¥{totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-          </View>
-          <View style={[styles.infoRow, styles.highlightRow]}>
-            <Text style={styles.infoLabel}>발주금액:</Text>
             <Text style={[styles.infoValue, styles.highlightValue]}>
-              ¥{(finalPaymentAmount + totalOptionCost + totalLaborCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ¥{orderUnitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
           </View>
-          <View style={[styles.infoRow, styles.highlightRow]}>
-            <Text style={styles.infoLabel}>예상최종단가:</Text>
-            <Text style={[styles.infoValue, styles.highlightValue]}>
-              ¥{expectedFinalUnitPrice.toFixed(2)}
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>수수료율:</Text>
+            <Text style={styles.infoValue}>
+              {formData.commissionType ? `${formData.commissionType}%` : '-'}
+            </Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>수수료 금액:</Text>
+            <Text style={styles.infoValue}>
+              ¥{commissionAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>결제 정보</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>결제상태:</Text>
-            <Text style={styles.infoValue}>{order.payment_status || '-'}</Text>
+        {/* 운송비 카드 */}
+        <View style={[styles.section, styles.cardSection]}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>🚚 운송비</Text>
+            <View style={styles.cardHeaderRight}>
+              <View style={styles.cardTotal}>
+                <Text style={styles.cardTotalLabel}>총 운송비:</Text>
+                <Text style={styles.cardTotalValue}>
+                  ¥{shippingCostTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+              {canWrite && (
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => setEditingSection('shipping')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.editButtonText}>✏️ 편집</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-          <NumberInput
-            label="선금비율 (%)"
-            value={formData.advancePaymentRate}
-            onChange={(value) => updateField('advancePaymentRate', value)}
-            min={0}
-            max={100}
-          />
-          <DateInput
-            label="선금일"
-            value={formData.advancePaymentDate}
-            onChange={(value) => updateField('advancePaymentDate', value)}
-          />
-          <DateInput
-            label="잔금일"
-            value={formData.balancePaymentDate}
-            onChange={(value) => updateField('balancePaymentDate', value)}
-          />
+          
+          {/* 읽기 모드 - Text만 표시 */}
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>업체 배송비:</Text>
+            <Text style={styles.infoValue}>
+              ¥{(formData.shippingCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>창고 배송비:</Text>
+            <Text style={styles.infoValue}>
+              ¥{(formData.warehouseShippingCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+          </View>
         </View>
+
+        {/* 결제 정보 카드 */}
+        <View style={[styles.section, styles.cardSection]}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>💳 결제 정보</Text>
+            <View style={styles.cardHeaderRight}>
+              {order.payment_status ? (
+                <View style={[styles.statusBadge, getStatusStyle(order.payment_status)]}>
+                  <Text style={styles.statusBadgeText}>{order.payment_status}</Text>
+                </View>
+              ) : null}
+              {canWrite && (
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => setEditingSection('payment')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.editButtonText}>✏️ 편집</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* 읽기 모드 - Text만 표시 */}
+          <View style={styles.paymentGrid}>
+            {/* 선금 */}
+            <View style={styles.paymentColumn}>
+              <Text style={styles.paymentColumnTitle}>선금</Text>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>선금 비율:</Text>
+                <Text style={styles.infoValue}>
+                  {(formData.advancePaymentRate || 0)}%
+                </Text>
+              </View>
+              <View style={styles.paymentAmountRow}>
+                <Text style={styles.paymentAmountLabel}>금액:</Text>
+                <Text style={[styles.paymentAmountValue, styles.highlightValue]}>
+                  ¥{advancePaymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>선금일:</Text>
+                <Text style={styles.infoValue}>
+                  {formData.advancePaymentDate || '-'}
+                </Text>
+              </View>
+            </View>
+            
+            {/* 잔금 */}
+            <View style={styles.paymentColumn}>
+              <Text style={styles.paymentColumnTitle}>잔금</Text>
+              <View style={styles.paymentAmountRow}>
+                <Text style={styles.paymentAmountLabel}>금액:</Text>
+                <Text style={[styles.paymentAmountValue, styles.highlightValue]}>
+                  ¥{balancePaymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>잔금일:</Text>
+                <Text style={styles.infoValue}>
+                  {formData.balancePaymentDate || '-'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* 최종 결제 금액 카드 (강조) */}
+        <View style={[styles.section, styles.finalPaymentCard]}>
+          <Text style={styles.finalPaymentLabel}>최종 결제 금액</Text>
+          <Text style={styles.finalPaymentValue}>
+            ¥{finalPaymentAmountWithCosts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </Text>
+              </View>
 
         {/* CostPaymentTab 컴포넌트 */}
         <CostPaymentTab
@@ -675,9 +887,11 @@ export default function PurchaseOrderDetailScreen({
           onAddLaborCostItem={handleAddLaborCostItem}
           isSuperAdmin={user?.level === 'A-SuperAdmin'}
           canWrite={true}
+          mode="read"
+          onEditClick={() => setEditingSection('costItems')}
         />
-      </View>
-    );
+    </View>
+  );
   }, [order, user, formData, updateField, orderUnitPrice, basicCostTotal, shippingCostTotal, finalPaymentAmount, expectedFinalUnitPrice, totalOptionCost, totalLaborCost, optionItems, laborCostItems, handleUpdateOptionItemName, handleUpdateOptionItemUnitPrice, handleUpdateOptionItemQuantity, handleRemoveOptionItem, handleAddOptionItem, handleUpdateLaborCostItemName, handleUpdateLaborCostItemUnitPrice, handleUpdateLaborCostItemQuantity, handleRemoveLaborCostItem, handleAddLaborCostItem]);
 
   const renderFactoryTab = useCallback(() => {
@@ -707,28 +921,28 @@ export default function PurchaseOrderDetailScreen({
     if (!order) return <View />;
     
     return (
-      <View style={styles.tabContent}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>작업 현황</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>작업상태:</Text>
+    <View style={styles.tabContent}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>작업 현황</Text>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>작업상태:</Text>
             <Text style={styles.infoValue}>{workStatus ?? '-'}</Text>
-          </View>
-          {order.work_start_date ? (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>작업시작일:</Text>
-              <Text style={styles.infoValue}>{formatDate(order.work_start_date)}</Text>
-            </View>
-          ) : null}
-          {order.work_end_date ? (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>작업종료일:</Text>
-              <Text style={styles.infoValue}>{formatDate(order.work_end_date)}</Text>
-            </View>
-          ) : null}
         </View>
+        {order.work_start_date ? (
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>작업시작일:</Text>
+            <Text style={styles.infoValue}>{formatDate(order.work_start_date)}</Text>
+          </View>
+        ) : null}
+        {order.work_end_date ? (
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>작업종료일:</Text>
+            <Text style={styles.infoValue}>{formatDate(order.work_end_date)}</Text>
+          </View>
+        ) : null}
+      </View>
 
-        {order.workItems && order.workItems.length > 0 ? (
+      {order.workItems && order.workItems.length > 0 ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>작업 항목</Text>
           {order.workItems.map((item, index) => (
@@ -745,32 +959,32 @@ export default function PurchaseOrderDetailScreen({
           ))}
         </View>
       ) : null}
-      </View>
-    );
+    </View>
+  );
   }, [order, workStatus, formatDate]);
 
   const renderDeliveryTab = useCallback(() => {
     if (!order) return <View />;
     
     return (
-      <View style={styles.tabContent}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>배송 현황</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>배송중:</Text>
-            <Text style={styles.infoValue}>{(order.shipping_quantity ?? 0)}개</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>한국도착:</Text>
-            <Text style={styles.infoValue}>{(order.arrived_quantity ?? 0)}개</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>발송수량:</Text>
-            <Text style={styles.infoValue}>{(order.shipped_quantity ?? 0)}개</Text>
-          </View>
+    <View style={styles.tabContent}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>배송 현황</Text>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>배송중:</Text>
+          <Text style={styles.infoValue}>{(order.shipping_quantity ?? 0)}개</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>한국도착:</Text>
+          <Text style={styles.infoValue}>{(order.arrived_quantity ?? 0)}개</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>발송수량:</Text>
+          <Text style={styles.infoValue}>{(order.shipped_quantity ?? 0)}개</Text>
         </View>
       </View>
-    );
+    </View>
+  );
   }, [order]);
 
   const renderTabContent = useCallback(() => {
@@ -793,14 +1007,14 @@ export default function PurchaseOrderDetailScreen({
   }, [activeTab, order, renderCostTab, renderFactoryTab, renderWorkTab, renderDeliveryTab]);
 
   if (loading && !refreshing) {
-    return (
+  return (
       <Container safeArea>
-        <Header
+      <Header
           title={t('menu.purchaseOrders') || '발주 관리'}
-          leftButton={{ label: '←', onPress: handleBack }}
-          showMenuButton={true}
-          onMenuPress={openDrawer}
-        />
+        leftButton={{ label: '←', onPress: handleBack }}
+        showMenuButton={true}
+        onMenuPress={openDrawer}
+      />
         <Loading message="로딩 중..." />
       </Container>
     );
@@ -825,88 +1039,204 @@ export default function PurchaseOrderDetailScreen({
 
   return (
     <Container safeArea padding={false}>
-      <Header
-        title={order.po_number ? String(order.po_number) : '발주 상세'}
-        leftButton={{ label: '←', onPress: handleBack }}
-        rightButton={{
-          icon: isDirty ? '💾' : '✓',
-          label: isSaving ? '저장 중...' : isDirty ? '저장' : null,
-          onPress: handleSave,
-        }}
-        showMenuButton={false}
-      />
-      <SaveStatusBar isDirty={isDirty} isSaving={isSaving} lastSavedAt={lastSavedAt} />
+      <View style={styles.mainContainer}>
+        <Header
+          title={order.po_number ? String(order.po_number) : '발주 상세'}
+          leftButton={{ label: '←', onPress: handleBack }}
+          rightButton={{
+            icon: isDirty ? '💾' : '✓',
+            label: isSaving ? '저장 중...' : isDirty ? '저장' : null,
+            onPress: handleSave,
+          }}
+          showMenuButton={false}
+          saveStatus={{
+            isDirty,
+            isSaving,
+            lastSavedAt,
+          }}
+        />
 
-      {/* 제품 정보 헤더 */}
-      <View style={styles.headerSection}>
-        {order.product_main_image ? (
-          <Image
-            source={{ uri: getFullImageUrl(order.product_main_image) }}
-            style={styles.productImage}
-            resizeMode="cover"
-          />
-        ) : null}
-        <View style={styles.productInfo}>
-          <Text style={styles.productName}>{order.product_name || '-'}</Text>
-          {order.product_name_chinese ? (
-            <Text style={styles.productNameChinese}>{order.product_name_chinese}</Text>
-          ) : null}
-          <View style={styles.statusRow}>
-            {order.order_status ? (
-              <View style={[styles.statusBadge, getStatusStyle(order.order_status)]}>
-                <Text style={styles.statusBadgeText}>{order.order_status}</Text>
-              </View>
-            ) : null}
-            {order.payment_status ? (
-              <View style={[styles.statusBadge, getStatusStyle(order.payment_status)]}>
-                <Text style={styles.statusBadgeText}>{order.payment_status}</Text>
-              </View>
-            ) : null}
-          </View>
+        {/* 상품 기본 정보 섹션 */}
+        <ProductInfoSection
+          productName={formData.productName || order.product_name || ''}
+          productNameChinese={order.product_name_chinese || null}
+          poNumber={order.po_number || ''}
+          productImage={order.product_main_image || null}
+          size={formData.productSize || order.size || ''}
+          weight={formData.productWeight || order.weight || ''}
+          packaging={formData.packaging || order.packaging || 0}
+          packagingSize={formData.productPackagingSize || order.packaging?.toString() || ''}
+          finalUnitPrice={expectedFinalUnitPrice}
+          orderDate={formData.orderDate || order.order_date || ''}
+          deliveryDate={formData.deliveryDate || order.delivery_date || ''}
+          quantity={formData.quantity || order.quantity || 0}
+          isOrderConfirmed={formData.isOrderConfirmed || order.is_confirmed || false}
+          orderStatus={order.order_status || ''}
+          onOrderConfirmedChange={handleOrderConfirmedChange}
+          onCancelOrder={handleCancelOrder}
+          onMainImageUpload={handleMainImageUpload}
+          onPhotoGalleryClick={handlePhotoGalleryClick}
+          onEditClick={() => setEditingSection('product')}
+          isEditable={canWrite}
+          userLevel={user?.level}
+          canWrite={canWrite}
+          mode="read"
+        />
+
+        {/* 탭 네비게이션 */}
+        <View style={styles.tabContainer}>
+          {renderTabButton('cost', '비용/결제')}
+          {renderTabButton('factory', '업체출고')}
+          {renderTabButton('work', '작업')}
+          {renderTabButton('delivery', '배송')}
         </View>
-      </View>
 
-      {/* 탭 네비게이션 */}
-      <View style={styles.tabContainer}>
-        {renderTabButton('cost', '비용/결제')}
-        {renderTabButton('factory', '업체출고')}
-        {renderTabButton('work', '작업')}
-        {renderTabButton('delivery', '배송')}
-      </View>
-
-      {/* 탭 내용 */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
-      >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={colors.primary}
-            />
-          }
+        {/* 탭 내용 */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-          {renderTabContent()}
-        </ScrollView>
-      </KeyboardAvoidingView>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={true}
+            nestedScrollEnabled={true}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={colors.primary}
+              />
+            }
+          >
+            {renderTabContent()}
+          </ScrollView>
+        </KeyboardAvoidingView>
 
-      {/* 하단 저장 버튼 (변경사항 있을 때만 표시) */}
-      {isDirty ? (
-        <View style={styles.bottomSaveButton}>
-          <Button
-            title={isSaving ? '저장 중...' : '저장'}
-            onPress={handleSave}
-            variant="primary"
-            disabled={isSaving}
+        {/* 하단 저장 버튼 (변경사항 있을 때만 표시) */}
+        {isDirty ? (
+          <View style={styles.bottomSaveButton}>
+            <Button
+              title={isSaving ? '저장 중...' : '저장'}
+              onPress={handleSave}
+              variant="primary"
+              disabled={isSaving}
+            />
+          </View>
+        ) : null}
+
+        {/* 상품 정보 편집 모달 */}
+        {order && (
+          <ProductInfoEditModal
+            visible={editingSection === 'product'}
+            onClose={() => setEditingSection(null)}
+            onSave={async (data: ProductInfoEditData) => {
+              // 폼 데이터 업데이트
+              updateField('productName', data.productName);
+              updateField('productSize', data.size);
+              updateField('productWeight', data.weight);
+              updateField('packaging', data.packaging);
+              updateField('productPackagingSize', data.packagingSize || '');
+              updateField('orderDate', data.orderDate);
+              updateField('deliveryDate', data.deliveryDate);
+              updateField('quantity', data.quantity);
+              
+              // 저장 실행
+              await handleSave();
+            }}
+            initialData={{
+              productName: formData.productName || order.product_name || '',
+              size: formData.productSize || order.size || '',
+              weight: formData.productWeight || order.weight || '',
+              packaging: formData.packaging || order.packaging || 0,
+              packagingSize: formData.productPackagingSize || order.packaging?.toString() || '',
+              orderDate: formData.orderDate || order.order_date || '',
+              deliveryDate: formData.deliveryDate || order.delivery_date || '',
+              quantity: formData.quantity || order.quantity || 0,
+              productImage: order.product_main_image || null,
+            }}
+            onMainImageUpload={handleMainImageUpload}
           />
-        </View>
-      ) : null}
+        )}
+
+        {/* 단가 정보 편집 모달 */}
+        {order && (
+          <UnitPriceEditModal
+            visible={editingSection === 'unitPrice'}
+            onClose={() => setEditingSection(null)}
+            onSave={async (data: UnitPriceEditData) => {
+              updateField('unitPrice', data.unitPrice);
+              updateField('backMargin', data.backMargin);
+              updateField('commissionType', data.commissionType);
+              updateField('commissionRate', data.commissionRate);
+              await handleSave();
+            }}
+            initialData={{
+              unitPrice: formData.unitPrice || order.unit_price || 0,
+              backMargin: formData.backMargin || order.back_margin || 0,
+              commissionType: formData.commissionType || order.commission_type || '',
+              commissionRate: formData.commissionRate || order.commission_rate || 0,
+            }}
+            isSuperAdmin={user?.level === 'A-SuperAdmin'}
+          />
+        )}
+
+        {/* 운송비 편집 모달 */}
+        {order && (
+          <ShippingEditModal
+            visible={editingSection === 'shipping'}
+            onClose={() => setEditingSection(null)}
+            onSave={async (data: ShippingEditData) => {
+              updateField('shippingCost', data.shippingCost);
+              updateField('warehouseShippingCost', data.warehouseShippingCost);
+              await handleSave();
+            }}
+            initialData={{
+              shippingCost: formData.shippingCost || order.shipping_cost || 0,
+              warehouseShippingCost: formData.warehouseShippingCost || order.warehouse_shipping_cost || 0,
+            }}
+          />
+        )}
+
+        {/* 결제 정보 편집 모달 */}
+        {order && (
+          <PaymentEditModal
+            visible={editingSection === 'payment'}
+            onClose={() => setEditingSection(null)}
+            onSave={async (data: PaymentEditData) => {
+              updateField('advancePaymentRate', data.advancePaymentRate);
+              updateField('advancePaymentDate', data.advancePaymentDate);
+              updateField('balancePaymentDate', data.balancePaymentDate);
+              await handleSave();
+            }}
+            initialData={{
+              advancePaymentRate: formData.advancePaymentRate || order.advance_payment_rate || 0,
+              advancePaymentDate: formData.advancePaymentDate || order.advance_payment_date || '',
+              balancePaymentDate: formData.balancePaymentDate || order.balance_payment_date || '',
+            }}
+          />
+        )}
+
+        {/* 비용 항목 편집 모달 */}
+        {order && (
+          <CostItemsEditModal
+            visible={editingSection === 'costItems'}
+            onClose={() => setEditingSection(null)}
+            onSave={async (data: CostItemsEditData) => {
+              setOptionItems(data.optionItems);
+              setLaborCostItems(data.laborCostItems);
+              await handleSave();
+            }}
+            initialData={{
+              optionItems: optionItems,
+              laborCostItems: laborCostItems,
+            }}
+            isSuperAdmin={user?.level === 'A-SuperAdmin'}
+          />
+        )}
+      </View>
     </Container>
   );
 }
@@ -924,6 +1254,10 @@ const getStatusStyle = (status: string): any => {
 };
 
 const styles = StyleSheet.create({
+  mainContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   headerSection: {
     flexDirection: 'row',
     padding: spacing.md,
@@ -999,10 +1333,11 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   scrollContent: {
     padding: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.xl * 3, // 하단 저장 버튼을 위한 여유 공간
   },
   bottomSaveButton: {
     position: 'absolute',
@@ -1020,7 +1355,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   tabContent: {
-    flex: 1,
+    // flex: 1 제거 - 스크롤을 위해 필요 없음
   },
   section: {
     backgroundColor: colors.white,
@@ -1112,6 +1447,124 @@ const styles = StyleSheet.create({
   },
   statusPending: {
     backgroundColor: colors.warning,
+  },
+  // 카드 스타일
+  cardSection: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardHeader: {
+    marginBottom: spacing.md,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  cardHeaderRight: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  cardTotal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  editButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.purple500,
+    borderRadius: 6,
+  },
+  editButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  cardTotalLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  cardTotalValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  // 결제 정보 그리드
+  paymentGrid: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  paymentColumn: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  paymentColumnTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  paymentInput: {
+    marginBottom: spacing.xs,
+  },
+  paymentAmountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.gray50,
+    borderRadius: 8,
+    marginBottom: spacing.xs,
+  },
+  paymentAmountLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  paymentAmountValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  // 최종 결제 금액 카드
+  finalPaymentCard: {
+    backgroundColor: colors.purple500,
+    borderRadius: 12,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  finalPaymentLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: spacing.sm,
+    opacity: 0.9,
+  },
+  finalPaymentValue: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#fff',
   },
 });
 

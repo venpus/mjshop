@@ -80,7 +80,22 @@ export function usePurchaseOrderSave({
   // 원본 데이터 설정 함수
   const setOriginalData = useCallback((data: OriginalData) => {
     originalDataRef.current = data;
+    // 원본 데이터 설정 직후에는 변경사항이 없으므로 false로 설정
     setIsDirty(false);
+  }, []);
+
+  // 날짜 정규화 헬퍼 함수 (내부용)
+  const normalizeDateValue = useCallback((date: string | null | undefined): string => {
+    if (!date) return '';
+    // ISO 형식 (2026-01-05T16:00:00.000Z)을 YYYY-MM-DD로 변환
+    if (date.includes('T')) {
+      return date.split('T')[0];
+    }
+    // 이미 YYYY-MM-DD 형식이면 그대로 반환
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return date;
+    }
+    return date;
   }, []);
 
   // 초기 원본 데이터 설정
@@ -95,13 +110,13 @@ export function usePurchaseOrderSave({
         commissionRate: originalOrder.commission_rate || 0,
         commissionType: originalOrder.commission_type || '',
         advancePaymentRate: originalOrder.advance_payment_rate || 0,
-        advancePaymentDate: originalOrder.advance_payment_date || '',
-        balancePaymentDate: originalOrder.balance_payment_date || '',
+        advancePaymentDate: normalizeDateValue(originalOrder.advance_payment_date),
+        balancePaymentDate: normalizeDateValue(originalOrder.balance_payment_date),
         packaging: originalOrder.packaging || 0,
-        orderDate: originalOrder.order_date || '',
-        deliveryDate: originalOrder.delivery_date || '',
-        workStartDate: originalOrder.work_start_date || '',
-        workEndDate: originalOrder.work_end_date || '',
+        orderDate: normalizeDateValue(originalOrder.order_date),
+        deliveryDate: normalizeDateValue(originalOrder.delivery_date),
+        workStartDate: normalizeDateValue(originalOrder.work_start_date),
+        workEndDate: normalizeDateValue(originalOrder.work_end_date),
         isOrderConfirmed: originalOrder.is_confirmed || false,
         productName: originalOrder.product_name || '',
         productSize: originalOrder.size || '',
@@ -110,7 +125,7 @@ export function usePurchaseOrderSave({
       };
       setIsDirty(false);
     }
-  }, [originalOrder]);
+  }, [originalOrder, normalizeDateValue]);
 
   // 원본 cost items 설정 (항상 호출되어야 함)
   useEffect(() => {
@@ -119,8 +134,13 @@ export function usePurchaseOrderSave({
         optionItems: JSON.parse(JSON.stringify(optionItems)),
         laborCostItems: JSON.parse(JSON.stringify(laborCostItems)),
       };
+      // 원본 데이터 설정 후 변경사항 체크
+      if (originalDataRef.current) {
+        const hasChanges = checkForChanges();
+        setIsDirty(hasChanges);
+      }
     }
-  }, [optionItems, laborCostItems]);
+  }, [optionItems, laborCostItems, checkForChanges]);
 
   // 원본 factory shipments 및 return exchanges 설정
   useEffect(() => {
@@ -130,7 +150,12 @@ export function usePurchaseOrderSave({
     if (!originalReturnExchangeItemsRef.current && returnExchangeItems.length > 0) {
       originalReturnExchangeItemsRef.current = JSON.parse(JSON.stringify(returnExchangeItems.map(r => ({ ...r, pendingImages: undefined }))));
     }
-  }, [factoryShipments, returnExchangeItems]);
+    // 원본 데이터 설정 후 변경사항 체크
+    if (originalDataRef.current && (originalFactoryShipmentsRef.current || originalReturnExchangeItemsRef.current)) {
+      const hasChanges = checkForChanges();
+      setIsDirty(hasChanges);
+    }
+  }, [factoryShipments, returnExchangeItems, checkForChanges]);
 
   // 배열 비교 헬퍼
   const areCostItemsEqual = useCallback((a: LaborCostItem[], b: LaborCostItem[]): boolean => {
@@ -149,6 +174,62 @@ export function usePurchaseOrderSave({
     });
   }, []);
 
+  // FactoryShipment 배열 비교 헬퍼 (이미지 제외)
+  const areFactoryShipmentsEqual = useCallback((a: FactoryShipment[], b: FactoryShipment[]): boolean => {
+    if (a.length !== b.length) return false;
+    const aSorted = [...a].map(s => ({ id: s.id, shipped_date: s.shipped_date, shipped_quantity: s.shipped_quantity, tracking_number: s.tracking_number, notes: s.notes }))
+      .sort((x, y) => x.id.localeCompare(y.id));
+    const bSorted = [...b].map(s => ({ id: s.id, shipped_date: s.shipped_date, shipped_quantity: s.shipped_quantity, tracking_number: s.tracking_number, notes: s.notes }))
+      .sort((x, y) => x.id.localeCompare(y.id));
+    return aSorted.every((item, index) => {
+      const bItem = bSorted[index];
+      return (
+        item.id === bItem.id &&
+        item.shipped_date === bItem.shipped_date &&
+        item.shipped_quantity === bItem.shipped_quantity &&
+        item.tracking_number === bItem.tracking_number &&
+        item.notes === bItem.notes
+      );
+    });
+  }, []);
+
+  // ReturnExchangeItem 배열 비교 헬퍼 (이미지 제외)
+  const areReturnExchangeItemsEqual = useCallback((a: ReturnExchangeItem[], b: ReturnExchangeItem[]): boolean => {
+    if (a.length !== b.length) return false;
+    const aSorted = [...a].map(item => ({ id: item.id, return_date: item.return_date, return_quantity: item.return_quantity, reason: item.reason }))
+      .sort((x, y) => x.id.localeCompare(y.id));
+    const bSorted = [...b].map(item => ({ id: item.id, return_date: item.return_date, return_quantity: item.return_quantity, reason: item.reason }))
+      .sort((x, y) => x.id.localeCompare(y.id));
+    return aSorted.every((item, index) => {
+      const bItem = bSorted[index];
+      return (
+        item.id === bItem.id &&
+        item.return_date === bItem.return_date &&
+        item.return_quantity === bItem.return_quantity &&
+        item.reason === bItem.reason
+      );
+    });
+  }, []);
+
+  // 날짜 정규화 헬퍼 함수 (YYYY-MM-DD 형식으로 변환)
+  const normalizeDate = useCallback((date: string | null | undefined): string => {
+    if (!date) return '';
+    // ISO 형식 (2026-01-05T16:00:00.000Z)을 YYYY-MM-DD로 변환
+    if (date.includes('T')) {
+      return date.split('T')[0];
+    }
+    // 이미 YYYY-MM-DD 형식이면 그대로 반환
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return date;
+    }
+    return date;
+  }, []);
+
+  // 빈 값 정규화 (빈 문자열과 null을 동일하게 처리)
+  const normalizeValue = useCallback((value: string | null | undefined): string => {
+    return value || '';
+  }, []);
+
   // 변경 감지
   const checkForChanges = useCallback((): boolean => {
     if (!originalDataRef.current) {
@@ -158,7 +239,7 @@ export function usePurchaseOrderSave({
 
     const original = originalDataRef.current;
 
-    // 각 필드 비교
+    // 각 필드 비교 (날짜는 정규화하여 비교)
     const hasFormChanges =
       formData.unitPrice !== original.unitPrice ||
       formData.backMargin !== original.backMargin ||
@@ -168,18 +249,18 @@ export function usePurchaseOrderSave({
       formData.commissionRate !== original.commissionRate ||
       formData.commissionType !== original.commissionType ||
       formData.advancePaymentRate !== original.advancePaymentRate ||
-      formData.advancePaymentDate !== original.advancePaymentDate ||
-      formData.balancePaymentDate !== original.balancePaymentDate ||
+      normalizeDate(formData.advancePaymentDate) !== normalizeDate(original.advancePaymentDate) ||
+      normalizeDate(formData.balancePaymentDate) !== normalizeDate(original.balancePaymentDate) ||
       formData.packaging !== original.packaging ||
-      formData.orderDate !== original.orderDate ||
-      formData.deliveryDate !== original.deliveryDate ||
-      formData.workStartDate !== original.workStartDate ||
-      formData.workEndDate !== original.workEndDate ||
+      normalizeDate(formData.orderDate) !== normalizeDate(original.orderDate) ||
+      normalizeDate(formData.deliveryDate) !== normalizeDate(original.deliveryDate) ||
+      normalizeDate(formData.workStartDate) !== normalizeDate(original.workStartDate) ||
+      normalizeDate(formData.workEndDate) !== normalizeDate(original.workEndDate) ||
       formData.isOrderConfirmed !== original.isOrderConfirmed ||
-      formData.productName !== original.productName ||
-      formData.productSize !== original.productSize ||
-      formData.productWeight !== original.productWeight ||
-      formData.productPackagingSize !== original.productPackagingSize;
+      normalizeValue(formData.productName) !== normalizeValue(original.productName) ||
+      normalizeValue(formData.productSize) !== normalizeValue(original.productSize) ||
+      normalizeValue(formData.productWeight) !== normalizeValue(original.productWeight) ||
+      normalizeValue(formData.productPackagingSize) !== normalizeValue(original.productPackagingSize);
 
     // cost items 변경 확인
     const originalCostItems = originalCostItemsRef.current;
@@ -199,13 +280,19 @@ export function usePurchaseOrderSave({
     const hasReturnExchangesPendingImages = returnExchangeItems.some(r => r.pendingImages && r.pendingImages.length > 0);
 
     return hasFormChanges || hasCostItemsChanges || hasFactoryShipmentsChanges || hasFactoryShipmentsPendingImages || hasReturnExchangesChanges || hasReturnExchangesPendingImages;
-  }, [formData, optionItems, laborCostItems, factoryShipments, returnExchangeItems, areCostItemsEqual, areFactoryShipmentsEqual, areReturnExchangeItemsEqual]);
+  }, [formData, optionItems, laborCostItems, factoryShipments, returnExchangeItems, areCostItemsEqual, areFactoryShipmentsEqual, areReturnExchangeItemsEqual, normalizeDate, normalizeValue]);
 
   // 변경 감지 useEffect
   useEffect(() => {
+    // originalDataRef가 설정되지 않았으면 변경사항 없음으로 처리
+    if (!originalDataRef.current) {
+      setIsDirty(false);
+      return;
+    }
+    
     const hasChanges = checkForChanges();
     setIsDirty(hasChanges);
-  }, [checkForChanges]);
+  }, [formData, optionItems, laborCostItems, factoryShipments, returnExchangeItems, checkForChanges]);
 
   // 저장 함수
   const handleSave = useCallback(async () => {
@@ -221,6 +308,20 @@ export function usePurchaseOrderSave({
     try {
       setIsSaving(true);
 
+      // 날짜 정규화 헬퍼 함수
+      const normalizeDateForServer = (date: string | null | undefined): string | null => {
+        if (!date) return null;
+        // ISO 형식 (2026-01-05T16:00:00.000Z)을 YYYY-MM-DD로 변환
+        if (date.includes('T')) {
+          return date.split('T')[0];
+        }
+        // 이미 YYYY-MM-DD 형식이면 그대로 반환
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          return date;
+        }
+        return date;
+      };
+
       const updateData: UpdatePurchaseOrderData = {
         unit_price: formData.unitPrice,
         back_margin: formData.backMargin || null,
@@ -230,13 +331,13 @@ export function usePurchaseOrderSave({
         commission_rate: formData.commissionRate || 0,
         commission_type: formData.commissionType || null,
         advance_payment_rate: formData.advancePaymentRate || 0,
-        advance_payment_date: formData.advancePaymentDate || null,
-        balance_payment_date: formData.balancePaymentDate || null,
+        advance_payment_date: normalizeDateForServer(formData.advancePaymentDate),
+        balance_payment_date: normalizeDateForServer(formData.balancePaymentDate),
         packaging: formData.packaging || 0,
-        order_date: formData.orderDate || null,
-        estimated_delivery: formData.deliveryDate || null,
-        work_start_date: formData.workStartDate || null,
-        work_end_date: formData.workEndDate || null,
+        order_date: normalizeDateForServer(formData.orderDate),
+        estimated_delivery: normalizeDateForServer(formData.deliveryDate),
+        work_start_date: normalizeDateForServer(formData.workStartDate),
+        work_end_date: normalizeDateForServer(formData.workEndDate),
         is_confirmed: formData.isOrderConfirmed,
         product_name: formData.productName || undefined,
         product_size: formData.productSize || undefined,
@@ -362,13 +463,13 @@ export function usePurchaseOrderSave({
           commissionRate: updatedOrder.commission_rate || 0,
           commissionType: updatedOrder.commission_type || '',
           advancePaymentRate: updatedOrder.advance_payment_rate || 0,
-          advancePaymentDate: updatedOrder.advance_payment_date || '',
-          balancePaymentDate: updatedOrder.balance_payment_date || '',
+          advancePaymentDate: normalizeDateValue(updatedOrder.advance_payment_date),
+          balancePaymentDate: normalizeDateValue(updatedOrder.balance_payment_date),
           packaging: updatedOrder.packaging || 0,
-          orderDate: updatedOrder.order_date || '',
-          deliveryDate: updatedOrder.delivery_date || '',
-          workStartDate: updatedOrder.work_start_date || '',
-          workEndDate: updatedOrder.work_end_date || '',
+          orderDate: normalizeDateValue(updatedOrder.order_date),
+          deliveryDate: normalizeDateValue(updatedOrder.delivery_date),
+          workStartDate: normalizeDateValue(updatedOrder.work_start_date),
+          workEndDate: normalizeDateValue(updatedOrder.work_end_date),
           isOrderConfirmed: updatedOrder.is_confirmed || false,
           productName: updatedOrder.product_name || '',
           productSize: updatedOrder.size || '',
