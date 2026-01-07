@@ -6,6 +6,7 @@ import {
   CreateAdminAccountDTO,
   UpdateAdminAccountDTO,
 } from '../models/adminAccount.js';
+import { logger } from '../utils/logger.js';
 
 const SALT_ROUNDS = 10;
 
@@ -169,36 +170,65 @@ export class AdminAccountService {
    * 비밀번호 검증
    */
   async verifyPassword(id: string, password: string): Promise<boolean> {
-    const passwordHash = await this.repository.findPasswordHashById(id);
-    if (!passwordHash) {
-      return false;
-    }
+    try {
+      const passwordHash = await this.repository.findPasswordHashById(id);
+      if (!passwordHash) {
+        logger.warn('비밀번호 해시를 찾을 수 없음:', { id });
+        return false;
+      }
 
-    return await bcrypt.compare(password, passwordHash);
+      const isValid = await bcrypt.compare(password, passwordHash);
+      logger.debug('비밀번호 검증 결과:', { id, isValid });
+      return isValid;
+    } catch (error: any) {
+      logger.error('비밀번호 검증 오류:', {
+        error: error.message,
+        stack: error.stack,
+        id,
+      });
+      throw error;
+    }
   }
 
   /**
    * 로그인 처리
    */
   async login(id: string, password: string): Promise<AdminAccountPublic> {
-    const account = await this.repository.findById(id);
-    if (!account) {
-      throw new Error('ID 또는 비밀번호가 올바르지 않습니다.');
+    try {
+      logger.debug('로그인 서비스 시작:', { id });
+      
+      const account = await this.repository.findById(id);
+      if (!account) {
+        logger.warn('로그인 실패: 계정을 찾을 수 없음', { id });
+        throw new Error('ID 또는 비밀번호가 올바르지 않습니다.');
+      }
+
+      if (!account.is_active) {
+        logger.warn('로그인 실패: 비활성화된 계정', { id });
+        throw new Error('비활성화된 계정입니다. 관리자에게 문의하세요.');
+      }
+
+      logger.debug('비밀번호 검증 시작:', { id });
+      const isValid = await this.verifyPassword(id, password);
+      if (!isValid) {
+        logger.warn('로그인 실패: 비밀번호 불일치', { id });
+        throw new Error('ID 또는 비밀번호가 올바르지 않습니다.');
+      }
+
+      logger.debug('비밀번호 검증 성공, 마지막 로그인 시간 업데이트:', { id });
+      // 마지막 로그인 시간 업데이트
+      await this.repository.updateLastLogin(id);
+
+      logger.info('로그인 성공:', { id: account.id });
+      return this.toPublicAccount(account);
+    } catch (error: any) {
+      logger.error('로그인 서비스 오류:', {
+        error: error.message,
+        stack: error.stack,
+        id,
+      });
+      throw error;
     }
-
-    if (!account.is_active) {
-      throw new Error('비활성화된 계정입니다. 관리자에게 문의하세요.');
-    }
-
-    const isValid = await this.verifyPassword(id, password);
-    if (!isValid) {
-      throw new Error('ID 또는 비밀번호가 올바르지 않습니다.');
-    }
-
-    // 마지막 로그인 시간 업데이트
-    await this.repository.updateLastLogin(id);
-
-    return this.toPublicAccount(account);
   }
 
   /**

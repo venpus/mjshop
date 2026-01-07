@@ -8,9 +8,7 @@ export const logger = {
   },
   error: (message: string, ...args: unknown[]) => {
     // 에러는 프로덕션에서도 로깅 (필요시 로깅 서비스로 전송 가능)
-    if (isDevelopment) {
-      console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, ...args);
-    }
+    console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, ...args);
   },
   warn: (message: string, ...args: unknown[]) => {
     if (isDevelopment) {

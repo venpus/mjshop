@@ -4,6 +4,7 @@ import {
   CreateAdminAccountDTO,
   UpdateAdminAccountDTO,
 } from '../models/adminAccount.js';
+import { logger } from '../utils/logger.js';
 
 export class AdminAccountController {
   private service: AdminAccountService;
@@ -256,17 +257,22 @@ export class AdminAccountController {
    */
   login = async (req: Request, res: Response) => {
     try {
+      logger.debug('로그인 요청 받음:', { body: { id: req.body?.id, hasPassword: !!req.body?.password } });
+      
       const { id, password } = req.body;
 
       // 필수 필드 검증
       if (!id || !password) {
+        logger.warn('로그인 실패: 필수 필드 누락', { id: !!id, password: !!password });
         return res.status(400).json({
           success: false,
           error: 'ID와 비밀번호를 입력해주세요.',
         });
       }
 
+      logger.debug('로그인 시도:', { id });
       const account = await this.service.login(id, password);
+      logger.info('로그인 성공:', { id: account.id });
 
       res.json({
         success: true,
@@ -274,11 +280,47 @@ export class AdminAccountController {
         message: '로그인에 성공했습니다.',
       });
     } catch (error: any) {
-      console.error('로그인 오류:', error);
+      // 상세한 에러 정보 로깅
+      logger.error('로그인 오류:', {
+        error: error.message,
+        code: error.code,
+        errno: error.errno,
+        sqlState: error.sqlState,
+        sqlMessage: error.sqlMessage,
+        stack: error.stack,
+        id: req.body?.id,
+      });
       
       // 보안을 위해 구체적인 오류 메시지 제공
       const errorMessage = error.message || '로그인에 실패했습니다.';
       
+      // 데이터베이스 관련 에러 체크 (더 포괄적으로)
+      const isDatabaseError = 
+        error.code === 'ECONNREFUSED' || 
+        error.code === 'ER_ACCESS_DENIED_ERROR' || 
+        error.code === 'PROTOCOL_CONNECTION_LOST' ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ENOTFOUND' ||
+        error.code?.startsWith('ER_') || // MySQL 에러 코드 (ER_NO_SUCH_TABLE, ER_BAD_FIELD_ERROR 등)
+        error.code?.startsWith('ECONN') || // 연결 관련 에러
+        error.errno !== undefined || // MySQL errno가 있으면 데이터베이스 에러
+        error.sqlState !== undefined; // SQL state가 있으면 데이터베이스 에러
+      
+      if (isDatabaseError) {
+        logger.error('데이터베이스 관련 오류:', {
+          code: error.code,
+          errno: error.errno,
+          sqlState: error.sqlState,
+          sqlMessage: error.sqlMessage,
+          message: error.message,
+        });
+        return res.status(500).json({
+          success: false,
+          error: '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+        });
+      }
+      
+      // 일반적인 로그인 실패는 401 반환
       res.status(401).json({
         success: false,
         error: errorMessage,

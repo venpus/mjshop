@@ -1,6 +1,7 @@
 import { pool } from '../config/database.js';
 import { AdminAccount, CreateAdminAccountDTO, UpdateAdminAccountDTO } from '../models/adminAccount.js';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { logger } from '../utils/logger.js';
 
 // 데이터베이스에서 조회한 결과 타입
 interface AdminAccountRow extends RowDataPacket {

@@ -704,7 +704,7 @@ export default function PurchaseOrderDetailScreen({
                 <Text style={styles.cardTotalValue}>
                   ¥{basicCostTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
-              </View>
+        </View>
               {canWrite && (
                 <TouchableOpacity
                   style={styles.editButton}
@@ -714,48 +714,48 @@ export default function PurchaseOrderDetailScreen({
                   <Text style={styles.editButtonText}>✏️ 편집</Text>
                 </TouchableOpacity>
               )}
-            </View>
-          </View>
+        </View>
+      </View>
 
           {/* 읽기 모드 - Text만 표시 */}
           {isSuperAdmin && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>기본단가:</Text>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>기본단가:</Text>
               <Text style={styles.infoValue}>
                 ¥{(formData.unitPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </Text>
-            </View>
+        </View>
           )}
           {isSuperAdmin && (
-            <View style={styles.infoRow}>
+          <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>추가단가 (백마진):</Text>
               <Text style={styles.infoValue}>
                 ¥{(formData.backMargin || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </Text>
-            </View>
+          </View>
           )}
           
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>발주단가:</Text>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>발주단가:</Text>
             <Text style={[styles.infoValue, styles.highlightValue]}>
               ¥{orderUnitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
-          </View>
+        </View>
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>수수료율:</Text>
             <Text style={styles.infoValue}>
               {formData.commissionType ? `${formData.commissionType}%` : '-'}
             </Text>
-          </View>
-          
-          <View style={styles.infoRow}>
+      </View>
+
+        <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>수수료 금액:</Text>
             <Text style={styles.infoValue}>
               ¥{commissionAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
-          </View>
         </View>
+          </View>
 
         {/* 운송비 카드 */}
         <View style={[styles.section, styles.cardSection]}>
@@ -766,8 +766,8 @@ export default function PurchaseOrderDetailScreen({
                 <Text style={styles.cardTotalLabel}>총 운송비:</Text>
                 <Text style={styles.cardTotalValue}>
                   ¥{shippingCostTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </Text>
-              </View>
+          </Text>
+        </View>
               {canWrite && (
                 <TouchableOpacity
                   style={styles.editButton}
@@ -777,22 +777,22 @@ export default function PurchaseOrderDetailScreen({
                   <Text style={styles.editButtonText}>✏️ 편집</Text>
                 </TouchableOpacity>
               )}
-            </View>
-          </View>
-          
+        </View>
+      </View>
+
           {/* 읽기 모드 - Text만 표시 */}
-          <View style={styles.infoRow}>
+        <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>업체 배송비:</Text>
             <Text style={styles.infoValue}>
               ¥{(formData.shippingCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
-          </View>
+        </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>창고 배송비:</Text>
             <Text style={styles.infoValue}>
               ¥{(formData.warehouseShippingCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </Text>
-          </View>
+              </Text>
+            </View>
         </View>
 
         {/* 결제 정보 카드 */}
@@ -803,8 +803,8 @@ export default function PurchaseOrderDetailScreen({
               {order.payment_status ? (
                 <View style={[styles.statusBadge, getStatusStyle(order.payment_status)]}>
                   <Text style={styles.statusBadgeText}>{order.payment_status}</Text>
-                </View>
-              ) : null}
+        </View>
+      ) : null}
               {canWrite && (
                 <TouchableOpacity
                   style={styles.editButton}
@@ -814,7 +814,7 @@ export default function PurchaseOrderDetailScreen({
                   <Text style={styles.editButtonText}>✏️ 편집</Text>
                 </TouchableOpacity>
               )}
-            </View>
+    </View>
           </View>
 
           {/* 읽기 모드 - Text만 표시 */}
@@ -822,26 +822,26 @@ export default function PurchaseOrderDetailScreen({
             {/* 선금 */}
             <View style={styles.paymentColumn}>
               <Text style={styles.paymentColumnTitle}>선금</Text>
-              <View style={styles.infoRow}>
+        <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>선금 비율:</Text>
                 <Text style={styles.infoValue}>
                   {(formData.advancePaymentRate || 0)}%
                 </Text>
-              </View>
+        </View>
               <View style={styles.paymentAmountRow}>
                 <Text style={styles.paymentAmountLabel}>금액:</Text>
                 <Text style={[styles.paymentAmountValue, styles.highlightValue]}>
                   ¥{advancePaymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
-              </View>
-              <View style={styles.infoRow}>
+        </View>
+        <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>선금일:</Text>
                 <Text style={styles.infoValue}>
                   {formData.advancePaymentDate || '-'}
                 </Text>
-              </View>
-            </View>
-            
+        </View>
+      </View>
+
             {/* 잔금 */}
             <View style={styles.paymentColumn}>
               <Text style={styles.paymentColumnTitle}>잔금</Text>
@@ -857,9 +857,9 @@ export default function PurchaseOrderDetailScreen({
                   {formData.balancePaymentDate || '-'}
                 </Text>
               </View>
+                </View>
+                </View>
             </View>
-          </View>
-        </View>
 
         {/* 최종 결제 금액 카드 (강조) */}
         <View style={[styles.section, styles.finalPaymentCard]}>
@@ -867,7 +867,7 @@ export default function PurchaseOrderDetailScreen({
           <Text style={styles.finalPaymentValue}>
             ¥{finalPaymentAmountWithCosts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </Text>
-              </View>
+        </View>
 
         {/* CostPaymentTab 컴포넌트 */}
         <CostPaymentTab
@@ -1083,36 +1083,36 @@ export default function PurchaseOrderDetailScreen({
           mode="read"
         />
 
-        {/* 탭 네비게이션 */}
-        <View style={styles.tabContainer}>
-          {renderTabButton('cost', '비용/결제')}
-          {renderTabButton('factory', '업체출고')}
-          {renderTabButton('work', '작업')}
-          {renderTabButton('delivery', '배송')}
-        </View>
+      {/* 탭 네비게이션 */}
+      <View style={styles.tabContainer}>
+        {renderTabButton('cost', '비용/결제')}
+        {renderTabButton('factory', '업체출고')}
+        {renderTabButton('work', '작업')}
+        {renderTabButton('delivery', '배송')}
+      </View>
 
-        {/* 탭 내용 */}
+      {/* 탭 내용 */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={true}
             nestedScrollEnabled={true}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                tintColor={colors.primary}
-              />
-            }
-          >
-            {renderTabContent()}
-          </ScrollView>
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        {renderTabContent()}
+      </ScrollView>
         </KeyboardAvoidingView>
 
         {/* 하단 저장 버튼 (변경사항 있을 때만 표시) */}
