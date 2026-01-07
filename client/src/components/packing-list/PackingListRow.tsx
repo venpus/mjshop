@@ -65,7 +65,7 @@ export function PackingListRow({
     // 두 번째 행 이후: rowspan으로 병합된 열들은 생략하고 제품, 입수량, 총수량, 한국도착일만 표시
     return (
       <tr className="hover:bg-gray-50">
-        <td className="px-4 py-3 text-sm text-center border-r border-gray-200">
+        <td className="px-4 py-3 text-sm text-center border-r border-gray-200" style={{ minWidth: '200px', width: '200px' }}>
           <ProductCell item={item} onProductNameClick={onProductNameClick} />
         </td>
         <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 whitespace-nowrap">
@@ -116,7 +116,7 @@ export function PackingListRow({
         )}
       </td>
       {/* 제품 */}
-      <td className="px-4 py-3 text-sm text-center border-r border-gray-200">
+      <td className="px-4 py-3 text-sm text-center border-r border-gray-200" style={{ minWidth: '200px', width: '200px' }}>
         <ProductCell 
           item={item} 
           onProductNameClick={onProductNameClick}

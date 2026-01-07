@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Package, Calendar, Truck, MapPin, Weight, Plus, Trash2, Save } from 'lucide-react';
+import { X, Package, Calendar, Truck, MapPin, Weight, Plus, Trash2, Save } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getPackingListById } from '../api/packingListApi';
 import type { PackingListWithItems } from '../api/packingListApi';
@@ -17,9 +16,13 @@ type OverseasInvoice = {
   inspection_quantity: number;
 };
 
-export function PackingListDetail() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+interface PackingListDetailProps {
+  packingListId: number;
+  onClose: () => void;
+  onCloseRequest?: () => boolean; // 변경사항 확인용 (true면 닫기 허용, false면 닫기 취소)
+}
+
+export function PackingListDetail({ packingListId, onClose, onCloseRequest }: PackingListDetailProps) {
   const { user } = useAuth();
   
   // A레벨, C0 레벨, D0 레벨만 접근 가능
@@ -47,7 +50,7 @@ export function PackingListDetail() {
       return;
     }
 
-    if (!id) {
+    if (!packingListId) {
       setError('패킹리스트 ID가 없습니다.');
       setIsLoading(false);
       return;
@@ -57,7 +60,7 @@ export function PackingListDetail() {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await getPackingListById(parseInt(id));
+        const data = await getPackingListById(packingListId);
         if (!data) {
           setError('패킹리스트를 찾을 수 없습니다.');
         } else {
@@ -96,7 +99,7 @@ export function PackingListDetail() {
     };
 
     loadPackingList();
-  }, [id, canAccess]);
+  }, [packingListId, canAccess]);
 
   // 변경사항 감지
   useEffect(() => {
@@ -105,41 +108,28 @@ export function PackingListDetail() {
     setIsDirty(hasRepackagingChanges || hasInvoiceChanges);
   }, [repackagingRequirements, originalRepackagingRequirements, overseasInvoices, originalOverseasInvoices]);
 
-  // 브라우저 닫기/새로고침 시 변경사항 경고
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirty) {
-        e.preventDefault();
-        e.returnValue = ''; // Chrome에서 메시지 표시를 위해 필요
-        return ''; // 일부 브라우저에서 필요
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [isDirty]);
-
-  // 안전한 네비게이션 함수 (변경사항이 있을 때 확인)
-  const safeNavigate = useCallback((path: string) => {
+  // 안전한 닫기 함수 (변경사항이 있을 때 확인)
+  const handleClose = useCallback(() => {
     if (isDirty) {
       const confirmed = window.confirm(
-        '저장하지 않은 변경사항이 있습니다. 정말로 이동하시겠습니까?\n\n변경사항은 저장되지 않습니다.'
+        '저장하지 않은 변경사항이 있습니다. 정말로 닫으시겠습니까?\n\n변경사항은 저장되지 않습니다.'
       );
       if (!confirmed) {
-        return false; // 이동 취소
+        return; // 닫기 취소
       }
     }
-    navigate(path);
-    return true;
-  }, [isDirty, navigate]);
+    // onCloseRequest가 있으면 확인
+    if (onCloseRequest && !onCloseRequest()) {
+      return; // 닫기 취소
+    }
+    onClose();
+  }, [isDirty, onClose, onCloseRequest]);
 
   // 재포장 요구사항 저장
   const handleSaveRepackagingRequirements = async () => {
-    if (!id) return;
+    if (!packingListId) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/packing-lists/${id}/repackaging-requirements`, {
+      const response = await fetch(`${API_BASE_URL}/packing-lists/${packingListId}/repackaging-requirements`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -185,10 +175,10 @@ export function PackingListDetail() {
 
   // 해외송장 저장
   const handleSaveOverseasInvoices = async () => {
-    if (!id) return;
+    if (!packingListId) return;
     try {
       setIsSaving(true);
-      const response = await fetch(`${API_BASE_URL}/packing-lists/${id}/overseas-invoices`, {
+      const response = await fetch(`${API_BASE_URL}/packing-lists/${packingListId}/overseas-invoices`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -248,10 +238,10 @@ export function PackingListDetail() {
           {error || '패킹리스트를 찾을 수 없습니다.'}
         </div>
         <button
-          onClick={() => safeNavigate('/admin/shipping-history')}
+          onClick={handleClose}
           className="mt-4 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
         >
-          목록으로 돌아가기
+          닫기
         </button>
       </div>
     );
@@ -262,17 +252,18 @@ export function PackingListDetail() {
       {/* 헤더 */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => safeNavigate('/admin/shipping-history')}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">패킹리스트 상세</h1>
             <p className="text-sm text-gray-600">코드: {packingList.code}</p>
           </div>
         </div>
+        <button
+          onClick={handleClose}
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          title="닫기"
+        >
+          <X className="w-5 h-5 text-gray-600" />
+        </button>
       </div>
 
       {/* 기본 정보와 내륙송장/재포장 요구사항을 같은 행에 배치 */}
@@ -548,4 +539,5 @@ export function PackingListDetail() {
     </div>
   );
 }
+
 

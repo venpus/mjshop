@@ -14,7 +14,6 @@ import { StockDetail } from './components/inventory/StockDetail';
 import { PurchaseOrders } from './components/PurchaseOrders';
 import { PurchaseOrderDetail } from './components/PurchaseOrderDetail';
 import { ShippingHistory } from './components/ShippingHistory';
-import { PackingListDetail } from './components/PackingListDetail';
 import { ChinaPayment } from './components/ChinaPayment';
 import { Members } from './components/Members';
 import { Gallery } from './components/Gallery';
@@ -242,9 +241,6 @@ function AdminLayout() {
                   <ShippingHistory />
                 </PermissionCheckWrapper>
               } />
-              <Route path="/packing-lists/:id" element={
-                <PackingListDetail />
-              } />
               <Route path="*" element={<Navigate to="/admin/shipping-history" replace />} />
             </>
           ) : (
@@ -281,9 +277,6 @@ function AdminLayout() {
                 <PermissionCheckWrapper resource="shipping-history" permissionType="read">
                   <ShippingHistory />
                 </PermissionCheckWrapper>
-              } />
-              <Route path="/packing-lists/:id" element={
-                <PackingListDetail />
               } />
               <Route path="/china-payment" element={<ChinaPayment />} />
               <Route path="/members" element={<Members />} />

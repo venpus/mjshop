@@ -5,6 +5,7 @@ import { SearchBar } from './ui/search-bar';
 import { PackingListCreateModal, type PackingListFormData } from './PackingListCreateModal';
 import { useAuth } from '../contexts/AuthContext';
 import { GalleryImageModal } from './GalleryImageModal';
+import { PackingListDetailModal } from './PackingListDetailModal';
 import { PackingListTable } from './packing-list/PackingListTable';
 import { ExportButton } from './packing-list/ExportButton';
 import { usePackingListSelection } from '../hooks/usePackingListSelection';
@@ -46,6 +47,8 @@ export function ShippingHistory() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingCodeDate, setEditingCodeDate] = useState<string | null>(null); // code-date 조합
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedPackingListId, setSelectedPackingListId] = useState<number | null>(null);
   const [packingListItems, setPackingListItems] = useState<PackingListItem[]>([]);
   const [originalPackingListItems, setOriginalPackingListItems] = useState<PackingListItem[]>([]); // 원본 데이터 (변경 감지용)
   const [selectedInvoiceImage, setSelectedInvoiceImage] = useState<string | null>(null);
@@ -416,7 +419,7 @@ export function ShippingHistory() {
     return filtered;
   }, [packingListItems, searchTerm, filters, user]);
 
-  // 코드 클릭 시 패킹리스트 상세 화면으로 이동하는 핸들러
+  // 코드 클릭 시 패킹리스트 상세 모달 열기
   const handleCodeClick = (code: string, date: string) => {
     // code와 date로 패킹리스트 ID 찾기
     const codeDateKey = `${code}::${date}`;
@@ -427,8 +430,25 @@ export function ShippingHistory() {
       return;
     }
     
-    // 패킹리스트 상세 화면으로 이동 (변경사항 확인)
-    safeNavigate(`/admin/packing-lists/${packingListId}`);
+    // 변경사항이 있으면 확인
+    if (isDirty) {
+      const confirmed = window.confirm(
+        '저장하지 않은 변경사항이 있습니다. 정말로 상세 화면을 열으시겠습니까?\n\n변경사항은 저장되지 않습니다.'
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+    
+    // 모달 열기
+    setSelectedPackingListId(packingListId);
+    setIsDetailModalOpen(true);
+  };
+
+  // 모달 닫기 핸들러
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedPackingListId(null);
   };
 
   const handleProductNameClick = (purchaseOrderId?: string) => {
@@ -1221,6 +1241,13 @@ export function ShippingHistory() {
       <GalleryImageModal
         imageUrl={selectedInvoiceImage}
         onClose={() => setSelectedInvoiceImage(null)}
+      />
+
+      {/* 패킹리스트 상세 모달 */}
+      <PackingListDetailModal
+        isOpen={isDetailModalOpen}
+        packingListId={selectedPackingListId}
+        onClose={handleCloseDetailModal}
       />
 
       {/* 에러 메시지 */}
