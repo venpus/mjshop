@@ -28,6 +28,8 @@ const allowedOrigins: (string | RegExp)[] = process.env.CLIENT_URL
       'http://localhost:5173',  // 클라이언트 (Vite)
       'http://localhost:8081',  // Expo 웹 (기본 포트)
       'http://localhost:8082',  // Expo 웹 (다른 포트)
+      'http://wkshop.kr',       // 상용 서버 (HTTP)
+      'https://wkshop.kr',      // 상용 서버 (HTTPS)
       /^http:\/\/192\.168\.\d+\.\d+:\d+$/,  // 로컬 네트워크 IP (모든 포트)
       /^http:\/\/localhost:\d+$/,  // localhost (모든 포트)
     ];
@@ -58,6 +60,9 @@ app.use(cors({
         logger.warn(`⚠️ CORS 경고: 허용되지 않은 origin: ${origin}`);
         callback(null, true); // 개발 환경에서는 허용
       } else {
+        // 프로덕션 환경에서도 로그를 남기고 에러 반환
+        logger.error(`🚫 CORS 차단: 허용되지 않은 origin: ${origin}`);
+        logger.error(`허용된 origin 목록:`, allowedOrigins);
         callback(new Error(`CORS 정책에 의해 차단되었습니다: ${origin}`));
       }
     }
