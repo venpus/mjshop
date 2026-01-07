@@ -1,5 +1,5 @@
 import { Image as ImageIcon, ExternalLink, Edit2, Check, X, User } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getFullImageUrl, updateProject, deleteInitialImage, type ProjectPublic, type ProjectReferenceLink } from "../../api/projectApi";
 import { ProjectReferenceLinks } from "./ProjectReferenceLinks";
 import { ProjectStatusSelector } from "./ProjectStatusSelector";
@@ -26,6 +26,14 @@ export function ProjectBasicInfo({
   const [editName, setEditName] = useState(project.name);
   const [editRequirements, setEditRequirements] = useState(project.requirements || '');
   const [isSaving, setIsSaving] = useState(false);
+
+  // 프로젝트가 업데이트되면 편집 상태 초기화
+  useEffect(() => {
+    setEditName(project.name);
+    setEditRequirements(project.requirements || '');
+    setIsEditingName(false);
+    setIsEditingRequirements(false);
+  }, [project.id, project.name, project.requirements]);
 
   const handleSaveName = async () => {
     if (!editName.trim()) {
