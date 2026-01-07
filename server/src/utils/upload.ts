@@ -1031,3 +1031,52 @@ export async function getNextProjectImageNumber(projectId: number, entryId: numb
     return 1;
   }
 }
+
+/**
+ * 프로젝트 초기 이미지 저장 경로
+ * uploads/projects/{project_id}/initial/{image_filename}
+ */
+export async function moveImageToProjectInitialFolder(
+  tempFilePath: string,
+  projectId: number,
+  imageNumber: number,
+  ext: string
+): Promise<string> {
+  const initialDir = path.join(projectUploadDir, String(projectId), 'initial');
+  await fs.promises.mkdir(initialDir, { recursive: true });
+
+  const filename = `initial_${String(imageNumber).padStart(3, '0')}${ext}`;
+  const finalPath = path.join(initialDir, filename);
+
+  await fs.promises.rename(tempFilePath, finalPath);
+
+  // 상대 경로 반환: projects/{project_id}/initial/{filename}
+  return path.join('projects', String(projectId), 'initial', filename).replace(/\\/g, '/');
+}
+
+/**
+ * 프로젝트 초기 이미지 번호 조회
+ */
+export async function getNextProjectInitialImageNumber(projectId: number): Promise<number> {
+  const initialDir = path.join(projectUploadDir, String(projectId), 'initial');
+  try {
+    const files = await fs.promises.readdir(initialDir);
+    const imageFiles = files.filter(file => file.startsWith('initial_') && /\.(jpg|jpeg|png|gif|webp)$/i.test(file));
+    
+    if (imageFiles.length === 0) {
+      return 1;
+    }
+
+    const numbers = imageFiles
+      .map(file => {
+        const match = file.match(/^initial_(\d+)\./);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(num => num > 0);
+
+    return numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
+  } catch (error) {
+    // 폴더가 없으면 1부터 시작
+    return 1;
+  }
+}

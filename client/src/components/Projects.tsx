@@ -1,113 +1,111 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Folder, Plus, X } from "lucide-react";
-import { getAllProjects, createProject, type Project as ProjectApi } from "../api/projectApi";
-
-interface Project {
-  id: number;
-  startDate: string; // 시작날짜
-  name: string; // 프로젝트명
-  status: '진행중' | 'PENDING' | '취소'; // 현재 상태
-  content: string; // 텍스트 내용
-  lastUpdatedDate: string; // 최종 업데이트 날짜
-  nextStep: string; // 다음 진행 단계
-}
+import { Folder, Plus, Search, Filter, X } from "lucide-react";
+import { getProjectsPaginated, type ProjectListItem } from "../api/projectApi";
+import { ProjectCard } from "./projects/ProjectCard";
+import { ProjectCreateModal } from "./projects/ProjectCreateModal";
 
 interface ProjectsProps {
   onViewDetail?: (projectId: number | string) => void;
 }
 
+const PAGE_SIZE = 18; // 6열 × 3행
+
 export function Projects({ onViewDetail }: ProjectsProps = {}) {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectStatus, setNewProjectStatus] = useState<'진행중' | 'PENDING' | '취소'>('진행중');
-  const [newProjectStartDate, setNewProjectStartDate] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  
+  // 검색 및 필터 상태
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<ProjectListItem['status'] | '전체'>('전체');
+  const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
-  // 프로젝트 목록 로드
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  // Intersection Observer를 위한 ref
+  const observerTarget = useRef<HTMLDivElement>(null);
 
-  const loadProjects = async () => {
+  // 프로젝트 목록 로드 (첫 페이지)
+  const loadProjects = useCallback(async (page: number = 1, reset: boolean = false) => {
     try {
-      setLoading(true);
-      const apiProjects = await getAllProjects();
-      // API 응답을 로컬 인터페이스로 변환 (임시 - 추후 API 응답 구조에 맞게 수정 필요)
-      const convertedProjects: Project[] = apiProjects.map((p: ProjectApi) => ({
-        id: p.id,
-        startDate: typeof p.start_date === 'string' ? p.start_date : p.start_date.toISOString().split('T')[0],
-        name: p.name,
-        status: p.status,
-        content: '', // API에 content 필드가 없으므로 빈 문자열
-        lastUpdatedDate: typeof p.updated_at === 'string' ? p.updated_at : p.updated_at.toISOString().split('T')[0],
-        nextStep: '', // API에 nextStep 필드가 없으므로 빈 문자열
-      }));
-      setProjects(convertedProjects);
-    } catch (error) {
-      console.error('프로젝트 목록 조회 오류:', error);
-      alert('프로젝트 목록을 불러오는데 실패했습니다.');
+      if (reset) {
+        setLoading(true);
+        setProjects([]);
+        setCurrentPage(1);
+      } else {
+        setLoadingMore(true);
+      }
+      setError(null);
+
+      const result = await getProjectsPaginated({
+        page,
+        limit: PAGE_SIZE,
+        search: searchQuery.trim() || undefined,
+        status: statusFilter !== '전체' ? statusFilter : undefined,
+        startDate: dateFilter.start || undefined,
+        endDate: dateFilter.end || undefined,
+      });
+
+      if (reset) {
+        setProjects(result.items);
+      } else {
+        setProjects((prev) => [...prev, ...result.items]);
+      }
+
+      setTotal(result.total);
+      setHasMore(result.hasMore);
+      setCurrentPage(page);
+    } catch (err: any) {
+      console.error('프로젝트 목록 조회 오류:', err);
+      setError(err.message || '프로젝트 목록을 불러오는데 실패했습니다.');
+      if (reset) {
+        alert('프로젝트 목록을 불러오는데 실패했습니다.');
+      }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  };
+  }, [searchQuery, statusFilter, dateFilter]);
 
-  const handleCreateProject = async () => {
-    if (!newProjectName.trim()) {
-      alert('프로젝트명을 입력해주세요.');
-      return;
+  // 초기 로드
+  useEffect(() => {
+    loadProjects(1, true);
+  }, []);
+
+  // 검색/필터 변경 시 첫 페이지로 리셋
+  useEffect(() => {
+    if (currentPage > 1) {
+      loadProjects(1, true);
+    }
+  }, [searchQuery, statusFilter, dateFilter.start, dateFilter.end]);
+
+  // Intersection Observer 설정
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          loadProjects(currentPage + 1, false);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
     }
 
-    if (!newProjectStartDate) {
-      alert('시작일을 선택해주세요.');
-      return;
-    }
-
-    try {
-      setIsCreating(true);
-      await createProject({
-        name: newProjectName,
-        status: newProjectStatus,
-        start_date: newProjectStartDate,
-      });
-      setIsCreateModalOpen(false);
-      setNewProjectName('');
-      setNewProjectStatus('진행중');
-      setNewProjectStartDate('');
-      await loadProjects();
-    } catch (error: any) {
-      console.error('프로젝트 생성 오류:', error);
-      alert(error.message || '프로젝트 생성에 실패했습니다.');
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  const getStatusColor = (status: Project['status']) => {
-    switch (status) {
-      case '진행중':
-        return 'bg-blue-100 text-blue-800';
-      case 'PENDING':
-        return 'bg-yellow-100 text-yellow-800';
-      case '취소':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-  };
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMore, loading, loadingMore, currentPage, loadProjects]);
 
   return (
     <div className="p-8 min-h-[1080px]">
@@ -133,171 +131,168 @@ export function Projects({ onViewDetail }: ProjectsProps = {}) {
         </p>
       </div>
 
-      {/* Projects Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  시작날짜
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  프로젝트명
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  현재 상태
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  내용
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  최종 업데이트 날짜
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  다음 진행 단계
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                    로딩 중...
-                  </td>
-                </tr>
-              ) : projects.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                    등록된 프로젝트가 없습니다.
-                  </td>
-                </tr>
-              ) : (
-                projects.map((project) => (
-                  <tr
-                    key={project.id}
-                    className="hover:bg-gray-50 transition-colors cursor-pointer"
-                    onClick={() => {
-                      if (onViewDetail) {
-                        onViewDetail(String(project.id));
-                      } else {
-                        navigate(`/admin/projects/${project.id}`);
-                      }
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f9fafb';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '';
-                    }}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(project.startDate)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {project.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                          project.status
-                        )}`}
-                      >
-                        {project.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-md">
-                      <div className="line-clamp-2">{project.content}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(project.lastUpdatedDate)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-md">
-                      <div className="line-clamp-2">{project.nextStep}</div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {/* 검색 및 필터 영역 */}
+      <div className="mb-6 space-y-4">
+        {/* 검색어 입력 */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="프로젝트명, 요청사항, 내용, 작성자로 검색..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* 필터 영역 */}
+        <div className="flex flex-wrap items-center gap-4">
+          {/* 상태 필터 */}
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-gray-500" />
+            <label className="text-sm font-medium text-gray-700">상태:</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as ProjectListItem['status'] | '전체')}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="전체">전체</option>
+              <option value="진행중">진행중</option>
+              <option value="홀딩중">홀딩중</option>
+              <option value="완성">완성</option>
+              <option value="취소">취소</option>
+            </select>
+          </div>
+
+          {/* 날짜 필터 */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">시작일:</label>
+            <input
+              type="date"
+              value={dateFilter.start}
+              onChange={(e) => setDateFilter({ ...dateFilter, start: e.target.value })}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+            <span className="text-sm text-gray-500">~</span>
+            <input
+              type="date"
+              value={dateFilter.end}
+              onChange={(e) => setDateFilter({ ...dateFilter, end: e.target.value })}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+            {(dateFilter.start || dateFilter.end) && (
+              <button
+                onClick={() => setDateFilter({ start: '', end: '' })}
+                className="px-2 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* 필터 결과 표시 */}
+          <div className="ml-auto text-sm text-gray-600">
+            {searchQuery || statusFilter !== '전체' || dateFilter.start || dateFilter.end ? (
+              <>
+                검색 결과: <span className="font-semibold text-blue-600">{total}</span>개
+              </>
+            ) : (
+              <>
+                전체: <span className="font-semibold text-blue-600">{total}</span>개
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 프로젝트 생성 모달 */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">프로젝트 추가</h3>
-              <button
-                onClick={() => setIsCreateModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  프로젝트명 *
-                </label>
-                <input
-                  type="text"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="프로젝트명을 입력하세요"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  상태 *
-                </label>
-                <select
-                  value={newProjectStatus}
-                  onChange={(e) => setNewProjectStatus(e.target.value as '진행중' | 'PENDING' | '취소')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="진행중">진행중</option>
-                  <option value="PENDING">PENDING</option>
-                  <option value="취소">취소</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  시작일 *
-                </label>
-                <input
-                  type="date"
-                  value={newProjectStartDate}
-                  onChange={(e) => setNewProjectStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => setIsCreateModalOpen(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-                disabled={isCreating}
-              >
-                취소
-              </button>
-              <button
-                onClick={handleCreateProject}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                disabled={isCreating}
-              >
-                {isCreating ? '생성 중...' : '생성'}
-              </button>
-            </div>
+      {/* Projects Grid */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">로딩 중...</p>
           </div>
         </div>
+      ) : error ? (
+        <div className="bg-white rounded-lg shadow-sm border border-red-200 p-12 text-center">
+          <p className="text-lg text-red-600 mb-2">오류가 발생했습니다.</p>
+          <p className="text-sm text-gray-500 mb-4">{error}</p>
+          <button
+            onClick={() => loadProjects(1, true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : projects.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <Folder className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+          <p className="text-lg text-gray-500">
+            {searchQuery || statusFilter !== '전체' || dateFilter.start || dateFilter.end
+              ? '검색 조건에 맞는 프로젝트가 없습니다.'
+              : '등록된 프로젝트가 없습니다.'}
+          </p>
+          <p className="text-sm text-gray-400 mt-2">
+            {searchQuery || statusFilter !== '전체' || dateFilter.start || dateFilter.end
+              ? '검색어나 필터 조건을 변경해보세요.'
+              : '위의 "프로젝트 추가" 버튼을 클릭하여 새 프로젝트를 생성하세요.'}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+            {projects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onClick={() => {
+                  if (onViewDetail) {
+                    onViewDetail(String(project.id));
+                  } else {
+                    navigate(`/admin/projects/${project.id}`);
+                  }
+                }}
+              />
+            ))}
+          </div>
+
+          {/* 무한 스크롤 감지 영역 */}
+          {hasMore && (
+            <div ref={observerTarget} className="flex items-center justify-center py-8">
+              {loadingMore ? (
+                <div className="text-center">
+                  <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                  <p className="text-sm text-gray-600">더 많은 프로젝트를 불러오는 중...</p>
+                </div>
+              ) : (
+                <div className="h-20" /> // 스크롤 감지를 위한 공간
+              )}
+            </div>
+          )}
+
+          {/* 더 이상 불러올 데이터가 없을 때 */}
+          {!hasMore && projects.length > 0 && (
+            <div className="text-center py-8 text-sm text-gray-500">
+              모든 프로젝트를 불러왔습니다.
+            </div>
+          )}
+        </>
       )}
+
+      {/* 프로젝트 생성 모달 */}
+      <ProjectCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={() => loadProjects(1, true)}
+      />
     </div>
   );
 }

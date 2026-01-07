@@ -6,9 +6,10 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Alert } from 'react-native';
 import type { PurchaseOrderDetail, UpdatePurchaseOrderData } from '../api/purchaseOrderApi';
-import { updatePurchaseOrder, updatePurchaseOrderCostItems } from '../api/purchaseOrderApi';
+import { updatePurchaseOrder, updatePurchaseOrderCostItems, updateFactoryShipments, updateReturnExchanges, uploadPurchaseOrderImages } from '../api/purchaseOrderApi';
 import type { PurchaseOrderFormData } from './usePurchaseOrderForm';
 import type { LaborCostItem } from '../components/purchase-order/tabs/CostPaymentTab';
+import type { FactoryShipment, ReturnExchangeItem } from '../components/purchase-order/tabs/FactoryShippingTab';
 
 export interface OriginalData {
   unitPrice: number;
@@ -33,6 +34,8 @@ export interface OriginalData {
   productPackagingSize: string;
   optionItems?: LaborCostItem[];
   laborCostItems?: LaborCostItem[];
+  factoryShipments?: FactoryShipment[];
+  returnExchangeItems?: ReturnExchangeItem[];
 }
 
 export interface UsePurchaseOrderSaveProps {
@@ -41,6 +44,8 @@ export interface UsePurchaseOrderSaveProps {
   originalOrder: PurchaseOrderDetail | null;
   optionItems?: LaborCostItem[];
   laborCostItems?: LaborCostItem[];
+  factoryShipments?: FactoryShipment[];
+  returnExchangeItems?: ReturnExchangeItem[];
   userLevel?: string;
   isSuperAdmin?: boolean;
 }
@@ -59,6 +64,8 @@ export function usePurchaseOrderSave({
   originalOrder,
   optionItems = [],
   laborCostItems = [],
+  factoryShipments = [],
+  returnExchangeItems = [],
   userLevel,
   isSuperAdmin = false,
 }: UsePurchaseOrderSaveProps): UsePurchaseOrderSaveReturn {
@@ -67,6 +74,8 @@ export function usePurchaseOrderSave({
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const originalDataRef = useRef<OriginalData | null>(null);
   const originalCostItemsRef = useRef<{ optionItems: LaborCostItem[]; laborCostItems: LaborCostItem[] } | null>(null);
+  const originalFactoryShipmentsRef = useRef<FactoryShipment[] | null>(null);
+  const originalReturnExchangeItemsRef = useRef<ReturnExchangeItem[] | null>(null);
 
   // 원본 데이터 설정 함수
   const setOriginalData = useCallback((data: OriginalData) => {
@@ -112,6 +121,16 @@ export function usePurchaseOrderSave({
       };
     }
   }, [optionItems, laborCostItems]);
+
+  // 원본 factory shipments 및 return exchanges 설정
+  useEffect(() => {
+    if (!originalFactoryShipmentsRef.current && factoryShipments.length > 0) {
+      originalFactoryShipmentsRef.current = JSON.parse(JSON.stringify(factoryShipments.map(s => ({ ...s, pendingImages: undefined }))));
+    }
+    if (!originalReturnExchangeItemsRef.current && returnExchangeItems.length > 0) {
+      originalReturnExchangeItemsRef.current = JSON.parse(JSON.stringify(returnExchangeItems.map(r => ({ ...r, pendingImages: undefined }))));
+    }
+  }, [factoryShipments, returnExchangeItems]);
 
   // 배열 비교 헬퍼
   const areCostItemsEqual = useCallback((a: LaborCostItem[], b: LaborCostItem[]): boolean => {
@@ -169,8 +188,18 @@ export function usePurchaseOrderSave({
       !areCostItemsEqual(optionItems, originalCostItems.optionItems) ||
       !areCostItemsEqual(laborCostItems, originalCostItems.laborCostItems);
 
-    return hasFormChanges || hasCostItemsChanges;
-  }, [formData, optionItems, laborCostItems, areCostItemsEqual]);
+    // factory shipments 변경 확인
+    const originalFactoryShipments = originalFactoryShipmentsRef.current || [];
+    const hasFactoryShipmentsChanges = !areFactoryShipmentsEqual(factoryShipments, originalFactoryShipments);
+    const hasFactoryShipmentsPendingImages = factoryShipments.some(s => s.pendingImages && s.pendingImages.length > 0);
+
+    // return exchanges 변경 확인
+    const originalReturnExchanges = originalReturnExchangeItemsRef.current || [];
+    const hasReturnExchangesChanges = !areReturnExchangeItemsEqual(returnExchangeItems, originalReturnExchanges);
+    const hasReturnExchangesPendingImages = returnExchangeItems.some(r => r.pendingImages && r.pendingImages.length > 0);
+
+    return hasFormChanges || hasCostItemsChanges || hasFactoryShipmentsChanges || hasFactoryShipmentsPendingImages || hasReturnExchangesChanges || hasReturnExchangesPendingImages;
+  }, [formData, optionItems, laborCostItems, factoryShipments, returnExchangeItems, areCostItemsEqual, areFactoryShipmentsEqual, areReturnExchangeItemsEqual]);
 
   // 변경 감지 useEffect
   useEffect(() => {
@@ -253,6 +282,75 @@ export function usePurchaseOrderSave({
 
       await updatePurchaseOrderCostItems(orderId, costItems, userLevel);
 
+      // factory shipments 저장
+      const shipments = factoryShipments.map((shipment, index) => {
+        // 임시 ID 판별: temp_로 시작하거나 13자리 이상 숫자
+        const isTemporaryId = shipment.id.startsWith('temp_') || (shipment.id.length >= 13 && /^\d+$/.test(shipment.id));
+        return {
+          id: isTemporaryId ? undefined : (parseInt(shipment.id) || undefined),
+          shipment_date: shipment.shipped_date || null,
+          quantity: shipment.shipped_quantity || 0,
+          tracking_number: shipment.tracking_number || null,
+          receive_date: null, // 클라이언트와 달리 receive_date는 없음
+          display_order: index,
+        };
+      });
+
+      const savedShipmentIds = await updateFactoryShipments(orderId, shipments);
+
+      // pendingImages가 있는 shipment들의 이미지 업로드
+      for (let i = 0; i < factoryShipments.length; i++) {
+        const shipment = factoryShipments[i];
+        if (shipment.pendingImages && shipment.pendingImages.length > 0 && savedShipmentIds[i]) {
+          try {
+            await uploadPurchaseOrderImages(
+              orderId,
+              'factory-shipment',
+              savedShipmentIds[i],
+              shipment.pendingImages
+            );
+          } catch (imageError: any) {
+            console.error(`출고 항목 ${savedShipmentIds[i]} 이미지 업로드 오류:`, imageError);
+            // 이미지 업로드 실패는 치명적이지 않으므로 계속 진행
+          }
+        }
+      }
+
+      // return exchanges 저장
+      const returnExchanges = returnExchangeItems.map((item, index) => {
+        // 임시 ID 판별: temp_로 시작하거나 13자리 이상 숫자
+        const isTemporaryId = item.id.startsWith('temp_') || (item.id.length >= 13 && /^\d+$/.test(item.id));
+        return {
+          id: isTemporaryId ? undefined : (parseInt(item.id) || undefined),
+          return_date: item.return_date || null,
+          quantity: item.return_quantity || 0,
+          tracking_number: null, // 클라이언트와 달리 tracking_number는 없음
+          receive_date: null, // 클라이언트와 달리 receive_date는 없음
+          reason: item.reason || null,
+          display_order: index,
+        };
+      });
+
+      const savedReturnExchangeIds = await updateReturnExchanges(orderId, returnExchanges);
+
+      // pendingImages가 있는 return exchange 항목들의 이미지 업로드
+      for (let i = 0; i < returnExchangeItems.length; i++) {
+        const item = returnExchangeItems[i];
+        if (item.pendingImages && item.pendingImages.length > 0 && savedReturnExchangeIds[i]) {
+          try {
+            await uploadPurchaseOrderImages(
+              orderId,
+              'return-exchange',
+              savedReturnExchangeIds[i],
+              item.pendingImages
+            );
+          } catch (imageError: any) {
+            console.error(`반품/교환 항목 ${savedReturnExchangeIds[i]} 이미지 업로드 오류:`, imageError);
+            // 이미지 업로드 실패는 치명적이지 않으므로 계속 진행
+          }
+        }
+      }
+
       // 원본 데이터 업데이트
       if (originalDataRef.current) {
         originalDataRef.current = {
@@ -285,6 +383,10 @@ export function usePurchaseOrderSave({
         laborCostItems: JSON.parse(JSON.stringify(laborCostItems)),
       };
 
+      // 원본 factory shipments 및 return exchanges 업데이트
+      originalFactoryShipmentsRef.current = JSON.parse(JSON.stringify(factoryShipments.map(s => ({ ...s, pendingImages: undefined }))));
+      originalReturnExchangeItemsRef.current = JSON.parse(JSON.stringify(returnExchangeItems.map(r => ({ ...r, pendingImages: undefined }))));
+
       setLastSavedAt(new Date());
       setIsDirty(false);
 
@@ -295,7 +397,7 @@ export function usePurchaseOrderSave({
     } finally {
       setIsSaving(false);
     }
-  }, [orderId, formData, isDirty, isSaving]);
+  }, [orderId, formData, optionItems, laborCostItems, factoryShipments, returnExchangeItems, isDirty, isSaving, isSuperAdmin, userLevel]);
 
   return {
     isDirty,

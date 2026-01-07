@@ -21,9 +21,51 @@ const PORT = process.env.PORT || 3000;
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 })); // 보안 헤더 설정
+// CORS 설정 - 개발 환경에서는 여러 origin 허용
+const allowedOrigins: (string | RegExp)[] = process.env.CLIENT_URL 
+  ? process.env.CLIENT_URL.split(',').map(url => url.trim())
+  : [
+      'http://localhost:5173',  // 클라이언트 (Vite)
+      'http://localhost:8081',  // Expo 웹 (기본 포트)
+      'http://localhost:8082',  // Expo 웹 (다른 포트)
+      /^http:\/\/192\.168\.\d+\.\d+:\d+$/,  // 로컬 네트워크 IP (모든 포트)
+      /^http:\/\/localhost:\d+$/,  // localhost (모든 포트)
+    ];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
-  credentials: true
+  origin: (origin, callback) => {
+    // origin이 없는 경우 (같은 origin 요청, Postman 등) 허용
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    // 허용된 origin 체크
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        return allowedOrigin === origin;
+      }
+      if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      // 개발 환경에서는 로그만 남기고 허용 (디버깅용)
+      if (process.env.NODE_ENV === 'development') {
+        logger.warn(`⚠️ CORS 경고: 허용되지 않은 origin: ${origin}`);
+        callback(null, true); // 개발 환경에서는 허용
+      } else {
+        callback(new Error(`CORS 정책에 의해 차단되었습니다: ${origin}`));
+      }
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-User-Id'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
 }));
 app.use(morgan('dev')); // 로깅
 app.use(express.json()); // JSON 파싱

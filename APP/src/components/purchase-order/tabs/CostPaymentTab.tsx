@@ -73,7 +73,7 @@ export function CostPaymentTab({
       <View key={item.id} style={styles.costItemCard}>
         <View style={styles.costItemHeader}>
           <Text style={styles.costItemTitle}>
-            {item.isAdminOnly ? '🔒 ' : null}
+            {item.isAdminOnly ? '🔒 ' : ''}
             {item.name || '항목명'}
           </Text>
           {canWrite ? (

@@ -15,12 +15,12 @@ import {
 export interface HeaderProps {
   title: string;
   leftButton?: {
-    icon?: ReactNode;
+    icon?: ReactNode | string;
     label?: string;
     onPress: () => void;
   };
   rightButton?: {
-    icon?: ReactNode;
+    icon?: ReactNode | string;
     label?: string;
     onPress: () => void;
   };
@@ -46,7 +46,13 @@ export function Header({
             onPress={leftButton.onPress}
             activeOpacity={0.7}
           >
-            {leftButton.icon || (
+            {leftButton.icon ? (
+              typeof leftButton.icon === 'string' ? (
+                <Text style={styles.buttonText}>{leftButton.icon}</Text>
+              ) : (
+                leftButton.icon
+              )
+            ) : (
               <Text style={styles.buttonText}>{leftButton.label || '←'}</Text>
             )}
           </TouchableOpacity>
@@ -71,7 +77,13 @@ export function Header({
             onPress={rightButton.onPress}
             activeOpacity={0.7}
           >
-            {rightButton.icon || (
+            {rightButton.icon ? (
+              typeof rightButton.icon === 'string' ? (
+                <Text style={styles.buttonText}>{rightButton.icon}</Text>
+              ) : (
+                rightButton.icon
+              )
+            ) : (
               <Text style={styles.buttonText}>{rightButton.label || '...'}</Text>
             )}
           </TouchableOpacity>

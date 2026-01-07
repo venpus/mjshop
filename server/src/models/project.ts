@@ -2,7 +2,7 @@
  * 프로젝트 관련 타입 정의
  */
 
-export type ProjectStatus = '진행중' | 'PENDING' | '취소';
+export type ProjectStatus = '진행중' | '홀딩중' | '취소' | '완성';
 
 export type ImageReaction = 'like' | 'dislike';
 
@@ -14,6 +14,10 @@ export interface Project {
   name: string;
   status: ProjectStatus;
   start_date: Date;
+  requirements: string | null;
+  last_entry_content: string | null;
+  confirmed_image_url: string | null;
+  thumbnail_image_url: string | null;
   created_at: Date;
   updated_at: Date;
   created_by: string | null;
@@ -43,7 +47,44 @@ export interface ProjectEntryImage {
   entry_id: number;
   image_url: string;
   display_order: number;
+  description: string | null;
+  is_confirmed: boolean;
+  confirmed_at: Date | null;
   created_at: Date;
+}
+
+/**
+ * 프로젝트 초기 이미지
+ */
+export interface ProjectInitialImage {
+  id: number;
+  project_id: number;
+  image_url: string;
+  display_order: number;
+  created_at: Date;
+}
+
+/**
+ * 프로젝트 참고 링크
+ */
+export interface ProjectReferenceLink {
+  id: number;
+  project_id: number;
+  title: string | null;
+  url: string;
+  display_order: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * 프로젝트 조회 이력
+ */
+export interface ProjectView {
+  id: number;
+  project_id: number;
+  user_id: string;
+  viewed_at: Date;
 }
 
 /**
@@ -66,6 +107,7 @@ export interface ProjectEntryComment {
   entry_id: number;
   content: string;
   user_id: string;
+  user_name?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -78,6 +120,7 @@ export interface ProjectEntryCommentReply {
   comment_id: number;
   content: string;
   user_id: string;
+  user_name?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -89,6 +132,7 @@ export interface CreateProjectDTO {
   name: string;
   status?: ProjectStatus;
   start_date: Date;
+  requirements?: string;
   created_by?: string;
 }
 
@@ -99,7 +143,44 @@ export interface UpdateProjectDTO {
   name?: string;
   status?: ProjectStatus;
   start_date?: Date;
+  requirements?: string;
   updated_by?: string;
+}
+
+/**
+ * 프로젝트 초기 이미지 생성 DTO
+ */
+export interface CreateProjectInitialImageDTO {
+  project_id: number;
+  image_url: string;
+  display_order: number;
+}
+
+/**
+ * 프로젝트 참고 링크 생성 DTO
+ */
+export interface CreateProjectReferenceLinkDTO {
+  project_id: number;
+  title?: string;
+  url: string;
+  display_order: number;
+}
+
+/**
+ * 프로젝트 참고 링크 수정 DTO
+ */
+export interface UpdateProjectReferenceLinkDTO {
+  title?: string;
+  url?: string;
+  display_order?: number;
+}
+
+/**
+ * 프로젝트 조회 이력 생성 DTO
+ */
+export interface CreateProjectViewDTO {
+  project_id: number;
+  user_id: string;
 }
 
 /**
@@ -155,6 +236,14 @@ export interface CreateCommentReplyDTO {
  */
 export interface ProjectPublic extends Project {
   entries?: ProjectEntryPublic[];
+  initial_images?: ProjectInitialImage[];
+  reference_links?: ProjectReferenceLink[];
+  creator_name?: string | null;
+  recent_viewers?: Array<{
+    user_id: string;
+    user_name: string | null;
+    viewed_at: Date;
+  }>;
 }
 
 /**
@@ -170,6 +259,31 @@ export interface ProjectEntryPublic extends ProjectEntry {
  */
 export interface ProjectEntryImagePublic extends ProjectEntryImage {
   reactions?: ProjectEntryImageReaction[];
+}
+
+/**
+ * 프로젝트 목록용 인터페이스 (성능 최적화)
+ */
+export interface ProjectListItem {
+  id: number;
+  name: string;
+  status: ProjectStatus;
+  start_date: Date;
+  requirements: string | null;
+  thumbnail_image_url: string | null;
+  confirmed_image_url: string | null;
+  last_entry_content: string | null;
+  last_entry_date: Date | null;
+  last_entry_author_id: string | null;
+  last_entry_author_name: string | null;
+  last_comment_content: string | null;
+  last_comment_author_id: string | null;
+  last_comment_author_name: string | null;
+  last_comment_date: Date | null;
+  creator_name: string | null;
+  created_by: string | null;
+  created_at: Date;
+  updated_at: Date;
 }
 
 /**

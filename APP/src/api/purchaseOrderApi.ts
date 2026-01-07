@@ -812,6 +812,132 @@ export async function getPurchaseOrderCostItems(
 }
 
 /**
+ * 업체 출고 항목 저장
+ * @param orderId 발주 ID
+ * @param shipments 출고 항목 배열
+ */
+export interface FactoryShipmentData {
+  id?: number;
+  shipment_date: string | null;
+  quantity: number;
+  tracking_number?: string | null;
+  receive_date?: string | null;
+  display_order: number;
+}
+
+export async function updateFactoryShipments(
+  orderId: string,
+  shipments: FactoryShipmentData[]
+): Promise<number[]> {
+  const response = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}/factory-shipments`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ shipments }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || '업체 출고 항목 저장에 실패했습니다.');
+  }
+
+  const responseData = await response.json();
+  if (!responseData.success) {
+    throw new Error(responseData.error || '업체 출고 항목 저장에 실패했습니다.');
+  }
+
+  return responseData.data || [];
+}
+
+/**
+ * 반품/교환 항목 저장
+ * @param orderId 발주 ID
+ * @param items 반품/교환 항목 배열
+ */
+export interface ReturnExchangeData {
+  id?: number;
+  return_date: string | null;
+  quantity: number;
+  tracking_number?: string | null;
+  receive_date?: string | null;
+  reason?: string | null;
+  display_order: number;
+}
+
+export async function updateReturnExchanges(
+  orderId: string,
+  items: ReturnExchangeData[]
+): Promise<number[]> {
+  const response = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}/return-exchanges`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ items }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || '반품/교환 항목 저장에 실패했습니다.');
+  }
+
+  const responseData = await response.json();
+  if (!responseData.success) {
+    throw new Error(responseData.error || '반품/교환 항목 저장에 실패했습니다.');
+  }
+
+  return responseData.data || [];
+}
+
+/**
+ * 이미지 업로드 (업체 출고 또는 반품/교환)
+ * @param orderId 발주 ID
+ * @param type 이미지 타입 ('factory-shipment' | 'return-exchange')
+ * @param relatedId 관련 항목 ID
+ * @param images 이미지 파일 배열
+ */
+export async function uploadPurchaseOrderImages(
+  orderId: string,
+  type: 'factory-shipment' | 'return-exchange',
+  relatedId: number,
+  images: Array<{ uri: string; type: string; name: string }>
+): Promise<void> {
+  const formData = new FormData();
+  
+  for (const image of images) {
+    // React Native의 uri를 File 객체로 변환
+    const file = {
+      uri: image.uri,
+      type: image.type || 'image/jpeg',
+      name: image.name || `image_${Date.now()}.jpg`,
+    } as any;
+    formData.append('images', file);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}/images/${type}/${relatedId}`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+    headers: {
+      // FormData를 사용할 때는 Content-Type을 설정하지 않음
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || '이미지 업로드에 실패했습니다.');
+  }
+
+  const responseData = await response.json();
+  if (!responseData.success) {
+    throw new Error(responseData.error || '이미지 업로드에 실패했습니다.');
+  }
+}
+
+/**
  * 이미지 URL을 전체 URL로 변환
  * (constants에서 export된 getFullImageUrl 사용)
  */

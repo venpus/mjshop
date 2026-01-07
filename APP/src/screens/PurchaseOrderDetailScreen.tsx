@@ -35,8 +35,10 @@ import {
 import { usePurchaseOrderForm } from '../hooks/usePurchaseOrderForm';
 import { usePurchaseOrderSave } from '../hooks/usePurchaseOrderSave';
 import { CostPaymentTab, type LaborCostItem } from '../components/purchase-order/tabs/CostPaymentTab';
+import { FactoryShippingTab, type FactoryShipment, type ReturnExchangeItem } from '../components/purchase-order/tabs/FactoryShippingTab';
 import { calculateTotalOptionCost, calculateTotalLaborCost } from '../utils/purchaseOrderCalculations';
 import { getPurchaseOrderCostItems } from '../api/purchaseOrderApi';
+import * as ImagePicker from 'expo-image-picker';
 
 type PurchaseOrderDetailScreenProps = NativeStackScreenProps<AdminStackParamList, 'PurchaseOrderDetail'>;
 
@@ -59,6 +61,10 @@ export default function PurchaseOrderDetailScreen({
   // 옵션 항목 및 인건비 항목 상태
   const [optionItems, setOptionItems] = useState<LaborCostItem[]>([]);
   const [laborCostItems, setLaborCostItems] = useState<LaborCostItem[]>([]);
+  
+  // 업체 출고 및 반품/교환 항목 상태
+  const [factoryShipments, setFactoryShipments] = useState<FactoryShipment[]>([]);
+  const [returnExchangeItems, setReturnExchangeItems] = useState<ReturnExchangeItem[]>([]);
 
   // 폼 상태 관리 Hook (항상 호출되어야 함)
   const {
@@ -85,6 +91,8 @@ export default function PurchaseOrderDetailScreen({
     originalOrder: order,
     optionItems,
     laborCostItems,
+    factoryShipments,
+    returnExchangeItems,
     userLevel: user?.level,
     isSuperAdmin: user?.level === 'A-SuperAdmin',
   });
@@ -375,6 +383,155 @@ export default function PurchaseOrderDetailScreen({
     setLaborCostItems((prev) => [...prev, newItem]);
   }, []);
 
+  // 업체 출고 항목 핸들러
+  const handleAddFactoryShipment = useCallback(() => {
+    const newShipment: FactoryShipment = {
+      id: `temp_${Date.now()}_${Math.random()}`,
+      shipped_date: '',
+      shipped_quantity: 0,
+      tracking_number: null,
+      notes: null,
+      images: [],
+      pendingImages: [],
+    };
+    setFactoryShipments((prev) => [...prev, newShipment]);
+  }, []);
+
+  const handleRemoveFactoryShipment = useCallback((id: string) => {
+    setFactoryShipments((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  const handleUpdateFactoryShipment = useCallback((id: string, field: keyof FactoryShipment, value: any) => {
+    setFactoryShipments((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+    );
+  }, []);
+
+  const handleFactoryImageUpload = useCallback(async (shipmentId: string, images: Array<{ uri: string; type: string; name: string }>) => {
+    const shipment = factoryShipments.find((s) => s.id === shipmentId);
+    if (!shipment) return;
+
+    const maxImages = 5;
+    const serverImageCount = (shipment.images?.filter(url => !url.startsWith('blob:')).length || 0);
+    const pendingImageCount = shipment.pendingImages?.length || 0;
+    const remainingSlots = maxImages - serverImageCount - pendingImageCount;
+
+    if (remainingSlots <= 0) {
+      Alert.alert('알림', '이미지는 최대 5장까지 업로드할 수 있습니다.');
+      return;
+    }
+
+    const imagesToAdd = images.slice(0, remainingSlots);
+    if (images.length > remainingSlots) {
+      Alert.alert('알림', `이미지는 최대 5장까지 업로드할 수 있습니다. ${remainingSlots}장만 추가됩니다.`);
+    }
+
+    // 미리보기 URL 생성
+    const previewUrls = imagesToAdd.map(img => img.uri);
+    const serverUrls = shipment.images?.filter(url => !url.startsWith('blob:')) || [];
+    const allUrls = [...serverUrls, ...previewUrls];
+
+    handleUpdateFactoryShipment(shipmentId, 'pendingImages', [...(shipment.pendingImages || []), ...imagesToAdd]);
+    handleUpdateFactoryShipment(shipmentId, 'images', allUrls);
+  }, [factoryShipments, handleUpdateFactoryShipment]);
+
+  const handleRemoveFactoryImage = useCallback(async (shipmentId: string, imageIndex: number, imageUrl: string) => {
+    const shipment = factoryShipments.find((s) => s.id === shipmentId);
+    if (!shipment) return;
+
+    // blob: URL인 경우 (미리보기) - pendingImages에서 제거
+    if (imageUrl.startsWith('blob:')) {
+      const blobIndex = shipment.images?.findIndex(url => url === imageUrl) ?? -1;
+      if (blobIndex >= 0) {
+        const pendingIndex = blobIndex - (shipment.images?.filter(url => !url.startsWith('blob:')).length || 0);
+        if (pendingIndex >= 0 && shipment.pendingImages) {
+          const newPendingImages = shipment.pendingImages.filter((_, i) => i !== pendingIndex);
+          handleUpdateFactoryShipment(shipmentId, 'pendingImages', newPendingImages);
+        }
+      }
+    }
+
+    // 이미지 목록에서 제거
+    const newImages = shipment.images?.filter((_, i) => i !== imageIndex) || [];
+    handleUpdateFactoryShipment(shipmentId, 'images', newImages);
+
+    // 서버 이미지인 경우 API 호출은 저장 시 처리
+  }, [factoryShipments, handleUpdateFactoryShipment]);
+
+  // 반품/교환 항목 핸들러
+  const handleAddReturnExchangeItem = useCallback(() => {
+    const newItem: ReturnExchangeItem = {
+      id: `temp_${Date.now()}_${Math.random()}`,
+      return_date: '',
+      return_quantity: 0,
+      reason: null,
+      images: [],
+      pendingImages: [],
+    };
+    setReturnExchangeItems((prev) => [...prev, newItem]);
+  }, []);
+
+  const handleRemoveReturnExchangeItem = useCallback((id: string) => {
+    setReturnExchangeItems((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  const handleUpdateReturnExchangeItem = useCallback((id: string, field: keyof ReturnExchangeItem, value: any) => {
+    setReturnExchangeItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+    );
+  }, []);
+
+  const handleReturnImageUpload = useCallback(async (itemId: string, images: Array<{ uri: string; type: string; name: string }>) => {
+    const item = returnExchangeItems.find((i) => i.id === itemId);
+    if (!item) return;
+
+    const maxImages = 5;
+    const serverImageCount = (item.images?.filter(url => !url.startsWith('blob:')).length || 0);
+    const pendingImageCount = item.pendingImages?.length || 0;
+    const remainingSlots = maxImages - serverImageCount - pendingImageCount;
+
+    if (remainingSlots <= 0) {
+      Alert.alert('알림', '이미지는 최대 5장까지 업로드할 수 있습니다.');
+      return;
+    }
+
+    const imagesToAdd = images.slice(0, remainingSlots);
+    if (images.length > remainingSlots) {
+      Alert.alert('알림', `이미지는 최대 5장까지 업로드할 수 있습니다. ${remainingSlots}장만 추가됩니다.`);
+    }
+
+    // 미리보기 URL 생성
+    const previewUrls = imagesToAdd.map(img => img.uri);
+    const serverUrls = item.images?.filter(url => !url.startsWith('blob:')) || [];
+    const allUrls = [...serverUrls, ...previewUrls];
+
+    handleUpdateReturnExchangeItem(itemId, 'pendingImages', [...(item.pendingImages || []), ...imagesToAdd]);
+    handleUpdateReturnExchangeItem(itemId, 'images', allUrls);
+  }, [returnExchangeItems, handleUpdateReturnExchangeItem]);
+
+  const handleRemoveReturnImage = useCallback(async (itemId: string, imageIndex: number, imageUrl: string) => {
+    const item = returnExchangeItems.find((i) => i.id === itemId);
+    if (!item) return;
+
+    // blob: URL인 경우 (미리보기) - pendingImages에서 제거
+    if (imageUrl.startsWith('blob:')) {
+      const blobIndex = item.images?.findIndex(url => url === imageUrl) ?? -1;
+      if (blobIndex >= 0) {
+        const pendingIndex = blobIndex - (item.images?.filter(url => !url.startsWith('blob:')).length || 0);
+        if (pendingIndex >= 0 && item.pendingImages) {
+          const newPendingImages = item.pendingImages.filter((_, i) => i !== pendingIndex);
+          handleUpdateReturnExchangeItem(itemId, 'pendingImages', newPendingImages);
+        }
+      }
+    }
+
+    // 이미지 목록에서 제거
+    const newImages = item.images?.filter((_, i) => i !== imageIndex) || [];
+    handleUpdateReturnExchangeItem(itemId, 'images', newImages);
+
+    // 서버 이미지인 경우 API 호출은 저장 시 처리
+  }, [returnExchangeItems, handleUpdateReturnExchangeItem]);
+
   // Render 함수들 (항상 호출되어야 함 - early return 전)
   const renderCostTab = useCallback(() => {
     if (!order) return <View />;
@@ -527,83 +684,24 @@ export default function PurchaseOrderDetailScreen({
     if (!order) return <View />;
     
     return (
-      <View style={styles.tabContent}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>업체 출고 현황</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>출고상태:</Text>
-            <Text style={styles.infoValue}>{factoryStatus ?? '-'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>출고수량:</Text>
-            <Text style={styles.infoValue}>{(order.factory_shipped_quantity ?? 0)}개</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>미출고수량:</Text>
-            <Text style={styles.infoValue}>{(order.unshipped_quantity ?? 0)}개</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>미입고수량:</Text>
-            <Text style={styles.infoValue}>{(order.unreceived_quantity ?? 0)}개</Text>
-          </View>
-        </View>
-
-        {order.factoryShipments && order.factoryShipments.length > 0 ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>출고 내역</Text>
-          {order.factoryShipments.map((shipment, index) => (
-            <View key={index} style={styles.shipmentCard}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>출고일:</Text>
-                <Text style={styles.infoValue}>{formatDate(shipment.shipped_date)}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>출고수량:</Text>
-                <Text style={styles.infoValue}>{shipment.shipped_quantity}개</Text>
-              </View>
-              {shipment.tracking_number ? (
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>운송장번호:</Text>
-                  <Text style={styles.infoValue}>{shipment.tracking_number}</Text>
-                </View>
-              ) : null}
-              {shipment.notes ? (
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>비고:</Text>
-                  <Text style={styles.infoValue}>{shipment.notes}</Text>
-                </View>
-              ) : null}
-            </View>
-          ))}
-        </View>
-      ) : null}
-
-      {order.returnExchangeItems && order.returnExchangeItems.length > 0 ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>반품/교환 내역</Text>
-          {order.returnExchangeItems.map((item, index) => (
-            <View key={index} style={styles.shipmentCard}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>반품일:</Text>
-                <Text style={styles.infoValue}>{formatDate(item.return_date)}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>반품수량:</Text>
-                <Text style={styles.infoValue}>{item.return_quantity}개</Text>
-              </View>
-              {item.reason ? (
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>사유:</Text>
-                  <Text style={styles.infoValue}>{item.reason}</Text>
-                </View>
-              ) : null}
-            </View>
-          ))}
-        </View>
-      ) : null}
-      </View>
+      <FactoryShippingTab
+        factoryShipments={factoryShipments}
+        returnExchangeItems={returnExchangeItems}
+        currentFactoryStatus={factoryStatus ?? '-'}
+        onAddFactoryShipment={handleAddFactoryShipment}
+        onRemoveFactoryShipment={handleRemoveFactoryShipment}
+        onUpdateFactoryShipment={handleUpdateFactoryShipment}
+        onHandleFactoryImageUpload={handleFactoryImageUpload}
+        onRemoveFactoryImage={handleRemoveFactoryImage}
+        onAddReturnExchangeItem={handleAddReturnExchangeItem}
+        onRemoveReturnExchangeItem={handleRemoveReturnExchangeItem}
+        onUpdateReturnExchangeItem={handleUpdateReturnExchangeItem}
+        onHandleReturnImageUpload={handleReturnImageUpload}
+        onRemoveReturnImage={handleRemoveReturnImage}
+        canWrite={true}
+      />
     );
-  }, [order, factoryStatus, formatDate]);
+  }, [order, factoryStatus, factoryShipments, returnExchangeItems, handleAddFactoryShipment, handleRemoveFactoryShipment, handleUpdateFactoryShipment, handleFactoryImageUpload, handleRemoveFactoryImage, handleAddReturnExchangeItem, handleRemoveReturnExchangeItem, handleUpdateReturnExchangeItem, handleReturnImageUpload, handleRemoveReturnImage]);
 
   const renderWorkTab = useCallback(() => {
     if (!order) return <View />;
@@ -728,7 +826,7 @@ export default function PurchaseOrderDetailScreen({
   return (
     <Container safeArea padding={false}>
       <Header
-        title={order.po_number || '발주 상세'}
+        title={order.po_number ? String(order.po_number) : '발주 상세'}
         leftButton={{ label: '←', onPress: handleBack }}
         rightButton={{
           icon: isDirty ? '💾' : '✓',

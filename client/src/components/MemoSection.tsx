@@ -4,6 +4,7 @@ export interface Reply {
   id: string;
   content: string;
   userId: string;
+  userName?: string | null;
   createdAt: string;
 }
 
@@ -11,6 +12,7 @@ export interface Memo {
   id: string;
   content: string;
   userId: string;
+  userName?: string | null;
   createdAt: string;
   replies: Reply[];
 }
@@ -61,7 +63,7 @@ export function MemoSection({
                   <div className="flex items-center gap-2 mb-1">
                     <User className="w-3 h-3 text-gray-600" />
                     <span className="text-xs text-gray-600 font-semibold">
-                      {memo.userId}
+                      {memo.userName || memo.userId || '관리자'}
                     </span>
                     <span className="text-xs text-gray-400">
                       {new Date(memo.createdAt).toLocaleDateString("ko-KR", {
@@ -96,7 +98,7 @@ export function MemoSection({
                           <div className="flex items-center gap-2 mb-1">
                             <User className="w-3 h-3 text-gray-600" />
                             <span className="text-xs text-gray-600 font-semibold">
-                              {reply.userId}
+                              {reply.userName || reply.userId || '관리자'}
                             </span>
                             <span className="text-xs text-gray-400">
                               {new Date(reply.createdAt).toLocaleDateString(
