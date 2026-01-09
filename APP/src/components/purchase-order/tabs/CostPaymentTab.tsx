@@ -42,7 +42,8 @@ interface CostPaymentTabProps {
   
   // 편집 모드
   mode?: 'read' | 'edit';
-  onEditClick?: () => void;
+  onEditOptionItemsClick?: () => void;
+  onEditLaborCostItemsClick?: () => void;
 }
 
 export function CostPaymentTab({
@@ -63,10 +64,12 @@ export function CostPaymentTab({
   isSuperAdmin = false,
   canWrite = true,
   mode = 'read',
-  onEditClick,
+  onEditOptionItemsClick,
+  onEditLaborCostItemsClick,
 }: CostPaymentTabProps) {
   const isReadMode = mode === 'read';
-  const showEditButton = isReadMode && canWrite && onEditClick;
+  const showEditOptionButton = isReadMode && canWrite && onEditOptionItemsClick;
+  const showEditLaborButton = isReadMode && canWrite && onEditLaborCostItemsClick;
   const renderCostItem = (
     item: LaborCostItem,
     type: 'option' | 'labor',
@@ -81,43 +84,45 @@ export function CostPaymentTab({
       ? [styles.costItemCard, styles.costItemCardAdmin] 
       : styles.costItemCard;
 
-    // 읽기 모드일 때는 Text만 표시
+    // 읽기 모드일 때는 컴팩트한 테이블 형태로 표시
     if (isReadMode) {
+      const compactRowStyle = isAdminOnly 
+        ? [styles.compactItemRow, styles.compactItemRowAdmin]
+        : styles.compactItemRow;
+      
       return (
-        <View key={item.id} style={cardStyle}>
-          <View style={styles.costItemHeader}>
-            <View style={styles.costItemTitleContainer}>
-              {isAdminOnly ? (
-                <View style={styles.adminBadge}>
-                  <Text style={styles.adminBadgeText}>A</Text>
-                </View>
-              ) : null}
-              <Text style={styles.costItemTitle}>
-                {item.name || '항목명'}
-              </Text>
+        <View key={item.id} style={compactRowStyle}>
+          {/* A레벨 배지 */}
+          {isAdminOnly && (
+            <View style={styles.compactAdminBadge}>
+              <Text style={styles.compactAdminBadgeText}>A</Text>
             </View>
-          </View>
-
-          <View style={styles.costItemRow}>
-            <View style={styles.readOnlyField}>
-              <Text style={styles.readOnlyLabel}>단가</Text>
-              <Text style={styles.readOnlyValue}>¥{item.unit_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-            </View>
-            <View style={styles.readOnlyField}>
-              <Text style={styles.readOnlyLabel}>수량</Text>
-              <Text style={styles.readOnlyValue}>{item.quantity.toLocaleString()}개</Text>
-            </View>
-          </View>
-
-          {/* 실시간 계산 표시 */}
-          <View style={styles.costCalculationRow}>
-            <Text style={styles.costCalculationText}>
-              ¥{item.unit_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              {' × '}
-              {item.quantity.toLocaleString()}개
-              {' = '}
+          )}
+          
+          {/* 항목명 */}
+          <View style={styles.compactItemName}>
+            <Text style={styles.compactItemNameText} numberOfLines={1}>
+              {item.name || '항목명'}
             </Text>
-            <Text style={styles.costItemTotalValue}>
+          </View>
+
+          {/* 단가 */}
+          <View style={styles.compactItemUnitPrice}>
+            <Text style={styles.compactItemValue}>
+              ¥{item.unit_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+          </View>
+
+          {/* 수량 */}
+          <View style={styles.compactItemQuantity}>
+            <Text style={styles.compactItemValue}>
+              {item.quantity.toLocaleString()}
+            </Text>
+          </View>
+
+          {/* 합계 */}
+          <View style={styles.compactItemTotal}>
+            <Text style={styles.compactItemTotalText}>
               ¥{cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
           </View>
@@ -215,10 +220,10 @@ export function CostPaymentTab({
                 ¥{totalOptionCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </Text>
             </View>
-            {showEditButton ? (
+            {showEditOptionButton ? (
               <TouchableOpacity
                 style={styles.editButton}
-                onPress={onEditClick}
+                onPress={onEditOptionItemsClick}
                 activeOpacity={0.7}
               >
                 <Text style={styles.editButtonText}>✏️ 편집</Text>
@@ -230,6 +235,23 @@ export function CostPaymentTab({
         {/* 일반 항목 섹션 */}
         <View style={styles.subSection}>
           <Text style={styles.subSectionTitle}>일반 항목</Text>
+          {/* 읽기 모드일 때 테이블 헤더 표시 */}
+          {isReadMode && regularOptionItems.length > 0 && (
+            <View style={styles.compactTableHeader}>
+              <View style={styles.compactItemName}>
+                <Text style={styles.compactTableHeaderText}>항목명</Text>
+              </View>
+              <View style={styles.compactItemUnitPrice}>
+                <Text style={styles.compactTableHeaderText}>단가</Text>
+              </View>
+              <View style={styles.compactItemQuantity}>
+                <Text style={styles.compactTableHeaderText}>수량</Text>
+              </View>
+              <View style={styles.compactItemTotal}>
+                <Text style={styles.compactTableHeaderText}>합계</Text>
+              </View>
+            </View>
+          )}
           {regularOptionItems.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>일반 항목이 없습니다</Text>
@@ -269,6 +291,23 @@ export function CostPaymentTab({
                 </Text>
               </View>
             </View>
+            {/* 읽기 모드일 때 테이블 헤더 표시 */}
+            {isReadMode && adminOptionItems.length > 0 && (
+              <View style={styles.compactTableHeader}>
+                <View style={[styles.compactItemName, { marginLeft: 26 }]}>
+                  <Text style={styles.compactTableHeaderText}>항목명</Text>
+                </View>
+                <View style={styles.compactItemUnitPrice}>
+                  <Text style={styles.compactTableHeaderText}>단가</Text>
+                </View>
+                <View style={styles.compactItemQuantity}>
+                  <Text style={styles.compactTableHeaderText}>수량</Text>
+                </View>
+                <View style={styles.compactItemTotal}>
+                  <Text style={styles.compactTableHeaderText}>합계</Text>
+                </View>
+              </View>
+            )}
             {adminOptionItems.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyStateText}>A레벨 전용 항목이 없습니다</Text>
@@ -309,10 +348,10 @@ export function CostPaymentTab({
                 ¥{totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </Text>
             </View>
-            {showEditButton ? (
+            {showEditLaborButton ? (
               <TouchableOpacity
                 style={styles.editButton}
-                onPress={onEditClick}
+                onPress={onEditLaborCostItemsClick}
                 activeOpacity={0.7}
               >
                 <Text style={styles.editButtonText}>✏️ 편집</Text>
@@ -324,6 +363,23 @@ export function CostPaymentTab({
         {/* 일반 항목 섹션 */}
         <View style={styles.subSection}>
           <Text style={styles.subSectionTitle}>일반 항목</Text>
+          {/* 읽기 모드일 때 테이블 헤더 표시 */}
+          {isReadMode && regularLaborCostItems.length > 0 && (
+            <View style={styles.compactTableHeader}>
+              <View style={styles.compactItemName}>
+                <Text style={styles.compactTableHeaderText}>항목명</Text>
+              </View>
+              <View style={styles.compactItemUnitPrice}>
+                <Text style={styles.compactTableHeaderText}>단가</Text>
+              </View>
+              <View style={styles.compactItemQuantity}>
+                <Text style={styles.compactTableHeaderText}>수량</Text>
+              </View>
+              <View style={styles.compactItemTotal}>
+                <Text style={styles.compactTableHeaderText}>합계</Text>
+              </View>
+            </View>
+          )}
           {regularLaborCostItems.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>일반 항목이 없습니다</Text>
@@ -363,6 +419,23 @@ export function CostPaymentTab({
                 </Text>
               </View>
             </View>
+            {/* 읽기 모드일 때 테이블 헤더 표시 */}
+            {isReadMode && adminLaborCostItems.length > 0 && (
+              <View style={styles.compactTableHeader}>
+                <View style={[styles.compactItemName, { marginLeft: 26 }]}>
+                  <Text style={styles.compactTableHeaderText}>항목명</Text>
+                </View>
+                <View style={styles.compactItemUnitPrice}>
+                  <Text style={styles.compactTableHeaderText}>단가</Text>
+                </View>
+                <View style={styles.compactItemQuantity}>
+                  <Text style={styles.compactTableHeaderText}>수량</Text>
+                </View>
+                <View style={styles.compactItemTotal}>
+                  <Text style={styles.compactTableHeaderText}>합계</Text>
+                </View>
+              </View>
+            )}
             {adminLaborCostItems.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyStateText}>A레벨 전용 항목이 없습니다</Text>
@@ -467,15 +540,15 @@ const styles = StyleSheet.create({
   },
   // 서브 섹션 (일반 / A레벨 전용)
   subSection: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   adminSubSection: {
     backgroundColor: colors.blue50,
     borderRadius: 8,
-    padding: spacing.md,
+    padding: spacing.sm,
     borderWidth: 1,
     borderColor: colors.blue200,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
   },
   subSectionHeader: {
     flexDirection: 'row',
@@ -484,9 +557,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   subSectionTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.text,
+    marginBottom: spacing.xs,
   },
   subSectionTotal: {
     flexDirection: 'row',
@@ -503,25 +577,86 @@ const styles = StyleSheet.create({
     color: colors.blue600,
   },
   emptyState: {
-    padding: spacing.lg,
+    padding: spacing.sm,
     alignItems: 'center',
   },
   emptyStateText: {
-    fontSize: 14,
+    fontSize: 12,
     color: colors.textSecondary,
   },
-  // 항목 카드
+  // 항목 카드 (편집 모드용)
   costItemCard: {
     backgroundColor: colors.gray50,
     borderRadius: 8,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    padding: spacing.sm,
+    marginBottom: spacing.xs,
     borderWidth: 1,
     borderColor: colors.gray200,
   },
   costItemCardAdmin: {
     backgroundColor: colors.blue100,
     borderColor: colors.blue300,
+  },
+  // 컴팩트 읽기 모드 스타일
+  compactItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xs,
+    borderRadius: 6,
+    minHeight: 36,
+    backgroundColor: colors.gray50,
+  },
+  compactItemRowAdmin: {
+    backgroundColor: colors.blue100,
+  },
+  compactAdminBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.blue600,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.xs,
+  },
+  compactAdminBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  compactItemName: {
+    flex: 2,
+    marginRight: spacing.xs,
+  },
+  compactItemNameText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  compactItemUnitPrice: {
+    flex: 1.2,
+    alignItems: 'flex-end',
+    marginRight: spacing.xs,
+  },
+  compactItemQuantity: {
+    flex: 0.8,
+    alignItems: 'center',
+    marginRight: spacing.xs,
+  },
+  compactItemTotal: {
+    flex: 1.2,
+    alignItems: 'flex-end',
+  },
+  compactItemValue: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  compactItemTotalText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
   },
   costItemHeader: {
     flexDirection: 'row',
@@ -634,6 +769,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
+  },
+  // 컴팩트 테이블 헤더
+  compactTableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xs,
+    backgroundColor: colors.gray100,
+    borderRadius: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray300,
+  },
+  compactTableHeaderText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });
 

@@ -4,6 +4,7 @@ import type { LaborCostItem } from "../components/tabs/CostPaymentTab";
 import type { WorkItem } from "../components/tabs/ProcessingPackagingTab";
 import { 
   calculateBasicCostTotal, 
+  calculateCommissionAmount,
   calculateShippingCostTotal, 
   calculateTotalOptionCost,
   calculateTotalLaborCost,
@@ -520,24 +521,42 @@ export function usePurchaseOrderSave({
       setIsSaving(true);
       console.log('[usePurchaseOrderSave] handleSave - 저장 시작, isNewOrder:', isNewOrder);
       
+      // 옵션비용과 인건비 계산
+      const totalOptionCost = calculateTotalOptionCost(optionItems);
+      const totalLaborCost = calculateTotalLaborCost(laborCostItems);
+      
+      // 수수료 계산 (2025-01-06 이후 발주는 옵션비용과 인건비 포함, A레벨 전용 항목 제외)
+      const commissionAmount = calculateCommissionAmount(
+        unitPrice,
+        quantity,
+        commissionRate,
+        backMargin,
+        orderDate,
+        totalOptionCost,
+        totalLaborCost,
+        optionItems,
+        laborCostItems
+      );
+      
       // 최종 결제 금액 계산
       const basicCostTotal = calculateBasicCostTotal(
         unitPrice,
         quantity,
         commissionRate,
-        backMargin
+        backMargin,
+        orderDate
       );
       const shippingCostTotal = calculateShippingCostTotal(
         shippingCost,
         warehouseShippingCost
       );
-      const totalOptionCost = calculateTotalOptionCost(optionItems);
-      const totalLaborCost = calculateTotalLaborCost(laborCostItems);
       const finalPaymentAmount = calculateFinalPaymentAmount(
         basicCostTotal,
         shippingCostTotal,
         totalOptionCost,
-        totalLaborCost
+        totalLaborCost,
+        commissionAmount,
+        orderDate
       );
       
       // 선금 금액 = 발주단가 * 수량 * (선금 비율 / 100)

@@ -1147,10 +1147,22 @@ export class PackingListRepository {
    */
   async getShippingSummaryByPurchaseOrder(purchaseOrderId: string): Promise<PurchaseOrderShippingSummary | null> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT purchase_order_id, ordered_quantity, shipped_quantity, arrived_quantity,
-              unshipped_quantity, shipping_quantity
-       FROM v_purchase_order_shipping_summary
-       WHERE purchase_order_id = ?`,
+      `SELECT 
+        summary.purchase_order_id, 
+        summary.ordered_quantity, 
+        summary.shipped_quantity, 
+        summary.arrived_quantity,
+        summary.unshipped_quantity, 
+        summary.shipping_quantity,
+        MAX(pl.warehouse_arrival_date) AS warehouse_arrival_date,
+        CASE WHEN MAX(korea.id) IS NOT NULL THEN 1 ELSE 0 END AS has_korea_arrival
+       FROM v_purchase_order_shipping_summary summary
+       LEFT JOIN packing_list_items pli ON summary.purchase_order_id = pli.purchase_order_id
+       LEFT JOIN packing_lists pl ON pli.packing_list_id = pl.id
+       LEFT JOIN packing_list_korea_arrivals korea ON pli.id = korea.packing_list_item_id
+       WHERE summary.purchase_order_id = ?
+       GROUP BY summary.purchase_order_id, summary.ordered_quantity, summary.shipped_quantity, 
+                summary.arrived_quantity, summary.unshipped_quantity, summary.shipping_quantity`,
       [purchaseOrderId]
     );
 
@@ -1159,6 +1171,102 @@ export class PackingListRepository {
     }
 
     return rows[0] as PurchaseOrderShippingSummary;
+  }
+
+  /**
+   * 발주 ID로 연결된 패킹리스트 목록 조회
+   */
+  async findByPurchaseOrderId(purchaseOrderId: string): Promise<Array<{
+    packing_list_id: number;
+    packing_list_code: string;
+    shipment_date: Date;
+    logistics_company: string | null;
+    warehouse_arrival_date: Date | null;
+    shipping_cost: number;
+    shipped_quantity: number;
+    korea_arrivals: Array<{
+      arrival_date: Date;
+      quantity: number;
+    }>;
+    delivery_status: string;
+  }>> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT 
+        pl.id AS packing_list_id,
+        pl.code AS packing_list_code,
+        pl.shipment_date,
+        pl.logistics_company,
+        pl.warehouse_arrival_date,
+        pl.shipping_cost,
+        pli.total_quantity AS shipped_quantity,
+        korea.arrival_date,
+        korea.quantity AS korea_arrival_quantity
+       FROM packing_list_items pli
+       INNER JOIN packing_lists pl ON pli.packing_list_id = pl.id
+       LEFT JOIN packing_list_korea_arrivals korea ON pli.id = korea.packing_list_item_id
+       WHERE pli.purchase_order_id = ?
+       ORDER BY pl.shipment_date DESC, pl.code ASC`,
+      [purchaseOrderId]
+    );
+
+    // 결과를 패킹리스트별로 그룹화
+    const packingListMap = new Map<number, {
+      packing_list_id: number;
+      packing_list_code: string;
+      shipment_date: Date;
+      logistics_company: string | null;
+      warehouse_arrival_date: Date | null;
+      shipping_cost: number;
+      shipped_quantity: number;
+      korea_arrivals: Array<{
+        arrival_date: Date;
+        quantity: number;
+      }>;
+    }>();
+
+    rows.forEach((row) => {
+      const plId = row.packing_list_id;
+      
+      if (!packingListMap.has(plId)) {
+        packingListMap.set(plId, {
+          packing_list_id: plId,
+          packing_list_code: row.packing_list_code,
+          shipment_date: row.shipment_date,
+          logistics_company: row.logistics_company,
+          warehouse_arrival_date: row.warehouse_arrival_date,
+          shipping_cost: row.shipping_cost,
+          shipped_quantity: row.shipped_quantity,
+          korea_arrivals: [],
+        });
+      }
+
+      // 한국도착일 정보 추가
+      if (row.arrival_date && row.korea_arrival_quantity) {
+        const existing = packingListMap.get(plId)!;
+        existing.korea_arrivals.push({
+          arrival_date: row.arrival_date,
+          quantity: row.korea_arrival_quantity,
+        });
+      }
+    });
+
+    // 배송 상태 계산 및 결과 반환
+    return Array.from(packingListMap.values()).map((pl) => {
+      const hasKoreaArrival = pl.korea_arrivals.length > 0;
+      const hasWarehouseArrival = pl.warehouse_arrival_date !== null;
+      
+      let delivery_status = '내륙운송중';
+      if (hasKoreaArrival) {
+        delivery_status = '한국도착';
+      } else if (hasWarehouseArrival) {
+        delivery_status = '배송중';
+      }
+
+      return {
+        ...pl,
+        delivery_status,
+      };
+    });
   }
 
   /**

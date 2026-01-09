@@ -56,7 +56,7 @@ import {
   calculatePackingListShippingCost,
   calculateDeliveryStatus,
 } from "../utils/purchaseOrderCalculations";
-import { getShippingCostByPurchaseOrder, getShippingSummaryByPurchaseOrder } from "../api/packingListApi";
+import { getShippingCostByPurchaseOrder, getShippingSummaryByPurchaseOrder, getPackingListsByPurchaseOrder, type RelatedPackingList } from "../api/packingListApi";
 import { usePurchaseOrderData } from "../hooks/usePurchaseOrderData";
 import { usePurchaseOrderSave } from "../hooks/usePurchaseOrderSave";
 import { useMemoManagement } from "../hooks/useMemoManagement";
@@ -137,6 +137,9 @@ export function PurchaseOrderDetail({
   // 패킹리스트 출고 수량 정보
   const [shippingQuantity, setShippingQuantity] = useState<number | undefined>(undefined);
   const [koreaArrivedQuantity, setKoreaArrivedQuantity] = useState<number | undefined>(undefined);
+  // 연관 패킹리스트 목록
+  const [relatedPackingLists, setRelatedPackingLists] = useState<RelatedPackingList[]>([]);
+  const [isLoadingPackingLists, setIsLoadingPackingLists] = useState(false);
   const [commissionRate, setCommissionRate] = useState(0);
   const [commissionType, setCommissionType] = useState("");
   const [optionCost, setOptionCost] = useState(0);
@@ -377,6 +380,8 @@ export function PurchaseOrderDetail({
   const [shippingSummary, setShippingSummary] = useState<{
     shipped_quantity: number;
     shipping_quantity: number;
+    warehouse_arrival_date?: string | null;
+    has_korea_arrival?: number | boolean;
   } | null>(null);
 
   // 패킹리스트 배송 정보 로드
@@ -388,11 +393,15 @@ export function PurchaseOrderDetail({
             setShippingSummary({
               shipped_quantity: summary.shipped_quantity || 0,
               shipping_quantity: summary.shipping_quantity || 0,
+              warehouse_arrival_date: summary.warehouse_arrival_date || null,
+              has_korea_arrival: summary.has_korea_arrival || false,
             });
           } else {
             setShippingSummary({
               shipped_quantity: 0,
               shipping_quantity: 0,
+              warehouse_arrival_date: null,
+              has_korea_arrival: false,
             });
           }
         })
@@ -401,17 +410,44 @@ export function PurchaseOrderDetail({
           setShippingSummary({
             shipped_quantity: 0,
             shipping_quantity: 0,
+            warehouse_arrival_date: null,
+            has_korea_arrival: false,
           });
         });
     }
   }, [orderId, isNewOrder]);
 
+  // delivery 탭 활성화 시 패킹리스트 목록 로드 (옵션 B)
+  useEffect(() => {
+    console.log('[PurchaseOrderDetail] delivery 탭 useEffect 실행:', { activeTab, isNewOrder, orderId });
+    if (activeTab === 'delivery' && !isNewOrder && orderId) {
+      console.log('[PurchaseOrderDetail] 패킹리스트 목록 로드 시작, orderId:', orderId);
+      setIsLoadingPackingLists(true);
+      getPackingListsByPurchaseOrder(orderId)
+        .then((lists) => {
+          console.log('[PurchaseOrderDetail] 패킹리스트 목록 로드 성공:', lists);
+          setRelatedPackingLists(lists);
+        })
+        .catch((error) => {
+          console.error('[PurchaseOrderDetail] 패킹리스트 목록 로드 오류:', error);
+          setRelatedPackingLists([]);
+        })
+        .finally(() => {
+          console.log('[PurchaseOrderDetail] 패킹리스트 목록 로드 완료');
+          setIsLoadingPackingLists(false);
+        });
+    } else {
+      console.log('[PurchaseOrderDetail] 패킹리스트 로드 조건 불만족:', { activeTab, isNewOrder, orderId });
+    }
+  }, [activeTab, orderId, isNewOrder]);
+
   // 계산된 배송 상태
   const calculatedDeliveryStatus = order
     ? calculateDeliveryStatus(
-        shippingSummary?.shipped_quantity || 0,
-        shippingSummary?.shipping_quantity || 0,
-        order.deliveryStatus || '대기중'
+        (shippingSummary?.shipped_quantity || 0) > 0, // hasPackingList
+        shippingSummary?.warehouse_arrival_date || null, // warehouseArrivalDate
+        (shippingSummary?.has_korea_arrival !== undefined && (Number(shippingSummary.has_korea_arrival) > 0 || shippingSummary.has_korea_arrival === true)), // hasKoreaArrival
+        order.deliveryStatus || '대기중' // defaultDeliveryStatus
       )
     : '대기중';
 
@@ -1149,13 +1185,16 @@ export function PurchaseOrderDetail({
   const totalReceivedQuantity = calculateTotalReceivedQuantity(factoryShipments, returnExchangeItems);
   const currentFactoryStatus = calculateFactoryStatus(factoryShipments, returnExchangeItems, quantity);
   const workStatus = calculateWorkStatus(workStartDate, workEndDate);
-  const commissionAmount = calculateCommissionAmount(unitPrice, quantity, commissionRate, backMargin);
-  const basicCostTotal = calculateBasicCostTotal(unitPrice, quantity, commissionRate, backMargin);
+  // 수수료 계산 (2025-01-06 이후 발주는 옵션비용과 인건비 포함, A레벨 전용 항목 제외)
+  const commissionAmount = calculateCommissionAmount(unitPrice, quantity, commissionRate, backMargin, orderDate, totalOptionCost, totalLaborCost, optionItems, laborCostItems);
+  // 기본 비용 계산 (2025-01-06 이후 발주는 수수료 미포함)
+  const basicCostTotal = calculateBasicCostTotal(unitPrice, quantity, commissionRate, backMargin, orderDate);
   const shippingCostTotal = calculateShippingCostTotal(
     shippingCost,
     warehouseShippingCost
   );
-  const finalPaymentAmount = calculateFinalPaymentAmount(basicCostTotal, shippingCostTotal, totalOptionCost, totalLaborCost);
+  // 최종 결제 금액 계산 (2025-01-06 이후 발주는 수수료 별도 포함)
+  const finalPaymentAmount = calculateFinalPaymentAmount(basicCostTotal, shippingCostTotal, totalOptionCost, totalLaborCost, commissionAmount, orderDate);
   const expectedFinalUnitPrice = calculateExpectedFinalUnitPrice(finalPaymentAmount, packingListShippingCost, quantity);
   // 선금 금액 = 발주단가 * 수량 * (선금 비율 / 100)
   // 발주단가 = 기본단가 + 백마진
@@ -1326,31 +1365,42 @@ export function PurchaseOrderDetail({
 
             
 
-            {/* 물류회사로 배송 탭 - 추후 수정 예정으로 주석처리 */}
-            {/*
+            {/* 연관 패킹리스트 탭 */}
             {activeTab === "delivery" && (
-              <LogisticsDeliveryTab
-                newPackingCode={newPackingCode}
-                newPackingDate={newPackingDate}
-                deliverySets={loadedDeliverySets}
-                hoveredImage={hoveredImage}
-                onSetNewPackingCode={setNewPackingCode}
-                onSetNewPackingDate={setNewPackingDate}
-                onAddDeliverySet={addDeliverySet}
-                onRemoveDeliverySet={removeDeliverySet}
-                onAddPackageInfo={addPackageInfo}
-                onUpdatePackageInfo={handleUpdatePackageInfo}
-                onRemovePackageInfo={removePackageInfo}
-                onAddLogisticsInfo={addLogisticsInfo}
-                onUpdateLogisticsInfo={handleUpdateLogisticsInfo}
-                onRemoveLogisticsInfo={removeLogisticsInfo}
-                onHandleLogisticsImageUpload={handleLogisticsImageUpload}
-                onRemoveLogisticsImage={removeLogisticsImage}
-                onSetSelectedImage={openLogisticsImageModal}
-                onSetHoveredImage={setHoveredImage}
-              />
+              <>
+                {console.log('[PurchaseOrderDetail] activeTab === "delivery", LogisticsDeliveryTab 렌더링 시도, relatedPackingLists:', relatedPackingLists?.length || 0)}
+                <LogisticsDeliveryTab
+                  newPackingCode={newPackingCode}
+                  newPackingDate={newPackingDate}
+                  deliverySets={loadedDeliverySets}
+                  hoveredImage={hoveredImage}
+                  relatedPackingLists={relatedPackingLists}
+                  isLoadingPackingLists={isLoadingPackingLists}
+                  onSetNewPackingCode={setNewPackingCode}
+                  onSetNewPackingDate={setNewPackingDate}
+                  onAddDeliverySet={addDeliverySet}
+                  onRemoveDeliverySet={removeDeliverySet}
+                  onAddPackageInfo={addPackageInfo}
+                  onUpdatePackageInfo={handleUpdatePackageInfo}
+                  onRemovePackageInfo={removePackageInfo}
+                  onAddLogisticsInfo={addLogisticsInfo}
+                  onUpdateLogisticsInfo={handleUpdateLogisticsInfo}
+                  onRemoveLogisticsInfo={removeLogisticsInfo}
+                  onHandleLogisticsImageUpload={handleLogisticsImageUpload}
+                  onRemoveLogisticsImage={removeLogisticsImage}
+                  onSetSelectedImage={openLogisticsImageModal}
+                  onSetHoveredImage={setHoveredImage}
+                  onPackingListClick={(code) => {
+                    navigate('/admin/shipping-history', { 
+                      state: { 
+                        searchTerm: code,
+                        initialPackingListCode: code 
+                      } 
+                    });
+                  }}
+                />
+              </>
             )}
-            */}
           </div>
         </div>
 

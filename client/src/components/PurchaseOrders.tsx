@@ -12,7 +12,8 @@ import { useDeletePurchaseOrder } from '../hooks/useDeletePurchaseOrder';
 import { formatDateForInput } from '../utils/dateUtils';
 import { CreatePurchaseOrderButton } from './purchase-order/CreatePurchaseOrderButton';
 import { 
-  calculateBasicCostTotal, 
+  calculateBasicCostTotal,
+  calculateCommissionAmount,
   calculateShippingCostTotal, 
   calculateFinalPaymentAmount,
   calculateExpectedFinalUnitPrice,
@@ -58,7 +59,7 @@ interface PurchaseOrder {
   warehouseShippingCost: number; // 창고 배송비
   factoryStatus: '출고대기' | '배송중' | '수령완료'; // 출고상태 (현재 주석 처리됨 - 추후 사용 예정)
   workStatus: '작업대기' | '작업중' | '완료';
-  deliveryStatus: '대기중' | '배송중' | '내륙운송중' | '항공운송중' | '해운운송중' | '통관및 배달' | '한국도착';
+  deliveryStatus: '대기중' | '내륙운송중' | '배송중' | '한국도착';
   paymentStatus: '미결제' | '선금결제' | '완료';
   orderStatus: '발주확인' | '발주 대기' | '취소됨';
   date: string;
@@ -69,6 +70,9 @@ interface PurchaseOrder {
   unreceivedQuantity?: number; // 미입고 수량 (발주 수량 - 업체 출고 수량)
   koreaArrivedQuantity?: number; // 한국도착 수량
   packingListShippingCost?: number; // 패킹리스트 배송비
+  estimatedDelivery?: string; // 예정 납기일
+  warehouseArrivalDate?: string | null; // 물류창고 도착일
+  hasKoreaArrival?: number | boolean; // 한국도착일 존재 여부
 }
 
 export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
@@ -210,9 +214,10 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             // 배송 상태 계산: 패킹리스트 정보를 기반으로 계산
             // 상세페이지와 동일한 로직 적용
             deliveryStatus: calculateDeliveryStatus(
-              po.shipped_quantity !== undefined ? Number(po.shipped_quantity) : 0,
-              po.shipping_quantity !== undefined ? Number(po.shipping_quantity) : 0,
-              po.delivery_status || '대기중'
+              (po.shipped_quantity !== undefined && Number(po.shipped_quantity) > 0), // hasPackingList
+              po.warehouse_arrival_date || null, // warehouseArrivalDate
+              (po.has_korea_arrival !== undefined && (Number(po.has_korea_arrival) > 0 || po.has_korea_arrival === true)), // hasKoreaArrival
+              po.delivery_status || '대기중' // defaultDeliveryStatus
             ),
             // 결제 상태 정규화: 유효한 값만 허용하고, 그 외는 '미결제'로 변환
             paymentStatus: (() => {
@@ -233,6 +238,11 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             shippingQuantity: po.shipping_quantity !== undefined ? Number(po.shipping_quantity) : undefined,
             unreceivedQuantity: po.unreceived_quantity !== undefined ? Number(po.unreceived_quantity) : undefined,
             koreaArrivedQuantity: po.arrived_quantity !== undefined ? Number(po.arrived_quantity) : undefined,
+            // 예정 납기일
+            estimatedDelivery: po.estimated_delivery ? formatDateForInput(po.estimated_delivery) : undefined,
+            // 패킹리스트 정보
+            warehouseArrivalDate: po.warehouse_arrival_date ? formatDateForInput(po.warehouse_arrival_date) : null,
+            hasKoreaArrival: po.has_korea_arrival !== undefined ? (Number(po.has_korea_arrival) > 0 || po.has_korea_arrival === true) : false,
           };
         });
         
@@ -683,7 +693,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     <div className="bg-purple-50 rounded-lg p-2.5 border border-purple-200">
                       <h4 className="text-xs text-purple-900 mb-2 pb-1.5 border-b border-purple-300">배송 상태</h4>
                       <div className="space-y-1.5">
-                        {['대기중', '내륙운송중', '항공운송중', '해운운송중', '통관및 배달', '한국도착'].map(status => (
+                        {['대기중', '내륙운송중', '배송중', '한국도착'].map(status => (
                           <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-purple-100 p-1 rounded">
                             <input
                               type="checkbox"
@@ -790,12 +800,24 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                 // 발주 단가 = 기본 단가 + 추가 단가
                 const orderUnitPrice = po.unitPrice + po.backMargin;
                 
+                // 수수료 계산 (2025-01-06 이후 발주는 옵션비용과 인건비 포함)
+                const commissionAmount = calculateCommissionAmount(
+                  po.unitPrice,
+                  po.quantity,
+                  po.commissionRate,
+                  po.backMargin,
+                  po.date,
+                  po.optionCost,
+                  po.laborCost
+                );
+                
                 // 최종 결제 금액 계산
                 const basicCostTotal = calculateBasicCostTotal(
                   po.unitPrice,
                   po.quantity,
                   po.commissionRate,
-                  po.backMargin
+                  po.backMargin,
+                  po.date
                 );
                 const shippingCostTotal = calculateShippingCostTotal(
                   po.shippingCost,
@@ -805,7 +827,9 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                   basicCostTotal,
                   shippingCostTotal,
                   po.optionCost,
-                  po.laborCost
+                  po.laborCost,
+                  commissionAmount,
+                  po.date
                 );
                 
                 // 예상최종단가 = (최종 결제 금액 + 패킹리스트 배송비) / 수량
@@ -905,7 +929,12 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     <td className="px-4 py-2 text-center text-gray-600">{po.weight ? `${po.weight}g` : '-'}</td>
                     <td className="px-4 py-2 text-center text-gray-600">{po.packaging.toLocaleString()}개</td>
                     <td className="px-4 py-2 text-center text-gray-600">
-                      {po.unreceivedQuantity !== undefined ? `${po.unreceivedQuantity}개` : '-'}
+                      <div className="flex flex-col gap-0.5">
+                        <span>{po.unreceivedQuantity !== undefined ? `${po.unreceivedQuantity}개` : '-'}</span>
+                        {po.estimatedDelivery && (
+                          <span className="text-xs text-gray-500">납기: {po.estimatedDelivery}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-2 text-center text-gray-600">
                       {po.unshippedQuantity !== undefined ? `${po.unshippedQuantity}개` : '-'}

@@ -189,5 +189,7 @@ export interface PurchaseOrderShippingSummary {
   arrived_quantity: number;
   unshipped_quantity: number;
   shipping_quantity: number;
+  warehouse_arrival_date?: Date | null;
+  has_korea_arrival?: number | boolean;
 }
 

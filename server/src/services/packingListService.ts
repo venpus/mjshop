@@ -493,6 +493,26 @@ export class PackingListService {
   }
 
   /**
+   * 발주 ID로 연결된 패킹리스트 목록 조회
+   */
+  async getPackingListsByPurchaseOrder(purchaseOrderId: string): Promise<Array<{
+    packing_list_id: number;
+    packing_list_code: string;
+    shipment_date: Date;
+    logistics_company: string | null;
+    warehouse_arrival_date: Date | null;
+    shipping_cost: number;
+    shipped_quantity: number;
+    korea_arrivals: Array<{
+      arrival_date: Date;
+      quantity: number;
+    }>;
+    delivery_status: string;
+  }>> {
+    return this.repository.findByPurchaseOrderId(purchaseOrderId);
+  }
+
+  /**
    * A레벨 관리자 비용 지불 완료 상태 업데이트
    */
   async updateAdminCostPaid(

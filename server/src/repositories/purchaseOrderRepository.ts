@@ -67,6 +67,8 @@ export class PurchaseOrderRepository {
     shipping_quantity: number;
     arrived_quantity: number;
     unreceived_quantity: number;
+    warehouse_arrival_date?: Date | null;
+    has_korea_arrival: number;
   }>> {
     let query = `SELECT 
         po.id, po.po_number, po.product_id, po.unit_price, po.back_margin,
@@ -87,13 +89,19 @@ export class PurchaseOrderRepository {
         COALESCE(summary.shipped_quantity, 0) AS shipped_quantity,
         COALESCE(summary.shipping_quantity, 0) AS shipping_quantity,
         COALESCE(summary.arrived_quantity, 0) AS arrived_quantity,
-        COALESCE(summary.unreceived_quantity, 0) AS unreceived_quantity
+        COALESCE(summary.unreceived_quantity, 0) AS unreceived_quantity,
+        -- 패킹리스트 정보 추가
+        MAX(pl.warehouse_arrival_date) AS warehouse_arrival_date,
+        CASE WHEN MAX(korea.id) IS NOT NULL THEN 1 ELSE 0 END AS has_korea_arrival
        FROM purchase_orders po
-       LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id`;
+       LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
+       LEFT JOIN packing_list_items pli ON po.id = pli.purchase_order_id
+       LEFT JOIN packing_lists pl ON pli.packing_list_id = pl.id
+       LEFT JOIN packing_list_korea_arrivals korea ON pli.id = korea.packing_list_item_id`;
     
     const params: any[] = [];
     
-    // 검색어가 있으면 WHERE 조건 추가
+    // 검색어가 있으면 WHERE 조건 추가 (GROUP BY 앞에 와야 함)
     if (searchTerm && searchTerm.trim()) {
       const searchPattern = `%${searchTerm.trim()}%`;
       query += ` WHERE (
@@ -104,7 +112,8 @@ export class PurchaseOrderRepository {
       params.push(searchPattern, searchPattern, searchPattern);
     }
     
-    query += ` ORDER BY po.order_date DESC, po.created_at DESC`;
+    query += ` GROUP BY po.id
+       ORDER BY po.order_date DESC, po.created_at DESC`;
     
     if (limit !== undefined) {
       query += ` LIMIT ?`;
@@ -121,6 +130,8 @@ export class PurchaseOrderRepository {
           shipping_quantity: Number(row.shipping_quantity) || 0,
           arrived_quantity: Number(row.arrived_quantity) || 0,
           unreceived_quantity: Number(row.unreceived_quantity) || 0,
+          warehouse_arrival_date: row.warehouse_arrival_date || null,
+          has_korea_arrival: Number(row.has_korea_arrival) || 0,
         }));
       } else {
         const [rows] = await pool.execute<any[]>(query, params);
@@ -132,6 +143,8 @@ export class PurchaseOrderRepository {
           shipping_quantity: Number(row.shipping_quantity) || 0,
           arrived_quantity: Number(row.arrived_quantity) || 0,
           unreceived_quantity: Number(row.unreceived_quantity) || 0,
+          warehouse_arrival_date: row.warehouse_arrival_date || null,
+          has_korea_arrival: Number(row.has_korea_arrival) || 0,
         }));
       }
     }
@@ -145,6 +158,8 @@ export class PurchaseOrderRepository {
       shipping_quantity: Number(row.shipping_quantity) || 0,
       arrived_quantity: Number(row.arrived_quantity) || 0,
       unreceived_quantity: Number(row.unreceived_quantity) || 0,
+      warehouse_arrival_date: row.warehouse_arrival_date || null,
+      has_korea_arrival: Number(row.has_korea_arrival) || 0,
     }));
   }
 

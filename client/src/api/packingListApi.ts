@@ -535,6 +535,8 @@ export interface PurchaseOrderShippingSummary {
   arrived_quantity: number;
   unshipped_quantity: number;
   shipping_quantity: number;
+  warehouse_arrival_date?: string | null;
+  has_korea_arrival?: number | boolean;
 }
 
 export async function getShippingCostByPurchaseOrder(
@@ -572,5 +574,47 @@ export async function getShippingSummaryByPurchaseOrder(
 
   const data = await response.json();
   return data.success ? data.data : null;
+}
+
+// 발주 ID로 연결된 패킹리스트 목록 조회
+export interface RelatedPackingList {
+  packing_list_id: number;
+  packing_list_code: string;
+  shipment_date: string;
+  logistics_company: string | null;
+  warehouse_arrival_date: string | null;
+  shipping_cost: number;
+  shipped_quantity: number;
+  korea_arrivals: Array<{
+    arrival_date: string;
+    quantity: number;
+  }>;
+  delivery_status: string;
+}
+
+export async function getPackingListsByPurchaseOrder(
+  purchaseOrderId: string
+): Promise<RelatedPackingList[]> {
+  console.log('[getPackingListsByPurchaseOrder] API 호출 시작, purchaseOrderId:', purchaseOrderId);
+  const response = await fetch(`${API_BASE_URL}/packing-lists/by-purchase-order/${purchaseOrderId}`, {
+    credentials: 'include',
+  });
+
+  console.log('[getPackingListsByPurchaseOrder] 응답 상태:', response.status, response.statusText);
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      console.log('[getPackingListsByPurchaseOrder] 404 응답 - 빈 배열 반환');
+      return [];
+    }
+    console.error('[getPackingListsByPurchaseOrder] 오류 응답:', response.status, response.statusText);
+    throw new Error('패킹리스트 목록 조회에 실패했습니다.');
+  }
+
+  const data = await response.json();
+  console.log('[getPackingListsByPurchaseOrder] 응답 데이터:', data);
+  const result = data.success ? (data.data || []) : [];
+  console.log('[getPackingListsByPurchaseOrder] 반환할 데이터:', result);
+  return result;
 }
 

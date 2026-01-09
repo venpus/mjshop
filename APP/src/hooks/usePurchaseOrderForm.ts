@@ -11,6 +11,7 @@ import {
   calculateFinalPaymentAmount,
   calculateExpectedFinalUnitPrice,
 } from '../utils/purchaseOrderCalculations';
+import { normalizePurchaseOrderFormData } from '../utils/dataNormalization';
 
 export interface PurchaseOrderFormData {
   // 기본 정보
@@ -85,28 +86,28 @@ export function usePurchaseOrderForm(
   const [formData, setFormData] = useState<PurchaseOrderFormData>(() => {
     if (!initialOrder) return initialFormData;
     
-    return {
-      unitPrice: initialOrder.unit_price || 0,
-      backMargin: initialOrder.back_margin || 0,
-      quantity: initialOrder.quantity || 0,
-      shippingCost: initialOrder.shipping_cost || 0,
-      warehouseShippingCost: initialOrder.warehouse_shipping_cost || 0,
-      commissionRate: initialOrder.commission_rate || 0,
-      commissionType: initialOrder.commission_type || '',
-      packaging: initialOrder.packaging || 0,
-      orderDate: initialOrder.order_date || '',
-      deliveryDate: initialOrder.delivery_date || '',
-      workStartDate: initialOrder.work_start_date || '',
-      workEndDate: initialOrder.work_end_date || '',
-      isOrderConfirmed: initialOrder.is_confirmed || false,
-      advancePaymentRate: initialOrder.advance_payment_rate || 0,
-      advancePaymentDate: initialOrder.advance_payment_date || '',
-      balancePaymentDate: initialOrder.balance_payment_date || '',
-      productName: initialOrder.product_name || '',
-      productSize: initialOrder.size || '',
-      productWeight: initialOrder.weight || '',
-      productPackagingSize: initialOrder.packaging?.toString() || '',
-    };
+    return normalizePurchaseOrderFormData({
+      unitPrice: initialOrder.unit_price,
+      backMargin: initialOrder.back_margin,
+      quantity: initialOrder.quantity,
+      shippingCost: initialOrder.shipping_cost,
+      warehouseShippingCost: initialOrder.warehouse_shipping_cost,
+      commissionRate: initialOrder.commission_rate,
+      commissionType: initialOrder.commission_type,
+      packaging: initialOrder.packaging,
+      orderDate: initialOrder.order_date,
+      deliveryDate: initialOrder.delivery_date,
+      workStartDate: initialOrder.work_start_date,
+      workEndDate: initialOrder.work_end_date,
+      isOrderConfirmed: initialOrder.is_confirmed,
+      advancePaymentRate: initialOrder.advance_payment_rate,
+      advancePaymentDate: initialOrder.advance_payment_date,
+      balancePaymentDate: initialOrder.balance_payment_date,
+      productName: initialOrder.product_name,
+      productSize: initialOrder.size,
+      productWeight: initialOrder.weight,
+      productPackagingSize: initialOrder.packaging?.toString(),
+    });
   });
 
   // 필드 업데이트 헬퍼
@@ -122,28 +123,28 @@ export function usePurchaseOrderForm(
 
   // 초기화 함수
   const initializeFromOrder = useCallback((order: PurchaseOrderDetail) => {
-    setFormData({
-      unitPrice: order.unit_price || 0,
-      backMargin: order.back_margin || 0,
-      quantity: order.quantity || 0,
-      shippingCost: order.shipping_cost || 0,
-      warehouseShippingCost: order.warehouse_shipping_cost || 0,
-      commissionRate: order.commission_rate || 0,
-      commissionType: order.commission_type || '',
-      packaging: order.packaging || 0,
-      orderDate: order.order_date || '',
-      deliveryDate: order.delivery_date || '',
-      workStartDate: order.work_start_date || '',
-      workEndDate: order.work_end_date || '',
-      isOrderConfirmed: order.is_confirmed || false,
-      advancePaymentRate: order.advance_payment_rate || 0,
-      advancePaymentDate: order.advance_payment_date || '',
-      balancePaymentDate: order.balance_payment_date || '',
-      productName: order.product_name || '',
-      productSize: order.size || '',
-      productWeight: order.weight || '',
-      productPackagingSize: order.packaging?.toString() || '',
-    });
+    setFormData(normalizePurchaseOrderFormData({
+      unitPrice: order.unit_price,
+      backMargin: order.back_margin,
+      quantity: order.quantity,
+      shippingCost: order.shipping_cost,
+      warehouseShippingCost: order.warehouse_shipping_cost,
+      commissionRate: order.commission_rate,
+      commissionType: order.commission_type,
+      packaging: order.packaging,
+      orderDate: order.order_date,
+      deliveryDate: order.delivery_date,
+      workStartDate: order.work_start_date,
+      workEndDate: order.work_end_date,
+      isOrderConfirmed: order.is_confirmed,
+      advancePaymentRate: order.advance_payment_rate,
+      advancePaymentDate: order.advance_payment_date,
+      balancePaymentDate: order.balance_payment_date,
+      productName: order.product_name,
+      productSize: order.size,
+      productWeight: order.weight,
+      productPackagingSize: order.packaging?.toString(),
+    }));
   }, []);
 
   // 계산된 값들

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -46,25 +46,39 @@ export function PaymentEditModal({
   
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  
+  // 초기 데이터 스냅샷 저장 (변경사항 감지용)
+  const initialDataRef = useRef<PaymentEditData>({
+    advancePaymentRate: initialData.advancePaymentRate || 0,
+    advancePaymentDate: initialData.advancePaymentDate || '',
+    balancePaymentDate: initialData.balancePaymentDate || '',
+  });
 
   // 초기 데이터가 변경되면 폼 데이터 업데이트
   useEffect(() => {
-    setFormData({
+    const normalizedInitialData: PaymentEditData = {
       advancePaymentRate: initialData.advancePaymentRate || 0,
       advancePaymentDate: initialData.advancePaymentDate || '',
       balancePaymentDate: initialData.balancePaymentDate || '',
-    });
+    };
+    
+    setFormData(normalizedInitialData);
+    initialDataRef.current = normalizedInitialData;
     setHasChanges(false);
   }, [initialData, visible]);
 
   // 변경사항 감지
   useEffect(() => {
+    const normalizeString = (val: string | null | undefined): string => String(val || '').trim();
+    const normalizeNumber = (val: number | null | undefined): number => Number(val || 0);
+    
+    const initial = initialDataRef.current;
     const changed =
-      formData.advancePaymentRate !== (initialData.advancePaymentRate || 0) ||
-      formData.advancePaymentDate !== (initialData.advancePaymentDate || '') ||
-      formData.balancePaymentDate !== (initialData.balancePaymentDate || '');
+      normalizeNumber(formData.advancePaymentRate) !== normalizeNumber(initial.advancePaymentRate) ||
+      normalizeString(formData.advancePaymentDate) !== normalizeString(initial.advancePaymentDate) ||
+      normalizeString(formData.balancePaymentDate) !== normalizeString(initial.balancePaymentDate);
     setHasChanges(changed);
-  }, [formData, initialData]);
+  }, [formData]);
 
   const handleSave = async () => {
     if (isSaving) return;

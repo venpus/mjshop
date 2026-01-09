@@ -621,6 +621,28 @@ export class PackingListController {
   };
 
   /**
+   * 발주 ID로 연결된 패킹리스트 목록 조회
+   * GET /api/packing-lists/by-purchase-order/:purchaseOrderId
+   */
+  getPackingListsByPurchaseOrder = async (req: Request, res: Response) => {
+    try {
+      const { purchaseOrderId } = req.params;
+      const packingLists = await this.service.getPackingListsByPurchaseOrder(purchaseOrderId);
+      
+      res.json({
+        success: true,
+        data: packingLists,
+      });
+    } catch (error) {
+      logger.error('패킹리스트 목록 조회 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: '패킹리스트 목록 조회 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  /**
    * 내륙송장 이미지 업로드
    * POST /api/packing-lists/:id/invoices/:invoiceId/images
    */

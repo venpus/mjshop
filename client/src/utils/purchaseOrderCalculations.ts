@@ -1,5 +1,6 @@
 import type { FactoryShipment, ReturnExchangeItem } from "../components/tabs/FactoryShippingTab";
 import type { LaborCostItem } from "../components/tabs/CostPaymentTab";
+import { isNewCommissionCalculationDate } from "./dateUtils";
 
 /**
  * 옵션 항목들의 총 비용을 계산합니다.
@@ -13,6 +14,26 @@ export function calculateTotalOptionCost(optionItems: LaborCostItem[]): number {
  */
 export function calculateTotalLaborCost(laborCostItems: LaborCostItem[]): number {
   return laborCostItems.reduce((sum, item) => sum + item.cost, 0);
+}
+
+/**
+ * 옵션 항목들의 총 비용을 계산합니다 (A레벨 관리자 전용 항목 제외).
+ * 수수료 계산 시 사용됩니다.
+ */
+export function calculateTotalOptionCostForCommission(optionItems: LaborCostItem[]): number {
+  return optionItems
+    .filter(item => !item.isAdminOnly)
+    .reduce((sum, item) => sum + item.cost, 0);
+}
+
+/**
+ * 인건비 항목들의 총 비용을 계산합니다 (A레벨 관리자 전용 항목 제외).
+ * 수수료 계산 시 사용됩니다.
+ */
+export function calculateTotalLaborCostForCommission(laborCostItems: LaborCostItem[]): number {
+  return laborCostItems
+    .filter(item => !item.isAdminOnly)
+    .reduce((sum, item) => sum + item.cost, 0);
 }
 
 /**
@@ -95,32 +116,67 @@ export function calculateFactoryStatusFromQuantity(
 
 /**
  * 기본 비용 총액을 계산합니다.
- * 기본 비용 = 발주단가 x (1 + 수수료율) x 수량
+ * 2025-01-06 이전: 기본 비용 = 발주단가 x (1 + 수수료율) x 수량
+ * 2025-01-06 이후: 기본 비용 = 발주단가 x 수량 (수수료는 별도 계산)
  * 발주단가 = 기본단가 + 추가단가
  */
 export function calculateBasicCostTotal(
   unitPrice: number,
   quantity: number,
   commissionRate: number,
-  backMargin: number
+  backMargin: number,
+  orderDate?: Date | string | null
 ): number {
   const orderUnitPrice = unitPrice + backMargin; // 발주단가
+  
+  // 2025-01-06 이후 발주는 수수료를 별도 계산하므로 기본 비용에는 수수료 미포함
+  if (orderDate && isNewCommissionCalculationDate(orderDate)) {
+    return orderUnitPrice * quantity;
+  }
+  
+  // 기존 방식: 수수료 포함
   return orderUnitPrice * quantity * (1 + commissionRate / 100);
 }
 
 /**
  * 수수료 금액을 계산합니다.
- * 수수료 금액 = 발주단가 x 수량 x 수수료율
+ * 2025-01-06 이전: 수수료 금액 = 발주단가 x 수량 x 수수료율
+ * 2025-01-06 이후: 수수료 금액 = ((발주단가 x 수량) + 포장 및 가공 부자재 총계 + 인건비 총계) x 수수료율
+ * 단, A레벨 관리자 전용 항목은 수수료 계산에서 제외됩니다.
  * 발주단가 = 기본단가 + 추가단가
  */
 export function calculateCommissionAmount(
   unitPrice: number,
   quantity: number,
   commissionRate: number,
-  backMargin: number
+  backMargin: number,
+  orderDate?: Date | string | null,
+  totalOptionCost: number = 0,
+  totalLaborCost: number = 0,
+  optionItems?: LaborCostItem[],
+  laborCostItems?: LaborCostItem[]
 ): number {
   const orderUnitPrice = unitPrice + backMargin; // 발주단가
-  return orderUnitPrice * quantity * (commissionRate / 100);
+  const baseAmount = orderUnitPrice * quantity;
+  
+  // 2025-01-06 이후 발주는 옵션비용과 인건비를 포함하여 수수료 계산
+  if (orderDate && isNewCommissionCalculationDate(orderDate)) {
+    // A레벨 관리자 전용 항목 제외한 옵션비용과 인건비 계산
+    let optionCostForCommission = totalOptionCost;
+    let laborCostForCommission = totalLaborCost;
+    
+    if (optionItems) {
+      optionCostForCommission = calculateTotalOptionCostForCommission(optionItems);
+    }
+    if (laborCostItems) {
+      laborCostForCommission = calculateTotalLaborCostForCommission(laborCostItems);
+    }
+    
+    return (baseAmount + optionCostForCommission + laborCostForCommission) * (commissionRate / 100);
+  }
+  
+  // 기존 방식: 발주단가 x 수량 x 수수료율
+  return baseAmount * (commissionRate / 100);
 }
 
 /**
@@ -136,14 +192,24 @@ export function calculateShippingCostTotal(
 
 /**
  * 최종 결제 금액을 계산합니다.
+ * 2025-01-06 이전: 기본비용(수수료 포함) + 운송비 + 옵션비용 + 인건비
+ * 2025-01-06 이후: 기본비용(수수료 미포함) + 수수료 + 운송비 + 옵션비용 + 인건비
  * 패킹리스트 배송비는 제외 (별도 관리)
  */
 export function calculateFinalPaymentAmount(
   basicCostTotal: number,
   shippingCostTotal: number,
   totalOptionCost: number,
-  totalLaborCost: number
+  totalLaborCost: number,
+  commissionAmount: number = 0,
+  orderDate?: Date | string | null
 ): number {
+  // 2025-01-06 이후 발주는 수수료를 별도로 더함
+  if (orderDate && isNewCommissionCalculationDate(orderDate)) {
+    return basicCostTotal + commissionAmount + shippingCostTotal + totalOptionCost + totalLaborCost;
+  }
+  
+  // 기존 방식: basicCostTotal에 이미 수수료가 포함되어 있음
   return basicCostTotal + shippingCostTotal + totalOptionCost + totalLaborCost;
 }
 
@@ -202,26 +268,35 @@ export function calculateBalancePaymentAmount(
  * 배송 상태를 계산합니다.
  * 패킹리스트 정보를 기반으로 배송 상태를 결정합니다.
  * 
- * @param shippedQuantity 패킹리스트 출고 수량
- * @param shippingQuantity 배송중 수량 (패킹리스트 출고 수량 - 한국도착 수량)
- * @param defaultDeliveryStatus DB에 저장된 기본 배송 상태
+ * @param hasPackingList 패킹리스트 존재 여부 (shippedQuantity > 0이면 패킹리스트 존재)
+ * @param warehouseArrivalDate 물류창고 도착일 (있으면 문자열, 없으면 null/undefined)
+ * @param hasKoreaArrival 한국도착일 존재 여부
+ * @param defaultDeliveryStatus DB에 저장된 기본 배송 상태 (패킹리스트가 없을 때 사용)
  * @returns 계산된 배송 상태
  */
 export function calculateDeliveryStatus(
-  shippedQuantity: number = 0,
-  shippingQuantity: number = 0,
+  hasPackingList: boolean = false,
+  warehouseArrivalDate?: string | null,
+  hasKoreaArrival: boolean = false,
   defaultDeliveryStatus: string = '대기중'
 ): string {
-  // 배송중 수량이 있으면 아직 도착하지 않은 것이므로 '배송중'
-  if (shippingQuantity > 0) {
-    return '배송중';
+  // 패킹리스트가 없으면 "대기중"
+  if (!hasPackingList) {
+    return defaultDeliveryStatus;
   }
   
-  // 패킹리스트 출고 수량이 있고, 배송중 수량이 없으면 모두 도착한 것이므로 '한국도착'
-  if (shippedQuantity > 0 && shippingQuantity === 0) {
+  // 패킹리스트가 있는 경우
+  // 우선순위 1: 한국도착일이 있으면 "한국도착"
+  if (hasKoreaArrival) {
     return '한국도착';
   }
   
-  // 그 외에는 DB의 기본 배송 상태 사용
-  return defaultDeliveryStatus;
+  // 우선순위 2: 물류창고 도착일이 있으면 "배송중"
+  if (warehouseArrivalDate && warehouseArrivalDate.trim() !== '') {
+    return '배송중';
+  }
+  
+  // 우선순위 3: 물류창고 도착일이 없으면 "내륙운송중"
+  // (물류창고 도착일이 없고 한국도착일도 없는 경우)
+  return '내륙운송중';
 }

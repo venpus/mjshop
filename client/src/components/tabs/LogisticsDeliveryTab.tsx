@@ -1,5 +1,8 @@
-import { Plus, Trash2, Truck, X } from "lucide-react";
+import { Plus, Trash2, Truck, X, Package, ExternalLink, Calendar, MapPin } from "lucide-react";
 import { useLogisticsOptions } from "../../hooks/useLogisticsOptions";
+import { RelatedPackingList } from "../../api/packingListApi";
+import { formatDateForInput } from "../../utils/dateUtils";
+import { handleNumberInput } from "../../utils/numberInputUtils";
 
 export interface PackageInfo {
   id: string;
@@ -36,6 +39,8 @@ interface LogisticsDeliveryTabProps {
   newPackingDate: string;
   deliverySets: DeliverySet[];
   hoveredImage: string;
+  relatedPackingLists?: RelatedPackingList[];
+  isLoadingPackingLists?: boolean;
   onSetNewPackingCode: (value: string) => void;
   onSetNewPackingDate: (value: string) => void;
   onAddDeliverySet: () => void;
@@ -50,6 +55,7 @@ interface LogisticsDeliveryTabProps {
   onRemoveLogisticsImage: (setId: string, logisticsId: string, imageIndex: number) => void;
   onSetSelectedImage: (image: string) => void;
   onSetHoveredImage: (image: string) => void;
+  onPackingListClick?: (packingListCode: string) => void;
 }
 
 export function LogisticsDeliveryTab({
@@ -57,6 +63,8 @@ export function LogisticsDeliveryTab({
   newPackingDate,
   deliverySets,
   hoveredImage,
+  relatedPackingLists = [],
+  isLoadingPackingLists = false,
   onSetNewPackingCode,
   onSetNewPackingDate,
   onAddDeliverySet,
@@ -71,11 +79,125 @@ export function LogisticsDeliveryTab({
   onRemoveLogisticsImage,
   onSetSelectedImage,
   onSetHoveredImage,
+  onPackingListClick,
 }: LogisticsDeliveryTabProps) {
+  console.log('[LogisticsDeliveryTab] 렌더링 시작:', { 
+    relatedPackingLists: relatedPackingLists?.length || 0, 
+    isLoadingPackingLists,
+    deliverySets: deliverySets?.length || 0 
+  });
+  
   const { inlandCompanies, warehouses, isLoading: optionsLoading } = useLogisticsOptions();
+  
+  console.log('[LogisticsDeliveryTab] useLogisticsOptions 완료:', {
+    inlandCompanies: inlandCompanies?.length || 0,
+    warehouses: warehouses?.length || 0,
+    optionsLoading
+  });
+
+  const getDeliveryStatusColor = (status: string) => {
+    switch (status) {
+      case '한국도착':
+        return 'bg-green-100 text-green-800';
+      case '배송중':
+        return 'bg-blue-100 text-blue-800';
+      case '내륙운송중':
+        return 'bg-indigo-100 text-indigo-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
 
   return (
     <div className="space-y-6">
+      {/* 연관 패킹리스트 목록 - 상단에 먼저 표시 */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Package className="w-5 h-5 text-orange-600" />
+          <h3 className="text-lg font-bold text-gray-900">연관 패킹리스트</h3>
+        </div>
+
+        {isLoadingPackingLists ? (
+          <div className="text-center py-8">
+            <p className="text-gray-500">로딩 중...</p>
+          </div>
+        ) : relatedPackingLists && relatedPackingLists.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">패킹리스트 코드</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">발송일</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">물류회사</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">물류창고 도착일</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">출고 수량</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">배송 상태</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">한국도착일</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">배송비</th>
+                </tr>
+              </thead>
+              <tbody>
+                {relatedPackingLists.map((pl) => (
+                  <tr key={pl.packing_list_id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      {onPackingListClick ? (
+                        <button
+                          onClick={() => onPackingListClick(pl.packing_list_code)}
+                          className="flex items-center gap-1 text-orange-600 hover:text-orange-700 font-medium hover:underline"
+                        >
+                          {pl.packing_list_code}
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      ) : (
+                        <span className="text-gray-900 font-medium">{pl.packing_list_code}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">
+                      {formatDateForInput(pl.shipment_date)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">
+                      {pl.logistics_company || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">
+                      {pl.warehouse_arrival_date ? formatDateForInput(pl.warehouse_arrival_date) : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-center text-gray-700">
+                      {pl.shipped_quantity.toLocaleString()}개
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${getDeliveryStatusColor(pl.delivery_status)}`}>
+                        {pl.delivery_status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">
+                      {pl.korea_arrivals && pl.korea_arrivals.length > 0 ? (
+                        <div className="space-y-1">
+                          {pl.korea_arrivals.map((arrival, idx) => (
+                            <div key={idx} className="text-sm">
+                              {formatDateForInput(arrival.arrival_date)} ({arrival.quantity}개)
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-700">
+                      ¥{pl.shipping_cost.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+            <Package className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+            <p className="text-gray-500">연관된 패킹리스트가 없습니다.</p>
+          </div>
+        )}
+      </div>
+
       {/* 포장 코드 및 날짜 입력 */}
       <div className="bg-orange-50 p-5 rounded-lg border border-orange-200">
         <div className="grid grid-cols-12 gap-6 items-end">

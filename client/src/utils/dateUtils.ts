@@ -108,3 +108,37 @@ export function getKSTDateString(): string {
   return getLocalDateString();
 }
 
+/**
+ * 발주일자가 2025-01-06 이후인지 확인합니다.
+ * 새로운 수수료 계산 방식 적용 기준일입니다.
+ * @param orderDate 발주일자 (YYYY-MM-DD 형식 문자열, Date 객체, 또는 null)
+ * @returns 2025-01-06 이후이면 true, 그렇지 않으면 false
+ */
+export function isNewCommissionCalculationDate(orderDate: Date | string | null | undefined): boolean {
+  if (!orderDate) return false;
+  
+  const targetDate = new Date('2025-01-06');
+  targetDate.setHours(0, 0, 0, 0);
+  
+  let compareDate: Date;
+  
+  if (typeof orderDate === 'string') {
+    // YYYY-MM-DD 형식의 문자열인 경우
+    if (/^\d{4}-\d{2}-\d{2}$/.test(orderDate)) {
+      compareDate = new Date(orderDate);
+    } else {
+      compareDate = new Date(orderDate);
+    }
+  } else {
+    compareDate = new Date(orderDate);
+  }
+  
+  if (isNaN(compareDate.getTime())) {
+    return false;
+  }
+  
+  compareDate.setHours(0, 0, 0, 0);
+  
+  return compareDate >= targetDate;
+}
+

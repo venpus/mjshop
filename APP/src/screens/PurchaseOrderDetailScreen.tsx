@@ -21,13 +21,15 @@ import { ProductInfoEditModal, type ProductInfoEditData } from '../components/pu
 import { UnitPriceEditModal, type UnitPriceEditData } from '../components/purchase-order/modals/UnitPriceEditModal';
 import { ShippingEditModal, type ShippingEditData } from '../components/purchase-order/modals/ShippingEditModal';
 import { PaymentEditModal, type PaymentEditData } from '../components/purchase-order/modals/PaymentEditModal';
-import { CostItemsEditModal, type CostItemsEditData } from '../components/purchase-order/modals/CostItemsEditModal';
+import { OptionItemsEditModal } from '../components/purchase-order/modals/OptionItemsEditModal';
+import { LaborCostItemsEditModal } from '../components/purchase-order/modals/LaborCostItemsEditModal';
 import { Input, NumberInput, DateInput, Select } from '../components/purchase-order/common';
 import { useMenuDrawer } from '../contexts/MenuDrawerContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts';
 import { colors, spacing } from '../constants';
 import { getPurchaseOrderDetail, type PurchaseOrderDetail, getFullImageUrl } from '../api/purchaseOrderApi';
+import { normalizePurchaseOrderFormData, normalizeDateValue } from '../utils/dataNormalization';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AdminStackParamList } from '../navigation/types';
 import {
@@ -76,7 +78,7 @@ export default function PurchaseOrderDetailScreen({
   const [returnExchangeItems, setReturnExchangeItems] = useState<ReturnExchangeItem[]>([]);
 
   // 편집 모달 상태
-  const [editingSection, setEditingSection] = useState<'product' | 'unitPrice' | 'shipping' | 'payment' | 'costItems' | null>(null);
+  const [editingSection, setEditingSection] = useState<'product' | 'unitPrice' | 'shipping' | 'payment' | 'optionItems' | 'laborCostItems' | null>(null);
 
   // 폼 상태 관리 Hook (항상 호출되어야 함)
   const {
@@ -114,10 +116,10 @@ export default function PurchaseOrderDetailScreen({
       setError(null);
       const data = await getPurchaseOrderDetail(id);
       setOrder(data);
-      // 폼 데이터 초기화
-      initializeFromOrder(data);
       
       // 비용 항목 로드
+      let formattedOptionItems: LaborCostItem[] = [];
+      let formattedLaborCostItems: LaborCostItem[] = [];
       try {
         const costItems = await getPurchaseOrderCostItems(id);
         const formatCostItem = (item: any): LaborCostItem => ({
@@ -129,92 +131,52 @@ export default function PurchaseOrderDetailScreen({
           isAdminOnly: item.is_admin_only || false,
         });
         
-        const formattedOptionItems = costItems.optionItems.map(formatCostItem);
-        const formattedLaborCostItems = costItems.laborCostItems.map(formatCostItem);
-        
-        setOptionItems(formattedOptionItems);
-        setLaborCostItems(formattedLaborCostItems);
-        
-        // 날짜 정규화 헬퍼 함수
-        const normalizeDateValue = (date: string | null | undefined): string => {
-          if (!date) return '';
-          // ISO 형식 (2026-01-05T16:00:00.000Z)을 YYYY-MM-DD로 변환
-          if (date.includes('T')) {
-            return date.split('T')[0];
-          }
-          // 이미 YYYY-MM-DD 형식이면 그대로 반환
-          if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            return date;
-          }
-          return date;
-        };
-
-        // 원본 데이터에 cost items 포함
-        setOriginalData({
-          unitPrice: data.unit_price || 0,
-          backMargin: data.back_margin || 0,
-          quantity: data.quantity || 0,
-          shippingCost: data.shipping_cost || 0,
-          warehouseShippingCost: data.warehouse_shipping_cost || 0,
-          commissionRate: data.commission_rate || 0,
-          commissionType: data.commission_type || '',
-          advancePaymentRate: data.advance_payment_rate || 0,
-          advancePaymentDate: normalizeDateValue(data.advance_payment_date),
-          balancePaymentDate: normalizeDateValue(data.balance_payment_date),
-          packaging: data.packaging || 0,
-          orderDate: normalizeDateValue(data.order_date),
-          deliveryDate: normalizeDateValue(data.delivery_date),
-          workStartDate: normalizeDateValue(data.work_start_date),
-          workEndDate: normalizeDateValue(data.work_end_date),
-          isOrderConfirmed: data.is_confirmed || false,
-          productName: data.product_name || '',
-          productSize: data.size || '',
-          productWeight: data.weight || '',
-          productPackagingSize: data.packaging?.toString() || '',
-          optionItems: formattedOptionItems,
-          laborCostItems: formattedLaborCostItems,
-        });
+        formattedOptionItems = costItems.optionItems.map(formatCostItem);
+        formattedLaborCostItems = costItems.laborCostItems.map(formatCostItem);
       } catch (costErr) {
         console.error('비용 항목 로드 실패:', costErr);
         // 비용 항목 로드 실패는 치명적이지 않으므로 계속 진행
-        // 날짜 정규화 헬퍼 함수
-        const normalizeDateValue = (date: string | null | undefined): string => {
-          if (!date) return '';
-          // ISO 형식 (2026-01-05T16:00:00.000Z)을 YYYY-MM-DD로 변환
-          if (date.includes('T')) {
-            return date.split('T')[0];
-          }
-          // 이미 YYYY-MM-DD 형식이면 그대로 반환
-          if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            return date;
-          }
-          return date;
-        };
-
-        // 원본 데이터 설정 (cost items 없이)
-        setOriginalData({
-          unitPrice: data.unit_price || 0,
-          backMargin: data.back_margin || 0,
-          quantity: data.quantity || 0,
-          shippingCost: data.shipping_cost || 0,
-          warehouseShippingCost: data.warehouse_shipping_cost || 0,
-          commissionRate: data.commission_rate || 0,
-          commissionType: data.commission_type || '',
-          advancePaymentRate: data.advance_payment_rate || 0,
-          advancePaymentDate: normalizeDateValue(data.advance_payment_date),
-          balancePaymentDate: normalizeDateValue(data.balance_payment_date),
-          packaging: data.packaging || 0,
-          orderDate: normalizeDateValue(data.order_date),
-          deliveryDate: normalizeDateValue(data.delivery_date),
-          workStartDate: normalizeDateValue(data.work_start_date),
-          workEndDate: normalizeDateValue(data.work_end_date),
-          isOrderConfirmed: data.is_confirmed || false,
-          productName: data.product_name || '',
-          productSize: data.size || '',
-          productWeight: data.weight || '',
-          productPackagingSize: data.packaging?.toString() || '',
-        });
       }
+
+      // 원본 데이터를 먼저 설정 (setIsDirty(false) 호출)
+      // 이렇게 하면 이후 formData, optionItems, laborCostItems 업데이트 시
+      // useEffect가 실행되어도 originalDataRef.current가 이미 업데이트되어 있어서
+      // checkForChanges()가 올바른 결과를 반환함
+      // normalizePurchaseOrderFormData를 사용하여 일관된 정규화 적용
+      const normalizedData = normalizePurchaseOrderFormData({
+        unitPrice: data.unit_price,
+        backMargin: data.back_margin,
+        quantity: data.quantity,
+        shippingCost: data.shipping_cost,
+        warehouseShippingCost: data.warehouse_shipping_cost,
+        commissionRate: data.commission_rate,
+        commissionType: data.commission_type,
+        advancePaymentRate: data.advance_payment_rate,
+        advancePaymentDate: data.advance_payment_date,
+        balancePaymentDate: data.balance_payment_date,
+        packaging: data.packaging,
+        orderDate: data.order_date,
+        deliveryDate: data.delivery_date,
+        workStartDate: data.work_start_date,
+        workEndDate: data.work_end_date,
+        isOrderConfirmed: data.is_confirmed,
+        productName: data.product_name,
+        productSize: data.size,
+        productWeight: data.weight,
+        productPackagingSize: data.packaging?.toString(),
+      });
+      setOriginalData({
+        ...normalizedData,
+        optionItems: formattedOptionItems,
+        laborCostItems: formattedLaborCostItems,
+      });
+
+      // 원본 데이터 설정 후 폼 데이터 및 비용 항목 업데이트
+      // 이제 originalDataRef.current가 이미 업데이트되어 있으므로
+      // useEffect가 실행되어도 checkForChanges()가 올바른 결과를 반환함
+      initializeFromOrder(data);
+      setOptionItems(formattedOptionItems);
+      setLaborCostItems(formattedLaborCostItems);
     } catch (err: any) {
       setError(err.message || '발주 상세 정보를 불러오는데 실패했습니다.');
     } finally {
@@ -497,11 +459,17 @@ export default function PurchaseOrderDetailScreen({
       // 발주 데이터 재로드
       await loadOrderDetail();
       Alert.alert('성공', confirmed ? '발주가 컨펌되었습니다.' : '발주 컨펌이 해제되었습니다.');
+      
+      // 목록 새로고침 트리거 (목록에서 온 경우)
+      if (shouldRefreshList) {
+        // navigation.navigate 대신 goBack 후 목록 화면에서 자동 새로고침
+        navigation.goBack();
+      }
     } catch (error: any) {
       console.error('발주 컨펌 변경 오류:', error);
       Alert.alert('오류', error.message || '발주 컨펌 상태 변경에 실패했습니다.');
     }
-  }, [id, loadOrderDetail]);
+  }, [id, loadOrderDetail, shouldRefreshList, navigation]);
 
   // 발주 취소 핸들러
   const handleCancelOrder = useCallback(async () => {
@@ -888,7 +856,8 @@ export default function PurchaseOrderDetailScreen({
           isSuperAdmin={user?.level === 'A-SuperAdmin'}
           canWrite={true}
           mode="read"
-          onEditClick={() => setEditingSection('costItems')}
+          onEditOptionItemsClick={() => setEditingSection('optionItems')}
+          onEditLaborCostItemsClick={() => setEditingSection('laborCostItems')}
         />
     </View>
   );
@@ -1106,7 +1075,7 @@ export default function PurchaseOrderDetailScreen({
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={handleRefresh}
+            onRefresh={isDirty ? undefined : handleRefresh} // 변경사항이 있을 때는 새로고침 비활성화
             tintColor={colors.primary}
           />
         }
@@ -1120,7 +1089,21 @@ export default function PurchaseOrderDetailScreen({
           <View style={styles.bottomSaveButton}>
             <Button
               title={isSaving ? '저장 중...' : '저장'}
-              onPress={handleSave}
+              onPress={async () => {
+                try {
+                  await handleSave();
+                  // 저장 후 데이터 재로드
+                  await loadOrderDetail();
+                  
+                  // 목록 새로고침 트리거 (목록에서 온 경우)
+                  if (shouldRefreshList) {
+                    // navigation.navigate 대신 goBack 후 목록 화면에서 자동 새로고침
+                    navigation.goBack();
+                  }
+                } catch (error) {
+                  // 에러는 handleSave에서 이미 처리됨
+                }
+              }}
               variant="primary"
               disabled={isSaving}
             />
@@ -1133,18 +1116,45 @@ export default function PurchaseOrderDetailScreen({
             visible={editingSection === 'product'}
             onClose={() => setEditingSection(null)}
             onSave={async (data: ProductInfoEditData) => {
-              // 폼 데이터 업데이트
+              // 최신 formData를 기반으로 업데이트된 데이터 생성
+              const updatedFormData = {
+                ...formData,
+                productName: data.productName,
+                productSize: data.size,
+                productWeight: data.weight,
+                packaging: data.packaging,
+                productPackagingSize: data.packagingSize || '',
+                orderDate: normalizeDateValue(data.orderDate),
+                deliveryDate: normalizeDateValue(data.deliveryDate),
+                quantity: data.quantity,
+              };
+              
+              // 폼 데이터 업데이트 (UI 반영용)
               updateField('productName', data.productName);
               updateField('productSize', data.size);
               updateField('productWeight', data.weight);
               updateField('packaging', data.packaging);
               updateField('productPackagingSize', data.packagingSize || '');
-              updateField('orderDate', data.orderDate);
-              updateField('deliveryDate', data.deliveryDate);
+              updateField('orderDate', normalizeDateValue(data.orderDate));
+              updateField('deliveryDate', normalizeDateValue(data.deliveryDate));
               updateField('quantity', data.quantity);
               
-              // 저장 실행
-              await handleSave();
+              // 저장 실행 (최신 데이터 직접 전달)
+              try {
+                await handleSave(true, { formData: updatedFormData });
+                
+                // 저장 후 데이터 재로드 및 모달 닫기
+                await loadOrderDetail();
+                setEditingSection(null);
+                
+                // 목록 새로고침 트리거
+                if (shouldRefreshList) {
+                  navigation.navigate('PurchaseOrders', { shouldRefresh: true });
+                }
+              } catch (error) {
+                // 에러는 handleSave에서 이미 처리됨
+                // 모달은 닫지 않음
+              }
             }}
             initialData={{
               productName: formData.productName || order.product_name || '',
@@ -1167,11 +1177,37 @@ export default function PurchaseOrderDetailScreen({
             visible={editingSection === 'unitPrice'}
             onClose={() => setEditingSection(null)}
             onSave={async (data: UnitPriceEditData) => {
+              // 최신 formData를 기반으로 업데이트된 데이터 생성
+              const updatedFormData = {
+                ...formData,
+                unitPrice: data.unitPrice,
+                backMargin: data.backMargin,
+                commissionType: data.commissionType,
+                commissionRate: data.commissionRate,
+              };
+              
+              // 폼 데이터 업데이트 (UI 반영용)
               updateField('unitPrice', data.unitPrice);
               updateField('backMargin', data.backMargin);
               updateField('commissionType', data.commissionType);
               updateField('commissionRate', data.commissionRate);
-              await handleSave();
+              
+              // 저장 실행 (최신 데이터 직접 전달)
+              try {
+                await handleSave(true, { formData: updatedFormData });
+                
+                // 저장 후 데이터 재로드 및 모달 닫기
+                await loadOrderDetail();
+                setEditingSection(null);
+                
+                // 목록 새로고침 트리거
+                if (shouldRefreshList) {
+                  navigation.navigate('PurchaseOrders', { shouldRefresh: true });
+                }
+              } catch (error) {
+                // 에러는 handleSave에서 이미 처리됨
+                // 모달은 닫지 않음
+              }
             }}
             initialData={{
               unitPrice: formData.unitPrice || order.unit_price || 0,
@@ -1189,9 +1225,33 @@ export default function PurchaseOrderDetailScreen({
             visible={editingSection === 'shipping'}
             onClose={() => setEditingSection(null)}
             onSave={async (data: ShippingEditData) => {
+              // 최신 formData를 기반으로 업데이트된 데이터 생성
+              const updatedFormData = {
+                ...formData,
+                shippingCost: data.shippingCost,
+                warehouseShippingCost: data.warehouseShippingCost,
+              };
+              
+              // 폼 데이터 업데이트 (UI 반영용)
               updateField('shippingCost', data.shippingCost);
               updateField('warehouseShippingCost', data.warehouseShippingCost);
-              await handleSave();
+              
+              // 저장 실행 (최신 데이터 직접 전달)
+              try {
+                await handleSave(true, { formData: updatedFormData });
+                
+                // 저장 후 데이터 재로드 및 모달 닫기
+                await loadOrderDetail();
+                setEditingSection(null);
+                
+                // 목록 새로고침 트리거
+                if (shouldRefreshList) {
+                  navigation.navigate('PurchaseOrders', { shouldRefresh: true });
+                }
+              } catch (error) {
+                // 에러는 handleSave에서 이미 처리됨
+                // 모달은 닫지 않음
+              }
             }}
             initialData={{
               shippingCost: formData.shippingCost || order.shipping_cost || 0,
@@ -1206,10 +1266,35 @@ export default function PurchaseOrderDetailScreen({
             visible={editingSection === 'payment'}
             onClose={() => setEditingSection(null)}
             onSave={async (data: PaymentEditData) => {
+              // 최신 formData를 기반으로 업데이트된 데이터 생성
+              const updatedFormData = {
+                ...formData,
+                advancePaymentRate: data.advancePaymentRate,
+                advancePaymentDate: normalizeDateValue(data.advancePaymentDate),
+                balancePaymentDate: normalizeDateValue(data.balancePaymentDate),
+              };
+              
+              // 폼 데이터 업데이트 (UI 반영용)
               updateField('advancePaymentRate', data.advancePaymentRate);
-              updateField('advancePaymentDate', data.advancePaymentDate);
-              updateField('balancePaymentDate', data.balancePaymentDate);
-              await handleSave();
+              updateField('advancePaymentDate', normalizeDateValue(data.advancePaymentDate));
+              updateField('balancePaymentDate', normalizeDateValue(data.balancePaymentDate));
+              
+              // 저장 실행 (최신 데이터 직접 전달)
+              try {
+                await handleSave(true, { formData: updatedFormData });
+                
+                // 저장 후 데이터 재로드 및 모달 닫기
+                await loadOrderDetail();
+                setEditingSection(null);
+                
+                // 목록 새로고침 트리거
+                if (shouldRefreshList) {
+                  navigation.navigate('PurchaseOrders', { shouldRefresh: true });
+                }
+              } catch (error) {
+                // 에러는 handleSave에서 이미 처리됨
+                // 모달은 닫지 않음
+              }
             }}
             initialData={{
               advancePaymentRate: formData.advancePaymentRate || order.advance_payment_rate || 0,
@@ -1219,20 +1304,64 @@ export default function PurchaseOrderDetailScreen({
           />
         )}
 
-        {/* 비용 항목 편집 모달 */}
+        {/* 포장 및 가공 부자재 편집 모달 */}
         {order && (
-          <CostItemsEditModal
-            visible={editingSection === 'costItems'}
+          <OptionItemsEditModal
+            visible={editingSection === 'optionItems'}
             onClose={() => setEditingSection(null)}
-            onSave={async (data: CostItemsEditData) => {
-              setOptionItems(data.optionItems);
-              setLaborCostItems(data.laborCostItems);
-              await handleSave();
+            onSave={async (data) => {
+              // 상태 업데이트 (UI 반영용)
+              setOptionItems(data);
+              
+              // 저장 실행 (최신 데이터 직접 전달)
+              try {
+                await handleSave(true, { optionItems: data });
+                
+                // 저장 후 데이터 재로드 및 모달 닫기
+                await loadOrderDetail();
+                setEditingSection(null);
+                
+                // 목록 새로고침 트리거
+                if (shouldRefreshList) {
+                  navigation.navigate('PurchaseOrders', { shouldRefresh: true });
+                }
+              } catch (error) {
+                // 에러는 handleSave에서 이미 처리됨
+                // 모달은 닫지 않음
+              }
             }}
-            initialData={{
-              optionItems: optionItems,
-              laborCostItems: laborCostItems,
+            initialData={optionItems}
+            isSuperAdmin={user?.level === 'A-SuperAdmin'}
+          />
+        )}
+
+        {/* 인건비 편집 모달 */}
+        {order && (
+          <LaborCostItemsEditModal
+            visible={editingSection === 'laborCostItems'}
+            onClose={() => setEditingSection(null)}
+            onSave={async (data) => {
+              // 상태 업데이트 (UI 반영용)
+              setLaborCostItems(data);
+              
+              // 저장 실행 (최신 데이터 직접 전달)
+              try {
+                await handleSave(true, { laborCostItems: data });
+                
+                // 저장 후 데이터 재로드 및 모달 닫기
+                await loadOrderDetail();
+                setEditingSection(null);
+                
+                // 목록 새로고침 트리거
+                if (shouldRefreshList) {
+                  navigation.navigate('PurchaseOrders', { shouldRefresh: true });
+                }
+              } catch (error) {
+                // 에러는 handleSave에서 이미 처리됨
+                // 모달은 닫지 않음
+              }
             }}
+            initialData={laborCostItems}
             isSuperAdmin={user?.level === 'A-SuperAdmin'}
           />
         )}

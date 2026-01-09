@@ -70,5 +70,8 @@ router.get('/shipping-cost/:purchaseOrderId', controller.getShippingCostByPurcha
 // 발주별 배송 수량 집계 조회
 router.get('/shipping-summary/:purchaseOrderId', controller.getShippingSummaryByPurchaseOrder);
 
+// 발주 ID로 연결된 패킹리스트 목록 조회
+router.get('/by-purchase-order/:purchaseOrderId', controller.getPackingListsByPurchaseOrder);
+
 export default router;
 

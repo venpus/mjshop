@@ -139,20 +139,28 @@ const PurchaseOrdersScreen: React.FC<PurchaseOrdersScreenProps> = ({ navigation,
     loadPurchaseOrders(1, activeSearchTerm, false, filters.orderStatus);
   }, [activeSearchTerm, filters.orderStatus, loadPurchaseOrders]);
 
-  // 화면이 포커스될 때 새로고침 (발주 생성 후 목록으로 돌아올 때)
+  // 화면이 포커스될 때 새로고침 (발주 생성/수정 후 목록으로 돌아올 때)
   useFocusEffect(
     useCallback(() => {
-      // route.params에서 shouldRefresh 플래그 확인
-      if (route.params?.shouldRefresh) {
-        // 플래그 제거 (다음 포커스 시에는 새로고침하지 않음)
-        navigation.setParams({ shouldRefresh: false });
-        // 목록 새로고침
-        setCurrentPage(1);
-        setPurchaseOrders([]);
-        loadPurchaseOrders(1, activeSearchTerm, false, filters.orderStatus);
-      }
-    }, [route.params?.shouldRefresh, navigation, activeSearchTerm, filters.orderStatus, loadPurchaseOrders])
+      // 화면이 포커스될 때마다 목록 새로고침 (발주 상세에서 돌아올 때 변경사항 반영)
+      setCurrentPage(1);
+      setPurchaseOrders([]);
+      loadPurchaseOrders(1, activeSearchTerm, false, filters.orderStatus);
+    }, [activeSearchTerm, filters.orderStatus, loadPurchaseOrders])
   );
+
+  // route.params가 변경될 때도 새로고침 (같은 화면에서 파라미터만 변경된 경우)
+  useEffect(() => {
+    if (route.params?.shouldRefresh) {
+      // 목록 새로고침
+      setCurrentPage(1);
+      setPurchaseOrders([]);
+      loadPurchaseOrders(1, activeSearchTerm, false, filters.orderStatus).then(() => {
+        // 새로고침 완료 후 플래그 제거
+        navigation.setParams({ shouldRefresh: false });
+      });
+    }
+  }, [route.params?.shouldRefresh, navigation, activeSearchTerm, filters.orderStatus, loadPurchaseOrders]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);

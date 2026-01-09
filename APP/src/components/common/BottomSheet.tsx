@@ -67,45 +67,49 @@ export function BottomSheet({
       animationType="none"
       onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback onPress={() => {}}>
-            <Animated.View
-              style={[
-                styles.sheet,
-                {
-                  height: sheetHeight,
-                  transform: [{ translateY: slideAnim }],
-                },
-              ]}
-            >
-              {/* 핸들 바 */}
-              <View style={styles.handleContainer}>
-                <View style={styles.handle} />
-              </View>
+      <View style={styles.overlay}>
+        {/* 오버레이 배경 - 클릭 시 닫기 */}
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={styles.overlayBackground} />
+        </TouchableWithoutFeedback>
+        
+        {/* 시트 영역 - 스크롤 가능하도록 터치 이벤트 가로채지 않음 */}
+        <Animated.View
+          style={[
+            styles.sheet,
+            {
+              height: sheetHeight,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+          onStartShouldSetResponder={() => false}
+          onMoveShouldSetResponder={() => false}
+        >
+          {/* 핸들 바 */}
+          <View style={styles.handleContainer}>
+            <View style={styles.handle} />
+          </View>
 
-              {/* 헤더 */}
-              {title && (
-                <View style={styles.header}>
-                  <Text style={styles.title}>{title}</Text>
-                  <TouchableOpacity
-                    onPress={onClose}
-                    style={styles.closeButton}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.closeButtonText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+          {/* 헤더 */}
+          {title && (
+            <View style={styles.header}>
+              <Text style={styles.title}>{title}</Text>
+              <TouchableOpacity
+                onPress={onClose}
+                style={styles.closeButton}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-              {/* 내용 */}
-              <View style={styles.content}>
-                {children}
-              </View>
-            </Animated.View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+          {/* 내용 */}
+          <View style={styles.content}>
+            {children}
+          </View>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
@@ -113,8 +117,11 @@ export function BottomSheet({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
+  },
+  overlayBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   sheet: {
     backgroundColor: colors.white,

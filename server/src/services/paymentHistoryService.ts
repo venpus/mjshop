@@ -3,7 +3,7 @@ import { PackingListRepository } from '../repositories/packingListRepository.js'
 import { PaymentRequestRepository } from '../repositories/paymentRequestRepository.js';
 import { pool } from '../config/database.js';
 import { RowDataPacket } from 'mysql2';
-import { formatDateToKSTString } from '../utils/dateUtils.js';
+import { formatDateToKSTString, isNewCommissionCalculationDate } from '../utils/dateUtils.js';
 
 export interface AdminCostItem {
   id: number;
@@ -12,6 +12,7 @@ export interface AdminCostItem {
   unit_price: number;
   quantity: number;
   cost: number;
+  is_admin_only?: boolean; // A레벨 관리자 전용 항목 여부
 }
 
 export interface PaymentHistoryItem {
@@ -212,49 +213,60 @@ export class PaymentHistoryService {
     const itemsMap = new Map<string, PaymentHistoryItem>();
 
     for (const row of rows) {
-      // A레벨 관리자 입력 항목 조회
-      const [costItems] = await pool.execute<RowDataPacket[]>(
-        `SELECT id, item_type, name, unit_price, quantity, cost
+      // 모든 비용 항목 조회 (일반 + A레벨 전용, is_admin_only 정보 포함)
+      const [allCostItems] = await pool.execute<RowDataPacket[]>(
+        `SELECT id, item_type, name, unit_price, quantity, cost, is_admin_only
          FROM po_cost_items
-         WHERE purchase_order_id = ? AND is_admin_only = 1
+         WHERE purchase_order_id = ?
          ORDER BY item_type, display_order`,
         [row.id]
       );
+      
+      const backMargin = row.back_margin ? Number(row.back_margin) : 0;
+      const quantity = row.quantity ? Number(row.quantity) : 0;
+      const backMarginTotal = backMargin * quantity; // 추가단가 * 수량
 
-      const adminCostItems: AdminCostItem[] = costItems.map((item) => ({
+      // 모든 항목을 AdminCostItem 형식으로 변환 (is_admin_only 정보 포함)
+      const allAdminCostItems: AdminCostItem[] = allCostItems.map((item) => ({
         id: item.id,
         item_type: item.item_type,
         name: item.name,
         unit_price: Number(item.unit_price),
         quantity: item.quantity,
         cost: Number(item.cost),
+        is_admin_only: item.is_admin_only === 1,
       }));
-
-      // A레벨 관리자 비용 합계 계산 (추가단가 * 수량 + A레벨 관리자 입력 비용)
-      const adminCostTotal = adminCostItems.reduce((sum, item) => sum + item.cost, 0);
-      const backMargin = row.back_margin ? Number(row.back_margin) : 0;
-      const quantity = row.quantity ? Number(row.quantity) : 0;
-      const backMarginTotal = backMargin * quantity; // 추가단가 * 수량
-      const adminTotalCost = backMarginTotal + adminCostTotal;
-
-      // 옵션 비용과 인건비 합계 계산 (발주관리와 동일: 모든 항목 포함)
-      const [allCostItems] = await pool.execute<RowDataPacket[]>(
-        `SELECT item_type, SUM(cost) as total_cost
-         FROM po_cost_items
-         WHERE purchase_order_id = ?
-         GROUP BY item_type`,
-        [row.id]
-      );
-
+      
+      // 옵션 비용과 인건비 합계 계산
       let totalOptionCost = 0;
       let totalLaborCost = 0;
-      for (const costItem of allCostItems) {
+      let totalOptionCostForCommission = 0; // 수수료 계산용 (A레벨 전용 제외)
+      let totalLaborCostForCommission = 0; // 수수료 계산용 (A레벨 전용 제외)
+      
+      for (const costItem of allAdminCostItems) {
+        const cost = costItem.cost;
+        const isAdminOnly = costItem.is_admin_only === true;
+        
         if (costItem.item_type === 'option') {
-          totalOptionCost += Number(costItem.total_cost) || 0;
+          totalOptionCost += cost;
+          // A레벨 관리자 전용 항목은 수수료 계산에서 제외
+          if (!isAdminOnly) {
+            totalOptionCostForCommission += cost;
+          }
         } else if (costItem.item_type === 'labor') {
-          totalLaborCost += Number(costItem.total_cost) || 0;
+          totalLaborCost += cost;
+          // A레벨 관리자 전용 항목은 수수료 계산에서 제외
+          if (!isAdminOnly) {
+            totalLaborCostForCommission += cost;
+          }
         }
       }
+      
+      // A레벨 관리자 비용 합계 계산 (추가단가 * 수량 + A레벨 관리자 입력 비용)
+      const adminCostTotal = allAdminCostItems
+        .filter(item => item.is_admin_only)
+        .reduce((sum, item) => sum + item.cost, 0);
+      const adminTotalCost = backMarginTotal + adminCostTotal;
 
       // 패킹리스트 배송비 계산 (발주관리와 동일: v_purchase_order_packing_shipping_cost 뷰 사용)
       const [packingListShippingData] = await pool.execute<RowDataPacket[]>(
@@ -274,13 +286,37 @@ export class PaymentHistoryService {
         packingListShippingCost = unitShippingCost * orderedQuantity;
       }
 
+      // 2025-01-06 이후 발주 여부 확인 (클라이언트와 동일한 로직 사용)
+      const isNewCommissionDate = isNewCommissionCalculationDate(row.order_date);
+      
       // 발주금액 계산 (발주관리 화면과 동일한 방식)
       const unitPrice = Number(row.unit_price) || 0;
       const commissionRate = Number(row.commission_rate) || 0;
       const orderUnitPrice = unitPrice + backMargin; // 발주단가
-      const basicCostTotal = orderUnitPrice * quantity * (1 + commissionRate / 100); // 기본 비용 총액
+      
+      let commissionAmount = 0;
+      let basicCostTotal = 0;
+      
+      if (isNewCommissionDate) {
+        // 2025-01-06 이후: 수수료 = ((발주단가 × 수량) + 옵션비용 + 인건비) × 수수료율
+        // A레벨 관리자 전용 항목은 수수료 계산에서 제외
+        const baseAmount = orderUnitPrice * quantity;
+        commissionAmount = (baseAmount + totalOptionCostForCommission + totalLaborCostForCommission) * (commissionRate / 100);
+        // 기본 비용에는 수수료 미포함
+        basicCostTotal = baseAmount;
+      } else {
+        // 기존 방식: 기본 비용 = 발주단가 × 수량 × (1 + 수수료율)
+        basicCostTotal = orderUnitPrice * quantity * (1 + commissionRate / 100);
+        commissionAmount = orderUnitPrice * quantity * (commissionRate / 100);
+      }
+      
       const shippingCostTotal = (Number(row.shipping_cost) || 0) + (Number(row.warehouse_shipping_cost) || 0); // 배송비 총액
-      const finalPaymentAmount = basicCostTotal + shippingCostTotal + totalOptionCost + totalLaborCost; // 발주금액
+      // 최종 결제 금액
+      // 2025-01-06 이후: 기본비용 + 수수료 + 배송비 + 옵션비용 + 인건비
+      // 기존: 기본비용(수수료 포함) + 배송비 + 옵션비용 + 인건비
+      const finalPaymentAmount = isNewCommissionDate
+        ? basicCostTotal + commissionAmount + shippingCostTotal + totalOptionCost + totalLaborCost
+        : basicCostTotal + shippingCostTotal + totalOptionCost + totalLaborCost;
 
       // 최종 예상단가 계산 (발주관리 화면과 동일한 방식)
       const expectedFinalUnitPrice = quantity > 0 
@@ -361,7 +397,7 @@ export class PaymentHistoryService {
           commission_rate: Number(row.commission_rate),
           shipping_cost: Number(row.shipping_cost),
           warehouse_shipping_cost: Number(row.warehouse_shipping_cost),
-          admin_cost_items: adminCostItems.length > 0 ? adminCostItems : undefined,
+          admin_cost_items: allAdminCostItems.length > 0 ? allAdminCostItems : undefined,
           admin_total_cost: adminTotalCost > 0 ? adminTotalCost : undefined,
           admin_cost_paid: row.admin_cost_paid ? Boolean(row.admin_cost_paid) : false,
           admin_cost_paid_date: row.admin_cost_paid_date

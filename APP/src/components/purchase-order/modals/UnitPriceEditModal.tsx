@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -53,34 +53,42 @@ export function UnitPriceEditModal({
   
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-
-  // 디버깅: visible 상태 확인
-  useEffect(() => {
-    if (visible) {
-      console.log('UnitPriceEditModal: visible = true');
-    }
-  }, [visible]);
+  
+  // 초기 데이터 스냅샷 저장 (변경사항 감지용)
+  const initialDataRef = useRef<UnitPriceEditData>({
+    unitPrice: initialData.unitPrice || 0,
+    backMargin: initialData.backMargin || 0,
+    commissionType: initialData.commissionType || '',
+    commissionRate: initialData.commissionRate || 0,
+  });
 
   // 초기 데이터가 변경되면 폼 데이터 업데이트
   useEffect(() => {
-    setFormData({
+    const normalizedInitialData: UnitPriceEditData = {
       unitPrice: initialData.unitPrice || 0,
       backMargin: initialData.backMargin || 0,
       commissionType: initialData.commissionType || '',
       commissionRate: initialData.commissionRate || 0,
-    });
+    };
+    
+    setFormData(normalizedInitialData);
+    initialDataRef.current = normalizedInitialData;
     setHasChanges(false);
   }, [initialData, visible]);
 
   // 변경사항 감지
   useEffect(() => {
+    const normalizeString = (val: string | null | undefined): string => String(val || '').trim();
+    const normalizeNumber = (val: number | null | undefined): number => Number(val || 0);
+    
+    const initial = initialDataRef.current;
     const changed =
-      formData.unitPrice !== (initialData.unitPrice || 0) ||
-      formData.backMargin !== (initialData.backMargin || 0) ||
-      formData.commissionType !== (initialData.commissionType || '') ||
-      formData.commissionRate !== (initialData.commissionRate || 0);
+      normalizeNumber(formData.unitPrice) !== normalizeNumber(initial.unitPrice) ||
+      normalizeNumber(formData.backMargin) !== normalizeNumber(initial.backMargin) ||
+      normalizeString(formData.commissionType) !== normalizeString(initial.commissionType) ||
+      normalizeNumber(formData.commissionRate) !== normalizeNumber(initial.commissionRate);
     setHasChanges(changed);
-  }, [formData, initialData]);
+  }, [formData]);
 
   const commissionOptions = [
     { label: '5%', value: '5' },

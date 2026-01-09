@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -43,23 +43,35 @@ export function ShippingEditModal({
   
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  
+  // 초기 데이터 스냅샷 저장 (변경사항 감지용)
+  const initialDataRef = useRef<ShippingEditData>({
+    shippingCost: initialData.shippingCost || 0,
+    warehouseShippingCost: initialData.warehouseShippingCost || 0,
+  });
 
   // 초기 데이터가 변경되면 폼 데이터 업데이트
   useEffect(() => {
-    setFormData({
+    const normalizedInitialData: ShippingEditData = {
       shippingCost: initialData.shippingCost || 0,
       warehouseShippingCost: initialData.warehouseShippingCost || 0,
-    });
+    };
+    
+    setFormData(normalizedInitialData);
+    initialDataRef.current = normalizedInitialData;
     setHasChanges(false);
   }, [initialData, visible]);
 
   // 변경사항 감지
   useEffect(() => {
+    const normalizeNumber = (val: number | null | undefined): number => Number(val || 0);
+    
+    const initial = initialDataRef.current;
     const changed =
-      formData.shippingCost !== (initialData.shippingCost || 0) ||
-      formData.warehouseShippingCost !== (initialData.warehouseShippingCost || 0);
+      normalizeNumber(formData.shippingCost) !== normalizeNumber(initial.shippingCost) ||
+      normalizeNumber(formData.warehouseShippingCost) !== normalizeNumber(initial.warehouseShippingCost);
     setHasChanges(changed);
-  }, [formData, initialData]);
+  }, [formData]);
 
   const handleSave = async () => {
     if (isSaving) return;

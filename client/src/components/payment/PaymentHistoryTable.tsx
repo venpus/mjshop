@@ -399,15 +399,55 @@ export function PaymentHistoryTable({ type, onStatisticsRefresh, userLevel }: Pa
         const quantity = item.quantity || 0;
         const commissionRate = item.commission_rate || 0;
         
+        // 옵션비용과 인건비 계산 (admin_cost_items에서)
+        // admin_cost_items에는 이제 모든 항목(일반 + A레벨)이 포함되며, is_admin_only 필드로 구분됨
+        // A레벨 관리자 전용 항목은 수수료 계산에서 제외
+        let totalOptionCost = 0;
+        let totalLaborCost = 0;
+        const optionItemsForCommission: Array<{ id: string; cost: number; isAdminOnly?: boolean }> = [];
+        const laborCostItemsForCommission: Array<{ id: string; cost: number; isAdminOnly?: boolean }> = [];
+        
+        if (item.admin_cost_items && item.admin_cost_items.length > 0) {
+          item.admin_cost_items.forEach(costItem => {
+            const isAdminOnly = costItem.is_admin_only === true;
+            if (costItem.item_type === 'option') {
+              totalOptionCost += costItem.cost || 0;
+              // A레벨 관리자 전용 항목은 수수료 계산에서 제외
+              if (!isAdminOnly) {
+                optionItemsForCommission.push({
+                  id: String(costItem.id),
+                  cost: costItem.cost || 0,
+                  isAdminOnly: false
+                });
+              }
+            } else if (costItem.item_type === 'labor') {
+              totalLaborCost += costItem.cost || 0;
+              // A레벨 관리자 전용 항목은 수수료 계산에서 제외
+              if (!isAdminOnly) {
+                laborCostItemsForCommission.push({
+                  id: String(costItem.id),
+                  cost: costItem.cost || 0,
+                  isAdminOnly: false
+                });
+              }
+            }
+          });
+        }
+        
         // 발주단가 계산
         const orderUnitPrice = unitPrice + backMargin;
 
-        // 발주관리와 동일한 계산 방식 사용
+        // 발주관리와 동일한 계산 방식 사용 (날짜 조건 포함, A레벨 전용 항목 제외)
         const commission = calculateCommissionAmount(
           unitPrice,
           quantity,
           commissionRate,
-          backMargin
+          backMargin,
+          item.order_date || null,
+          totalOptionCost,
+          totalLaborCost,
+          optionItemsForCommission as any,
+          laborCostItemsForCommission as any
         );
 
         totalCommission += commission;

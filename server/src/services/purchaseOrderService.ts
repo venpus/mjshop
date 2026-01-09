@@ -8,7 +8,7 @@ import {
   ReorderPurchaseOrderDTO,
 } from '../models/purchaseOrder.js';
 import { RowDataPacket } from 'mysql2';
-import { getKSTDateString } from '../utils/dateUtils.js';
+import { getKSTDateString, formatDateToKSTString, isNewCommissionCalculationDate } from '../utils/dateUtils.js';
 
 export class PurchaseOrderService {
   private repository: PurchaseOrderRepository;
@@ -52,6 +52,8 @@ export class PurchaseOrderService {
         shipping_quantity: po.shipping_quantity,
         arrived_quantity: po.arrived_quantity,
         unreceived_quantity: po.unreceived_quantity,
+        warehouse_arrival_date: po.warehouse_arrival_date ? formatDateToKSTString(po.warehouse_arrival_date) : null,
+        has_korea_arrival: po.has_korea_arrival || 0,
       };
     }));
 
@@ -572,19 +574,48 @@ export class PurchaseOrderService {
       const totalLaborCost = costItems
         .filter(item => item.item_type === 'labor')
         .reduce((sum, item) => sum + item.cost, 0);
+      
+      // 수수료 계산용: A레벨 관리자 전용 항목 제외
+      const totalOptionCostForCommission = costItems
+        .filter(item => item.item_type === 'option' && !item.is_admin_only)
+        .reduce((sum, item) => sum + item.cost, 0);
+      const totalLaborCostForCommission = costItems
+        .filter(item => item.item_type === 'labor' && !item.is_admin_only)
+        .reduce((sum, item) => sum + item.cost, 0);
 
       // 발주단가 계산
       const orderUnitPrice = po.order_unit_price || ((po.unit_price || 0) + (po.back_margin || 0));
       
-      // 기본 비용 총액 계산
+      // 2025-01-06 이후 발주 여부 확인 (클라이언트와 동일한 로직 사용)
+      const isNewCommissionDate = isNewCommissionCalculationDate(po.order_date);
+      
+      // 수수료 계산
       const commissionRate = po.commission_rate || 0;
-      const basicCostTotal = orderUnitPrice * po.quantity * (1 + commissionRate / 100);
+      let commissionAmount = 0;
+      let basicCostTotal = 0;
+      
+      if (isNewCommissionDate) {
+        // 2025-01-06 이후: 수수료 = ((발주단가 × 수량) + 옵션비용 + 인건비) × 수수료율
+        // A레벨 관리자 전용 항목은 수수료 계산에서 제외
+        const baseAmount = orderUnitPrice * po.quantity;
+        commissionAmount = (baseAmount + totalOptionCostForCommission + totalLaborCostForCommission) * (commissionRate / 100);
+        // 기본 비용에는 수수료 미포함
+        basicCostTotal = baseAmount;
+      } else {
+        // 기존 방식: 기본 비용 = 발주단가 × 수량 × (1 + 수수료율)
+        basicCostTotal = orderUnitPrice * po.quantity * (1 + commissionRate / 100);
+        commissionAmount = orderUnitPrice * po.quantity * (commissionRate / 100);
+      }
       
       // 배송비 총액
       const shippingCostTotal = (po.shipping_cost || 0) + (po.warehouse_shipping_cost || 0);
       
       // 최종 결제 금액
-      const finalPaymentAmount = basicCostTotal + shippingCostTotal + totalOptionCost + totalLaborCost;
+      // 2025-01-06 이후: 기본비용 + 수수료 + 배송비 + 옵션비용 + 인건비
+      // 기존: 기본비용(수수료 포함) + 배송비 + 옵션비용 + 인건비
+      const finalPaymentAmount = isNewCommissionDate
+        ? basicCostTotal + commissionAmount + shippingCostTotal + totalOptionCost + totalLaborCost
+        : basicCostTotal + shippingCostTotal + totalOptionCost + totalLaborCost;
 
       // 패킹리스트 배송비 계산 (v_purchase_order_packing_shipping_cost 뷰 사용)
       const [packingListShippingData] = await pool.execute<RowDataPacket[]>(
@@ -618,8 +649,18 @@ export class PurchaseOrderService {
    * PurchaseOrder를 PurchaseOrderPublic으로 변환 (공급업체 및 상품 정보 포함)
    */
   private async enrichPurchaseOrder(po: PurchaseOrder): Promise<PurchaseOrderPublic> {
+    // Date 객체를 YYYY-MM-DD 형식의 문자열로 변환하여 타임존 변환 문제 방지
     const result: PurchaseOrderPublic = {
       ...po,
+      // 날짜 필드를 문자열로 변환 (타임존 변환 없이 날짜 부분만 추출)
+      order_date: formatDateToKSTString(po.order_date) as any,
+      estimated_delivery: formatDateToKSTString(po.estimated_delivery) as any,
+      estimated_shipment_date: formatDateToKSTString(po.estimated_shipment_date) as any,
+      work_start_date: formatDateToKSTString(po.work_start_date) as any,
+      work_end_date: formatDateToKSTString(po.work_end_date) as any,
+      advance_payment_date: formatDateToKSTString(po.advance_payment_date) as any,
+      balance_payment_date: formatDateToKSTString(po.balance_payment_date) as any,
+      admin_cost_paid_date: formatDateToKSTString(po.admin_cost_paid_date) as any,
     };
 
     // 상품 정보는 더 이상 JOIN 불필요 - 직접 매핑

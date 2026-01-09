@@ -9,6 +9,7 @@ export interface AdminCostItem {
   unit_price: number;
   quantity: number;
   cost: number;
+  is_admin_only?: boolean; // A레벨 관리자 전용 항목 여부
 }
 
 export interface PaymentHistoryItem {

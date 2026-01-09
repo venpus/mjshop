@@ -10,6 +10,7 @@ import { updatePurchaseOrder, updatePurchaseOrderCostItems, updateFactoryShipmen
 import type { PurchaseOrderFormData } from './usePurchaseOrderForm';
 import type { LaborCostItem } from '../components/purchase-order/tabs/CostPaymentTab';
 import type { FactoryShipment, ReturnExchangeItem } from '../components/purchase-order/tabs/FactoryShippingTab';
+import { normalizePurchaseOrderFormData, areFormDataEqual, normalizeDateValue } from '../utils/dataNormalization';
 
 export interface OriginalData {
   unitPrice: number;
@@ -54,7 +55,13 @@ export interface UsePurchaseOrderSaveReturn {
   isDirty: boolean;
   isSaving: boolean;
   lastSavedAt: Date | null;
-  handleSave: () => Promise<void>;
+  handleSave: (force?: boolean, overrideData?: {
+    formData?: PurchaseOrderFormData;
+    optionItems?: LaborCostItem[];
+    laborCostItems?: LaborCostItem[];
+    factoryShipments?: FactoryShipment[];
+    returnExchangeItems?: ReturnExchangeItem[];
+  }) => Promise<void>;
   setOriginalData: (data: OriginalData) => void;
 }
 
@@ -84,48 +91,37 @@ export function usePurchaseOrderSave({
     setIsDirty(false);
   }, []);
 
-  // 날짜 정규화 헬퍼 함수 (내부용)
-  const normalizeDateValue = useCallback((date: string | null | undefined): string => {
-    if (!date) return '';
-    // ISO 형식 (2026-01-05T16:00:00.000Z)을 YYYY-MM-DD로 변환
-    if (date.includes('T')) {
-      return date.split('T')[0];
-    }
-    // 이미 YYYY-MM-DD 형식이면 그대로 반환
-    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      return date;
-    }
-    return date;
-  }, []);
+  // 날짜 정규화는 공통 유틸 함수 사용
 
   // 초기 원본 데이터 설정
   useEffect(() => {
     if (originalOrder && !originalDataRef.current) {
-      originalDataRef.current = {
-        unitPrice: originalOrder.unit_price || 0,
-        backMargin: originalOrder.back_margin || 0,
-        quantity: originalOrder.quantity || 0,
-        shippingCost: originalOrder.shipping_cost || 0,
-        warehouseShippingCost: originalOrder.warehouse_shipping_cost || 0,
-        commissionRate: originalOrder.commission_rate || 0,
-        commissionType: originalOrder.commission_type || '',
-        advancePaymentRate: originalOrder.advance_payment_rate || 0,
-        advancePaymentDate: normalizeDateValue(originalOrder.advance_payment_date),
-        balancePaymentDate: normalizeDateValue(originalOrder.balance_payment_date),
-        packaging: originalOrder.packaging || 0,
-        orderDate: normalizeDateValue(originalOrder.order_date),
-        deliveryDate: normalizeDateValue(originalOrder.delivery_date),
-        workStartDate: normalizeDateValue(originalOrder.work_start_date),
-        workEndDate: normalizeDateValue(originalOrder.work_end_date),
-        isOrderConfirmed: originalOrder.is_confirmed || false,
-        productName: originalOrder.product_name || '',
-        productSize: originalOrder.size || '',
-        productWeight: originalOrder.weight || '',
-        productPackagingSize: originalOrder.packaging?.toString() || '',
-      };
+      const normalized = normalizePurchaseOrderFormData({
+        unitPrice: originalOrder.unit_price,
+        backMargin: originalOrder.back_margin,
+        quantity: originalOrder.quantity,
+        shippingCost: originalOrder.shipping_cost,
+        warehouseShippingCost: originalOrder.warehouse_shipping_cost,
+        commissionRate: originalOrder.commission_rate,
+        commissionType: originalOrder.commission_type,
+        advancePaymentRate: originalOrder.advance_payment_rate,
+        advancePaymentDate: originalOrder.advance_payment_date,
+        balancePaymentDate: originalOrder.balance_payment_date,
+        packaging: originalOrder.packaging,
+        orderDate: originalOrder.order_date,
+        deliveryDate: originalOrder.delivery_date,
+        workStartDate: originalOrder.work_start_date,
+        workEndDate: originalOrder.work_end_date,
+        isOrderConfirmed: originalOrder.is_confirmed,
+        productName: originalOrder.product_name,
+        productSize: originalOrder.size,
+        productWeight: originalOrder.weight,
+        productPackagingSize: originalOrder.packaging?.toString(),
+      });
+      originalDataRef.current = normalized;
       setIsDirty(false);
     }
-  }, [originalOrder, normalizeDateValue]);
+  }, [originalOrder]);
 
   // 원본 cost items 설정 (항상 호출되어야 함)
   useEffect(() => {
@@ -211,24 +207,9 @@ export function usePurchaseOrderSave({
     });
   }, []);
 
-  // 날짜 정규화 헬퍼 함수 (YYYY-MM-DD 형식으로 변환)
-  const normalizeDate = useCallback((date: string | null | undefined): string => {
-    if (!date) return '';
-    // ISO 형식 (2026-01-05T16:00:00.000Z)을 YYYY-MM-DD로 변환
-    if (date.includes('T')) {
-      return date.split('T')[0];
-    }
-    // 이미 YYYY-MM-DD 형식이면 그대로 반환
-    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      return date;
-    }
-    return date;
-  }, []);
+  // 날짜 정규화는 공통 유틸 함수 사용 (normalizeDateValue)
 
-  // 빈 값 정규화 (빈 문자열과 null을 동일하게 처리)
-  const normalizeValue = useCallback((value: string | null | undefined): string => {
-    return value || '';
-  }, []);
+  // normalizeValue는 더 이상 필요하지 않음 (normalizePurchaseOrderFormData에서 처리)
 
   // 변경 감지
   const checkForChanges = useCallback((): boolean => {
@@ -239,28 +220,32 @@ export function usePurchaseOrderSave({
 
     const original = originalDataRef.current;
 
-    // 각 필드 비교 (날짜는 정규화하여 비교)
-    const hasFormChanges =
-      formData.unitPrice !== original.unitPrice ||
-      formData.backMargin !== original.backMargin ||
-      formData.quantity !== original.quantity ||
-      formData.shippingCost !== original.shippingCost ||
-      formData.warehouseShippingCost !== original.warehouseShippingCost ||
-      formData.commissionRate !== original.commissionRate ||
-      formData.commissionType !== original.commissionType ||
-      formData.advancePaymentRate !== original.advancePaymentRate ||
-      normalizeDate(formData.advancePaymentDate) !== normalizeDate(original.advancePaymentDate) ||
-      normalizeDate(formData.balancePaymentDate) !== normalizeDate(original.balancePaymentDate) ||
-      formData.packaging !== original.packaging ||
-      normalizeDate(formData.orderDate) !== normalizeDate(original.orderDate) ||
-      normalizeDate(formData.deliveryDate) !== normalizeDate(original.deliveryDate) ||
-      normalizeDate(formData.workStartDate) !== normalizeDate(original.workStartDate) ||
-      normalizeDate(formData.workEndDate) !== normalizeDate(original.workEndDate) ||
-      formData.isOrderConfirmed !== original.isOrderConfirmed ||
-      normalizeValue(formData.productName) !== normalizeValue(original.productName) ||
-      normalizeValue(formData.productSize) !== normalizeValue(original.productSize) ||
-      normalizeValue(formData.productWeight) !== normalizeValue(original.productWeight) ||
-      normalizeValue(formData.productPackagingSize) !== normalizeValue(original.productPackagingSize);
+    // formData를 정규화하여 비교 (일관된 비교를 위해)
+    const normalizedFormData = normalizePurchaseOrderFormData({
+      unitPrice: formData.unitPrice,
+      backMargin: formData.backMargin,
+      quantity: formData.quantity,
+      shippingCost: formData.shippingCost,
+      warehouseShippingCost: formData.warehouseShippingCost,
+      commissionRate: formData.commissionRate,
+      commissionType: formData.commissionType,
+      advancePaymentRate: formData.advancePaymentRate,
+      advancePaymentDate: formData.advancePaymentDate,
+      balancePaymentDate: formData.balancePaymentDate,
+      packaging: formData.packaging,
+      orderDate: formData.orderDate,
+      deliveryDate: formData.deliveryDate,
+      workStartDate: formData.workStartDate,
+      workEndDate: formData.workEndDate,
+      isOrderConfirmed: formData.isOrderConfirmed,
+      productName: formData.productName,
+      productSize: formData.productSize,
+      productWeight: formData.productWeight,
+      productPackagingSize: formData.productPackagingSize,
+    });
+
+    // 정규화된 데이터를 사용하여 비교
+    const hasFormChanges = !areFormDataEqual(normalizedFormData, original);
 
     // cost items 변경 확인
     const originalCostItems = originalCostItemsRef.current;
@@ -280,7 +265,7 @@ export function usePurchaseOrderSave({
     const hasReturnExchangesPendingImages = returnExchangeItems.some(r => r.pendingImages && r.pendingImages.length > 0);
 
     return hasFormChanges || hasCostItemsChanges || hasFactoryShipmentsChanges || hasFactoryShipmentsPendingImages || hasReturnExchangesChanges || hasReturnExchangesPendingImages;
-  }, [formData, optionItems, laborCostItems, factoryShipments, returnExchangeItems, areCostItemsEqual, areFactoryShipmentsEqual, areReturnExchangeItemsEqual, normalizeDate, normalizeValue]);
+  }, [formData, optionItems, laborCostItems, factoryShipments, returnExchangeItems, areCostItemsEqual, areFactoryShipmentsEqual, areReturnExchangeItemsEqual]);
 
   // 변경 감지 useEffect
   useEffect(() => {
@@ -295,12 +280,22 @@ export function usePurchaseOrderSave({
   }, [formData, optionItems, laborCostItems, factoryShipments, returnExchangeItems, checkForChanges]);
 
   // 저장 함수
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (
+    force: boolean = false,
+    overrideData?: {
+      formData?: PurchaseOrderFormData;
+      optionItems?: LaborCostItem[];
+      laborCostItems?: LaborCostItem[];
+      factoryShipments?: FactoryShipment[];
+      returnExchangeItems?: ReturnExchangeItem[];
+    }
+  ) => {
     if (isSaving) {
       return;
     }
 
-    if (!isDirty) {
+    // force가 true가 아니고 변경사항이 없으면 저장하지 않음
+    if (!force && !isDirty) {
       Alert.alert('알림', '변경된 내용이 없습니다.');
       return;
     }
@@ -308,41 +303,41 @@ export function usePurchaseOrderSave({
     try {
       setIsSaving(true);
 
-      // 날짜 정규화 헬퍼 함수
+      // overrideData가 제공되면 사용, 아니면 현재 상태 사용
+      const currentFormData = overrideData?.formData ?? formData;
+      const currentOptionItems = overrideData?.optionItems ?? optionItems;
+      const currentLaborCostItems = overrideData?.laborCostItems ?? laborCostItems;
+      const currentFactoryShipments = overrideData?.factoryShipments ?? factoryShipments;
+      const currentReturnExchangeItems = overrideData?.returnExchangeItems ?? returnExchangeItems;
+
+      // 날짜 정규화 헬퍼 함수 (서버 전송용 - null 허용)
       const normalizeDateForServer = (date: string | null | undefined): string | null => {
         if (!date) return null;
-        // ISO 형식 (2026-01-05T16:00:00.000Z)을 YYYY-MM-DD로 변환
-        if (date.includes('T')) {
-          return date.split('T')[0];
-        }
-        // 이미 YYYY-MM-DD 형식이면 그대로 반환
-        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-          return date;
-        }
-        return date;
+        const normalized = normalizeDateValue(date);
+        return normalized || null;
       };
 
       const updateData: UpdatePurchaseOrderData = {
-        unit_price: formData.unitPrice,
-        back_margin: formData.backMargin || null,
-        quantity: formData.quantity,
-        shipping_cost: formData.shippingCost || 0,
-        warehouse_shipping_cost: formData.warehouseShippingCost || 0,
-        commission_rate: formData.commissionRate || 0,
-        commission_type: formData.commissionType || null,
-        advance_payment_rate: formData.advancePaymentRate || 0,
-        advance_payment_date: normalizeDateForServer(formData.advancePaymentDate),
-        balance_payment_date: normalizeDateForServer(formData.balancePaymentDate),
-        packaging: formData.packaging || 0,
-        order_date: normalizeDateForServer(formData.orderDate),
-        estimated_delivery: normalizeDateForServer(formData.deliveryDate),
-        work_start_date: normalizeDateForServer(formData.workStartDate),
-        work_end_date: normalizeDateForServer(formData.workEndDate),
-        is_confirmed: formData.isOrderConfirmed,
-        product_name: formData.productName || undefined,
-        product_size: formData.productSize || undefined,
-        product_weight: formData.productWeight || undefined,
-        product_packaging_size: formData.productPackagingSize || undefined,
+        unit_price: currentFormData.unitPrice,
+        back_margin: currentFormData.backMargin || null,
+        quantity: currentFormData.quantity,
+        shipping_cost: currentFormData.shippingCost || 0,
+        warehouse_shipping_cost: currentFormData.warehouseShippingCost || 0,
+        commission_rate: currentFormData.commissionRate || 0,
+        commission_type: currentFormData.commissionType || null,
+        advance_payment_rate: currentFormData.advancePaymentRate || 0,
+        advance_payment_date: normalizeDateForServer(currentFormData.advancePaymentDate),
+        balance_payment_date: normalizeDateForServer(currentFormData.balancePaymentDate),
+        packaging: currentFormData.packaging || 0,
+        order_date: normalizeDateForServer(currentFormData.orderDate),
+        estimated_delivery: normalizeDateForServer(currentFormData.deliveryDate),
+        work_start_date: normalizeDateForServer(currentFormData.workStartDate),
+        work_end_date: normalizeDateForServer(currentFormData.workEndDate),
+        is_confirmed: currentFormData.isOrderConfirmed,
+        product_name: currentFormData.productName || undefined,
+        product_size: currentFormData.productSize || undefined,
+        product_weight: currentFormData.productWeight || undefined,
+        product_packaging_size: currentFormData.productPackagingSize || undefined,
       };
 
       const updatedOrder = await updatePurchaseOrder(orderId, updateData);
@@ -350,11 +345,11 @@ export function usePurchaseOrderSave({
       // 비용 항목 저장
       // A 레벨 관리자가 아닌 경우 isAdminOnly === true인 항목 제외
       const filteredOptionItems = isSuperAdmin
-        ? optionItems
-        : optionItems.filter((item) => item.isAdminOnly !== true);
+        ? currentOptionItems
+        : currentOptionItems.filter((item) => item.isAdminOnly !== true);
       const filteredLaborCostItems = isSuperAdmin
-        ? laborCostItems
-        : laborCostItems.filter((item) => item.isAdminOnly !== true);
+        ? currentLaborCostItems
+        : currentLaborCostItems.filter((item) => item.isAdminOnly !== true);
 
       const costItems = [
         ...filteredOptionItems.map((item, index) => ({
@@ -384,7 +379,7 @@ export function usePurchaseOrderSave({
       await updatePurchaseOrderCostItems(orderId, costItems, userLevel);
 
       // factory shipments 저장
-      const shipments = factoryShipments.map((shipment, index) => {
+      const shipments = currentFactoryShipments.map((shipment, index) => {
         // 임시 ID 판별: temp_로 시작하거나 13자리 이상 숫자
         const isTemporaryId = shipment.id.startsWith('temp_') || (shipment.id.length >= 13 && /^\d+$/.test(shipment.id));
         return {
@@ -400,8 +395,8 @@ export function usePurchaseOrderSave({
       const savedShipmentIds = await updateFactoryShipments(orderId, shipments);
 
       // pendingImages가 있는 shipment들의 이미지 업로드
-      for (let i = 0; i < factoryShipments.length; i++) {
-        const shipment = factoryShipments[i];
+      for (let i = 0; i < currentFactoryShipments.length; i++) {
+        const shipment = currentFactoryShipments[i];
         if (shipment.pendingImages && shipment.pendingImages.length > 0 && savedShipmentIds[i]) {
           try {
             await uploadPurchaseOrderImages(
@@ -418,7 +413,7 @@ export function usePurchaseOrderSave({
       }
 
       // return exchanges 저장
-      const returnExchanges = returnExchangeItems.map((item, index) => {
+      const returnExchanges = currentReturnExchangeItems.map((item, index) => {
         // 임시 ID 판별: temp_로 시작하거나 13자리 이상 숫자
         const isTemporaryId = item.id.startsWith('temp_') || (item.id.length >= 13 && /^\d+$/.test(item.id));
         return {
@@ -435,8 +430,8 @@ export function usePurchaseOrderSave({
       const savedReturnExchangeIds = await updateReturnExchanges(orderId, returnExchanges);
 
       // pendingImages가 있는 return exchange 항목들의 이미지 업로드
-      for (let i = 0; i < returnExchangeItems.length; i++) {
-        const item = returnExchangeItems[i];
+      for (let i = 0; i < currentReturnExchangeItems.length; i++) {
+        const item = currentReturnExchangeItems[i];
         if (item.pendingImages && item.pendingImages.length > 0 && savedReturnExchangeIds[i]) {
           try {
             await uploadPurchaseOrderImages(
@@ -452,43 +447,23 @@ export function usePurchaseOrderSave({
         }
       }
 
-      // 원본 데이터 업데이트
-      if (originalDataRef.current) {
-        originalDataRef.current = {
-          unitPrice: updatedOrder.unit_price || 0,
-          backMargin: updatedOrder.back_margin || 0,
-          quantity: updatedOrder.quantity || 0,
-          shippingCost: updatedOrder.shipping_cost || 0,
-          warehouseShippingCost: updatedOrder.warehouse_shipping_cost || 0,
-          commissionRate: updatedOrder.commission_rate || 0,
-          commissionType: updatedOrder.commission_type || '',
-          advancePaymentRate: updatedOrder.advance_payment_rate || 0,
-          advancePaymentDate: normalizeDateValue(updatedOrder.advance_payment_date),
-          balancePaymentDate: normalizeDateValue(updatedOrder.balance_payment_date),
-          packaging: updatedOrder.packaging || 0,
-          orderDate: normalizeDateValue(updatedOrder.order_date),
-          deliveryDate: normalizeDateValue(updatedOrder.delivery_date),
-          workStartDate: normalizeDateValue(updatedOrder.work_start_date),
-          workEndDate: normalizeDateValue(updatedOrder.work_end_date),
-          isOrderConfirmed: updatedOrder.is_confirmed || false,
-          productName: updatedOrder.product_name || '',
-          productSize: updatedOrder.size || '',
-          productWeight: updatedOrder.weight || '',
-          productPackagingSize: updatedOrder.packaging?.toString() || '',
-        };
-      }
-
+      // 원본 데이터 업데이트는 loadOrderDetail에서 수행하므로 여기서는 하지 않음
+      // loadOrderDetail이 호출되면 setOriginalData가 호출되어 originalDataRef.current가 업데이트되고
+      // setIsDirty(false)가 호출되므로, 여기서는 setIsDirty(false)만 호출
+      
       // 원본 cost items 업데이트
       originalCostItemsRef.current = {
-        optionItems: JSON.parse(JSON.stringify(optionItems)),
-        laborCostItems: JSON.parse(JSON.stringify(laborCostItems)),
+        optionItems: JSON.parse(JSON.stringify(currentOptionItems)),
+        laborCostItems: JSON.parse(JSON.stringify(currentLaborCostItems)),
       };
 
       // 원본 factory shipments 및 return exchanges 업데이트
-      originalFactoryShipmentsRef.current = JSON.parse(JSON.stringify(factoryShipments.map(s => ({ ...s, pendingImages: undefined }))));
-      originalReturnExchangeItemsRef.current = JSON.parse(JSON.stringify(returnExchangeItems.map(r => ({ ...r, pendingImages: undefined }))));
+      originalFactoryShipmentsRef.current = JSON.parse(JSON.stringify(currentFactoryShipments.map(s => ({ ...s, pendingImages: undefined }))));
+      originalReturnExchangeItemsRef.current = JSON.parse(JSON.stringify(currentReturnExchangeItems.map(r => ({ ...r, pendingImages: undefined }))));
 
       setLastSavedAt(new Date());
+      // setIsDirty(false)는 loadOrderDetail 후 setOriginalData에서 호출되므로 여기서는 호출하지 않음
+      // 하지만 모달에서 저장 후 loadOrderDetail을 호출하지 않는 경우를 대비하여 여기서도 호출
       setIsDirty(false);
 
       Alert.alert('성공', '저장되었습니다.');
@@ -498,7 +473,7 @@ export function usePurchaseOrderSave({
     } finally {
       setIsSaving(false);
     }
-  }, [orderId, formData, optionItems, laborCostItems, factoryShipments, returnExchangeItems, isDirty, isSaving, isSuperAdmin, userLevel]);
+  }, [orderId, formData, optionItems, laborCostItems, factoryShipments, returnExchangeItems, isDirty, isSaving, isSuperAdmin, userLevel, normalizeDateValue]);
 
   return {
     isDirty,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -72,10 +72,22 @@ export function ProductInfoEditModal({
   const [imageUri, setImageUri] = useState<string | null>(
     initialData.productImage ? getFullImageUrl(initialData.productImage) : null
   );
+  
+  // 초기 데이터 스냅샷 저장 (변경사항 감지용)
+  const initialDataRef = useRef<ProductInfoEditData>({
+    productName: initialData.productName || '',
+    size: initialData.size || '',
+    weight: initialData.weight || '',
+    packaging: initialData.packaging || 0,
+    packagingSize: initialData.packagingSize || '',
+    orderDate: initialData.orderDate || '',
+    deliveryDate: initialData.deliveryDate || '',
+    quantity: initialData.quantity || 0,
+  });
 
   // 초기 데이터가 변경되면 폼 데이터 업데이트
   useEffect(() => {
-    setFormData({
+    const normalizedInitialData: ProductInfoEditData = {
       productName: initialData.productName || '',
       size: initialData.size || '',
       weight: initialData.weight || '',
@@ -84,24 +96,31 @@ export function ProductInfoEditModal({
       orderDate: initialData.orderDate || '',
       deliveryDate: initialData.deliveryDate || '',
       quantity: initialData.quantity || 0,
-    });
+    };
+    
+    setFormData(normalizedInitialData);
+    initialDataRef.current = normalizedInitialData;
     setImageUri(initialData.productImage ? getFullImageUrl(initialData.productImage) : null);
     setHasChanges(false);
   }, [initialData, visible]);
 
   // 변경사항 감지
   useEffect(() => {
+    const normalizeString = (val: string | null | undefined): string => String(val || '').trim();
+    const normalizeNumber = (val: number | null | undefined): number => Number(val || 0);
+    
+    const initial = initialDataRef.current;
     const changed =
-      formData.productName !== (initialData.productName || '') ||
-      formData.size !== (initialData.size || '') ||
-      formData.weight !== (initialData.weight || '') ||
-      formData.packaging !== (initialData.packaging || 0) ||
-      formData.packagingSize !== (initialData.packagingSize || '') ||
-      formData.orderDate !== (initialData.orderDate || '') ||
-      formData.deliveryDate !== (initialData.deliveryDate || '') ||
-      formData.quantity !== (initialData.quantity || 0);
+      normalizeString(formData.productName) !== normalizeString(initial.productName) ||
+      normalizeString(formData.size) !== normalizeString(initial.size) ||
+      normalizeString(formData.weight) !== normalizeString(initial.weight) ||
+      normalizeNumber(formData.packaging) !== normalizeNumber(initial.packaging) ||
+      normalizeString(formData.packagingSize) !== normalizeString(initial.packagingSize) ||
+      normalizeString(formData.orderDate) !== normalizeString(initial.orderDate) ||
+      normalizeString(formData.deliveryDate) !== normalizeString(initial.deliveryDate) ||
+      normalizeNumber(formData.quantity) !== normalizeNumber(initial.quantity);
     setHasChanges(changed);
-  }, [formData, initialData]);
+  }, [formData]);
 
   const handleImagePick = async () => {
     try {
@@ -281,6 +300,7 @@ export function ProductInfoEditModal({
                 label="납기일"
                 value={formData.deliveryDate}
                 onChange={(value) => setFormData({ ...formData, deliveryDate: value })}
+                displayFormat="korean"
               />
             </View>
           </View>
