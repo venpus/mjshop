@@ -48,8 +48,8 @@ function getStatusColor(status: string, type: StatusBadgeType): string {
 
     case 'payment':
       // 결제 상태
-      if (status === '완료') return 'bg-green-100 text-green-800';
-      if (status === '선금결제') return 'bg-yellow-100 text-yellow-800';
+      if (status === '완료' || status === '지급완료') return 'bg-green-100 text-green-800';
+      if (status === '선금결제' || status === '지급대기') return 'bg-yellow-100 text-yellow-800';
       if (status === '미결제') return 'bg-red-100 text-red-800';
       return 'bg-gray-100 text-gray-800';
 

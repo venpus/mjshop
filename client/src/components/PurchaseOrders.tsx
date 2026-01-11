@@ -9,7 +9,7 @@ import { useReorderPurchaseOrder } from '../hooks/useReorderPurchaseOrder';
 import { PurchaseOrderDeleteDialog } from './PurchaseOrderDeleteDialog';
 import { useAuth } from '../contexts/AuthContext';
 import { useDeletePurchaseOrder } from '../hooks/useDeletePurchaseOrder';
-import { formatDateForInput } from '../utils/dateUtils';
+import { formatDateForInput, formatDateKST } from '../utils/dateUtils';
 import { CreatePurchaseOrderButton } from './purchase-order/CreatePurchaseOrderButton';
 import { 
   calculateBasicCostTotal,
@@ -64,6 +64,11 @@ interface PurchaseOrder {
   orderStatus: '발주확인' | '발주 대기' | '취소됨';
   date: string;
   isOrderConfirmed?: boolean;
+  // 선금/잔금 정보
+  advancePaymentAmount?: number | null; // 선금 금액
+  advancePaymentDate?: string | null; // 선금 지급일
+  balancePaymentAmount?: number | null; // 잔금 금액
+  balancePaymentDate?: string | null; // 잔금 지급일
   // 수량 정보
   unshippedQuantity?: number; // 미발송 수량 (업체 출고 수량 - 패킹리스트 출고 수량)
   shippingQuantity?: number; // 배송중 수량 (패킹리스트 출고 수량 - 한국도착 수량)
@@ -233,6 +238,11 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             orderStatus: po.order_status || (po.is_confirmed ? '발주확인' : '발주 대기'),
             date: formatDateForInput(po.order_date),
             isOrderConfirmed: po.is_confirmed || false,
+            // 선금/잔금 정보
+            advancePaymentAmount: po.advance_payment_amount || null,
+            advancePaymentDate: po.advance_payment_date ? formatDateForInput(po.advance_payment_date) : null,
+            balancePaymentAmount: po.balance_payment_amount || null,
+            balancePaymentDate: po.balance_payment_date ? formatDateForInput(po.balance_payment_date) : null,
             // 패킹리스트와 연동된 수량 정보
             unshippedQuantity: po.unshipped_quantity !== undefined ? Number(po.unshipped_quantity) : undefined,
             shippingQuantity: po.shipping_quantity !== undefined ? Number(po.shipping_quantity) : undefined,
@@ -995,7 +1005,36 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                       </div>
                     </td> */}
                     <td className="px-4 py-2 text-center">
-                      <StatusBadge status={po.paymentStatus} type="payment" size="sm" />
+                      {(() => {
+                        // 선금/잔금 금액이 있는지 확인
+                        const hasAdvance = po.advancePaymentAmount && po.advancePaymentAmount > 0;
+                        const hasBalance = po.balancePaymentAmount && po.balancePaymentAmount > 0;
+                        
+                        // 둘 다 없으면 기존 paymentStatus 표시 (하위 호환성)
+                        if (!hasAdvance && !hasBalance) {
+                          return <StatusBadge status={po.paymentStatus} type="payment" size="sm" />;
+                        }
+                        
+                        // 선금/잔금 각각 표시 (결제내역과 동일한 방식)
+                        return (
+                          <div className="flex flex-col gap-1 items-center">
+                            {hasAdvance && (
+                              <StatusBadge 
+                                status={po.advancePaymentDate ? `지급완료 (${formatDateKST(po.advancePaymentDate)})` : '지급대기'} 
+                                type="payment" 
+                                size="xs" 
+                              />
+                            )}
+                            {hasBalance && (
+                              <StatusBadge 
+                                status={po.balancePaymentDate ? `지급완료 (${formatDateKST(po.balancePaymentDate)})` : '지급대기'} 
+                                type="payment" 
+                                size="xs" 
+                              />
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-2 text-center">
                       <div className="flex items-center justify-center gap-1">
