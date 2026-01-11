@@ -13,6 +13,7 @@ interface PaymentDetail {
 
 interface AdminCostDetail {
   backMargin: number; // 발주 주가비
+  adminCostItems: number; // A레벨 관리자 입력 비용
   shippingDifference: number; // 배송비 추가비
 }
 
@@ -49,11 +50,11 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
     pendingDetail: { advance: 0, balance: 0, shipping: 0 },
     requestedDetail: { advance: 0, balance: 0, shipping: 0 },
     adminCostTotal: 0,
-    adminCostDetail: { backMargin: 0, shippingDifference: 0 },
+    adminCostDetail: { backMargin: 0, adminCostItems: 0, shippingDifference: 0 },
     adminCostPending: 0,
-    adminCostPendingDetail: { backMargin: 0, shippingDifference: 0 },
+    adminCostPendingDetail: { backMargin: 0, adminCostItems: 0, shippingDifference: 0 },
     adminCostPaid: 0,
-    adminCostPaidDetail: { backMargin: 0, shippingDifference: 0 },
+    adminCostPaidDetail: { backMargin: 0, adminCostItems: 0, shippingDifference: 0 },
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -191,7 +192,7 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
 
       // 4. A레벨 관리자 추가 비용 총계 계산
       let adminCostTotal = 0;
-      const adminCostDetail: AdminCostDetail = { backMargin: 0, shippingDifference: 0 };
+      const adminCostDetail: AdminCostDetail = { backMargin: 0, adminCostItems: 0, shippingDifference: 0 };
 
       // 발주관리: admin_total_cost 또는 (back_margin * quantity) + admin_cost_items 합계
       allHistory
@@ -207,8 +208,11 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
             const backMargin = item.back_margin || 0;
             const quantity = item.quantity || 0;
             const backMarginTotal = backMargin * quantity; // 추가단가 * 수량
+            // is_admin_only === true인 항목만 포함 (서버 로직과 동일)
             const adminCostItemsTotal = item.admin_cost_items
-              ? item.admin_cost_items.reduce((sum, costItem) => sum + (costItem.cost || 0), 0)
+              ? item.admin_cost_items
+                  .filter((costItem) => costItem.is_admin_only === true)
+                  .reduce((sum, costItem) => sum + (costItem.cost || 0), 0)
               : 0;
             adminCost = backMarginTotal + adminCostItemsTotal;
           }
@@ -219,6 +223,14 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
           const backMargin = item.back_margin || 0;
           const quantity = item.quantity || 0;
           adminCostDetail.backMargin += backMargin * quantity;
+          
+          // A레벨 관리자 입력 비용 (is_admin_only === true인 항목만 포함, 서버 로직과 동일)
+          const adminCostItemsTotal = item.admin_cost_items
+            ? item.admin_cost_items
+                .filter((costItem) => costItem.is_admin_only === true)
+                .reduce((sum, costItem) => sum + (costItem.cost || 0), 0)
+            : 0;
+          adminCostDetail.adminCostItems += adminCostItemsTotal;
         });
 
       // 패킹리스트: shipping_cost_difference
@@ -233,8 +245,8 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
       // 5. A레벨 관리자 지급예정/지급완료 비용 계산 (상세 포함)
       let adminCostPending = 0; // 지급예정
       let adminCostPaid = 0; // 지급완료
-      const adminCostPendingDetail: AdminCostDetail = { backMargin: 0, shippingDifference: 0 };
-      const adminCostPaidDetail: AdminCostDetail = { backMargin: 0, shippingDifference: 0 };
+      const adminCostPendingDetail: AdminCostDetail = { backMargin: 0, adminCostItems: 0, shippingDifference: 0 };
+      const adminCostPaidDetail: AdminCostDetail = { backMargin: 0, adminCostItems: 0, shippingDifference: 0 };
 
       // 발주관리 항목만 대상 (패킹리스트는 제외)
       allHistory
@@ -250,8 +262,11 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
             const backMargin = item.back_margin || 0;
             const quantity = item.quantity || 0;
             const backMarginTotal = backMargin * quantity;
+            // is_admin_only === true인 항목만 포함 (서버 로직과 동일)
             const adminCostItemsTotal = item.admin_cost_items
-              ? item.admin_cost_items.reduce((sum, costItem) => sum + (costItem.cost || 0), 0)
+              ? item.admin_cost_items
+                  .filter((costItem) => costItem.is_admin_only === true)
+                  .reduce((sum, costItem) => sum + (costItem.cost || 0), 0)
               : 0;
             adminCost = backMarginTotal + adminCostItemsTotal;
           }
@@ -260,23 +275,24 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
           const backMargin = item.back_margin || 0;
           const quantity = item.quantity || 0;
           const backMarginTotal = backMargin * quantity;
+          
+          // A레벨 관리자 입력 비용 (is_admin_only === true인 항목만 포함, 서버 로직과 동일)
+          const adminCostItemsTotal = item.admin_cost_items
+            ? item.admin_cost_items
+                .filter((costItem) => costItem.is_admin_only === true)
+                .reduce((sum, costItem) => sum + (costItem.cost || 0), 0)
+            : 0;
 
           // admin_cost_paid가 true이면 지급완료, false이거나 undefined이면 지급예정
           if (item.admin_cost_paid === true) {
             adminCostPaid += adminCost;
             adminCostPaidDetail.backMargin += backMarginTotal;
-            // A레벨 관리자 입력 비용 (admin_cost_items)
-            const adminCostItemsTotal = item.admin_cost_items
-              ? item.admin_cost_items.reduce((sum, costItem) => sum + (costItem.cost || 0), 0)
-              : 0;
+            adminCostPaidDetail.adminCostItems += adminCostItemsTotal;
             // shippingDifference는 발주관리 항목에는 없으므로 0으로 유지
           } else {
             adminCostPending += adminCost;
             adminCostPendingDetail.backMargin += backMarginTotal;
-            // A레벨 관리자 입력 비용 (admin_cost_items)
-            const adminCostItemsTotal = item.admin_cost_items
-              ? item.admin_cost_items.reduce((sum, costItem) => sum + (costItem.cost || 0), 0)
-              : 0;
+            adminCostPendingDetail.adminCostItems += adminCostItemsTotal;
             // shippingDifference는 발주관리 항목에는 없으므로 0으로 유지
           }
         });
@@ -355,10 +371,14 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
       </div>
       
       {/* 상세 내역 그룹 */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-teal-50 border border-teal-300 shadow-sm">
           <span className="text-xs text-teal-600 font-semibold mb-1">발주 주가비</span>
           <span className="text-base font-bold text-teal-700">{formatCurrency(detail.backMargin)}</span>
+        </div>
+        <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-purple-50 border border-purple-300 shadow-sm">
+          <span className="text-xs text-purple-600 font-semibold mb-1">관리자 입력비</span>
+          <span className="text-base font-bold text-purple-700">{formatCurrency(detail.adminCostItems)}</span>
         </div>
         <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-cyan-50 border border-cyan-300 shadow-sm">
           <span className="text-xs text-cyan-600 font-semibold mb-1">배송비 추가비</span>
