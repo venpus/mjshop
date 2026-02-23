@@ -25,6 +25,8 @@ import {
   Hammer,
   Folder,
   Shield,
+  TrendingUp,
+  MessageCircle,
 } from "lucide-react";
 
 type PageType =
@@ -36,6 +38,7 @@ type PageType =
   | "payment-history"
   | "inventory"
   | "purchase-orders"
+  | "not-arrived-analysis"
   | "shipping-history"
   | "china-payment"
   | "members"
@@ -46,7 +49,8 @@ type PageType =
   | "materials"
   | "packaging-work"
   | "projects"
-  | "permissions";
+  | "permissions"
+  | "ai-search";
 
 interface SidebarProps {
   currentPage: PageType | 'purchase-order-detail';
@@ -126,6 +130,20 @@ export function Sidebar({
               {!isCollapsed && <span>{t('menu.dashboard')}</span>}
             </button>
 
+            {/* AI 데이터 검색 */}
+            <button
+              onClick={() => onPageChange("ai-search")}
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
+                currentPage === "ai-search"
+                  ? "bg-purple-50 text-purple-600"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
+              title={isCollapsed ? t('menu.aiSearch') : undefined}
+            >
+              <MessageCircle className="w-5 h-5 flex-shrink-0" />
+              {!isCollapsed && <span>{t('menu.aiSearch')}</span>}
+            </button>
+
         {/* 중국협업 메뉴 (A, B0, C0 레벨만 표시) */}
         {canAccessChinaCooperation && (
           <div className="mt-1">
@@ -163,6 +181,21 @@ export function Sidebar({
                   >
                     <FileText className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
                     {!isCollapsed && <span>{t('menu.purchaseOrders')}</span>}
+                  </button>
+                )}
+                {/* 미도착 물품 분석 (임시 테스트) */}
+                {hasPermission('purchase-orders', 'read') && (
+                  <button
+                    onClick={() => onPageChange("not-arrived-analysis")}
+                    className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
+                      currentPage === "not-arrived-analysis"
+                        ? "bg-purple-50 text-purple-600"
+                        : "text-gray-600 hover:bg-gray-50"
+                    }`}
+                    title={isCollapsed ? "미도착 분석" : undefined}
+                  >
+                    <TrendingUp className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
+                    {!isCollapsed && <span>미도착 분석</span>}
                   </button>
                 )}
                 {/* 패킹리스트 */}

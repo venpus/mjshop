@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import { calculateWeight } from '../../../utils/packingListUtils';
 import { WEIGHT_RATIOS } from '../types';
 import type { PackingListItem } from '../types';
@@ -11,6 +12,12 @@ interface WeightCellProps {
   onWeightRatioChange: (groupId: string, weightRatio: '0%' | '5%' | '10%' | '15%' | '20%' | '', calculatedWeight: string) => void;
 }
 
+function filterActualWeightInput(value: string): string {
+  const cleaned = value.replace(/[^0-9.]/g, '');
+  const parts = cleaned.split('.');
+  return parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : cleaned;
+}
+
 export function WeightCell({
   item,
   groupId,
@@ -19,25 +26,37 @@ export function WeightCell({
   onActualWeightChange,
   onWeightRatioChange,
 }: WeightCellProps) {
+  const propActualWeight = item.actualWeight ?? '';
+  const [localActualWeight, setLocalActualWeight] = useState(propActualWeight);
+  const [isFocused, setIsFocused] = useState(false);
+  const itemIdRef = useRef(item.id);
+
+  // 다른 행으로 바뀐 경우에만 prop으로 로컬 동기화 (blur 시 이전 prop으로 덮어쓰는 것 방지)
+  useEffect(() => {
+    if (itemIdRef.current !== item.id) {
+      itemIdRef.current = item.id;
+      setLocalActualWeight(item.actualWeight ?? '');
+    }
+  }, [item.id, item.actualWeight]);
+
   const handleActualWeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // 숫자와 소수점만 입력 허용, 최대 6자리 (9999.99 형태)
-    const value = e.target.value.replace(/[^0-9.]/g, '');
-    // 소수점이 하나만 들어가도록 제한
-    const parts = value.split('.');
-    const filteredValue = parts.length > 2 
-      ? parts[0] + '.' + parts.slice(1).join('')
-      : value;
-    
-    if (filteredValue.length <= 6) {
-      const calculated = calculateWeight(filteredValue, item.weightRatio);
-      onActualWeightChange(groupId, filteredValue, calculated);
+    const filtered = filterActualWeightInput(e.target.value);
+    if (filtered.length <= 6) setLocalActualWeight(filtered);
+  };
+
+  const handleActualWeightBlur = () => {
+    setIsFocused(false);
+    const trimmed = localActualWeight.trim();
+    const current = (item.actualWeight ?? '').trim();
+    if (trimmed !== current) {
+      const calculated = calculateWeight(trimmed, item.weightRatio);
+      onActualWeightChange(groupId, trimmed, calculated);
     }
   };
 
   const handleWeightRatioChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newRatio = e.target.value as '0%' | '5%' | '10%' | '15%' | '20%' | '';
-    console.log('[비율 변경] 사용자가 선택한 비율:', newRatio, 'item.weightRatio:', item.weightRatio, 'groupId:', groupId);
-    const calculated = calculateWeight(item.actualWeight, newRatio);
+    const calculated = calculateWeight(item.actualWeight ?? '', newRatio);
     onWeightRatioChange(groupId, newRatio, calculated);
   };
 
@@ -48,8 +67,10 @@ export function WeightCell({
         <div className="flex items-center justify-center gap-1">
           <input
             type="text"
-            value={item.actualWeight}
+            value={localActualWeight}
             onChange={handleActualWeightChange}
+            onFocus={() => setIsFocused(true)}
+            onBlur={handleActualWeightBlur}
             className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
             placeholder="0"
             maxLength={6}

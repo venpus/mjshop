@@ -85,6 +85,32 @@ export class PackingListService {
   }
 
   /**
+   * 패킹리스트 목록만 조회 (아이템 미포함, AI 검색용)
+   * findAll/findByMonth/findByDateRange 1회만 호출하여 연결 풀 과부하를 방지합니다.
+   */
+  async getPackingListsForSummary(year?: number, month?: number): Promise<PackingList[]>;
+  async getPackingListsForSummary(startDate: string, endDate: string): Promise<PackingList[]>;
+  async getPackingListsForSummary(
+    yearOrStartDate?: number | string,
+    monthOrEndDate?: number | string
+  ): Promise<PackingList[]> {
+    if (
+      typeof yearOrStartDate === 'string' &&
+      typeof monthOrEndDate === 'string' &&
+      /^\d{4}-\d{2}-\d{2}$/.test(yearOrStartDate) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(monthOrEndDate)
+    ) {
+      return this.repository.findByDateRange(yearOrStartDate, monthOrEndDate);
+    }
+    const year = typeof yearOrStartDate === 'number' ? yearOrStartDate : undefined;
+    const month = typeof monthOrEndDate === 'number' ? monthOrEndDate : undefined;
+    const packingLists = year != null && month != null
+      ? await this.repository.findByMonth(year, month)
+      : await this.repository.findAll();
+    return packingLists;
+  }
+
+  /**
    * 모든 패킹리스트 조회 (아이템 포함)
    * 발송일 기준 최신순으로 정렬
    * @param year 연도 (선택사항)
@@ -133,6 +159,43 @@ export class PackingListService {
     });
     
     return filtered;
+  }
+
+  /**
+   * 필터 + 페이징 적용 패킹리스트 조회
+   */
+  async getAllPackingListsPaginated(
+    filters: {
+      search?: string;
+      logisticsCompanies?: string[];
+      startDate?: string;
+      endDate?: string;
+      status?: string[];
+      purchaseOrderId?: string;
+    },
+    page: number,
+    limit: number
+  ): Promise<{
+    data: PackingListWithItems[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const offset = (page - 1) * limit;
+    const { rows, total } = await this.repository.findWithFiltersPaginated(filters, limit, offset);
+    const data = await Promise.all(
+      rows.map((pl) => this.repository.findWithItems(pl.id))
+    );
+    const filtered = data.filter((r): r is PackingListWithItems => r !== null);
+    const totalPages = limit > 0 ? Math.ceil(total / limit) : 0;
+    return {
+      data: filtered,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   /**
@@ -249,10 +312,14 @@ export class PackingListService {
 
         // 공장→물류창고 플래그가 true일 경우 factory_shipments에 출고 항목 자동 생성
         if (data.is_factory_to_warehouse && data.purchase_order_id) {
-          const shipmentDate = packingList.shipment_date.toISOString().split('T')[0]; // YYYY-MM-DD 형식
-          const receiveDate = packingList.warehouse_arrival_date 
-            ? packingList.warehouse_arrival_date.toISOString().split('T')[0] 
-            : shipmentDate; // 물류창고 도착일이 없으면 출고일과 동일
+          const shipmentDate = typeof packingList.shipment_date === 'string'
+            ? packingList.shipment_date
+            : packingList.shipment_date.toISOString().split('T')[0];
+          const receiveDate = packingList.warehouse_arrival_date
+            ? (typeof packingList.warehouse_arrival_date === 'string'
+              ? packingList.warehouse_arrival_date
+              : packingList.warehouse_arrival_date.toISOString().split('T')[0])
+            : shipmentDate;
 
           await this.repository.createFactoryShipmentWithConnection(
             data.purchase_order_id,

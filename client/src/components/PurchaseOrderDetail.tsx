@@ -1462,6 +1462,12 @@ export function PurchaseOrderDetail({
         userLevel={user?.level}
         onPhotoGalleryClick={handlePhotoGalleryClick}
         onImageClick={() => setIsImageModalOpen(true)}
+        onViewPackingListClick={() => {
+          const params = new URLSearchParams();
+          params.set('purchaseOrderId', orderId);
+          if (order!.poNumber?.trim()) params.set('poNumber', order!.poNumber.trim());
+          window.open(`/admin/shipping-history?${params.toString()}`, '_blank');
+        }}
         currentFactoryStatus={currentFactoryStatus}
         totalShippedQuantity={totalShippedQuantity}
         totalReturnQuantity={totalReturnQuantity}

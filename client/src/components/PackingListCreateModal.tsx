@@ -9,6 +9,7 @@ interface PackingListCreateModalProps {
   onClose: () => void;
   onSubmit: (data: PackingListFormData) => void;
   initialData?: PackingListFormData; // 수정 모드용 초기 데이터
+  initialPurchaseOrderId?: string; // 발주 ID (발주별 패킹리스트 생성 시 사용)
   mode?: 'create' | 'edit'; // 모달 모드 (생성 또는 수정)
 }
 
@@ -55,6 +56,7 @@ export function PackingListCreateModal({
   onClose,
   onSubmit,
   initialData,
+  initialPurchaseOrderId,
   mode = 'create',
 }: PackingListCreateModalProps) {
   const [formData, setFormData] = useState<PackingListFormData>({
@@ -76,6 +78,72 @@ export function PackingListCreateModal({
       if (initialData) {
         // 초기 데이터가 있으면 사용 (수정 모드 또는 공장→물류창고에서 전달된 데이터)
         setFormData(initialData);
+      } else if (initialPurchaseOrderId) {
+        // 발주 ID가 있으면 발주 정보를 가져와서 자동으로 채우기
+        const loadPurchaseOrder = async () => {
+          try {
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+            const response = await fetch(`${API_BASE_URL}/purchase-orders/${initialPurchaseOrderId}`, {
+              credentials: 'include',
+            });
+            
+            if (!response.ok) {
+              throw new Error('발주 정보를 불러오는데 실패했습니다.');
+            }
+            
+            const result = await response.json();
+            if (!result.success || !result.data) {
+              throw new Error('발주 정보를 찾을 수 없습니다.');
+            }
+            
+            const order = result.data;
+            const unshippedQuantity = order.unshipped_quantity || order.quantity || 0;
+            
+            // 발주 정보로 제품 그룹 자동 생성
+            const productGroup: ProductGroup = {
+              id: Date.now().toString(),
+              productName: order.product_name || '',
+              purchaseOrderId: order.id,
+              purchaseOrderNumber: order.po_number || '',
+              productImageUrl: order.product_main_image || order.product?.main_image || undefined,
+              unshippedQuantity: unshippedQuantity,
+              boxCount: '',
+              boxType: '박스',
+              weight: '',
+              kind: '',
+              quantity: '',
+              set: '',
+              total: 0,
+            };
+            
+            setFormData({
+              date: getTodayDate(),
+              code: '',
+              logisticsCompany: '',
+              products: [productGroup],
+              weight: '',
+              weightType: '개별 중량',
+              boxCount: '',
+              boxType: '박스',
+            });
+          } catch (error: any) {
+            console.error('발주 정보 로드 오류:', error);
+            alert(error.message || '발주 정보를 불러오는 중 오류가 발생했습니다.');
+            // 오류 발생 시 기본값 사용
+            setFormData({
+              date: getTodayDate(),
+              code: '',
+              logisticsCompany: '',
+              products: [],
+              weight: '',
+              weightType: '개별 중량',
+              boxCount: '',
+              boxType: '박스',
+            });
+          }
+        };
+        
+        loadPurchaseOrder();
       } else {
         // 생성 모드: 기본값 사용
         setFormData({
@@ -90,7 +158,7 @@ export function PackingListCreateModal({
         });
       }
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, initialPurchaseOrderId]);
 
   // 종 x 수량 x 세트 = 몇개 자동 계산
   const calculateTotal = (kind: string, quantity: string, set: string): number => {

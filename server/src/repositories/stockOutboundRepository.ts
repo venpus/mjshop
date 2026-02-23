@@ -16,6 +16,21 @@ interface StockOutboundRecordRow extends RowDataPacket {
 
 export class StockOutboundRepository {
   /**
+   * 최근 출고 기록 목록 조회 (AI 검색용)
+   */
+  async findAll(limit: number = 50): Promise<StockOutboundRecord[]> {
+    const [rows] = await pool.execute<StockOutboundRecordRow[]>(
+      `SELECT id, group_key, outbound_date, customer_name, quantity,
+              created_at, updated_at, created_by, updated_by
+       FROM kr_stock_outbound_records
+       ORDER BY outbound_date DESC, created_at DESC
+       LIMIT ?`,
+      [limit]
+    );
+    return rows.map(this.mapRowToRecord);
+  }
+
+  /**
    * groupKey로 출고 기록 목록 조회
    */
   async findByGroupKey(groupKey: string): Promise<StockOutboundRecord[]> {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, X, Upload } from 'lucide-react';
 import type { PackingListItem, DomesticInvoice } from '../types';
 import { uploadDomesticInvoiceImages, deleteDomesticInvoiceImage, createDomesticInvoice } from '../../../api/packingListApi';
@@ -53,14 +53,41 @@ export function DomesticInvoiceCell({
     }
   };
 
-  const handleInvoiceNumberChange = (invoiceIndex: number, number: string) => {
-    const newInvoices = [...(item.domesticInvoice || [])];
-    if (newInvoices[invoiceIndex]) {
-      newInvoices[invoiceIndex] = { ...newInvoices[invoiceIndex], number };
-    } else {
-      newInvoices[invoiceIndex] = { number, images: [] };
+  const invoices = item.domesticInvoice || [];
+  const [localNumbers, setLocalNumbers] = useState<string[]>(() => invoices.map((inv) => inv.number ?? ''));
+  const [focusedInvoiceIndex, setFocusedInvoiceIndex] = useState<number | null>(null);
+  const itemIdRef = useRef(item.id);
+
+  // 다른 행으로 바뀐 경우에만 prop으로 로컬 동기화 (blur 시 이전 prop으로 덮어쓰는 것 방지)
+  useEffect(() => {
+    if (itemIdRef.current !== item.id) {
+      itemIdRef.current = item.id;
+      setLocalNumbers((item.domesticInvoice || []).map((inv) => inv.number ?? ''));
     }
-    onInvoiceChange(groupId, newInvoices);
+  }, [item.id, item.domesticInvoice]);
+
+  const handleInvoiceNumberChange = (invoiceIndex: number, number: string) => {
+    setLocalNumbers((prev) => {
+      const next = [...prev];
+      if (invoiceIndex >= next.length) next.length = invoiceIndex + 1;
+      next[invoiceIndex] = number;
+      return next;
+    });
+  };
+
+  const flushInvoiceNumber = (invoiceIndex: number) => {
+    setFocusedInvoiceIndex(null);
+    const current = invoices[invoiceIndex]?.number ?? '';
+    const local = localNumbers[invoiceIndex] ?? '';
+    if (local !== current) {
+      const newInvoices = [...invoices];
+      if (newInvoices[invoiceIndex]) {
+        newInvoices[invoiceIndex] = { ...newInvoices[invoiceIndex], number: local };
+      } else {
+        newInvoices[invoiceIndex] = { number: local, images: [] };
+      }
+      onInvoiceChange(groupId, newInvoices);
+    }
   };
 
   const handleImageUpload = async (invoiceIndex: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -169,8 +196,10 @@ export function DomesticInvoiceCell({
             <div className="flex items-center gap-1 w-full">
               <input
                 type="text"
-                value={invoice.number}
+                value={localNumbers[invoiceIndex] ?? invoice.number ?? ''}
                 onChange={(e) => handleInvoiceNumberChange(invoiceIndex, e.target.value)}
+                onFocus={() => setFocusedInvoiceIndex(invoiceIndex)}
+                onBlur={() => flushInvoiceNumber(invoiceIndex)}
                 className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
                 placeholder="송장번호"
               />

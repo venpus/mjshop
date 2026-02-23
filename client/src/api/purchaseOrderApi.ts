@@ -231,3 +231,52 @@ export async function getAllPurchaseOrderImages(purchaseOrderId: string): Promis
   return allImages.sort((a, b) => a.display_order - b.display_order);
 }
 
+/**
+ * 한국에 도착하지 않은 물품 분석 조회
+ */
+export interface NotArrivedItem {
+  id: string;
+  po_number: string;
+  order_date: string | null;
+  product_name: string;
+  product_main_image: string | null;
+  estimated_delivery: string | null;
+  quantity: number;
+  unreceived_quantity: number;
+  shipping_quantity: number;
+  arrived_quantity: number;
+  unit_price: number;
+  order_unit_price: number | null;
+  total_amount: number;
+  not_arrived_quantity: number;
+}
+
+export interface NotArrivedSummary {
+  total_quantity: number;
+  total_amount: number;
+  not_arrived_quantity: number;
+  not_arrived_amount: number;
+}
+
+export interface NotArrivedAnalysis {
+  items: NotArrivedItem[];
+  summary: NotArrivedSummary;
+}
+
+export async function getNotArrivedAnalysis(): Promise<NotArrivedAnalysis> {
+  const response = await fetch(`${API_BASE_URL}/purchase-orders/analysis/not-arrived`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('한국 미도착 물품 분석 조회에 실패했습니다.');
+  }
+
+  const responseData = await response.json();
+  if (!responseData.success) {
+    throw new Error(responseData.error || '한국 미도착 물품 분석 조회에 실패했습니다.');
+  }
+
+  return responseData.data;
+}
+

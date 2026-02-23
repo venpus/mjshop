@@ -109,7 +109,7 @@ export class PackingListRepository {
        ORDER BY shipment_date DESC, created_at DESC`
     );
 
-    return rows.map(this.mapRowToPackingList);
+    return rows.map((row) => this.mapRowToPackingList(row));
   }
 
   /**
@@ -127,7 +127,121 @@ export class PackingListRepository {
       [year, month]
     );
 
-    return rows.map(this.mapRowToPackingList);
+    return rows.map((row) => this.mapRowToPackingList(row));
+  }
+
+  /**
+   * 발송일 기준 기간별 패킹리스트 조회 (AI 검색용, 경량)
+   * @param startDate YYYY-MM-DD
+   * @param endDate YYYY-MM-DD
+   */
+  async findByDateRange(startDate: string, endDate: string): Promise<PackingList[]> {
+    const [rows] = await pool.execute<PackingListRow[]>(
+      `SELECT id, code, shipment_date, logistics_company, warehouse_arrival_date,
+              actual_weight, weight_ratio, calculated_weight, shipping_cost,
+              payment_date, wk_payment_date, repackaging_requirements, admin_cost_paid, admin_cost_paid_date,
+              created_at, updated_at, created_by, updated_by
+       FROM packing_lists
+       WHERE DATE(shipment_date) >= ? AND DATE(shipment_date) <= ?
+       ORDER BY shipment_date DESC, created_at DESC`,
+      [startDate, endDate]
+    );
+
+    return rows.map((row) => this.mapRowToPackingList(row));
+  }
+
+  /**
+   * 필터 + 페이징 적용 패킹리스트 조회
+   * @returns { rows: PackingList[], total: number }
+   */
+  async findWithFiltersPaginated(
+    filters: {
+      search?: string;
+      logisticsCompanies?: string[];
+      startDate?: string;
+      endDate?: string;
+      status?: string[];
+      purchaseOrderId?: string;
+    },
+    limit: number,
+    offset: number
+  ): Promise<{ rows: PackingList[]; total: number }> {
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+    const pl = 'pl';
+
+    if (filters.purchaseOrderId && filters.purchaseOrderId.trim()) {
+      conditions.push(
+        `EXISTS (SELECT 1 FROM packing_list_items pli WHERE pli.packing_list_id = pl.id AND pli.purchase_order_id = ?)`
+      );
+      params.push(filters.purchaseOrderId.trim());
+    }
+
+    if (filters.search && filters.search.trim()) {
+      const searchPattern = `%${filters.search.trim()}%`;
+      conditions.push(
+        `(pl.code LIKE ? OR pl.logistics_company LIKE ? OR EXISTS (SELECT 1 FROM packing_list_items pli WHERE pli.packing_list_id = pl.id AND pli.product_name LIKE ?))`
+      );
+      params.push(searchPattern, searchPattern, searchPattern);
+    }
+
+    if (filters.logisticsCompanies && filters.logisticsCompanies.length > 0) {
+      conditions.push(`pl.logistics_company IN (${filters.logisticsCompanies.map(() => '?').join(',')})`);
+      params.push(...filters.logisticsCompanies);
+    }
+
+    if (filters.startDate) {
+      conditions.push('DATE(pl.shipment_date) >= ?');
+      params.push(filters.startDate);
+    }
+
+    if (filters.endDate) {
+      conditions.push('DATE(pl.shipment_date) <= ?');
+      params.push(filters.endDate);
+    }
+
+    const hasKoreaArrivalSubquery = `EXISTS (SELECT 1 FROM packing_list_items pli INNER JOIN packing_list_korea_arrivals ka ON pli.id = ka.packing_list_item_id WHERE pli.packing_list_id = pl.id)`;
+    if (filters.status && filters.status.length > 0) {
+      const statusConds: string[] = [];
+      if (filters.status.includes('한국도착')) {
+        statusConds.push(hasKoreaArrivalSubquery);
+      }
+      if (filters.status.includes('배송중')) {
+        statusConds.push(`(pl.warehouse_arrival_date IS NOT NULL AND NOT ${hasKoreaArrivalSubquery})`);
+      }
+      if (filters.status.includes('내륙운송중')) {
+        statusConds.push(`(pl.warehouse_arrival_date IS NULL AND NOT ${hasKoreaArrivalSubquery})`);
+      }
+      if (statusConds.length > 0) {
+        conditions.push(`(${statusConds.join(' OR ')})`);
+      }
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const baseTable = `packing_lists ${pl}`;
+
+    const [countRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS total FROM ${baseTable} ${whereClause}`,
+      params
+    );
+    const total = countRows[0]?.total ?? 0;
+
+    const [rows] = await pool.execute<PackingListRow[]>(
+      `SELECT pl.id, pl.code, pl.shipment_date, pl.logistics_company, pl.warehouse_arrival_date,
+              pl.actual_weight, pl.weight_ratio, pl.calculated_weight, pl.shipping_cost,
+              pl.payment_date, pl.wk_payment_date, pl.repackaging_requirements, pl.admin_cost_paid, pl.admin_cost_paid_date,
+              pl.created_at, pl.updated_at, pl.created_by, pl.updated_by
+       FROM ${baseTable}
+       ${whereClause}
+       ORDER BY pl.shipment_date DESC, pl.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    return {
+      rows: rows.map((row) => this.mapRowToPackingList(row)),
+      total: Number(total),
+    };
   }
 
   /**
@@ -189,7 +303,7 @@ export class PackingListRepository {
       [code]
     );
 
-    return rows.map(this.mapRowToPackingList);
+    return rows.map((row) => this.mapRowToPackingList(row));
   }
 
   /**
@@ -1009,7 +1123,7 @@ export class PackingListRepository {
       [itemId]
     );
 
-    return rows.map(this.mapRowToKoreaArrival);
+    return rows.map((row) => this.mapRowToKoreaArrival(row));
   }
 
   /**
@@ -1401,28 +1515,44 @@ export class PackingListRepository {
   }
 
   // 매핑 함수들
+  /** DB DATE 컬럼을 YYYY-MM-DD 문자열로 변환 (로컬 날짜 유지, JSON 직렬화 시 UTC로 하루 밀리는 현상 방지) */
+  private dateToYMD(d: Date | string | null | undefined): string | null {
+    if (d == null) return null;
+    if (typeof d === 'string') {
+      const match = d.match(/^(\d{4}-\d{2}-\d{2})/);
+      return match ? match[1] : d;
+    }
+    if (typeof d === 'object' && d instanceof Date && !Number.isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${month}-${day}`;
+    }
+    return null;
+  }
+
   private mapRowToPackingList(row: PackingListRow): PackingList {
     console.log('[비율 로드 - 서버] mapRowToPackingList, row.weight_ratio:', row.weight_ratio, 'packingListId:', row.id);
     return {
       id: row.id,
       code: row.code,
-      shipment_date: row.shipment_date,
+      shipment_date: (this.dateToYMD(row.shipment_date) ?? (row.shipment_date != null ? String(row.shipment_date).slice(0, 10) : null) ?? row.shipment_date) as unknown as Date,
       logistics_company: row.logistics_company,
-      warehouse_arrival_date: row.warehouse_arrival_date,
+      warehouse_arrival_date: this.dateToYMD(row.warehouse_arrival_date) ?? row.warehouse_arrival_date,
       actual_weight: row.actual_weight,
       weight_ratio: row.weight_ratio,
       calculated_weight: row.calculated_weight,
       shipping_cost: row.shipping_cost,
-      payment_date: row.payment_date,
-      wk_payment_date: row.wk_payment_date,
+      payment_date: this.dateToYMD(row.payment_date) ?? row.payment_date,
+      wk_payment_date: this.dateToYMD(row.wk_payment_date) ?? row.wk_payment_date,
       repackaging_requirements: row.repackaging_requirements,
       admin_cost_paid: row.admin_cost_paid ? Boolean(row.admin_cost_paid) : false,
-      admin_cost_paid_date: row.admin_cost_paid_date,
+      admin_cost_paid_date: this.dateToYMD(row.admin_cost_paid_date) ?? row.admin_cost_paid_date,
       created_at: row.created_at,
       updated_at: row.updated_at,
       created_by: row.created_by,
       updated_by: row.updated_by,
-    };
+    } as PackingList;
   }
 
   private mapRowToOverseasInvoice(row: OverseasInvoiceRow): OverseasInvoice {
@@ -1477,7 +1607,7 @@ export class PackingListRepository {
     return {
       id: row.id,
       packing_list_item_id: row.packing_list_item_id,
-      arrival_date: row.arrival_date,
+      arrival_date: (this.dateToYMD(row.arrival_date) ?? row.arrival_date) as unknown as Date,
       quantity: row.quantity,
       created_at: row.created_at,
       updated_at: row.updated_at,

@@ -82,21 +82,14 @@ export function PaymentHistoryRow({
     try {
       await updateAdminCostPaid(item.source_id, newValue);
       
-      // 낙관적 업데이트: 날짜도 즉시 업데이트 (로컬 날짜 기준)
-      if (newValue) {
-        const today = getLocalDateString();
-        setAdminCostPaidDate(today);
-      } else {
-        setAdminCostPaidDate(null);
-      }
+      const today = newValue ? getLocalDateString() : null;
+      setAdminCostPaidDate(today);
       
-      // 성공 시 onRefresh 호출하여 목록 새로고침
-      if (onRefresh) {
-        // 약간의 지연을 두어 서버 데이터가 반영되도록 함
-        setTimeout(() => {
-          onRefresh();
-        }, 300);
+      // 목록 전체 리로드 없이 해당 행만 부모 state 반영 (화면 리프레시 방지)
+      if (onItemUpdate) {
+        onItemUpdate(item.id, { admin_cost_paid: newValue, admin_cost_paid_date: today });
       }
+      onStatisticsRefresh?.();
     } catch (error: any) {
       console.error('A레벨 관리자 비용 지불 완료 상태 업데이트 오류:', error);
       // 실패 시 이전 값으로 롤백
@@ -142,21 +135,14 @@ export function PaymentHistoryRow({
 
       await updatePackingListAdminCostPaid(packingListId, newValue);
       
-      // 낙관적 업데이트: 날짜도 즉시 업데이트 (로컬 날짜 기준)
-      if (newValue) {
-        const today = getLocalDateString();
-        setAdminCostPaidDate(today);
-      } else {
-        setAdminCostPaidDate(null);
-      }
+      const today = newValue ? getLocalDateString() : null;
+      setAdminCostPaidDate(today);
       
-      // 성공 시 onRefresh 호출하여 목록 새로고침 및 통계 카드 업데이트
-      if (onRefresh) {
-        // 약간의 지연을 두어 서버 데이터가 반영되도록 함
-        setTimeout(() => {
-          onRefresh();
-        }, 300);
+      // 목록 전체 리로드 없이 해당 행만 부모 state 반영 (화면 리프레시 방지)
+      if (onItemUpdate) {
+        onItemUpdate(item.id, { admin_cost_paid: newValue, admin_cost_paid_date: today });
       }
+      onStatisticsRefresh?.();
     } catch (error: any) {
       console.error('A레벨 관리자 비용 지불 완료 상태 업데이트 오류:', error);
       // 실패 시 이전 값으로 롤백

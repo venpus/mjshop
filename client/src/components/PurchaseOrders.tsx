@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Filter, Download, Eye, Package, Plus, Image, X, CheckSquare, RotateCw, Trash2 } from 'lucide-react';
+import { Filter, Download, Eye, Package, Plus, Image, X, CheckSquare, RotateCw, Trash2, Search } from 'lucide-react';
 import { TablePagination } from './ui/table-pagination';
 import { StatusBadge } from './ui/status-badge';
 import { SearchBar } from './ui/search-bar';
@@ -81,46 +81,54 @@ interface PurchaseOrder {
 }
 
 export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
-  console.log('[PurchaseOrders] 컴포넌트 렌더링 시작');
   const { user } = useAuth();
   const isSuperAdmin = user?.level === 'A-SuperAdmin';
   const location = useLocation();
   const navigate = useNavigate();
   
-  console.log('[PurchaseOrders] 현재 경로:', location.pathname);
-  console.log('[PurchaseOrders] user:', user);
-  
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [totalItems, setTotalItems] = useState(0); // 전체 발주 개수 (서버에서 받음)
   const [isLoading, setIsLoading] = useState(true);
   
-  useEffect(() => {
-    console.log('[PurchaseOrders] useEffect 실행 - 컴포넌트 마운트 또는 경로 변경');
-    console.log('[PurchaseOrders] location.pathname:', location.pathname);
-  }, [location.pathname]);
   const [statusFilter, setStatusFilter] = useState<string>('전체');
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   
-  // URL 쿼리 파라미터에서 페이지 번호 및 검색어 읽기
+  // URL ↔ 필터 직렬화 (페이지 이동/새로고침 시 필터 유지)
+  type FiltersState = { deliveryStatus: string[]; paymentStatus: string[]; orderStatus: string[] };
+  const parseFiltersFromParams = (params: URLSearchParams): FiltersState => ({
+    deliveryStatus: params.get('deliveryStatus')?.split(',').filter(Boolean) ?? [],
+    paymentStatus: params.get('paymentStatus')?.split(',').filter(Boolean) ?? [],
+    orderStatus: params.get('orderStatus')?.split(',').filter(Boolean) ?? [],
+  });
+  const buildQueryWithFilters = (page: number, itemsPerPage: number, search: string, f: FiltersState) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('itemsPerPage', String(itemsPerPage));
+    if (search.trim()) params.set('search', search.trim());
+    if (f.orderStatus.length) params.set('orderStatus', f.orderStatus.join(','));
+    if (f.deliveryStatus.length) params.set('deliveryStatus', f.deliveryStatus.join(','));
+    if (f.paymentStatus.length) params.set('paymentStatus', f.paymentStatus.join(','));
+    return params.toString();
+  };
+
   const searchParams = new URLSearchParams(location.search);
   const pageFromUrl = parseInt(searchParams.get('page') || '1', 10);
   const itemsPerPageFromUrl = parseInt(searchParams.get('itemsPerPage') || '15', 10);
   const searchFromUrl = searchParams.get('search') || '';
-  
+  const filtersFromUrl = parseFiltersFromParams(searchParams);
+
   const [currentPage, setCurrentPage] = useState(pageFromUrl);
   const [itemsPerPage, setItemsPerPage] = useState(itemsPerPageFromUrl);
-  const [searchTerm, setSearchTerm] = useState(searchFromUrl); // 실제 검색에 사용되는 검색어
-  const [inputSearchTerm, setInputSearchTerm] = useState(searchFromUrl); // 입력 필드에 표시되는 검색어
+  const [searchTerm, setSearchTerm] = useState(searchFromUrl);
+  const [inputSearchTerm, setInputSearchTerm] = useState(searchFromUrl);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [filters, setFilters] = useState({
-    // factoryStatus: [] as string[], // 출고상태 필터 (주석 처리 - 추후 사용 예정)
-    // workStatus: [] as string[], // 작업상태 필터 (제거됨)
-    deliveryStatus: [] as string[],
-    paymentStatus: [] as string[],
-    orderStatus: [] as string[],
-  });
+  const [filters, setFilters] = useState<FiltersState>(filtersFromUrl);
+
+  // 필터 유지 상태에서 페이징 시 불필요한 API 재호출 방지: searchTerm/filters 변경 시에만 재요청
+  const prevSearchTermRef = useRef<string | null>(null);
+  const prevFiltersRef = useRef<typeof filters | null>(null);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
   const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
@@ -224,25 +232,31 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
               (po.has_korea_arrival !== undefined && (Number(po.has_korea_arrival) > 0 || po.has_korea_arrival === true)), // hasKoreaArrival
               po.delivery_status || '대기중' // defaultDeliveryStatus
             ),
-            // 결제 상태 정규화: 유효한 값만 허용하고, 그 외는 '미결제'로 변환
+            // 선금/잔금 정보 (먼저 파싱)
+            advancePaymentAmount: po.advance_payment_amount || null,
+            advancePaymentDate: po.advance_payment_date ? formatDateForInput(po.advance_payment_date) : null,
+            balancePaymentAmount: po.balance_payment_amount || null,
+            balancePaymentDate: po.balance_payment_date ? formatDateForInput(po.balance_payment_date) : null,
+            // 결제 상태 계산: 선금/잔금 날짜를 기반으로 재계산 (DB 값과 동기화 보장)
             paymentStatus: (() => {
-              const status = po.payment_status;
-              if (!status || typeof status !== 'string') return '미결제';
-              const normalizedStatus = status.trim();
-              if (['미결제', '선금결제', '완료'].includes(normalizedStatus)) {
-                return normalizedStatus;
+              const advanceDate = po.advance_payment_date ? formatDateForInput(po.advance_payment_date) : null;
+              const balanceDate = po.balance_payment_date ? formatDateForInput(po.balance_payment_date) : null;
+              
+              // 선금과 잔금 날짜가 모두 있으면 '완료'
+              if (advanceDate && balanceDate) {
+                return '완료';
               }
+              // 선금 날짜만 있으면 '선금결제'
+              if (advanceDate) {
+                return '선금결제';
+              }
+              // 둘 다 없으면 '미결제'
               return '미결제';
             })(),
             // order_status가 있으면 사용, 없으면 is_confirmed 기반으로 계산 (기존 데이터 호환성)
             orderStatus: po.order_status || (po.is_confirmed ? '발주확인' : '발주 대기'),
             date: formatDateForInput(po.order_date),
             isOrderConfirmed: po.is_confirmed || false,
-            // 선금/잔금 정보
-            advancePaymentAmount: po.advance_payment_amount || null,
-            advancePaymentDate: po.advance_payment_date ? formatDateForInput(po.advance_payment_date) : null,
-            balancePaymentAmount: po.balance_payment_amount || null,
-            balancePaymentDate: po.balance_payment_date ? formatDateForInput(po.balance_payment_date) : null,
             // 패킹리스트와 연동된 수량 정보
             unshippedQuantity: po.unshipped_quantity !== undefined ? Number(po.unshipped_quantity) : undefined,
             shippingQuantity: po.shipping_quantity !== undefined ? Number(po.shipping_quantity) : undefined,
@@ -328,10 +342,11 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     // paymentStatus는 항상 '미결제', '선금결제', '완료' 중 하나로 정규화되어 있음
     const matchesPaymentStatus = filters.paymentStatus.length === 0 || filters.paymentStatus.includes(po.paymentStatus);
     
-    
     const matchesOrderStatus = filters.orderStatus.length === 0 || filters.orderStatus.includes(po.orderStatus);
     
-    return /* matchesFactoryStatus && */ /* matchesWorkStatus && */ matchesDeliveryStatus && matchesPaymentStatus && matchesOrderStatus;
+    const finalMatch = /* matchesFactoryStatus && */ /* matchesWorkStatus && */ matchesDeliveryStatus && matchesPaymentStatus && matchesOrderStatus;
+    
+    return finalMatch;
   });
 
   const statusOptions = ['전체', '출고대기', '배송중', '수령완료', '작업대기', '작업중', '완료', '공장출고', '중국운송중', '항공운송중', '해운운송중', '통관및 배달', '한국도착'];
@@ -369,19 +384,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const handleSearch = () => {
     const trimmedSearch = inputSearchTerm.trim();
     setSearchTerm(trimmedSearch);
-    setCurrentPage(1); // 검색 시 첫 페이지로 이동
-    
-    // URL 쿼리 파라미터 업데이트
-    const params = new URLSearchParams(location.search);
-    if (trimmedSearch) {
-      params.set('search', trimmedSearch);
-    } else {
-      params.delete('search');
-    }
-    params.set('page', '1'); // 검색 시 페이지를 1로 리셋
-    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
-    
-    // 검색어가 변경되면 서버에서 데이터를 다시 로드 (useEffect에서 자동 처리됨)
+    setInputSearchTerm(trimmedSearch);
+    setCurrentPage(1);
   };
 
   // 입력 필드 변경 핸들러 (실제 검색은 실행하지 않음)
@@ -399,40 +403,71 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    // URL 쿼리 파라미터 업데이트
-    const params = new URLSearchParams(location.search);
-    params.set('page', page.toString());
-    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
   };
 
   const handleItemsPerPageChange = (value: number) => {
     setItemsPerPage(value);
-    setCurrentPage(1); // Reset to first page when changing items per page
-    // URL 쿼리 파라미터 업데이트
-    const params = new URLSearchParams(location.search);
-    params.set('itemsPerPage', value.toString());
-    params.set('page', '1');
-    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+    setCurrentPage(1);
   };
 
-  // URL 쿼리 파라미터 변경 시 상태 동기화
+  // URL 쿼리 파라미터 변경 시 상태 동기화 (필터 포함 → 페이지 이동 시 필터 유지)
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const pageFromUrl = parseInt(searchParams.get('page') || '1', 10);
-    const itemsPerPageFromUrl = parseInt(searchParams.get('itemsPerPage') || '15', 10);
-    const searchFromUrl = searchParams.get('search') || '';
-    
-    // URL 값으로 상태 업데이트
+    const params = new URLSearchParams(location.search);
+    const pageFromUrl = parseInt(params.get('page') || '1', 10);
+    const itemsPerPageFromUrl = parseInt(params.get('itemsPerPage') || '15', 10);
+    const searchFromUrl = params.get('search') || '';
+    const filtersFromUrl = parseFiltersFromParams(params);
+
     setCurrentPage(pageFromUrl);
     setItemsPerPage(itemsPerPageFromUrl);
     setSearchTerm(searchFromUrl);
-    setInputSearchTerm(searchFromUrl); // 입력 필드도 동기화
+    setInputSearchTerm(searchFromUrl);
+    setFilters(filtersFromUrl);
   }, [location.search]);
 
+  // 상태 변경 시 URL 반영 (필터·페이지·검색 유지)
   useEffect(() => {
-    loadPurchaseOrders();
+    const params = new URLSearchParams(location.search);
+    const urlPage = parseInt(params.get('page') || '1', 10);
+    const urlItemsPerPage = parseInt(params.get('itemsPerPage') || '15', 10);
+    const urlSearch = params.get('search') || '';
+    const urlFilters = parseFiltersFromParams(params);
+    const urlMatches =
+      urlPage === currentPage &&
+      urlItemsPerPage === itemsPerPage &&
+      urlSearch === searchTerm &&
+      JSON.stringify(urlFilters) === JSON.stringify(filters);
+    if (!urlMatches) {
+      const query = buildQueryWithFilters(currentPage, itemsPerPage, searchTerm, filters);
+      navigate(`${location.pathname}?${query}`, { replace: true });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, itemsPerPage, searchTerm, filters]); // 페이지, itemsPerPage, 검색어, 필터 변경 시 다시 로드
+  }, [currentPage, itemsPerPage, searchTerm, filters]);
+
+  // 필터 활성화 시: searchTerm 또는 filters 변경 시에만 API 호출 (페이징 이동 시에는 기존 데이터로 slice만 사용)
+  useEffect(() => {
+    const hasActiveStatusFilters =
+      filters.deliveryStatus.length > 0 ||
+      filters.paymentStatus.length > 0 ||
+      filters.orderStatus.length > 0;
+
+    const searchTermChanged = prevSearchTermRef.current !== searchTerm;
+    const filtersChanged =
+      prevFiltersRef.current === null ||
+      JSON.stringify(prevFiltersRef.current) !== JSON.stringify(filters);
+
+    const shouldReload =
+      !hasActiveStatusFilters ||
+      searchTermChanged ||
+      filtersChanged;
+
+    if (shouldReload) {
+      loadPurchaseOrders();
+      prevSearchTermRef.current = searchTerm;
+      prevFiltersRef.current = { ...filters };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, itemsPerPage, searchTerm, filters]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
@@ -564,21 +599,19 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       const newValues = current.includes(value)
         ? current.filter(v => v !== value)
         : [...current, value];
-      // 필터 변경 시 첫 페이지로 리셋
-      setCurrentPage(1);
       return { ...prev, [category]: newValues };
     });
+    setCurrentPage(1); // 필터 변경 시 첫 페이지로 리셋
   };
 
   // 모든 필터 초기화
   const clearAllFilters = () => {
     setFilters({
-      // factoryStatus: [], // 출고상태 필터 (주석 처리 - 추후 사용 예정)
-      // workStatus: [], // 작업상태 필터 (제거됨)
       deliveryStatus: [],
       paymentStatus: [],
       orderStatus: [],
     });
+    setCurrentPage(1);
   };
 
   // 활성 필터 개수
@@ -637,7 +670,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
             {/* Filter Dropdown Panel */}
             {isFilterOpen && (
-              <div className="absolute top-full left-0 mt-2 w-[850px] bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+              <div className="absolute top-full left-0 mt-2 w-[1050px] bg-white rounded-lg shadow-xl border border-gray-200 z-50">
                 <div className="p-3">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-gray-900 text-sm">필터 옵션</h3>
@@ -660,7 +693,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                   </div>
 
                   {/* Filter Groups - Grid Layout */}
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-5 gap-3">
                     {/* 발주 상태 */}
                     <div className="bg-indigo-50 rounded-lg p-2.5 border border-indigo-200">
                       <h4 className="text-xs text-indigo-900 mb-2 pb-1.5 border-b border-indigo-300">발주 상태</h4>
@@ -678,26 +711,6 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                         ))}
                       </div>
                     </div>
-
-                    {/* 업체출고 상태 필터 (주석 처리 - 추후 사용 예정) */}
-                    {/* <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-200">
-                      <h4 className="text-xs text-blue-900 mb-2 pb-1.5 border-b border-blue-300">업체출고 상태</h4>
-                      <div className="space-y-1.5">
-                        {['출고대기', '배송중', '수령완료'].map(status => (
-                          <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-blue-100 p-1 rounded">
-                            <input
-                              type="checkbox"
-                              checked={filters.factoryStatus.includes(status)}
-                              onChange={() => toggleFilter('factoryStatus', status)}
-                              className="w-3.5 h-3.5 accent-blue-600 cursor-pointer"
-                            />
-                            <span className="text-xs text-gray-700">{status}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div> */}
-
-                    {/* 작업 상태 필터 (제거됨) */}
 
                     {/* 배송 상태 */}
                     <div className="bg-purple-50 rounded-lg p-2.5 border border-purple-200">
@@ -892,19 +905,37 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                       }}
                     >
                       <div className="flex flex-col items-center gap-2">
-                        <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden flex items-center justify-center">
-                          {po.product?.main_image ? (
-                            <img
-                              src={getFullImageUrl(po.product.main_image)}
-                              alt={po.product.name}
-                              className="w-full h-full object-cover"
-                              onMouseMove={handleMouseMove}
-                              onMouseEnter={() => setHoveredProduct(getFullImageUrl(po.product.main_image))}
-                              onMouseLeave={() => setHoveredProduct(null)}
-                            />
-                          ) : (
-                            <Image className="w-5 h-5 text-gray-400" />
-                          )}
+                        <div className="flex items-center gap-1.5 justify-center">
+                          <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden flex items-center justify-center flex-shrink-0">
+                            {po.product?.main_image ? (
+                              <img
+                                src={getFullImageUrl(po.product.main_image)}
+                                alt={po.product.name}
+                                className="w-full h-full object-cover"
+                                onMouseMove={handleMouseMove}
+                                onMouseEnter={() => setHoveredProduct(getFullImageUrl(po.product.main_image))}
+                                onMouseLeave={() => setHoveredProduct(null)}
+                              />
+                            ) : (
+                              <Image className="w-5 h-5 text-gray-400" />
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const params = new URLSearchParams();
+                              params.set('purchaseOrderId', po.id);
+                              if (po.poNumber?.trim()) {
+                                params.set('poNumber', po.poNumber.trim());
+                              }
+                              window.open(`/admin/shipping-history?${params.toString()}`, '_blank');
+                            }}
+                            className="p-1.5 rounded text-gray-500 hover:bg-purple-100 hover:text-purple-600 transition-colors"
+                            title="패킹리스트에서 이 발주 관련 목록 보기"
+                          >
+                            <Search className="w-4 h-4" />
+                          </button>
                         </div>
                         <span className="text-gray-600 text-center font-bold">{po.product?.name || '-'}</span>
                       </div>

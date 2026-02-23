@@ -9,6 +9,7 @@ import projectRoutes from './projects.js';
 import paymentRequestRoutes from './paymentRequests.js';
 import permissionRoutes from './permissions.js';
 import stockOutboundRoutes from './stockOutbound.js';
+import qwenRoutes from './qwen.js';
 
 const router = Router();
 
@@ -23,6 +24,7 @@ router.use('/projects', projectRoutes);
 router.use('/payment-requests', paymentRequestRoutes);
 router.use('/permissions', permissionRoutes);
 router.use('/stock-outbound', stockOutboundRoutes);
+router.use('/qwen', qwenRoutes);
 
 router.get('/', (req, res) => {
   res.json({ 

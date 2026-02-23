@@ -1800,5 +1800,119 @@ export class PurchaseOrderRepository {
       [replyId]
     );
   }
+
+  /**
+   * 한국에 도착하지 않은 물품 분석 조회
+   * - 납기일, 수량, 단가, 총금액 분석
+   * - 모든 물품들의 수량 합계와 총 금액 합계 포함
+   * - 하드코딩으로 제외할 발주 ID 목록
+   */
+  private readonly EXCLUDED_PO_IDS: string[] = [
+    // 제외할 발주 ID를 여기에 추가하세요
+    // 예: 'PO001', 'PO002'
+  ];
+
+  async findNotArrivedAnalysis(): Promise<{
+    items: Array<{
+      id: string;
+      po_number: string;
+      order_date: Date | null;
+      product_name: string;
+      product_main_image: string | null;
+      estimated_delivery: Date | null;
+      quantity: number;
+      unreceived_quantity: number;
+      shipping_quantity: number;
+      arrived_quantity: number;
+      unit_price: number;
+      order_unit_price: number | null;
+      total_amount: number;
+      not_arrived_quantity: number;
+    }>;
+    summary: {
+      total_quantity: number;
+      total_amount: number;
+      not_arrived_quantity: number;
+      not_arrived_amount: number;
+    };
+  }> {
+    // 제외할 발주 ID가 있으면 WHERE 조건에 추가
+    const excludeCondition = this.EXCLUDED_PO_IDS.length > 0 
+      ? `AND po.id NOT IN (${this.EXCLUDED_PO_IDS.map(() => '?').join(', ')})`
+      : '';
+    
+    const queryParams: any[] = [];
+    if (this.EXCLUDED_PO_IDS.length > 0) {
+      queryParams.push(...this.EXCLUDED_PO_IDS);
+    }
+
+    const [rows] = await pool.execute<RowDataPacket[]>(`
+      SELECT 
+        po.id,
+        po.po_number,
+        po.order_date,
+        po.product_name,
+        po.product_main_image,
+        po.estimated_delivery,
+        po.quantity,
+        po.unit_price,
+        po.order_unit_price,
+        COALESCE(summary.unreceived_quantity, 0) AS unreceived_quantity,
+        COALESCE(summary.shipping_quantity, 0) AS shipping_quantity,
+        COALESCE(summary.arrived_quantity, 0) AS arrived_quantity,
+        po.quantity - COALESCE(summary.arrived_quantity, 0) AS not_arrived_quantity,
+        -- 단가: order_unit_price가 있으면 사용, 없으면 unit_price 사용
+        COALESCE(po.order_unit_price, po.unit_price) AS effective_unit_price,
+        -- 총금액: 단가 * 수량
+        (COALESCE(po.order_unit_price, po.unit_price) * po.quantity) AS total_amount,
+        -- 미도착 금액: 단가 * 미도착 수량
+        (COALESCE(po.order_unit_price, po.unit_price) * (po.quantity - COALESCE(summary.arrived_quantity, 0))) AS not_arrived_amount
+      FROM purchase_orders po
+      LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
+      WHERE po.quantity > COALESCE(summary.arrived_quantity, 0)
+        ${excludeCondition}
+      ORDER BY po.order_date DESC, po.estimated_delivery ASC, po.po_number ASC
+    `, queryParams);
+
+    const items = rows.map(row => ({
+      id: row.id,
+      po_number: row.po_number,
+      order_date: row.order_date,
+      product_name: row.product_name,
+      product_main_image: row.product_main_image || null,
+      estimated_delivery: row.estimated_delivery,
+      quantity: Number(row.quantity),
+      unreceived_quantity: Number(row.unreceived_quantity),
+      shipping_quantity: Number(row.shipping_quantity),
+      arrived_quantity: Number(row.arrived_quantity),
+      unit_price: Number(row.unit_price),
+      order_unit_price: row.order_unit_price ? Number(row.order_unit_price) : null,
+      total_amount: Number(row.total_amount),
+      not_arrived_quantity: Number(row.not_arrived_quantity),
+    }));
+
+    // 전체 합계 계산 (모든 발주 대상)
+    const [summaryRows] = await pool.execute<RowDataPacket[]>(`
+      SELECT 
+        SUM(po.quantity) AS total_quantity,
+        SUM(COALESCE(po.order_unit_price, po.unit_price) * po.quantity) AS total_amount,
+        SUM(po.quantity - COALESCE(summary.arrived_quantity, 0)) AS not_arrived_quantity,
+        SUM(COALESCE(po.order_unit_price, po.unit_price) * (po.quantity - COALESCE(summary.arrived_quantity, 0))) AS not_arrived_amount
+      FROM purchase_orders po
+      LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
+    `);
+
+    const summary = {
+      total_quantity: Number(summaryRows[0]?.total_quantity || 0),
+      total_amount: Number(summaryRows[0]?.total_amount || 0),
+      not_arrived_quantity: Number(summaryRows[0]?.not_arrived_quantity || 0),
+      not_arrived_amount: Number(summaryRows[0]?.not_arrived_amount || 0),
+    };
+
+    return {
+      items,
+      summary,
+    };
+  }
 }
 

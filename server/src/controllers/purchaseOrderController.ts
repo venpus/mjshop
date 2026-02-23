@@ -1347,5 +1347,37 @@ export class PurchaseOrderController {
       });
     }
   };
+
+  /**
+   * 한국에 도착하지 않은 물품 분석 조회
+   * GET /api/purchase-orders/analysis/not-arrived
+   */
+  getNotArrivedAnalysis = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.getNotArrivedAnalysis();
+
+      // 날짜 필드 포맷팅 (YYYY-MM-DD 형식)
+      const { formatDateToKSTString } = await import('../utils/dateUtils.js');
+      const formattedItems = result.items.map(item => ({
+        ...item,
+        order_date: formatDateToKSTString(item.order_date),
+        estimated_delivery: formatDateToKSTString(item.estimated_delivery),
+      }));
+
+      res.json({
+        success: true,
+        data: {
+          items: formattedItems,
+          summary: result.summary,
+        },
+      });
+    } catch (error: any) {
+      console.error('한국 미도착 물품 분석 조회 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '분석 데이터 조회에 실패했습니다.',
+      });
+    }
+  };
 }
 

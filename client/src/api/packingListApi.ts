@@ -129,7 +129,7 @@ export async function getAllPackingLists(): Promise<PackingListWithItems[]> {
   return data.success ? data.data : [];
 }
 
-// 월별 패킹리스트 조회
+// 월별 패킹리스트 조회 (기존 호환)
 export async function getPackingListsByMonth(
   year: number,
   month: number
@@ -147,6 +147,74 @@ export async function getPackingListsByMonth(
 
   const data = await response.json();
   return data.success ? data.data : [];
+}
+
+export interface PackingListPagination {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface GetPackingListsPaginatedParams {
+  page: number;
+  limit: number;
+  search?: string;
+  logisticsCompanies?: string[];
+  startDate?: string;
+  endDate?: string;
+  status?: string[];
+  purchaseOrderId?: string;
+}
+
+// 패킹리스트 페이징 조회 (필터 + 페이징)
+export async function getPackingListsPaginated(
+  params: GetPackingListsPaginatedParams
+): Promise<{ data: PackingListWithItems[]; pagination: PackingListPagination }> {
+  const searchParams = new URLSearchParams();
+  searchParams.set('page', String(params.page));
+  searchParams.set('limit', String(params.limit));
+  if (params.search?.trim()) {
+    searchParams.set('search', params.search.trim());
+  }
+  if (params.logisticsCompanies?.length) {
+    searchParams.set('logisticsCompanies', params.logisticsCompanies.join(','));
+  }
+  if (params.startDate) {
+    searchParams.set('startDate', params.startDate);
+  }
+  if (params.endDate) {
+    searchParams.set('endDate', params.endDate);
+  }
+  if (params.status?.length) {
+    searchParams.set('status', params.status.join(','));
+  }
+  if (params.purchaseOrderId?.trim()) {
+    searchParams.set('purchaseOrderId', params.purchaseOrderId.trim());
+  }
+
+  const response = await fetch(`${API_BASE_URL}/packing-lists?${searchParams.toString()}`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('패킹리스트 조회에 실패했습니다.');
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || '패킹리스트 조회에 실패했습니다.');
+  }
+
+  return {
+    data: result.data ?? [],
+    pagination: result.pagination ?? {
+      total: 0,
+      page: params.page,
+      limit: params.limit,
+      totalPages: 0,
+    },
+  };
 }
 
 // ID로 패킹리스트 조회

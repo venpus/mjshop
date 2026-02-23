@@ -18,6 +18,7 @@ export interface PackingListItem {
   code: string; // 코드
   productName: string; // 제품명
   purchaseOrderId?: string; // 발주 ID (제품명 클릭 시 발주 상세로 이동하기 위해 필요)
+  poNumber?: string; // 발주번호 (발주별 정렬용)
   productImage: string; // 제품사진 (URL)
   entryQuantity: string; // 입수량
   boxCount: string; // 박스수

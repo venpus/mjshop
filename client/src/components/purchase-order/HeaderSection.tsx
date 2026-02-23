@@ -33,6 +33,7 @@ interface HeaderSectionProps {
   onProductClick?: () => void; // 제품명 링크 기능 제거로 optional로 변경
   onPhotoGalleryClick: () => void;
   onImageClick: () => void;
+  onViewPackingListClick?: () => void; // 패킹리스트 페이지에서 이 발주만 보기 (새 탭)
   
   // 편집 모드 (새 발주일 때 true)
   isEditable?: boolean;
@@ -82,6 +83,7 @@ export function HeaderSection({
   onProductClick,
   onPhotoGalleryClick,
   onImageClick,
+  onViewPackingListClick,
   currentFactoryStatus,
   totalShippedQuantity,
   totalReturnQuantity,
@@ -140,6 +142,7 @@ export function HeaderSection({
             onProductClick={onProductClick}
             onPhotoGalleryClick={onPhotoGalleryClick}
             onImageClick={onImageClick}
+            onViewPackingListClick={onViewPackingListClick}
             onMainImageUpload={onMainImageUpload}
             isEditable={isEditable}
             onProductNameChange={onProductNameChange}

@@ -9,6 +9,13 @@ export class StockOutboundService {
   }
 
   /**
+   * 최근 출고 기록 목록 조회 (AI 검색용)
+   */
+  async getAllRecords(limit: number = 50): Promise<StockOutboundRecord[]> {
+    return await this.repository.findAll(limit);
+  }
+
+  /**
    * groupKey로 출고 기록 목록 조회
    */
   async getRecordsByGroupKey(groupKey: string): Promise<StockOutboundRecord[]> {

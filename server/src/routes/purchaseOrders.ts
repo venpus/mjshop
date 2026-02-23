@@ -11,6 +11,9 @@ router.get('/', purchaseOrderController.getAllPurchaseOrders);
 // 미출고 수량이 있는 발주 목록 조회
 router.get('/unshipped', purchaseOrderController.getPurchaseOrdersWithUnshipped);
 
+// 한국에 도착하지 않은 물품 분석 조회
+router.get('/analysis/not-arrived', purchaseOrderController.getNotArrivedAnalysis);
+
 // 발주 상세 조회
 router.get('/:id', purchaseOrderController.getPurchaseOrderById);
 

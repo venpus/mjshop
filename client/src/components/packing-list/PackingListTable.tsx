@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, Fragment } from 'react';
 import { getGroupId, calculateShippingCostByLogisticsCompany } from '../../utils/packingListUtils';
 import type { PackingListItem, DomesticInvoice } from './types';
 import { PackingListHeader } from './PackingListHeader';
@@ -21,6 +21,12 @@ interface PackingListTableProps {
   hideSensitiveColumns: boolean; // C0 레벨, D0 레벨일 때 실중량, 비율, 중량, 배송비, 지급일, WK결제일 숨김
   isC0Level?: boolean; // C0 레벨 여부 (물류회사 읽기 전용 표시용)
   isD0Level?: boolean; // D0 레벨 여부 (물류회사 읽기 전용 표시용)
+  /** 수정한 행(그룹) 아래에 표시할 저장 바 */
+  lastEditedGroupId?: string | null;
+  /** 체크박스로 선택한 행(그룹) 아래에 표시할 수정/삭제 바 */
+  firstSelectedGroupId?: string | null;
+  saveBarContent?: React.ReactNode;
+  editBarContent?: React.ReactNode;
 }
 
 /**
@@ -54,7 +60,12 @@ export function PackingListTable({
   hideSensitiveColumns,
   isC0Level = false,
   isD0Level = false,
+  lastEditedGroupId = null,
+  firstSelectedGroupId = null,
+  saveBarContent = null,
+  editBarContent = null,
 }: PackingListTableProps) {
+  const colSpan = 1 + getColumnCount(isSuperAdmin, hideSensitiveColumns);
   // 그룹별로 아이템들을 나누기 (순서 유지)
   const groupedItems = useMemo(() => {
     const groups: { [key: string]: PackingListItem[] } = {};
@@ -199,37 +210,59 @@ export function PackingListTable({
                 </td>
               </tr>
             ) : (
-              renderItems.map((item) => {
+              renderItems.map((item, index) => {
                 const isFirst = isFirstRowInGroup(item);
                 const groupSize = getGroupSize(item);
+                const groupId = getGroupId(item.id);
+                const nextItem = items[index + 1];
+                const isLastRowOfGroup = !nextItem || getGroupId(nextItem.id) !== groupId;
 
                 return (
-                  <PackingListRow
-                    key={item.id}
-                    item={item}
-                    isFirst={isFirst}
-                    groupSize={groupSize}
-                    isSuperAdmin={isSuperAdmin}
-                    isCodeSelected={isCodeSelected(item.code, item.date)}
-                    onToggleCode={onToggleCode}
-                    onUnitChange={handleUnitChange}
-                    onInvoiceChange={handleInvoiceChange}
-                    onLogisticsCompanyChange={handleLogisticsCompanyChange}
-                    onWarehouseArrivalDateChange={handleWarehouseArrivalDateChange}
-                    onKoreaArrivalChange={handleKoreaArrivalChange}
-                    onActualWeightChange={handleActualWeightChange}
-                    onWeightRatioChange={handleWeightRatioChange}
-                    onShippingCostChange={handleShippingCostChange}
-                    onPaymentDateChange={handlePaymentDateChange}
-                    onWkPaymentDateChange={handleWkPaymentDateChange}
-                    onProductNameClick={onProductNameClick}
-                    onImageClick={onImageClick}
-                    showCodeLink={showCodeLink}
-                    onCodeClick={onCodeClick}
-                    hideSensitiveColumns={hideSensitiveColumns}
-                    isC0Level={isC0Level}
-                    isD0Level={isD0Level}
-                  />
+                  <Fragment key={item.id}>
+                    <PackingListRow
+                      item={item}
+                      isFirst={isFirst}
+                      groupSize={groupSize}
+                      isSuperAdmin={isSuperAdmin}
+                      isCodeSelected={isCodeSelected(item.code, item.date)}
+                      onToggleCode={onToggleCode}
+                      onUnitChange={handleUnitChange}
+                      onInvoiceChange={handleInvoiceChange}
+                      onLogisticsCompanyChange={handleLogisticsCompanyChange}
+                      onWarehouseArrivalDateChange={handleWarehouseArrivalDateChange}
+                      onKoreaArrivalChange={handleKoreaArrivalChange}
+                      onActualWeightChange={handleActualWeightChange}
+                      onWeightRatioChange={handleWeightRatioChange}
+                      onShippingCostChange={handleShippingCostChange}
+                      onPaymentDateChange={handlePaymentDateChange}
+                      onWkPaymentDateChange={handleWkPaymentDateChange}
+                      onProductNameClick={onProductNameClick}
+                      onImageClick={onImageClick}
+                      showCodeLink={showCodeLink}
+                      onCodeClick={onCodeClick}
+                      hideSensitiveColumns={hideSensitiveColumns}
+                      isC0Level={isC0Level}
+                      isD0Level={isD0Level}
+                    />
+                    {isLastRowOfGroup && (
+                      <>
+                        {lastEditedGroupId === groupId && saveBarContent && (
+                          <tr className="bg-amber-50/50">
+                            <td colSpan={colSpan} className="p-0 align-top">
+                              {saveBarContent}
+                            </td>
+                          </tr>
+                        )}
+                        {firstSelectedGroupId === groupId && editBarContent && (
+                          <tr className="bg-blue-50/50">
+                            <td colSpan={colSpan} className="p-0 align-top">
+                              {editBarContent}
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    )}
+                  </Fragment>
                 );
               })
             )}

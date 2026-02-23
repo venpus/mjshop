@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import { getGroupId } from '../../utils/packingListUtils';
 import type { PackingListItem, DomesticInvoice } from './types';
 import { LOGISTICS_COMPANIES } from './types';
@@ -60,6 +61,22 @@ export function PackingListRow({
 }: PackingListRowProps) {
   const isMultipleProducts = groupSize > 1;
   const groupId = getGroupId(item.id);
+
+  // 날짜 입력: blur 시에만 부모 반영. 다른 행으로 바뀐 경우에만 prop으로 로컬 동기화 (blur 시 이전 값으로 덮어쓰는 것 방지)
+  const [localWarehouseDate, setLocalWarehouseDate] = useState(item.warehouseArrivalDate ?? '');
+  const [localPaymentDate, setLocalPaymentDate] = useState(item.paymentDate ?? '');
+  const [localWkPaymentDate, setLocalWkPaymentDate] = useState(item.wkPaymentDate ?? '');
+  const [focusedDateField, setFocusedDateField] = useState<'warehouse' | 'payment' | 'wk' | null>(null);
+  const itemIdRef = useRef(item.id);
+
+  useEffect(() => {
+    if (itemIdRef.current !== item.id) {
+      itemIdRef.current = item.id;
+      setLocalWarehouseDate(item.warehouseArrivalDate ?? '');
+      setLocalPaymentDate(item.paymentDate ?? '');
+      setLocalWkPaymentDate(item.wkPaymentDate ?? '');
+    }
+  }, [item.id, item.warehouseArrivalDate, item.paymentDate, item.wkPaymentDate]);
 
   if (!isFirst) {
     // 두 번째 행 이후: rowspan으로 병합된 열들은 생략하고 제품, 입수량, 총수량, 한국도착일만 표시
@@ -189,8 +206,15 @@ export function PackingListRow({
       <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
         <input
           type="date"
-          value={item.warehouseArrivalDate}
-          onChange={(e) => onWarehouseArrivalDateChange(groupId, e.target.value)}
+          value={localWarehouseDate}
+          onChange={(e) => setLocalWarehouseDate(e.target.value)}
+          onFocus={() => setFocusedDateField('warehouse')}
+          onBlur={() => {
+            setFocusedDateField(null);
+            if (localWarehouseDate !== (item.warehouseArrivalDate ?? '')) {
+              onWarehouseArrivalDateChange(groupId, localWarehouseDate);
+            }
+          }}
           className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
         />
       </td>
@@ -227,8 +251,15 @@ export function PackingListRow({
         <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200 align-middle whitespace-nowrap">
           <input
             type="date"
-            value={item.paymentDate}
-            onChange={(e) => onPaymentDateChange(groupId, e.target.value)}
+            value={localPaymentDate}
+            onChange={(e) => setLocalPaymentDate(e.target.value)}
+            onFocus={() => setFocusedDateField('payment')}
+            onBlur={() => {
+              setFocusedDateField(null);
+              if (localPaymentDate !== (item.paymentDate ?? '')) {
+                onPaymentDateChange(groupId, localPaymentDate);
+              }
+            }}
             className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
           />
         </td>
@@ -238,8 +269,15 @@ export function PackingListRow({
         <td rowSpan={isMultipleProducts ? groupSize : undefined} className="px-4 py-3 text-sm text-center text-gray-900 align-middle whitespace-nowrap">
           <input
             type="date"
-            value={item.wkPaymentDate}
-            onChange={(e) => onWkPaymentDateChange(groupId, e.target.value)}
+            value={localWkPaymentDate}
+            onChange={(e) => setLocalWkPaymentDate(e.target.value)}
+            onFocus={() => setFocusedDateField('wk')}
+            onBlur={() => {
+              setFocusedDateField(null);
+              if (localWkPaymentDate !== (item.wkPaymentDate ?? '')) {
+                onWkPaymentDateChange(groupId, localWkPaymentDate);
+              }
+            }}
             className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm text-center"
           />
         </td>

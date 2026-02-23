@@ -8,6 +8,7 @@ import {
   Calendar,
   DollarSign,
   Upload,
+  Search,
 } from "lucide-react";
 import { useRef, useState, useEffect, useMemo } from "react";
 import { handleNumberInput } from "../utils/numberInputUtils";
@@ -44,6 +45,7 @@ interface ProductInfoSectionProps {
   onProductClick?: () => void; // 제품명 링크 기능 제거로 optional로 변경
   onPhotoGalleryClick: () => void;
   onImageClick: () => void;
+  onViewPackingListClick?: () => void; // 패킹리스트 페이지에서 이 발주만 보기 (새 탭)
   onMainImageUpload?: (file: File) => Promise<void>; // 메인 이미지 업로드 핸들러
   
   // 편집 모드 (새 발주일 때 true)
@@ -81,6 +83,7 @@ export function ProductInfoSection({
   onProductClick,
   onPhotoGalleryClick,
   onImageClick,
+  onViewPackingListClick,
   onMainImageUpload,
   isEditable = false,
   onProductNameChange,
@@ -222,6 +225,18 @@ export function ProductInfoSection({
             <Images className="w-5 h-5" />
             <span className="font-semibold">사진첩</span>
           </button>
+          {/* 패킹 리스트 검색 (새 탭에서 이 발주 관련 패킹리스트만 보기) */}
+          {onViewPackingListClick && (
+            <button
+              type="button"
+              onClick={onViewPackingListClick}
+              className="flex items-center gap-2 px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 transition-colors"
+              title="패킹리스트에서 이 발주 관련 목록 보기"
+            >
+              <Search className="w-5 h-5" />
+              <span className="font-semibold">패킹 리스트 검색</span>
+            </button>
+          )}
         </div>
 
         {/* 발주 컨펌 체크박스 (C0 레벨에서는 숨김) */}

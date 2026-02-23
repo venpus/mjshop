@@ -937,5 +937,12 @@ export class PurchaseOrderService {
   async deleteMemoReply(replyId: number) {
     await this.repository.deleteMemoReply(replyId);
   }
+
+  /**
+   * 한국에 도착하지 않은 물품 분석 조회
+   */
+  async getNotArrivedAnalysis() {
+    return await this.repository.findNotArrivedAnalysis();
+  }
 }
 

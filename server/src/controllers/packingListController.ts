@@ -29,29 +29,83 @@ export class PackingListController {
 
   /**
    * 모든 패킹리스트 조회
-   * GET /api/packing-lists?year=2024&month=12
+   * GET /api/packing-lists
+   * - page, limit 있음: 필터+페이징 적용, pagination 포함 응답
+   * - year, month 있음: 해당 월만 조회 (기존 호환)
+   * - 없음: 전체 조회 (InboundTab, StockDetail 등)
    */
   getAllPackingLists = async (req: Request, res: Response) => {
     try {
+      const pageParam = req.query.page;
+      const limitParam = req.query.limit;
+      const hasPaging = pageParam != null && limitParam != null;
+
+      if (hasPaging) {
+        const page = parseInt(pageParam as string, 10);
+        const limit = parseInt(limitParam as string, 10);
+        if (isNaN(page) || page < 1) {
+          return res.status(400).json({
+            success: false,
+            error: 'page는 1 이상의 정수여야 합니다.',
+          });
+        }
+        if (isNaN(limit) || limit < 1) {
+          return res.status(400).json({
+            success: false,
+            error: 'limit는 1 이상의 정수여야 합니다.',
+          });
+        }
+
+        const search = req.query.search as string | undefined;
+        const logisticsCompaniesParam = req.query.logisticsCompanies as string | undefined;
+        const logisticsCompanies = logisticsCompaniesParam
+          ? logisticsCompaniesParam.split(',').map((s) => s.trim()).filter(Boolean)
+          : undefined;
+        const startDate = req.query.startDate as string | undefined;
+        const endDate = req.query.endDate as string | undefined;
+        const statusParam = req.query.status as string | undefined;
+        const status = statusParam
+          ? statusParam.split(',').map((s) => s.trim()).filter(Boolean)
+          : undefined;
+        const purchaseOrderId = (req.query.purchaseOrderId as string)?.trim() || undefined;
+
+        const filters = {
+          search: search?.trim() || undefined,
+          logisticsCompanies,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+          status,
+          purchaseOrderId,
+        };
+
+        const result = await this.service.getAllPackingListsPaginated(filters, page, limit);
+        return res.json({
+          success: true,
+          data: result.data,
+          pagination: {
+            total: result.total,
+            page: result.page,
+            limit: result.limit,
+            totalPages: result.totalPages,
+          },
+        });
+      }
+
       const year = req.query.year ? parseInt(req.query.year as string) : undefined;
       const month = req.query.month ? parseInt(req.query.month as string) : undefined;
-      
-      // year와 month가 모두 제공되거나 모두 없는 경우만 허용
       if ((year && !month) || (!year && month)) {
         return res.status(400).json({
           success: false,
           error: 'year와 month는 함께 제공되어야 합니다.',
         });
       }
-      
-      // month 유효성 검사 (1-12)
       if (month && (month < 1 || month > 12)) {
         return res.status(400).json({
           success: false,
           error: 'month는 1부터 12 사이의 값이어야 합니다.',
         });
       }
-      
+
       const packingLists = await this.service.getAllPackingLists(year, month);
       res.json({
         success: true,

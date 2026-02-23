@@ -13,6 +13,7 @@ import { StockManagement } from './components/inventory/StockManagement';
 import { StockDetail } from './components/inventory/StockDetail';
 import { PurchaseOrders } from './components/PurchaseOrders';
 import { PurchaseOrderDetail } from './components/PurchaseOrderDetail';
+import { NotArrivedAnalysis } from './components/NotArrivedAnalysis';
 import { ShippingHistory } from './components/ShippingHistory';
 import { ChinaPayment } from './components/ChinaPayment';
 import { Members } from './components/Members';
@@ -26,15 +27,36 @@ import { MaterialDetail } from './components/materials/MaterialDetail';
 import { PackagingWork } from './components/PackagingWork';
 import { Projects } from './components/Projects';
 import { ProjectDetail } from './components/ProjectDetail';
+import { AiSearch } from './components/AiSearch';
 import { Login } from './components/Login';
 import { useAuth } from './contexts/AuthContext';
 import { usePermission } from './contexts/PermissionContext';
 import { LanguageProvider, useLanguage, Language } from './contexts/LanguageContext';
+import { PackingListUnsavedProvider, usePackingListUnsaved } from './contexts/PackingListUnsavedContext';
+
+/** 권한 체크 래퍼 — 반드시 모듈 레벨에 두어 매 렌더마다 새 참조가 되지 않게 함. 그렇지 않으면 Route 자식(ShippingHistory 등)이 매번 리마운트되어 state가 초기화됨. */
+function PermissionCheckWrapper({
+  resource,
+  permissionType,
+  children,
+}: {
+  resource: string;
+  permissionType: 'read' | 'write' | 'delete';
+  children: ReactNode;
+}) {
+  const { hasPermission, isLoading: isPermissionLoading } = usePermission();
+  if (isPermissionLoading) {
+    return <>{children}</>;
+  }
+  if (hasPermission(resource, permissionType)) {
+    return <>{children}</>;
+  }
+  return <Navigate to="/admin/dashboard" replace />;
+}
 
 // 메인 레이아웃 컴포넌트
 function AdminLayout() {
   const { logout, user } = useAuth();
-  const { hasPermission, isLoading: isPermissionLoading } = usePermission();
   const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -76,6 +98,7 @@ function AdminLayout() {
   };
 
   const currentPage = getCurrentPage();
+  const { hasUnsavedChanges: packingListHasUnsaved } = usePackingListUnsaved();
 
   // 경로가 변경될 때 패킹리스트 또는 발주관리면 사이드바 접기, 아니면 펼치기
   useEffect(() => {
@@ -100,29 +123,6 @@ function AdminLayout() {
 
   const handleBackToPurchaseOrders = () => {
     navigate('/admin/purchase-orders');
-  };
-
-  // 권한 로딩 중일 때는 현재 페이지를 유지하기 위한 컴포넌트
-  const PermissionCheckWrapper = ({ 
-    resource, 
-    permissionType, 
-    children 
-  }: { 
-    resource: string; 
-    permissionType: 'read' | 'write' | 'delete';
-    children: ReactNode;
-  }) => {
-    if (isPermissionLoading) {
-      // 권한 로딩 중일 때는 현재 페이지를 유지 (로딩 화면 표시하지 않음)
-      return <>{children}</>;
-    }
-    
-    const hasPerm = hasPermission(resource, permissionType);
-    
-    if (hasPerm) {
-      return <>{children}</>;
-    }
-    return <Navigate to="/admin/dashboard" replace />;
   };
 
   return (
@@ -150,15 +150,22 @@ function AdminLayout() {
               // purchase-order-detail은 직접 이동할 수 없음
               return;
             }
+            // 패킹리스트에서 저장하지 않은 변경이 있으면 확인 후 이동
+            if (location.pathname.includes('shipping-history') && packingListHasUnsaved) {
+              const confirmed = window.confirm(
+                '저장하지 않은 변경사항이 있습니다. 정말로 이동하시겠습니까?\n\n변경사항은 저장되지 않습니다.'
+              );
+              if (!confirmed) return;
+            }
             navigate(`/admin/${page}`);
           }} 
         />
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto min-h-[1080px]">
+      <main className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-4 py-3 lg:px-8 lg:py-4 flex items-center justify-between">
+        <div className="shrink-0 bg-white border-b border-gray-200 px-4 py-3 lg:px-8 lg:py-4 flex items-center justify-between">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="p-2 rounded-lg hover:bg-gray-100 transition-colors lg:hidden"
@@ -231,8 +238,9 @@ function AdminLayout() {
           </div>
         </div>
 
-        {/* Routes */}
-        <Routes>
+        {/* Routes: content area fills remaining height and scrolls when needed */}
+        <div className="flex-1 min-h-0 overflow-y-auto min-w-0">
+          <Routes>
           {/* D0 레벨 관리자는 패킹리스트 관련 페이지만 접근 가능 */}
           {user?.level === 'D0: 비전 담당자' ? (
             <>
@@ -246,6 +254,11 @@ function AdminLayout() {
           ) : (
             <>
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/ai-search" element={
+                <PermissionCheckWrapper resource="dashboard" permissionType="read">
+                  <AiSearch />
+                </PermissionCheckWrapper>
+              } />
               <Route path="/products" element={
                 (user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin') ? (
                   <Products onNavigateToPurchaseOrder={handleViewOrderDetail} />
@@ -271,6 +284,11 @@ function AdminLayout() {
               <Route path="/purchase-orders/:id" element={
                 <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
                   <PurchaseOrderDetailWrapper onBack={handleBackToPurchaseOrders} />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/not-arrived-analysis" element={
+                <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
+                  <NotArrivedAnalysis />
                 </PermissionCheckWrapper>
               } />
               <Route path="/shipping-history" element={
@@ -330,7 +348,8 @@ function AdminLayout() {
               } />
             </>
           )}
-        </Routes>
+          </Routes>
+        </div>
       </main>
     </div>
   );
@@ -497,7 +516,9 @@ function AppContent() {
         path="/admin/*"
         element={
           <ProtectedRoute>
-            <AdminLayout />
+            <PackingListUnsavedProvider>
+              <AdminLayout />
+            </PackingListUnsavedProvider>
           </ProtectedRoute>
         }
       />

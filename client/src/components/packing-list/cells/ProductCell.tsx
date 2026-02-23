@@ -7,14 +7,44 @@ interface ProductCellProps {
 }
 
 export function ProductCell({ item, onProductNameClick, canClickProductName = true }: ProductCellProps) {
+  const canOpenOrderDetail = Boolean(item.purchaseOrderId && onProductNameClick && canClickProductName);
+
   return (
     <div className="flex flex-col items-center gap-2 w-full">
       {item.productImage ? (
-        <img src={item.productImage} alt={item.productName} className="w-16 h-16 object-cover rounded mx-auto flex-shrink-0" />
+        canOpenOrderDetail ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onProductNameClick(item.purchaseOrderId);
+            }}
+            className="w-16 h-16 rounded mx-auto flex-shrink-0 block cursor-pointer hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1"
+            title="발주 상세 보기"
+          >
+            <img src={item.productImage} alt={item.productName} className="w-full h-full object-cover rounded pointer-events-none" />
+          </button>
+        ) : (
+          <img src={item.productImage} alt={item.productName} className="w-16 h-16 object-cover rounded mx-auto flex-shrink-0" />
+        )
       ) : (
-        <div className="w-16 h-16 flex items-center justify-center flex-shrink-0">
-          <span className="text-gray-400 text-xs">-</span>
-        </div>
+        canOpenOrderDetail ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onProductNameClick(item.purchaseOrderId);
+            }}
+            className="w-16 h-16 flex items-center justify-center flex-shrink-0 rounded border border-gray-200 hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500"
+            title="발주 상세 보기"
+          >
+            <span className="text-gray-400 text-xs">-</span>
+          </button>
+        ) : (
+          <div className="w-16 h-16 flex items-center justify-center flex-shrink-0">
+            <span className="text-gray-400 text-xs">-</span>
+          </div>
+        )
       )}
       {item.purchaseOrderId && onProductNameClick && canClickProductName ? (
         <button
