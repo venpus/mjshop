@@ -27,7 +27,9 @@ import {
   Shield,
   TrendingUp,
   MessageCircle,
+  Sparkles,
 } from "lucide-react";
+import { SidebarExternalLink } from "./sidebar/SidebarExternalLink";
 
 type PageType =
   | "dashboard"
@@ -143,6 +145,15 @@ export function Sidebar({
               <MessageCircle className="w-5 h-5 flex-shrink-0" />
               {!isCollapsed && <span>{t('menu.aiSearch')}</span>}
             </button>
+
+            {/* 악세서리 AI (외부 링크) */}
+            <SidebarExternalLink
+              href="https://dollapp-g72sj77j.manus.space/"
+              icon={<Sparkles className="w-5 h-5" />}
+              label={t("menu.accessoryAi")}
+              isCollapsed={isCollapsed}
+              title={isCollapsed ? t("menu.accessoryAi") : undefined}
+            />
 
         {/* 중국협업 메뉴 (A, B0, C0 레벨만 표시) */}
         {canAccessChinaCooperation && (
