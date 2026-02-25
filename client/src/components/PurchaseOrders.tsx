@@ -388,9 +388,13 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     setCurrentPage(1);
   };
 
-  // 입력 필드 변경 핸들러 (실제 검색은 실행하지 않음)
+  // 입력 필드 변경 핸들러 (X 버튼 또는 수동 삭제로 비울 때 검색 초기화 → 전체 데이터 표시)
   const handleSearchInputChange = (value: string) => {
     setInputSearchTerm(value);
+    if (value === '') {
+      setSearchTerm('');
+      setCurrentPage(1);
+    }
   };
 
   // 엔터키 입력 핸들러
