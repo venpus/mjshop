@@ -256,12 +256,26 @@ export class PurchaseOrderController {
     try {
       const { id } = req.params;
       const user = (req as any).user;
-      const userId = user?.id;
+      // X-User-Id 헤더가 프록시에서 제거될 수 있으므로, 본문의 updated_by로 폴백
+      const userIdFromHeader = user?.id;
+      const userIdFromBody = req.body?.updated_by;
+      const userId = userIdFromHeader ?? userIdFromBody;
 
       // 비용 관련 필드 변경 시 허용 사용자만 가능 (venpus 등)
       const costFields = ['unit_price', 'back_margin', 'quantity', 'commission_type', 'commission_rate', 'shipping_cost', 'warehouse_shipping_cost', 'advance_payment_rate'];
       const hasCostFieldChange = costFields.some((key) => req.body[key] !== undefined);
-      if (hasCostFieldChange && !isCostInputAllowed(userId)) {
+      const allowed = isCostInputAllowed(userId);
+
+      console.log('[purchaseOrderController.updatePurchaseOrder] 비용 권한 디버그:', {
+        orderId: id,
+        userIdFromHeader: userIdFromHeader ?? '(없음)',
+        userIdFromBody: userIdFromBody ?? '(없음)',
+        userIdUsed: userId ?? '(없음)',
+        hasCostFieldChange,
+        isCostInputAllowed: allowed,
+      });
+
+      if (hasCostFieldChange && !allowed) {
         return res.status(403).json({
           success: false,
           error: '비용 입력 권한이 없습니다. (허용 사용자: 성수현)',
@@ -498,7 +512,7 @@ export class PurchaseOrderController {
   saveCostItems = async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { items, userLevel } = req.body;
+      const { items, userLevel, userId: bodyUserId } = req.body;
 
       if (!Array.isArray(items)) {
         return res.status(400).json({
@@ -510,8 +524,19 @@ export class PurchaseOrderController {
       // 현재 사용자 권한 확인 (A 레벨 관리자 여부)
       // req.user가 없는 경우 클라이언트에서 전송한 userLevel 사용
       const user = (req as any).user;
-      const userId = user?.id;
+      // X-User-Id 헤더가 프록시에서 제거될 수 있으므로, 본문의 userId로 폴백
+      const userIdFromHeader = user?.id;
+      const userId = user?.id ?? bodyUserId;
       const isAdminLevelA = user?.level === 'A-SuperAdmin' || userLevel === 'A-SuperAdmin';
+
+      console.log('[purchaseOrderController.saveCostItems] 비용 권한 디버그:', {
+        orderId: id,
+        userIdFromHeader: userIdFromHeader ?? '(없음)',
+        userIdFromBody: bodyUserId ?? '(없음)',
+        userIdUsed: userId ?? '(없음)',
+        isCostInputAllowed: isCostInputAllowed(userId),
+        itemsCount: items.length,
+      });
 
       // 비용 입력 허용 사용자가 아니면 일반 항목(비 A레벨) 변경 불가 → 기존 일반 항목 유지 후 저장
       let itemsToSave = items;

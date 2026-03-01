@@ -718,7 +718,7 @@ export function usePurchaseOrderSave({
           ...(currentUserId ? { 'X-User-Id': currentUserId } : {}),
         },
         credentials: 'include',
-        body: JSON.stringify({ items: costItems, userLevel }),
+        body: JSON.stringify({ items: costItems, userLevel, userId: currentUserId }),
       });
 
       if (!costItemsResponse.ok) {

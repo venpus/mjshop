@@ -100,32 +100,25 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
   // 권한 체크 함수
   const hasPermission = (resource: string, permissionType: 'read' | 'write' | 'delete'): boolean => {
     if (!user) {
-      console.log('[PermissionContext] hasPermission: user가 없음');
       return false;
     }
 
     // A-SuperAdmin은 모든 권한 허용
     if (user.level === 'A-SuperAdmin') {
-      console.log('[PermissionContext] hasPermission: A-SuperAdmin - 모든 권한 허용');
       return true;
     }
 
     const resourcePerm = permissions.find(p => p.resource === resource);
     if (!resourcePerm) {
-      console.log(`[PermissionContext] hasPermission: ${resource} 리소스 권한 설정 없음`);
-      console.log('[PermissionContext] 현재 권한 데이터:', permissions);
       return false; // 권한 설정이 없으면 기본적으로 차단
     }
 
     const levelPerm = resourcePerm.permissions[user.level];
     if (!levelPerm) {
-      console.log(`[PermissionContext] hasPermission: ${user.level} 레벨의 ${resource} 권한 설정 없음`);
       return false; // 해당 레벨의 권한 설정이 없으면 차단
     }
 
-    const result = levelPerm[`can_${permissionType}`];
-    console.log(`[PermissionContext] hasPermission: ${resource}.${permissionType} = ${result}`);
-    return result;
+    return Boolean(levelPerm[`can_${permissionType}`]);
   };
 
   return (

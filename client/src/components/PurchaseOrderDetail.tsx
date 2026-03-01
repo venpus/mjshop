@@ -202,7 +202,7 @@ export function PurchaseOrderDetail({
     setHoveredImage,
   } = useImageModals();
 
-  const currentUserId = "admin"; // 실제로는 로그인한 사용자 ID
+  const currentUserId = user?.id ?? '';
 
   // 메모 관리 Hook 사용
   const {
