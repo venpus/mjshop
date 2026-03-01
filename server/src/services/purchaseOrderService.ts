@@ -324,13 +324,14 @@ export class PurchaseOrderService {
       }
     }
 
-    // 추가 비용 정보 복사 (운송비, 수수료 등)
+    // 추가 비용 정보 복사 (운송비, 수수료, 추가 단가 등)
     const updateData: UpdatePurchaseOrderDTO = {
       shipping_cost: sourceOrder.shipping_cost,
       warehouse_shipping_cost: sourceOrder.warehouse_shipping_cost,
       commission_rate: sourceOrder.commission_rate,
       commission_type: sourceOrder.commission_type || undefined,
       advance_payment_rate: sourceOrder.advance_payment_rate,
+      back_margin: sourceOrder.back_margin ?? undefined,
     };
     await this.repository.update(newOrder.id, updateData);
 
