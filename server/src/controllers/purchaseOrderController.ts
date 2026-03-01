@@ -6,6 +6,7 @@ import { RowDataPacket } from 'mysql2';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { isCostInputAllowed } from '../config/costInputAllowedUsers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -254,9 +255,22 @@ export class PurchaseOrderController {
   updatePurchaseOrder = async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
+      const user = (req as any).user;
+      const userId = user?.id;
+
+      // 비용 관련 필드 변경 시 허용 사용자만 가능 (venpus 등)
+      const costFields = ['unit_price', 'back_margin', 'quantity', 'commission_type', 'commission_rate', 'shipping_cost', 'warehouse_shipping_cost', 'advance_payment_rate'];
+      const hasCostFieldChange = costFields.some((key) => req.body[key] !== undefined);
+      if (hasCostFieldChange && !isCostInputAllowed(userId)) {
+        return res.status(403).json({
+          success: false,
+          error: '비용 입력 권한이 없습니다. (허용 사용자: 성수현)',
+        });
+      }
+
       const updateData: UpdatePurchaseOrderDTO = {
         ...req.body,
-        updated_by: (req as any).user?.id || undefined,
+        updated_by: userId || undefined,
       };
 
       const purchaseOrder = await this.service.updatePurchaseOrder(id, updateData);
@@ -496,17 +510,36 @@ export class PurchaseOrderController {
       // 현재 사용자 권한 확인 (A 레벨 관리자 여부)
       // req.user가 없는 경우 클라이언트에서 전송한 userLevel 사용
       const user = (req as any).user;
+      const userId = user?.id;
       const isAdminLevelA = user?.level === 'A-SuperAdmin' || userLevel === 'A-SuperAdmin';
-      
+
+      // 비용 입력 허용 사용자가 아니면 일반 항목(비 A레벨) 변경 불가 → 기존 일반 항목 유지 후 저장
+      let itemsToSave = items;
+      if (!isCostInputAllowed(userId)) {
+        const existingItems = await this.service.getCostItemsByPoId(id);
+        const existingNonAdmin = existingItems
+          .filter((i) => !i.is_admin_only)
+          .map((i) => ({
+            item_type: i.item_type,
+            name: i.name,
+            unit_price: i.unit_price,
+            quantity: i.quantity,
+            is_admin_only: false,
+            display_order: i.display_order,
+          }));
+        const requestAdminOnly = items.filter((it: { is_admin_only?: boolean }) => it.is_admin_only === true);
+        itemsToSave = [...existingNonAdmin, ...requestAdminOnly];
+      }
+
       console.log('[purchaseOrderController.saveCostItems] 사용자 정보:', {
         userId: user?.id,
         userLevel: user?.level,
         isAdminLevelA,
-        itemsCount: items.length
+        itemsCount: items.length,
       });
 
       // 유효성 검사
-      for (const item of items) {
+      for (const item of itemsToSave) {
         if (!item.item_type || !['option', 'labor'].includes(item.item_type)) {
           return res.status(400).json({
             success: false,
@@ -553,7 +586,7 @@ export class PurchaseOrderController {
       // A 레벨이 아닌 관리자가 저장할 때는 기존 A 레벨 전용 항목을 유지
       const preserveAdminOnlyItems = !isAdminLevelA;
       
-      await this.service.saveCostItems(id, items, preserveAdminOnlyItems);
+      await this.service.saveCostItems(id, itemsToSave, preserveAdminOnlyItems);
 
       res.json({
         success: true,

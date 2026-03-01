@@ -19,6 +19,8 @@ interface PermissionContextType {
   permissions: ResourcePermissions[];
   isLoading: boolean;
   hasPermission: (resource: string, permissionType: 'read' | 'write' | 'delete') => boolean;
+  /** 발주 상세 비용 입력(기본단가, 배송비, 부자재 일반, 인건비 일반, 추가단가, 수량, 수수료율, 선금 비율) 가능 여부 - 허용 사용자(venpus 등)만 true */
+  canEditPurchaseOrderCost: boolean;
   reloadPermissions: () => Promise<void>;
 }
 
@@ -31,42 +33,60 @@ interface PermissionProviderProps {
 export function PermissionProvider({ children }: PermissionProviderProps) {
   const { user } = useAuth();
   const [permissions, setPermissions] = useState<ResourcePermissions[]>([]);
+  const [canEditPurchaseOrderCost, setCanEditPurchaseOrderCost] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 권한 데이터 로드
+  // 권한 데이터 및 비용 입력 권한 로드
   const loadPermissions = async () => {
     if (!user) {
       setPermissions([]);
+      setCanEditPurchaseOrderCost(false);
       setIsLoading(false);
       return;
     }
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/permissions`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (user.id) {
+      headers['X-User-Id'] = user.id;
+    }
 
-      if (!response.ok) {
-        console.error('권한 설정 조회 실패');
+    try {
+      const [permRes, costRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/permissions`, {
+          method: 'GET',
+          headers,
+          credentials: 'include',
+        }),
+        fetch(`${API_BASE_URL}/permissions/can-edit-purchase-order-cost`, {
+          method: 'GET',
+          headers,
+          credentials: 'include',
+        }),
+      ]);
+
+      if (permRes.ok) {
+        const data = await permRes.json();
+        if (data.success && data.data) {
+          setPermissions(data.data);
+        } else {
+          setPermissions([]);
+        }
+      } else {
         setPermissions([]);
-        return;
       }
 
-      const data = await response.json();
-      if (data.success && data.data) {
-        console.log('[PermissionContext] 권한 데이터 로드 완료:', data.data);
-        setPermissions(data.data);
+      if (costRes.ok) {
+        const data = await costRes.json();
+        setCanEditPurchaseOrderCost(data.success && data.data?.allowed === true);
       } else {
-        console.log('[PermissionContext] 권한 데이터 로드 실패:', data);
-        setPermissions([]);
+        setCanEditPurchaseOrderCost(false);
       }
     } catch (error) {
       console.error('권한 설정 로드 오류:', error);
       setPermissions([]);
+      setCanEditPurchaseOrderCost(false);
     } finally {
       setIsLoading(false);
     }
@@ -114,6 +134,7 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
         permissions,
         isLoading,
         hasPermission,
+        canEditPurchaseOrderCost,
         reloadPermissions: loadPermissions,
       }}
     >

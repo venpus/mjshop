@@ -654,6 +654,7 @@ export function usePurchaseOrderSave({
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...(currentUserId ? { 'X-User-Id': currentUserId } : {}),
         },
         credentials: 'include',
         body: JSON.stringify(updateData),
@@ -714,6 +715,7 @@ export function usePurchaseOrderSave({
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...(currentUserId ? { 'X-User-Id': currentUserId } : {}),
         },
         credentials: 'include',
         body: JSON.stringify({ items: costItems, userLevel }),

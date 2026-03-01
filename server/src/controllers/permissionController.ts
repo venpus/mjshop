@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { PermissionService } from '../services/permissionService.js';
 import { PermissionSettingsDTO } from '../models/permission.js';
+import { isCostInputAllowed } from '../config/costInputAllowedUsers.js';
 
 export class PermissionController {
   private service: PermissionService;
@@ -77,6 +78,28 @@ export class PermissionController {
       res.status(500).json({
         success: false,
         error: error.message || '권한 설정 저장 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 발주 상세 비용 입력 가능 여부 (사용자 ID 기준)
+   * GET /api/permissions/can-edit-purchase-order-cost
+   */
+  getCanEditPurchaseOrderCost = async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user?.id as string | undefined;
+      const allowed = isCostInputAllowed(userId);
+
+      res.json({
+        success: true,
+        data: { allowed },
+      });
+    } catch (error) {
+      console.error('비용 입력 권한 조회 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: '비용 입력 권한 조회 중 오류가 발생했습니다.',
       });
     }
   };

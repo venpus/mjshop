@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { authenticateUser } from '../middleware/auth.js';
 import adminAccountRoutes from './adminAccounts.js';
 import productRoutes from './products.js';
 import purchaseOrderRoutes from './purchaseOrders.js';
@@ -12,6 +13,9 @@ import stockOutboundRoutes from './stockOutbound.js';
 import qwenRoutes from './qwen.js';
 
 const router = Router();
+
+// 요청에 X-User-Id가 있으면 req.user에 설정 (비용 입력 권한 등에서 사용)
+router.use(authenticateUser);
 
 // API 라우트들을 여기에 추가
 router.use('/admin-accounts', adminAccountRoutes);

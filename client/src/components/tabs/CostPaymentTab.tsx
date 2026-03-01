@@ -21,6 +21,8 @@ interface CostPaymentTabProps {
   isSuperAdmin: boolean; // A 레벨 관리자 여부
   userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자'; // 사용자 레벨
   canWrite?: boolean; // 쓰기 권한 여부
+  /** 비용 입력(기본단가, 배송비, 부자재 일반, 인건비 일반, 추가단가, 수량, 수수료율, 선금 비율) 허용 사용자만 true */
+  canEditCostInput?: boolean;
   onSetUnitPrice: (value: number) => void;
   onSetBackMargin: (value: number) => void;
   onSetQuantity: (value: number) => void;
@@ -75,6 +77,7 @@ export function CostPaymentTab({
   isSuperAdmin,
   userLevel,
   canWrite = true, // 기본값은 true (하위 호환성)
+  canEditCostInput = true, // 기본값 true (하위 호환성)
   onSetUnitPrice,
   onSetBackMargin,
   onSetQuantity,
@@ -122,8 +125,10 @@ export function CostPaymentTab({
   const normalLaborCostItems = laborCostItems.filter(item => !item.isAdminOnly);
   const adminOnlyLaborCostItems = laborCostItems.filter(item => item.isAdminOnly);
   
-  // 항목 추가 버튼 표시 여부: C 레벨은 표시 안 함, 쓰기 권한도 체크
-  const canAddItems = (isLevelA || isLevelSorB) && canWrite;
+  // 항목 추가 버튼 표시 여부: C 레벨은 표시 안 함, 쓰기 권한 + 비용 입력 허용 사용자
+  const canAddItems = (isLevelA || isLevelSorB) && canWrite && canEditCostInput;
+  // 비용 필드 편집 가능 여부 (기본단가, 추가단가, 수량, 수수료율, 배송비)
+  const canEditCostFields = canWrite && canEditCostInput;
   return (
     <div className="space-y-4">
       {/* Cost sections in columns */}
@@ -168,7 +173,7 @@ export function CostPaymentTab({
                       onSetUnitPrice(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
                     }}
                     step="0.01"
-                    disabled={!canWrite}
+                    disabled={!canEditCostFields}
                     className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   />
                 </div>
@@ -193,7 +198,7 @@ export function CostPaymentTab({
                       onSetBackMargin(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
                     }}
                     step="0.01"
-                    disabled={!canWrite}
+                    disabled={!canEditCostFields}
                     className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   />
                 </div>
@@ -210,7 +215,7 @@ export function CostPaymentTab({
                   onChange={(e) =>
                     onSetQuantity(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)
                   }
-                  disabled={!canWrite}
+                  disabled={!canEditCostFields}
                   className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 />
                 <span className="text-gray-500 text-xs min-w-[16px]">개</span>
@@ -226,7 +231,7 @@ export function CostPaymentTab({
                   onChange={(e) =>
                     onHandleCommissionTypeChange(e.target.value)
                   }
-                  disabled={!canWrite}
+                  disabled={!canEditCostFields}
                   className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 >
                   {commissionOptions.map((opt) => (
@@ -277,7 +282,7 @@ export function CostPaymentTab({
                     onSetShippingCost(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
                   }}
                   step="0.01"
-                  disabled={!canWrite}
+                  disabled={!canEditCostFields}
                   className={`w-24 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 />
               </div>
@@ -299,7 +304,7 @@ export function CostPaymentTab({
                     onSetWarehouseShippingCost(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
                   }}
                   step="0.01"
-                  disabled={!canWrite}
+                  disabled={!canEditCostFields}
                   className={`w-24 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 />
               </div>
@@ -741,8 +746,8 @@ export function CostPaymentTab({
                         min="0"
                         max="100"
                         step="1"
-                        disabled={!canWrite}
-                        className={`w-20 px-3 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        disabled={!canEditCostFields}
+                        className={`w-20 px-3 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canEditCostFields ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
                       <span className="text-sm text-gray-600">%</span>
                     </div>

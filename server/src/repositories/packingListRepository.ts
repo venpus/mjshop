@@ -180,9 +180,14 @@ export class PackingListRepository {
     if (filters.search && filters.search.trim()) {
       const searchPattern = `%${filters.search.trim()}%`;
       conditions.push(
-        `(pl.code LIKE ? OR pl.logistics_company LIKE ? OR EXISTS (SELECT 1 FROM packing_list_items pli WHERE pli.packing_list_id = pl.id AND pli.product_name LIKE ?))`
+        `(pl.code LIKE ? OR pl.logistics_company LIKE ? OR EXISTS (
+          SELECT 1 FROM packing_list_items pli
+          LEFT JOIN purchase_orders po ON pli.purchase_order_id = po.id
+          WHERE pli.packing_list_id = pl.id
+          AND (pli.product_name LIKE ? OR po.product_name LIKE ?)
+        ))`
       );
-      params.push(searchPattern, searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern);
     }
 
     if (filters.logisticsCompanies && filters.logisticsCompanies.length > 0) {
@@ -554,14 +559,19 @@ export class PackingListRepository {
 
   /**
    * 패킹리스트 아이템 조회 (패킹리스트 ID로)
+   * 연결된 발주가 있으면 발주의 현재 product_name/product_main_image 사용, 없으면 저장값 사용
    */
   async findItemsByPackingListId(packingListId: number): Promise<PackingListItem[]> {
     const [rows] = await pool.execute<PackingListItemRow[]>(
-      `SELECT id, packing_list_id, purchase_order_id, product_name, product_image_url,
-              entry_quantity, box_count, unit, total_quantity, created_at, updated_at
-       FROM packing_list_items
-       WHERE packing_list_id = ?
-       ORDER BY id`,
+      `SELECT pli.id, pli.packing_list_id, pli.purchase_order_id,
+              COALESCE(po.product_name, pli.product_name) AS product_name,
+              COALESCE(po.product_main_image, pli.product_image_url) AS product_image_url,
+              pli.entry_quantity, pli.box_count, pli.unit, pli.total_quantity,
+              pli.created_at, pli.updated_at
+       FROM packing_list_items pli
+       LEFT JOIN purchase_orders po ON pli.purchase_order_id = po.id
+       WHERE pli.packing_list_id = ?
+       ORDER BY pli.id`,
       [packingListId]
     );
 
@@ -570,13 +580,18 @@ export class PackingListRepository {
 
   /**
    * 패킹리스트 아이템 ID로 조회
+   * 연결된 발주가 있으면 발주의 현재 product_name/product_main_image 사용, 없으면 저장값 사용
    */
   async findItemById(id: number): Promise<PackingListItem | null> {
     const [rows] = await pool.execute<PackingListItemRow[]>(
-      `SELECT id, packing_list_id, purchase_order_id, product_name, product_image_url,
-              entry_quantity, box_count, unit, total_quantity, created_at, updated_at
-       FROM packing_list_items
-       WHERE id = ?`,
+      `SELECT pli.id, pli.packing_list_id, pli.purchase_order_id,
+              COALESCE(po.product_name, pli.product_name) AS product_name,
+              COALESCE(po.product_main_image, pli.product_image_url) AS product_image_url,
+              pli.entry_quantity, pli.box_count, pli.unit, pli.total_quantity,
+              pli.created_at, pli.updated_at
+       FROM packing_list_items pli
+       LEFT JOIN purchase_orders po ON pli.purchase_order_id = po.id
+       WHERE pli.id = ?`,
       [id]
     );
 

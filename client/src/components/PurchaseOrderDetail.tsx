@@ -86,7 +86,7 @@ export function PurchaseOrderDetail({
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
   const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
   const { user } = useAuth();
-  const { hasPermission } = usePermission();
+  const { hasPermission, canEditPurchaseOrderCost } = usePermission();
   const isSuperAdmin = user?.level === 'A-SuperAdmin';
   const canWrite = hasPermission('purchase-orders', 'write');
   const canDelete = hasPermission('purchase-orders', 'delete');
@@ -1290,6 +1290,7 @@ export function PurchaseOrderDetail({
                 isSuperAdmin={isSuperAdmin}
                 userLevel={user?.level}
                 canWrite={canWrite}
+                canEditCostInput={canEditPurchaseOrderCost}
                 onSetUnitPrice={setUnitPrice}
                 onSetBackMargin={setBackMargin}
                 onSetQuantity={setQuantity}
@@ -1515,6 +1516,7 @@ export function PurchaseOrderDetail({
                 isSuperAdmin={isSuperAdmin}
                 userLevel={user?.level}
                 canWrite={canWrite}
+                canEditCostInput={canEditPurchaseOrderCost}
                 onSetUnitPrice={setUnitPrice}
                 onSetBackMargin={setBackMargin}
                 onSetQuantity={setQuantity}
