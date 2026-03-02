@@ -127,6 +127,8 @@ export function CostPaymentTab({
   
   // 항목 추가 버튼 표시 여부: C 레벨은 표시 안 함, 쓰기 권한 + 비용 입력 허용 사용자
   const canAddItems = (isLevelA || isLevelSorB) && canWrite && canEditCostInput;
+  // A 전용 항목 추가: A 레벨 + 쓰기 권한만 있으면 가능 (비용 입력 허용 목록과 무관)
+  const canAddAdminOnlyItems = isLevelA && canWrite;
   // 비용 필드 편집 가능 여부 (기본단가, 추가단가, 수량, 수수료율, 배송비)
   const canEditCostFields = canWrite && canEditCostInput;
   return (
@@ -507,7 +509,7 @@ export function CostPaymentTab({
                     </div>
                   );
                 })}
-                {isLevelA && canAddItems && (
+                {isLevelA && canAddAdminOnlyItems && (
                   <button
                     onClick={() => onAddOptionItem(true)}
                     className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 border border-blue-300 rounded transition-colors"
@@ -704,7 +706,7 @@ export function CostPaymentTab({
                       </div>
                     );
                   })}
-                  {isLevelA && canAddItems && (
+                  {isLevelA && canAddAdminOnlyItems && (
                     <button
                       onClick={() => onAddLaborCostItem(true)}
                       className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 border border-blue-300 rounded transition-colors"
