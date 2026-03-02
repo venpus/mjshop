@@ -129,8 +129,10 @@ export function CostPaymentTab({
   const canAddItems = (isLevelA || isLevelSorB) && canWrite && canEditCostInput;
   // A 전용 항목 추가: A 레벨 + 쓰기 권한만 있으면 가능 (비용 입력 허용 목록과 무관)
   const canAddAdminOnlyItems = isLevelA && canWrite;
-  // 비용 필드 편집 가능 여부 (기본단가, 추가단가, 수량, 수수료율, 배송비)
+  // 비용 필드 편집 가능 여부 (기본단가, 수량, 수수료율, 배송비 등 - venpus 등 허용 사용자만)
   const canEditCostFields = canWrite && canEditCostInput;
+  // 추가 단가 편집: A-SuperAdmin + 쓰기 권한이면 가능 (비용 입력 허용 목록과 무관)
+  const canEditBackMargin = isLevelA && canWrite;
   return (
     <div className="space-y-4">
       {/* Cost sections in columns */}
@@ -200,8 +202,8 @@ export function CostPaymentTab({
                       onSetBackMargin(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
                     }}
                     step="0.01"
-                    disabled={!canEditCostFields}
-                    className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    disabled={!canEditBackMargin}
+                    className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canEditBackMargin ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   />
                 </div>
               </div>
