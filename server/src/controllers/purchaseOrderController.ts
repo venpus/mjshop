@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PurchaseOrderService } from '../services/purchaseOrderService.js';
+import { AdminAccountService } from '../services/adminAccountService.js';
 import { CreatePurchaseOrderDTO, UpdatePurchaseOrderDTO } from '../models/purchaseOrder.js';
 import { pool } from '../config/database.js';
 import { RowDataPacket } from 'mysql2';
@@ -13,9 +14,11 @@ const __dirname = path.dirname(__filename);
 
 export class PurchaseOrderController {
   private service: PurchaseOrderService;
+  private adminAccountService: AdminAccountService;
 
   constructor() {
     this.service = new PurchaseOrderService();
+    this.adminAccountService = new AdminAccountService();
   }
 
   /**
@@ -261,10 +264,16 @@ export class PurchaseOrderController {
       const userIdFromBody = req.body?.updated_by;
       const userId = userIdFromHeader ?? userIdFromBody;
 
-      // 비용 관련 필드 변경 시 허용 사용자만 가능 (venpus 등)
+      // 비용 관련 필드 변경 시: 비용 입력 허용 사용자만 가능. 단, A-SuperAdmin은 DB 레벨 조회로 허용(리스트 없음)
       const costFields = ['unit_price', 'back_margin', 'quantity', 'commission_type', 'commission_rate', 'shipping_cost', 'warehouse_shipping_cost', 'advance_payment_rate'];
       const hasCostFieldChange = costFields.some((key) => req.body[key] !== undefined);
-      const allowed = isCostInputAllowed(userId);
+      const allowedByCostList = isCostInputAllowed(userId);
+
+      let isSuperAdmin = false;
+      if (userId) {
+        const account = await this.adminAccountService.getAccountById(userId);
+        isSuperAdmin = account?.level === 'A-SuperAdmin';
+      }
 
       console.log('[purchaseOrderController.updatePurchaseOrder] 비용 권한 디버그:', {
         orderId: id,
@@ -272,10 +281,11 @@ export class PurchaseOrderController {
         userIdFromBody: userIdFromBody ?? '(없음)',
         userIdUsed: userId ?? '(없음)',
         hasCostFieldChange,
-        isCostInputAllowed: allowed,
+        allowedByCostList,
+        isSuperAdmin,
       });
 
-      if (hasCostFieldChange && !allowed) {
+      if (hasCostFieldChange && !allowedByCostList && !isSuperAdmin) {
         return res.status(403).json({
           success: false,
           error: '비용 입력 권한이 없습니다. (허용 사용자: 성수현)',
