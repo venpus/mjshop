@@ -8,16 +8,19 @@ export interface UnreceivedQuantityCellProps {
   estimatedDelivery: string | undefined;
   /** 납기일 경과 + 미입고 수량 0 초과 여부. true이면 강조 스타일 적용 */
   isOverdueWithUnreceived: boolean;
+  /** 납기일 미지정 여부. true이면 주황 강조 + '납기일 미지정' 메시지 표시 */
+  hasNoDeliveryDate?: boolean;
 }
 
 /**
  * 발주 목록의 미입고 수량 셀.
- * 납기일이 지났고 미입고 수량이 있는 경우 강조(빨간색, 아이콘, 납기경과·N일 경과) 표시.
+ * 납기일 경과+미입고 시 빨간 강조, 납기일 미지정 시 주황 강조 + '납기일 미지정' 표시.
  */
 export function UnreceivedQuantityCell({
   unreceivedQuantity,
   estimatedDelivery,
   isOverdueWithUnreceived,
+  hasNoDeliveryDate = false,
 }: UnreceivedQuantityCellProps) {
   const qtyText = unreceivedQuantity !== undefined ? `${unreceivedQuantity}개` : '-';
   const daysPast = isOverdueWithUnreceived && estimatedDelivery ? getDaysPast(estimatedDelivery) : 0;
@@ -31,25 +34,41 @@ export function UnreceivedQuantityCell({
             aria-hidden
           />
         )}
+        {hasNoDeliveryDate && (
+          <AlertTriangle
+            className="w-4 h-4 text-amber-600 flex-shrink-0"
+            aria-hidden
+          />
+        )}
         <span
           className={
             isOverdueWithUnreceived
               ? 'text-red-700 font-bold'
-              : 'text-gray-600'
+              : hasNoDeliveryDate
+                ? 'text-amber-700 font-bold'
+                : 'text-gray-600'
           }
         >
           {qtyText}
         </span>
       </div>
-      {estimatedDelivery && (
-        <span className={`text-xs ${isOverdueWithUnreceived ? 'text-red-700 font-bold' : 'text-gray-500'}`}>
-          납기: {estimatedDelivery}
-        </span>
-      )}
-      {isOverdueWithUnreceived && daysPast > 0 && (
+      {hasNoDeliveryDate ? (
         <span className="text-xs text-red-700 font-bold">
-          {daysPast}일 경과
+          납기일 미지정
         </span>
+      ) : (
+        <>
+          {estimatedDelivery && (
+            <span className={`text-xs ${isOverdueWithUnreceived ? 'text-red-700 font-bold' : 'text-gray-500'}`}>
+              납기: {estimatedDelivery}
+            </span>
+          )}
+          {isOverdueWithUnreceived && daysPast > 0 && (
+            <span className="text-xs text-red-700 font-bold">
+              {daysPast}일 경과
+            </span>
+          )}
+        </>
       )}
     </div>
   );

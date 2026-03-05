@@ -866,12 +866,15 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                   po.packingListShippingCost || 0,
                   po.quantity
                 );
-                // 납기일 경과 + 미입고 수량 있음 → 행/셀 강조
-                const isOverdueWithUnreceived = !!(
-                  po.estimatedDelivery &&
-                  isPastDate(po.estimatedDelivery) &&
-                  (po.unreceivedQuantity ?? 0) > 0
-                );
+                // 2026-02-20 이후 발주에만 납기일 경고 적용
+                const isTargetPeriod = !!(po.date && po.date >= '2026-02-20');
+                // 납기일 경과 + 미입고 수량 있음 → 행/셀 강조 (빨강)
+                const isOverdueWithUnreceived =
+                  isTargetPeriod &&
+                  !!(po.estimatedDelivery && isPastDate(po.estimatedDelivery) && (po.unreceivedQuantity ?? 0) > 0);
+                // 납기일 미지정 → 행/셀 강조 (주황)
+                const hasNoDeliveryDate =
+                  isTargetPeriod && (!po.estimatedDelivery || po.estimatedDelivery.trim() === '');
                 
                 return (
                   <tr
@@ -879,9 +882,11 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     className={
                       isOverdueWithUnreceived
                         ? 'bg-red-50'
-                        : po.isOrderConfirmed
-                          ? 'bg-green-50'
-                          : ''
+                        : hasNoDeliveryDate
+                          ? 'bg-amber-50'
+                          : po.isOrderConfirmed
+                            ? 'bg-green-50'
+                            : ''
                     }
                   >
                     <td className="px-4 py-2 text-center">
@@ -993,13 +998,16 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                       className={`px-4 py-2 text-center ${
                         isOverdueWithUnreceived
                           ? 'border-l-4 border-red-500 bg-red-100'
-                          : 'text-gray-600'
+                          : hasNoDeliveryDate
+                            ? 'border-l-4 border-amber-500 bg-amber-100'
+                            : 'text-gray-600'
                       }`}
                     >
                       <UnreceivedQuantityCell
                         unreceivedQuantity={po.unreceivedQuantity}
                         estimatedDelivery={po.estimatedDelivery}
                         isOverdueWithUnreceived={isOverdueWithUnreceived}
+                        hasNoDeliveryDate={hasNoDeliveryDate}
                       />
                     </td>
                     <td className="px-4 py-2 text-center text-gray-600">
