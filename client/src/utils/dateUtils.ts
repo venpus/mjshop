@@ -100,6 +100,35 @@ export function getLocalDateString(): string {
 }
 
 /**
+ * 날짜 문자열(YYYY-MM-DD)이 오늘 이전인지(과거인지) 판별합니다.
+ * 로컬 날짜 기준으로 비교합니다.
+ * @param dateStr YYYY-MM-DD 형식 문자열
+ * @returns 오늘보다 이전이면 true
+ */
+export function isPastDate(dateStr: string | null | undefined): boolean {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const today = getLocalDateString();
+  return dateStr < today;
+}
+
+/**
+ * 날짜 문자열(YYYY-MM-DD) 기준으로 오늘까지 경과한 일수를 반환합니다.
+ * 미래일 경우 0을 반환합니다.
+ * @param dateStr YYYY-MM-DD 형식 문자열
+ * @returns 경과 일수 (0 이상)
+ */
+export function getDaysPast(dateStr: string | null | undefined): number {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return 0;
+  const today = getLocalDateString();
+  if (dateStr >= today) return 0;
+  const a = new Date(dateStr);
+  const b = new Date(today);
+  a.setHours(0, 0, 0, 0);
+  b.setHours(0, 0, 0, 0);
+  return Math.floor((b.getTime() - a.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+/**
  * @deprecated getLocalDateString()을 사용하세요
  * 현재 날짜를 한국 시간대(UTC+9) 기준으로 YYYY-MM-DD 형식으로 반환합니다.
  * @returns YYYY-MM-DD 형식의 날짜 문자열

@@ -9,8 +9,9 @@ import { useReorderPurchaseOrder } from '../hooks/useReorderPurchaseOrder';
 import { PurchaseOrderDeleteDialog } from './PurchaseOrderDeleteDialog';
 import { useAuth } from '../contexts/AuthContext';
 import { useDeletePurchaseOrder } from '../hooks/useDeletePurchaseOrder';
-import { formatDateForInput, formatDateKST } from '../utils/dateUtils';
+import { formatDateForInput, formatDateKST, isPastDate } from '../utils/dateUtils';
 import { CreatePurchaseOrderButton } from './purchase-order/CreatePurchaseOrderButton';
+import { UnreceivedQuantityCell } from './purchase-order/UnreceivedQuantityCell';
 import { 
   calculateBasicCostTotal,
   calculateCommissionAmount,
@@ -865,9 +866,24 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                   po.packingListShippingCost || 0,
                   po.quantity
                 );
+                // 납기일 경과 + 미입고 수량 있음 → 행/셀 강조
+                const isOverdueWithUnreceived = !!(
+                  po.estimatedDelivery &&
+                  isPastDate(po.estimatedDelivery) &&
+                  (po.unreceivedQuantity ?? 0) > 0
+                );
                 
                 return (
-                  <tr key={po.id} className={`hover:bg-gray-50 ${po.isOrderConfirmed ? 'bg-green-50' : ''}`}>
+                  <tr
+                    key={po.id}
+                    className={
+                      isOverdueWithUnreceived
+                        ? 'bg-red-50'
+                        : po.isOrderConfirmed
+                          ? 'bg-green-50'
+                          : ''
+                    }
+                  >
                     <td className="px-4 py-2 text-center">
                       <input
                         type="checkbox"
@@ -973,13 +989,18 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     <td className="px-4 py-2 text-center text-gray-600">{po.size ? `${po.size}cm` : '-'}</td>
                     <td className="px-4 py-2 text-center text-gray-600">{po.weight ? `${po.weight}g` : '-'}</td>
                     <td className="px-4 py-2 text-center text-gray-600">{po.packaging.toLocaleString()}개</td>
-                    <td className="px-4 py-2 text-center text-gray-600">
-                      <div className="flex flex-col gap-0.5">
-                        <span>{po.unreceivedQuantity !== undefined ? `${po.unreceivedQuantity}개` : '-'}</span>
-                        {po.estimatedDelivery && (
-                          <span className="text-xs text-gray-500">납기: {po.estimatedDelivery}</span>
-                        )}
-                      </div>
+                    <td
+                      className={`px-4 py-2 text-center ${
+                        isOverdueWithUnreceived
+                          ? 'border-l-4 border-red-500 bg-red-100'
+                          : 'text-gray-600'
+                      }`}
+                    >
+                      <UnreceivedQuantityCell
+                        unreceivedQuantity={po.unreceivedQuantity}
+                        estimatedDelivery={po.estimatedDelivery}
+                        isOverdueWithUnreceived={isOverdueWithUnreceived}
+                      />
                     </td>
                     <td className="px-4 py-2 text-center text-gray-600">
                       {po.unshippedQuantity !== undefined ? `${po.unshippedQuantity}개` : '-'}
