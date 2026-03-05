@@ -1,6 +1,6 @@
 import type { FactoryShipment, ReturnExchangeItem } from "../components/tabs/FactoryShippingTab";
 import type { LaborCostItem } from "../components/tabs/CostPaymentTab";
-import { isNewCommissionCalculationDate } from "./dateUtils";
+import { isNewCommissionCalculationDate, isCommissionUseFullOptionLaborFromDate } from "./dateUtils";
 
 /**
  * 옵션 항목들의 총 비용을 계산합니다.
@@ -161,17 +161,20 @@ export function calculateCommissionAmount(
   
   // 2025-01-06 이후 발주는 옵션비용과 인건비를 포함하여 수수료 계산
   if (orderDate && isNewCommissionCalculationDate(orderDate)) {
-    // A레벨 관리자 전용 항목 제외한 옵션비용과 인건비 계산
+    // 2026-03-05 이후: 목록과 동일하게 전체 옵션/인건비로 수수료 계산 (A레벨 전용 제외 안 함)
+    // 2025-01-06 ~ 2026-03-04: A레벨 관리자 전용 항목 제외한 옵션/인건비로 수수료 계산
     let optionCostForCommission = totalOptionCost;
     let laborCostForCommission = totalLaborCost;
-    
-    if (optionItems) {
-      optionCostForCommission = calculateTotalOptionCostForCommission(optionItems);
+
+    if (!isCommissionUseFullOptionLaborFromDate(orderDate)) {
+      if (optionItems) {
+        optionCostForCommission = calculateTotalOptionCostForCommission(optionItems);
+      }
+      if (laborCostItems) {
+        laborCostForCommission = calculateTotalLaborCostForCommission(laborCostItems);
+      }
     }
-    if (laborCostItems) {
-      laborCostForCommission = calculateTotalLaborCostForCommission(laborCostItems);
-    }
-    
+
     return (baseAmount + optionCostForCommission + laborCostForCommission) * (commissionRate / 100);
   }
   

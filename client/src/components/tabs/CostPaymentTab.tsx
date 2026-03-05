@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
-import { handleNumberInput, formatNumberForInput } from "../../utils/numberInputUtils";
+import { DecimalInput } from "../ui/DecimalInput";
 
 export interface LaborCostItem {
   id: string;
@@ -166,16 +166,9 @@ export function CostPaymentTab({
                 </span>
                 <div className="flex items-center gap-1 flex-1 min-w-0">
                   <span className="text-gray-500 text-sm">¥</span>
-                  <input
-                    type="number"
-                    value={formatNumberForInput(unitPrice)}
-                    onChange={(e) => {
-                      const processedValue = handleNumberInput(e.target.value);
-                      if (processedValue !== e.target.value) {
-                        e.target.value = processedValue;
-                      }
-                      onSetUnitPrice(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
-                    }}
+                  <DecimalInput
+                    value={unitPrice}
+                    onChange={onSetUnitPrice}
                     step="0.01"
                     disabled={!canEditCostFields}
                     className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -191,16 +184,9 @@ export function CostPaymentTab({
                 </span>
                 <div className="flex items-center gap-1 flex-1 min-w-0">
                   <span className="text-gray-500 text-sm">¥</span>
-                  <input
-                    type="number"
-                    value={formatNumberForInput(backMargin)}
-                    onChange={(e) => {
-                      const processedValue = handleNumberInput(e.target.value);
-                      if (processedValue !== e.target.value) {
-                        e.target.value = processedValue;
-                      }
-                      onSetBackMargin(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
-                    }}
+                  <DecimalInput
+                    value={backMargin}
+                    onChange={onSetBackMargin}
                     step="0.01"
                     disabled={!canEditBackMargin}
                     className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canEditBackMargin ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -275,16 +261,9 @@ export function CostPaymentTab({
               </span>
               <div className="flex items-center gap-1">
                 <span className="text-gray-500 text-sm">¥</span>
-                <input
-                  type="number"
-                  value={formatNumberForInput(shippingCost)}
-                  onChange={(e) => {
-                    const processedValue = handleNumberInput(e.target.value);
-                    if (processedValue !== e.target.value) {
-                      e.target.value = processedValue;
-                    }
-                    onSetShippingCost(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
-                  }}
+                <DecimalInput
+                  value={shippingCost}
+                  onChange={onSetShippingCost}
                   step="0.01"
                   disabled={!canEditCostFields}
                   className={`w-24 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -297,16 +276,9 @@ export function CostPaymentTab({
               </span>
               <div className="flex items-center gap-1">
                 <span className="text-gray-500 text-sm">¥</span>
-                <input
-                  type="number"
-                  value={formatNumberForInput(warehouseShippingCost)}
-                  onChange={(e) => {
-                    const processedValue = handleNumberInput(e.target.value);
-                    if (processedValue !== e.target.value) {
-                      e.target.value = processedValue;
-                    }
-                    onSetWarehouseShippingCost(processedValue === "" ? 0 : parseFloat(processedValue) || 0);
-                  }}
+                <DecimalInput
+                  value={warehouseShippingCost}
+                  onChange={onSetWarehouseShippingCost}
                   step="0.01"
                   disabled={!canEditCostFields}
                   className={`w-24 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -369,16 +341,9 @@ export function CostPaymentTab({
                       )}
                       <span className="text-gray-500 text-xs">¥</span>
                       {isEditable ? (
-                        <input
-                          type="number"
-                          value={formatNumberForInput(item.unit_price)}
-                          onChange={(e) => {
-                            const processedValue = handleNumberInput(e.target.value);
-                            if (processedValue !== e.target.value) {
-                              e.target.value = processedValue;
-                            }
-                            onUpdateOptionItemUnitPrice(item.id, processedValue === "" ? 0 : parseFloat(processedValue) || 0);
-                          }}
+                        <DecimalInput
+                          value={item.unit_price}
+                          onChange={(v) => onUpdateOptionItemUnitPrice(item.id, v)}
                           step="0.01"
                           className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                         />
@@ -389,16 +354,9 @@ export function CostPaymentTab({
                       )}
                       <span className="text-gray-500 text-xs">×</span>
                       {isEditable ? (
-                        <input
-                          type="number"
-                          value={formatNumberForInput(item.quantity)}
-                          onChange={(e) => {
-                            const processedValue = handleNumberInput(e.target.value);
-                            if (processedValue !== e.target.value) {
-                              e.target.value = processedValue;
-                            }
-                            onUpdateOptionItemQuantity(item.id, processedValue === "" ? 0 : parseFloat(processedValue) || 0);
-                          }}
+                        <DecimalInput
+                          value={item.quantity}
+                          onChange={(v) => onUpdateOptionItemQuantity(item.id, v)}
                           step="0.01"
                           className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                         />
@@ -466,16 +424,9 @@ export function CostPaymentTab({
                       )}
                       <span className="text-gray-500 text-xs">¥</span>
                       {isEditable ? (
-                        <input
-                          type="number"
-                          value={formatNumberForInput(item.unit_price)}
-                          onChange={(e) => {
-                            const processedValue = handleNumberInput(e.target.value);
-                            if (processedValue !== e.target.value) {
-                              e.target.value = processedValue;
-                            }
-                            onUpdateOptionItemUnitPrice(item.id, processedValue === "" ? 0 : parseFloat(processedValue) || 0);
-                          }}
+                        <DecimalInput
+                          value={item.unit_price}
+                          onChange={(v) => onUpdateOptionItemUnitPrice(item.id, v)}
                           step="0.01"
                           className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                         />
@@ -486,16 +437,9 @@ export function CostPaymentTab({
                       )}
                       <span className="text-gray-500 text-xs">×</span>
                       {isEditable ? (
-                        <input
-                          type="number"
-                          value={formatNumberForInput(item.quantity)}
-                          onChange={(e) => {
-                            const processedValue = handleNumberInput(e.target.value);
-                            if (processedValue !== e.target.value) {
-                              e.target.value = processedValue;
-                            }
-                            onUpdateOptionItemQuantity(item.id, processedValue === "" ? 0 : parseFloat(processedValue) || 0);
-                          }}
+                        <DecimalInput
+                          value={item.quantity}
+                          onChange={(v) => onUpdateOptionItemQuantity(item.id, v)}
                           step="0.01"
                           className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                         />
@@ -566,16 +510,9 @@ export function CostPaymentTab({
                     )}
                     <span className="text-gray-500 text-xs">¥</span>
                     {isEditable ? (
-                      <input
-                        type="number"
-                        value={formatNumberForInput(item.unit_price)}
-                        onChange={(e) => {
-                          const processedValue = handleNumberInput(e.target.value);
-                          if (processedValue !== e.target.value) {
-                            e.target.value = processedValue;
-                          }
-                          onUpdateLaborCostItemUnitPrice(item.id, processedValue === "" ? 0 : parseFloat(processedValue) || 0);
-                        }}
+                      <DecimalInput
+                        value={item.unit_price}
+                        onChange={(v) => onUpdateLaborCostItemUnitPrice(item.id, v)}
                         step="0.01"
                         className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
@@ -586,16 +523,9 @@ export function CostPaymentTab({
                     )}
                     <span className="text-gray-500 text-xs">×</span>
                     {isEditable ? (
-                      <input
-                        type="number"
-                        value={formatNumberForInput(item.quantity)}
-                        onChange={(e) => {
-                          const processedValue = handleNumberInput(e.target.value);
-                          if (processedValue !== e.target.value) {
-                            e.target.value = processedValue;
-                          }
-                          onUpdateLaborCostItemQuantity(item.id, processedValue === "" ? 0 : parseFloat(processedValue) || 0);
-                        }}
+                      <DecimalInput
+                        value={item.quantity}
+                        onChange={(v) => onUpdateLaborCostItemQuantity(item.id, v)}
                         step="0.01"
                         className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
@@ -663,16 +593,9 @@ export function CostPaymentTab({
                         )}
                         <span className="text-gray-500 text-xs">¥</span>
                         {isEditable ? (
-                          <input
-                            type="number"
-                            value={formatNumberForInput(item.unit_price)}
-                            onChange={(e) => {
-                              const processedValue = handleNumberInput(e.target.value);
-                              if (processedValue !== e.target.value) {
-                                e.target.value = processedValue;
-                              }
-                              onUpdateLaborCostItemUnitPrice(item.id, processedValue === "" ? 0 : parseFloat(processedValue) || 0);
-                            }}
+                          <DecimalInput
+                            value={item.unit_price}
+                            onChange={(v) => onUpdateLaborCostItemUnitPrice(item.id, v)}
                             step="0.01"
                             className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                           />
@@ -683,16 +606,9 @@ export function CostPaymentTab({
                         )}
                         <span className="text-gray-500 text-xs">×</span>
                         {isEditable ? (
-                          <input
-                            type="number"
-                            value={formatNumberForInput(item.quantity)}
-                            onChange={(e) => {
-                              const processedValue = handleNumberInput(e.target.value);
-                              if (processedValue !== e.target.value) {
-                                e.target.value = processedValue;
-                              }
-                              onUpdateLaborCostItemQuantity(item.id, processedValue === "" ? 0 : parseFloat(processedValue) || 0);
-                            }}
+                          <DecimalInput
+                            value={item.quantity}
+                            onChange={(v) => onUpdateLaborCostItemQuantity(item.id, v)}
                             step="0.01"
                             className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                           />
@@ -735,21 +651,13 @@ export function CostPaymentTab({
                   <span className="text-gray-900 font-semibold">선금</span>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        value={formatNumberForInput(advancePaymentRate)}
-                        onChange={(e) => {
-                          const processedValue = handleNumberInput(e.target.value);
-                          if (processedValue !== e.target.value) {
-                            e.target.value = processedValue;
-                          }
-                          onSetAdvancePaymentRate(
-                            processedValue === "" ? 0 : parseFloat(processedValue) || 0,
-                          );
-                        }}
-                        min="0"
-                        max="100"
+                      <DecimalInput
+                        value={advancePaymentRate}
+                        onChange={onSetAdvancePaymentRate}
+                        min={0}
+                        max={100}
                         step="1"
+                        decimalPlaces={0}
                         disabled={!canEditCostFields}
                         className={`w-20 px-3 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canEditCostFields ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                       />
