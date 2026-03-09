@@ -28,6 +28,7 @@ import { PackagingWork } from './components/PackagingWork';
 import { Projects } from './components/Projects';
 import { ProjectDetail } from './components/ProjectDetail';
 import { AiSearch } from './components/AiSearch';
+import { ProductCollabRoutes } from './components/product-collab/routes';
 import { Login } from './components/Login';
 import { useAuth } from './contexts/AuthContext';
 import { usePermission } from './contexts/PermissionContext';
@@ -71,9 +72,8 @@ function AdminLayout() {
   // 사이드바 접힘 상태 (패킹리스트와 발주관리는 기본 접힘, 나머지는 기본 펼침)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(isCollapsedPage);
 
-  const languages = {
+  const languages: Record<Language, { name: string; flag: string }> = {
     ko: { name: '한국어', flag: '🇰🇷' },
-    en: { name: 'English', flag: '🇺🇸' },
     zh: { name: '中文', flag: '🇨🇳' },
   };
 
@@ -86,6 +86,10 @@ function AdminLayout() {
     // purchase-orders 상세 페이지인 경우
     if (adminPath.startsWith('purchase-orders/') && adminPath !== 'purchase-orders') {
       return 'purchase-order-detail';
+    }
+    // product-collab 하위 경로
+    if (adminPath.startsWith('product-collab')) {
+      return 'product-collab';
     }
     
     // 루트 경로는 dashboard
@@ -143,8 +147,8 @@ function AdminLayout() {
       >
         <Sidebar 
           currentPage={currentPage as any} 
-          isCollapsed={isSidebarCollapsed}
-          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          isCollapsed={isSidebarOpen ? false : isSidebarCollapsed}
+          onToggleCollapse={isSidebarOpen ? undefined : () => setIsSidebarCollapsed(!isSidebarCollapsed)}
           onPageChange={(page) => {
             if (page === 'purchase-order-detail') {
               // purchase-order-detail은 직접 이동할 수 없음
@@ -152,12 +156,11 @@ function AdminLayout() {
             }
             // 패킹리스트에서 저장하지 않은 변경이 있으면 확인 후 이동
             if (location.pathname.includes('shipping-history') && packingListHasUnsaved) {
-              const confirmed = window.confirm(
-                '저장하지 않은 변경사항이 있습니다. 정말로 이동하시겠습니까?\n\n변경사항은 저장되지 않습니다.'
-              );
+              const confirmed = window.confirm(t('app.unsavedConfirm'));
               if (!confirmed) return;
             }
             navigate(`/admin/${page}`);
+            setIsSidebarOpen(false);
           }} 
         />
       </div>
@@ -222,10 +225,8 @@ function AdminLayout() {
                         setLanguage(lang);
                         setIsLanguageDropdownOpen(false);
                       }}
-                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2 ${
+                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 transition-colors flex items-center gap-2 rounded-lg ${
                         language === lang ? 'bg-purple-50 text-purple-700' : 'text-gray-700'
-                      } ${
-                        lang === 'ko' ? 'rounded-t-lg' : lang === 'zh' ? 'rounded-b-lg' : ''
                       }`}
                     >
                       <span className="text-base">{languages[lang].flag}</span>
@@ -259,6 +260,7 @@ function AdminLayout() {
                   <AiSearch />
                 </PermissionCheckWrapper>
               } />
+              <Route path="/product-collab/*" element={<ProductCollabRoutes />} />
               <Route path="/products" element={
                 (user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin') ? (
                   <Products onNavigateToPurchaseOrder={handleViewOrderDetail} />
@@ -446,6 +448,7 @@ function RootRedirect() {
 // Protected Route 컴포넌트
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useLanguage();
   const location = useLocation();
   
   if (isLoading) {
@@ -453,7 +456,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">로딩 중...</p>
+          <p className="text-gray-600">{t('app.loading')}</p>
         </div>
       </div>
     );
@@ -468,6 +471,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppContent() {
   const { isAuthenticated, isLoading, login } = useAuth();
+  const { t } = useLanguage();
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const location = useLocation();
@@ -478,7 +482,7 @@ function AppContent() {
     try {
       await login(id, password);
     } catch (error: any) {
-      setLoginError(error.message || '로그인에 실패했습니다.');
+      setLoginError(error.message || t('app.loginFailed'));
       throw error;
     } finally {
       setIsLoggingIn(false);
@@ -491,7 +495,7 @@ function AppContent() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">로딩 중...</p>
+          <p className="text-gray-600">{t('app.loading')}</p>
         </div>
       </div>
     );

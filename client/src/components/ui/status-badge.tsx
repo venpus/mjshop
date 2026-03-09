@@ -2,11 +2,19 @@ import React from 'react';
 
 export type StatusBadgeType = 'factory' | 'work' | 'delivery' | 'payment' | 'order';
 
+/** order/payment 타입에서 색상 결정용 키 (언어 무관) */
+export type OrderStatusKey = 'pending' | 'confirmed' | 'cancelled';
+export type PaymentStatusKey = 'unpaid' | 'advance' | 'complete';
+
 export interface StatusBadgeProps {
   /** 표시할 상태 텍스트 */
   status: string;
   /** 상태 타입 (색상 매핑에 사용) */
   type: StatusBadgeType;
+  /** order 타입일 때 색상용 키 (지정 시 언어와 무관하게 동일 색상) */
+  orderStatusKey?: OrderStatusKey;
+  /** payment 타입일 때 색상용 키 (지정 시 언어와 무관하게 동일 색상) */
+  paymentStatusKey?: PaymentStatusKey;
   /** 추가 클래스명 */
   className?: string;
   /** 크기 조절 (기본값: 'sm') */
@@ -16,9 +24,40 @@ export interface StatusBadgeProps {
 }
 
 /**
+ * orderStatusKey / paymentStatusKey 기준 색상 (언어 무관)
+ */
+function getColorByKey(
+  type: 'order' | 'payment',
+  key: OrderStatusKey | PaymentStatusKey
+): string {
+  if (type === 'order') {
+    switch (key as OrderStatusKey) {
+      case 'confirmed': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  }
+  switch (key as PaymentStatusKey) {
+    case 'complete': return 'bg-green-100 text-green-800';
+    case 'advance': return 'bg-yellow-100 text-yellow-800';
+    case 'unpaid': return 'bg-red-100 text-red-800';
+    default: return 'bg-gray-100 text-gray-800';
+  }
+}
+
+/**
  * 상태별 색상을 반환하는 헬퍼 함수
  */
-function getStatusColor(status: string, type: StatusBadgeType): string {
+function getStatusColor(
+  status: string,
+  type: StatusBadgeType,
+  orderStatusKey?: OrderStatusKey,
+  paymentStatusKey?: PaymentStatusKey
+): string {
+  if (type === 'order' && orderStatusKey) return getColorByKey('order', orderStatusKey);
+  if (type === 'payment' && paymentStatusKey) return getColorByKey('payment', paymentStatusKey);
+
   switch (type) {
     case 'factory':
       // 업체출고 상태
@@ -88,11 +127,13 @@ function getSizeClass(size: 'xs' | 'sm' | 'md'): string {
 export function StatusBadge({
   status,
   type,
+  orderStatusKey,
+  paymentStatusKey,
   className = '',
   size = 'sm',
   onClick,
 }: StatusBadgeProps) {
-  const colorClass = getStatusColor(status, type);
+  const colorClass = getStatusColor(status, type, orderStatusKey, paymentStatusKey);
   const sizeClass = getSizeClass(size);
 
   const Component = onClick ? 'button' : 'span';

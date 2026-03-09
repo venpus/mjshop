@@ -4,6 +4,7 @@ import {
   PaymentHistoryItem,
 } from '../../api/paymentHistoryApi';
 import { getAllPaymentRequests, PaymentRequest } from '../../api/paymentRequestApi';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface PaymentDetail {
   advance: number; // 선금
@@ -41,6 +42,7 @@ interface PaymentStatisticsCardsProps {
  * 결제 통계 카드 컴포넌트
  */
 export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentStatisticsCardsProps) {
+  const { t } = useLanguage();
   const isLevelC = userLevel === 'C0: 한국Admin';
   const [statistics, setStatistics] = useState<PaymentStatistics>({
     paidAmount: 0,
@@ -348,15 +350,15 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
       {/* 상세 내역 그룹 */}
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-blue-50 border border-blue-300 shadow-sm">
-          <span className="text-xs text-blue-600 font-semibold mb-1">선금</span>
+          <span className="text-xs text-blue-600 font-semibold mb-1">{t('payment.advance')}</span>
           <span className="text-base font-bold text-blue-700">{formatCurrency(detail.advance)}</span>
         </div>
         <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-orange-50 border border-orange-300 shadow-sm">
-          <span className="text-xs text-orange-600 font-semibold mb-1">잔금</span>
+          <span className="text-xs text-orange-600 font-semibold mb-1">{t('payment.balance')}</span>
           <span className="text-base font-bold text-orange-700">{formatCurrency(detail.balance)}</span>
         </div>
         <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-indigo-50 border border-indigo-300 shadow-sm">
-          <span className="text-xs text-indigo-600 font-semibold mb-1">배송비</span>
+          <span className="text-xs text-indigo-600 font-semibold mb-1">{t('payment.shippingCost')}</span>
           <span className="text-base font-bold text-indigo-700">{formatCurrency(detail.shipping)}</span>
         </div>
       </div>
@@ -373,15 +375,15 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
       {/* 상세 내역 그룹 */}
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-teal-50 border border-teal-300 shadow-sm">
-          <span className="text-xs text-teal-600 font-semibold mb-1">발주 주가비</span>
+          <span className="text-xs text-teal-600 font-semibold mb-1">{t('payment.orderCost')}</span>
           <span className="text-base font-bold text-teal-700">{formatCurrency(detail.backMargin)}</span>
         </div>
         <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-purple-50 border border-purple-300 shadow-sm">
-          <span className="text-xs text-purple-600 font-semibold mb-1">관리자 입력비</span>
+          <span className="text-xs text-purple-600 font-semibold mb-1">{t('payment.adminInput')}</span>
           <span className="text-base font-bold text-purple-700">{formatCurrency(detail.adminCostItems)}</span>
         </div>
         <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-cyan-50 border border-cyan-300 shadow-sm">
-          <span className="text-xs text-cyan-600 font-semibold mb-1">배송비 추가비</span>
+          <span className="text-xs text-cyan-600 font-semibold mb-1">{t('payment.shippingExtra')}</span>
           <span className="text-base font-bold text-cyan-700">{formatCurrency(detail.shippingDifference)}</span>
         </div>
       </div>
@@ -394,7 +396,7 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* 지급된 금액 총계 */}
         <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
-          <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">지급된 금액 총계</h3>
+          <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">{t('payment.paidTotal')}</h3>
           {isLoading ? (
             <div className="flex items-center justify-center h-32">
               <p className="text-2xl font-bold text-gray-400">-</p>
@@ -406,7 +408,7 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
 
         {/* 지급 예정 총계 */}
         <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
-          <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">지급 예정 총계</h3>
+          <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">{t('payment.scheduledTotal')}</h3>
           {isLoading ? (
             <div className="flex items-center justify-center h-32">
               <p className="text-2xl font-bold text-gray-400">-</p>
@@ -418,7 +420,7 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
 
         {/* 금일까지 지급요청 총계 */}
         <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
-          <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">금일까지 지급요청 총계</h3>
+          <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">{t('payment.requestTotal')}</h3>
           {isLoading ? (
             <div className="flex items-center justify-center h-32">
               <p className="text-2xl font-bold text-gray-400">-</p>

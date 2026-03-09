@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Filter, Download, Eye, Package, Plus, Image, X, CheckSquare, RotateCw, Trash2, Search } from 'lucide-react';
 import { TablePagination } from './ui/table-pagination';
@@ -8,9 +8,11 @@ import { ReorderPurchaseOrderModal } from './ReorderPurchaseOrderModal';
 import { useReorderPurchaseOrder } from '../hooks/useReorderPurchaseOrder';
 import { PurchaseOrderDeleteDialog } from './PurchaseOrderDeleteDialog';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useDeletePurchaseOrder } from '../hooks/useDeletePurchaseOrder';
 import { formatDateForInput, formatDateKST, isPastDate } from '../utils/dateUtils';
 import { CreatePurchaseOrderButton } from './purchase-order/CreatePurchaseOrderButton';
+import { PurchaseOrderCardList } from './purchase-order/PurchaseOrderCardList';
 import { UnreceivedQuantityCell } from './purchase-order/UnreceivedQuantityCell';
 import { 
   calculateBasicCostTotal,
@@ -81,8 +83,64 @@ interface PurchaseOrder {
   hasKoreaArrival?: number | boolean; // 한국도착일 존재 여부
 }
 
+/** API 응답 data.data 배열을 PurchaseOrder[]로 변환 (패킹리스트 배송비는 0) */
+function convertDataDataToOrders(dataData: any[]): PurchaseOrder[] {
+  return dataData.map((po: any) => ({
+    id: po.id,
+    poNumber: po.po_number,
+    supplier: po.supplier,
+    product: po.product,
+    unitPrice: po.unit_price || 0,
+    backMargin: po.back_margin || 0,
+    optionCost: po.total_option_cost || 0,
+    laborCost: po.total_labor_cost || 0,
+    quantity: po.quantity || 0,
+    amount: 0,
+    commissionRate: po.commission_rate || 0,
+    shippingCost: po.shipping_cost || 0,
+    warehouseShippingCost: po.warehouse_shipping_cost || 0,
+    size: po.product?.size || po.size || '',
+    weight: po.product?.weight || po.weight || '',
+    packaging: po.packaging || 0,
+    factoryStatus: '출고대기' as const,
+    workStatus: calculateWorkStatus(
+      po.work_start_date ? formatDateForInput(po.work_start_date) : null,
+      po.work_end_date ? formatDateForInput(po.work_end_date) : null
+    ),
+    deliveryStatus: calculateDeliveryStatus(
+      (po.shipped_quantity !== undefined && Number(po.shipped_quantity) > 0),
+      po.warehouse_arrival_date || null,
+      (po.has_korea_arrival !== undefined && (Number(po.has_korea_arrival) > 0 || po.has_korea_arrival === true)),
+      po.delivery_status || '대기중'
+    ),
+    advancePaymentAmount: po.advance_payment_amount || null,
+    advancePaymentDate: po.advance_payment_date ? formatDateForInput(po.advance_payment_date) : null,
+    balancePaymentAmount: po.balance_payment_amount || null,
+    balancePaymentDate: po.balance_payment_date ? formatDateForInput(po.balance_payment_date) : null,
+    paymentStatus: (() => {
+      const advanceDate = po.advance_payment_date ? formatDateForInput(po.advance_payment_date) : null;
+      const balanceDate = po.balance_payment_date ? formatDateForInput(po.balance_payment_date) : null;
+      if (advanceDate && balanceDate) return '완료';
+      if (advanceDate) return '선금결제';
+      return '미결제';
+    })(),
+    orderStatus: po.order_status || (po.is_confirmed ? '발주확인' : '발주 대기'),
+    date: formatDateForInput(po.order_date),
+    isOrderConfirmed: po.is_confirmed || false,
+    unshippedQuantity: po.unshipped_quantity !== undefined ? Number(po.unshipped_quantity) : undefined,
+    shippingQuantity: po.shipping_quantity !== undefined ? Number(po.shipping_quantity) : undefined,
+    unreceivedQuantity: po.unreceived_quantity !== undefined ? Number(po.unreceived_quantity) : undefined,
+    koreaArrivedQuantity: po.arrived_quantity !== undefined ? Number(po.arrived_quantity) : undefined,
+    estimatedDelivery: po.estimated_delivery ? formatDateForInput(po.estimated_delivery) : undefined,
+    warehouseArrivalDate: po.warehouse_arrival_date ? formatDateForInput(po.warehouse_arrival_date) : null,
+    hasKoreaArrival: po.has_korea_arrival !== undefined ? (Number(po.has_korea_arrival) > 0 || po.has_korea_arrival === true) : false,
+    packingListShippingCost: 0,
+  }));
+}
+
 export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const { user } = useAuth();
+  const { language, t } = useLanguage();
   const isSuperAdmin = user?.level === 'A-SuperAdmin';
   const location = useLocation();
   const navigate = useNavigate();
@@ -126,6 +184,15 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const [inputSearchTerm, setInputSearchTerm] = useState(searchFromUrl);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState<FiltersState>(filtersFromUrl);
+
+  // 모바일 무한 스크롤용 상태
+  const [mobileOrders, setMobileOrders] = useState<PurchaseOrder[]>([]);
+  const [mobilePage, setMobilePage] = useState(1);
+  const [hasMoreMobile, setHasMoreMobile] = useState(true);
+  const [isLoadingMoreMobile, setIsLoadingMoreMobile] = useState(false);
+  const [mobileDisplayCount, setMobileDisplayCount] = useState(20);
+  const mobileScrollRef = useRef<HTMLDivElement>(null);
+  const mobileSentinelRef = useRef<HTMLDivElement>(null);
 
   // 필터 유지 상태에서 페이징 시 불필요한 API 재호출 방지: searchTerm/filters 변경 시에만 재요청
   const prevSearchTermRef = useRef<string | null>(null);
@@ -190,87 +257,10 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
       const data = await response.json();
       if (data.success && data.data) {
-        // 페이징 정보 저장
         if (data.pagination) {
           setTotalItems(data.pagination.total);
         }
-        
-        // 서버 응답을 클라이언트 PurchaseOrder 인터페이스로 변환
-        const convertedOrders: PurchaseOrder[] = data.data.map((po: any) => {
-          return {
-            id: po.id,
-            poNumber: po.po_number,
-            supplier: po.supplier,
-            product: po.product,
-            unitPrice: po.unit_price || 0,
-            backMargin: po.back_margin || 0,
-            optionCost: po.total_option_cost || 0, // 서버에서 계산된 옵션 비용 총액
-            laborCost: po.total_labor_cost || 0, // 서버에서 계산된 인건비 총액
-            quantity: po.quantity || 0,
-            amount: 0, // 최종 결제 금액은 별도로 계산
-            commissionRate: po.commission_rate || 0,
-            shippingCost: po.shipping_cost || 0,
-            warehouseShippingCost: po.warehouse_shipping_cost || 0,
-            size: po.product?.size || po.size || '',
-            weight: po.product?.weight || po.weight || '',
-            packaging: po.packaging || 0,
-            // 업체 출고 상태 계산: factory_shipped_quantity와 ordered_quantity를 기반으로 계산 (주석 처리 - 추후 사용 예정)
-            // factoryStatus: calculateFactoryStatusFromQuantity(
-            //   po.factory_shipped_quantity !== undefined ? Number(po.factory_shipped_quantity) : 0,
-            //   po.quantity || 0
-            // ),
-            factoryStatus: '출고대기' as const, // 임시 값 (주석 처리된 코드를 복원하면 제거)
-            // 작업 상태 계산: work_start_date와 work_end_date를 기반으로 계산
-            workStatus: calculateWorkStatus(
-              po.work_start_date ? formatDateForInput(po.work_start_date) : null,
-              po.work_end_date ? formatDateForInput(po.work_end_date) : null
-            ),
-            // 배송 상태 계산: 패킹리스트 정보를 기반으로 계산
-            // 상세페이지와 동일한 로직 적용
-            deliveryStatus: calculateDeliveryStatus(
-              (po.shipped_quantity !== undefined && Number(po.shipped_quantity) > 0), // hasPackingList
-              po.warehouse_arrival_date || null, // warehouseArrivalDate
-              (po.has_korea_arrival !== undefined && (Number(po.has_korea_arrival) > 0 || po.has_korea_arrival === true)), // hasKoreaArrival
-              po.delivery_status || '대기중' // defaultDeliveryStatus
-            ),
-            // 선금/잔금 정보 (먼저 파싱)
-            advancePaymentAmount: po.advance_payment_amount || null,
-            advancePaymentDate: po.advance_payment_date ? formatDateForInput(po.advance_payment_date) : null,
-            balancePaymentAmount: po.balance_payment_amount || null,
-            balancePaymentDate: po.balance_payment_date ? formatDateForInput(po.balance_payment_date) : null,
-            // 결제 상태 계산: 선금/잔금 날짜를 기반으로 재계산 (DB 값과 동기화 보장)
-            paymentStatus: (() => {
-              const advanceDate = po.advance_payment_date ? formatDateForInput(po.advance_payment_date) : null;
-              const balanceDate = po.balance_payment_date ? formatDateForInput(po.balance_payment_date) : null;
-              
-              // 선금과 잔금 날짜가 모두 있으면 '완료'
-              if (advanceDate && balanceDate) {
-                return '완료';
-              }
-              // 선금 날짜만 있으면 '선금결제'
-              if (advanceDate) {
-                return '선금결제';
-              }
-              // 둘 다 없으면 '미결제'
-              return '미결제';
-            })(),
-            // order_status가 있으면 사용, 없으면 is_confirmed 기반으로 계산 (기존 데이터 호환성)
-            orderStatus: po.order_status || (po.is_confirmed ? '발주확인' : '발주 대기'),
-            date: formatDateForInput(po.order_date),
-            isOrderConfirmed: po.is_confirmed || false,
-            // 패킹리스트와 연동된 수량 정보
-            unshippedQuantity: po.unshipped_quantity !== undefined ? Number(po.unshipped_quantity) : undefined,
-            shippingQuantity: po.shipping_quantity !== undefined ? Number(po.shipping_quantity) : undefined,
-            unreceivedQuantity: po.unreceived_quantity !== undefined ? Number(po.unreceived_quantity) : undefined,
-            koreaArrivedQuantity: po.arrived_quantity !== undefined ? Number(po.arrived_quantity) : undefined,
-            // 예정 납기일
-            estimatedDelivery: po.estimated_delivery ? formatDateForInput(po.estimated_delivery) : undefined,
-            // 패킹리스트 정보
-            warehouseArrivalDate: po.warehouse_arrival_date ? formatDateForInput(po.warehouse_arrival_date) : null,
-            hasKoreaArrival: po.has_korea_arrival !== undefined ? (Number(po.has_korea_arrival) > 0 || po.has_korea_arrival === true) : false,
-          };
-        });
-        
+        const convertedOrders = convertDataDataToOrders(data.data);
         // 각 발주에 대해 패킹리스트 배송비 가져오기
         const ordersWithShippingCost = await Promise.all(convertedOrders.map(async (order) => {
           try {
@@ -299,6 +289,25 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       setIsLoading(false);
     }
   };
+
+  /** 모바일 무한 스크롤: 한 페이지만 조회 (배송비 API 없이 빠르게) */
+  const loadPurchaseOrdersPage = useCallback(async (page: number): Promise<{ orders: PurchaseOrder[]; total: number }> => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('limit', '20');
+    if (searchTerm.trim()) params.set('search', searchTerm.trim());
+    const response = await fetch(`${API_BASE_URL}/purchase-orders?${params.toString()}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Failed to load');
+    const data = await response.json();
+    if (!data.success || !data.data) return { orders: [], total: 0 };
+    const orders = convertDataDataToOrders(data.data);
+    const total = data.pagination?.total ?? 0;
+    return { orders, total };
+  }, [searchTerm]);
 
   // 재주문 훅 사용 (loadPurchaseOrders 선언 후에 위치)
   const {
@@ -380,6 +389,159 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   
   // 표시할 전체 개수: 상태 필터가 있으면 필터링된 개수, 없으면 서버의 전체 개수
   const displayTotalItems = hasActiveStatusFilters ? filteredCount : totalItems;
+
+  // 테이블/카드 공통 row 데이터 (계산 한 곳에서만 수행)
+  const rowDataList = useMemo(() => {
+    return currentPurchaseOrders.map((po) => {
+      const orderUnitPrice = po.unitPrice + po.backMargin;
+      const commissionAmount = calculateCommissionAmount(
+        po.unitPrice,
+        po.quantity,
+        po.commissionRate,
+        po.backMargin,
+        po.date,
+        po.optionCost,
+        po.laborCost
+      );
+      const basicCostTotal = calculateBasicCostTotal(
+        po.unitPrice,
+        po.quantity,
+        po.commissionRate,
+        po.backMargin,
+        po.date
+      );
+      const shippingCostTotal = calculateShippingCostTotal(
+        po.shippingCost,
+        po.warehouseShippingCost
+      );
+      const finalPaymentAmount = calculateFinalPaymentAmount(
+        basicCostTotal,
+        shippingCostTotal,
+        po.optionCost,
+        po.laborCost,
+        commissionAmount,
+        po.date
+      );
+      const finalUnitPrice = calculateExpectedFinalUnitPrice(
+        finalPaymentAmount,
+        po.packingListShippingCost || 0,
+        po.quantity
+      );
+      const isTargetPeriod = !!(po.date && po.date >= '2026-02-20');
+      const isOverdueWithUnreceived =
+        isTargetPeriod &&
+        !!(po.estimatedDelivery && isPastDate(po.estimatedDelivery) && (po.unreceivedQuantity ?? 0) > 0);
+      const hasNoDeliveryDate = isTargetPeriod && (!po.estimatedDelivery || po.estimatedDelivery.trim() === '');
+      return {
+        po,
+        orderUnitPrice,
+        finalPaymentAmount,
+        finalUnitPrice,
+        isOverdueWithUnreceived,
+        hasNoDeliveryDate,
+      };
+    });
+  }, [currentPurchaseOrders]);
+
+  // 검색/필터 변경 시 모바일 무한스크롤 상태 초기화
+  useEffect(() => {
+    setMobileOrders([]);
+    setMobilePage(1);
+    setHasMoreMobile(true);
+    setMobileDisplayCount(20);
+  }, [searchTerm, filters]);
+
+  // 필터 없을 때 모바일: 첫 데이터는 purchaseOrders와 동기화 (데스크톱과 동일 1페이지)
+  useEffect(() => {
+    if (!hasActiveStatusFilters && mobileOrders.length === 0 && purchaseOrders.length > 0 && !isLoading) {
+      setMobileOrders([...purchaseOrders]);
+      setMobilePage(2);
+      setHasMoreMobile(totalItems > purchaseOrders.length);
+    }
+  }, [hasActiveStatusFilters, purchaseOrders.length, totalItems, isLoading]);
+
+  // 모바일용 목록 소스 (필터 있으면 슬라이스, 없으면 누적 목록)
+  const mobileOrdersSource = hasActiveStatusFilters
+    ? filteredPurchaseOrders.slice(0, mobileDisplayCount)
+    : mobileOrders;
+
+  const rowDataListForMobile = useMemo(() => {
+    return mobileOrdersSource.map((po) => {
+      const orderUnitPrice = po.unitPrice + po.backMargin;
+      const commissionAmount = calculateCommissionAmount(
+        po.unitPrice,
+        po.quantity,
+        po.commissionRate,
+        po.backMargin,
+        po.date,
+        po.optionCost,
+        po.laborCost
+      );
+      const basicCostTotal = calculateBasicCostTotal(
+        po.unitPrice,
+        po.quantity,
+        po.commissionRate,
+        po.backMargin,
+        po.date
+      );
+      const shippingCostTotal = calculateShippingCostTotal(po.shippingCost, po.warehouseShippingCost);
+      const finalPaymentAmount = calculateFinalPaymentAmount(
+        basicCostTotal,
+        shippingCostTotal,
+        po.optionCost,
+        po.laborCost,
+        commissionAmount,
+        po.date
+      );
+      const isTargetPeriod = !!(po.date && po.date >= '2026-02-20');
+      const isOverdueWithUnreceived =
+        isTargetPeriod &&
+        !!(po.estimatedDelivery && isPastDate(po.estimatedDelivery) && (po.unreceivedQuantity ?? 0) > 0);
+      const hasNoDeliveryDate = isTargetPeriod && (!po.estimatedDelivery || po.estimatedDelivery.trim() === '');
+      return {
+        po,
+        orderUnitPrice,
+        finalPaymentAmount,
+        finalUnitPrice: 0,
+        isOverdueWithUnreceived,
+        hasNoDeliveryDate,
+      };
+    });
+  }, [mobileOrdersSource]);
+
+  const loadMoreMobile = useCallback(() => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) return;
+    if (isLoadingMoreMobile) return;
+    if (hasActiveStatusFilters) {
+      setMobileDisplayCount((c) => c + 20);
+      return;
+    }
+    if (!hasMoreMobile) return;
+    setIsLoadingMoreMobile(true);
+    const prevLen = mobileOrders.length;
+    loadPurchaseOrdersPage(mobilePage)
+      .then(({ orders, total }) => {
+        setMobileOrders((prev) => [...prev, ...orders]);
+        setMobilePage((p) => p + 1);
+        setHasMoreMobile(prevLen + orders.length < total);
+      })
+      .catch(() => setHasMoreMobile(false))
+      .finally(() => setIsLoadingMoreMobile(false));
+  }, [hasActiveStatusFilters, isLoadingMoreMobile, hasMoreMobile, mobilePage, mobileOrders.length, loadPurchaseOrdersPage]);
+
+  // 모바일 스크롤 감지: sentinel이 보이면 더 불러오기
+  useEffect(() => {
+    const sentinel = mobileSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMoreMobile();
+      },
+      { root: mobileScrollRef.current, rootMargin: '200px', threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadMoreMobile]);
 
   // 검색 실행 핸들러 (엔터키 또는 검색 버튼 클릭 시)
   const handleSearch = () => {
@@ -769,15 +931,15 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             <CheckSquare className="w-5 h-5" />
             <span>발주 컨펌{selectedOrders.size > 0 ? ` (${selectedOrders.size})` : ''}</span>
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          <button className="hidden md:flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
             <Download className="w-5 h-5" />
             <span>내보내기</span>
           </button>
         </div>
       </div>
 
-      {/* Purchase Orders Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      {/* Purchase Orders Table (desktop) */}
+      <div className="hidden md:block bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {/* 상단 페이징 */}
         <TablePagination
           currentPage={currentPage}
@@ -824,58 +986,15 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {currentPurchaseOrders.map((po) => {
-                // 발주 단가 = 기본 단가 + 추가 단가
-                const orderUnitPrice = po.unitPrice + po.backMargin;
-                
-                // 수수료 계산 (2025-01-06 이후 발주는 옵션비용과 인건비 포함)
-                const commissionAmount = calculateCommissionAmount(
-                  po.unitPrice,
-                  po.quantity,
-                  po.commissionRate,
-                  po.backMargin,
-                  po.date,
-                  po.optionCost,
-                  po.laborCost
-                );
-                
-                // 최종 결제 금액 계산
-                const basicCostTotal = calculateBasicCostTotal(
-                  po.unitPrice,
-                  po.quantity,
-                  po.commissionRate,
-                  po.backMargin,
-                  po.date
-                );
-                const shippingCostTotal = calculateShippingCostTotal(
-                  po.shippingCost,
-                  po.warehouseShippingCost
-                );
-                const finalPaymentAmount = calculateFinalPaymentAmount(
-                  basicCostTotal,
-                  shippingCostTotal,
-                  po.optionCost,
-                  po.laborCost,
-                  commissionAmount,
-                  po.date
-                );
-                
-                // 예상최종단가 = (최종 결제 금액 + 패킹리스트 배송비) / 수량
-                const finalUnitPrice = calculateExpectedFinalUnitPrice(
+              {rowDataList.map((rowData) => {
+                const po = rowData.po;
+                const {
+                  orderUnitPrice,
                   finalPaymentAmount,
-                  po.packingListShippingCost || 0,
-                  po.quantity
-                );
-                // 2026-02-20 이후 발주에만 납기일 경고 적용
-                const isTargetPeriod = !!(po.date && po.date >= '2026-02-20');
-                // 납기일 경과 + 미입고 수량 있음 → 행/셀 강조 (빨강)
-                const isOverdueWithUnreceived =
-                  isTargetPeriod &&
-                  !!(po.estimatedDelivery && isPastDate(po.estimatedDelivery) && (po.unreceivedQuantity ?? 0) > 0);
-                // 납기일 미지정 → 행/셀 강조 (주황)
-                const hasNoDeliveryDate =
-                  isTargetPeriod && (!po.estimatedDelivery || po.estimatedDelivery.trim() === '');
-                
+                  finalUnitPrice,
+                  isOverdueWithUnreceived,
+                  hasNoDeliveryDate,
+                } = rowData;
                 return (
                   <tr
                     key={po.id}
@@ -1159,6 +1278,39 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
           onPageChange={handlePageChange}
           onItemsPerPageChange={handleItemsPerPageChange}
         />
+      </div>
+
+      {/* Purchase Orders Card List (mobile, infinite scroll) */}
+      <div className="block md:hidden bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col max-h-[calc(100vh-12rem)]">
+        <div
+          ref={mobileScrollRef}
+          className="flex-1 overflow-y-auto p-3"
+        >
+          <PurchaseOrderCardList
+            rowDataList={rowDataListForMobile}
+            getProductDisplayName={(po) =>
+              language === 'zh' && po.product?.name_chinese
+                ? (po.product.name_chinese as string)
+                : (po.product?.name || '-')
+            }
+            getFullImageUrl={getFullImageUrl}
+            onNavigateToDetail={(orderId) => {
+              const params = new URLSearchParams();
+              params.set('returnPage', currentPage.toString());
+              params.set('returnItemsPerPage', itemsPerPage.toString());
+              if (searchTerm.trim()) params.set('returnSearch', searchTerm.trim());
+              navigate(`/admin/purchase-orders/${orderId}?${params.toString()}`);
+            }}
+            selectedOrderIds={selectedOrders}
+            onToggleSelect={(orderId) => () => toggleOrderSelection(orderId)}
+          />
+          <div ref={mobileSentinelRef} className="h-4 flex-shrink-0" aria-hidden />
+          {isLoadingMoreMobile && (
+            <div className="py-4 text-center text-sm text-gray-500">
+              {t('purchaseOrder.card.loadingMore')}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Product Image Preview */}

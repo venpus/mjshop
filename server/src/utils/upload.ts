@@ -1032,6 +1032,38 @@ export async function getNextProjectImageNumber(projectId: number, entryId: numb
   }
 }
 
+// ==================== Product Collab Images ====================
+
+const productCollabUploadDir = path.join(__dirname, '../../uploads/product-collab');
+
+if (!fs.existsSync(productCollabUploadDir)) {
+  fs.mkdirSync(productCollabUploadDir, { recursive: true });
+}
+
+const productCollabStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const id = (req as unknown as { params?: { id?: string } }).params?.id ?? 'temp';
+    const dir = path.join(productCollabUploadDir, String(id));
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `${randomUUID()}${ext}`);
+  },
+});
+
+export const productCollabImageUpload = multer({
+  storage: productCollabStorage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+export function getProductCollabImageUrl(relativePath: string): string {
+  return `/uploads/${relativePath}`;
+}
 /**
  * 프로젝트 초기 이미지 저장 경로
  * uploads/projects/{project_id}/initial/{image_filename}

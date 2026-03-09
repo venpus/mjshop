@@ -28,19 +28,19 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
 
     // 유효성 검사
     if (!id.trim()) {
-      setError(t('login.idRequired') || 'ID를 입력해주세요.');
+      setError(t('login.idRequired'));
       return;
     }
 
     if (!password.trim()) {
-      setError(t('login.passwordRequired') || '비밀번호를 입력해주세요.');
+      setError(t('login.passwordRequired'));
       return;
     }
 
     try {
       await onLogin(id.trim(), password);
     } catch (err: any) {
-      setError(err.message || (t('login.failed') || '로그인에 실패했습니다.'));
+      setError(err.message || t('login.failed'));
     }
   };
 
@@ -92,7 +92,7 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
                   type="text"
                   value={id}
                   onChange={(e) => setId(e.target.value)}
-                  placeholder={t('login.idPlaceholder') || '관리자 ID를 입력하세요'}
+                  placeholder={t('login.idPlaceholder')}
                   className="pl-10 h-12"
                   disabled={isLoading}
                   autoComplete="username"
@@ -103,7 +103,7 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
             {/* Password Input */}
             <div className="space-y-2">
               <Label htmlFor="password" className="text-gray-700 font-medium">
-                비밀번호
+                {t('login.password')}
               </Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -112,7 +112,7 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="비밀번호를 입력하세요"
+                  placeholder={t('login.passwordPlaceholder')}
                   className="pl-10 h-12"
                   disabled={isLoading}
                   autoComplete="current-password"
@@ -128,7 +128,7 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
                 className="text-sm text-purple-600 hover:text-purple-700 hover:underline transition-colors"
                 disabled={isLoading}
               >
-                비밀번호를 잊으셨나요?
+                {t('login.forgotPassword')}
               </button>
             </div>
 
@@ -141,12 +141,12 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>로그인 중...</span>
+                  <span>{t('login.submitting')}</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
                   <LogIn className="w-5 h-5" />
-                  <span>로그인</span>
+                  <span>{t('login.submit')}</span>
                 </div>
               )}
             </Button>
@@ -160,7 +160,7 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
                 disabled={isLoading}
               >
                 <UserPlus className="w-4 h-4" />
-                <span>관리자 가입 신청</span>
+                <span>{t('login.signup')}</span>
               </button>
             </div>
           </form>

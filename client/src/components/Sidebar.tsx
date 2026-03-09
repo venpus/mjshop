@@ -28,6 +28,7 @@ import {
   TrendingUp,
   MessageCircle,
   Sparkles,
+  Package,
 } from "lucide-react";
 import { SidebarExternalLink } from "./sidebar/SidebarExternalLink";
 
@@ -52,7 +53,8 @@ type PageType =
   | "packaging-work"
   | "projects"
   | "permissions"
-  | "ai-search";
+  | "ai-search"
+  | "product-collab";
 
 interface SidebarProps {
   currentPage: PageType | 'purchase-order-detail';
@@ -146,6 +148,20 @@ export function Sidebar({
               {!isCollapsed && <span>{t('menu.aiSearch')}</span>}
             </button>
 
+            {/* 제품 개발 협업 */}
+            <button
+              onClick={() => onPageChange("product-collab")}
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
+                currentPage === "product-collab"
+                  ? "bg-purple-50 text-purple-600"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
+              title={isCollapsed ? t('menu.productCollab') : undefined}
+            >
+              <Package className="w-5 h-5 flex-shrink-0" />
+              {!isCollapsed && <span>{t('menu.productCollab')}</span>}
+            </button>
+
             {/* 악세서리 AI (외부 링크) */}
             <SidebarExternalLink
               href="https://dollapp-g72sj77j.manus.space/"
@@ -203,10 +219,10 @@ export function Sidebar({
                         ? "bg-purple-50 text-purple-600"
                         : "text-gray-600 hover:bg-gray-50"
                     }`}
-                    title={isCollapsed ? "미도착 분석" : undefined}
+                    title={isCollapsed ? t('menu.notArrivedAnalysis') : undefined}
                   >
                     <TrendingUp className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                    {!isCollapsed && <span>미도착 분석</span>}
+                    {!isCollapsed && <span>{t('menu.notArrivedAnalysis')}</span>}
                   </button>
                 )}
                 {/* 패킹리스트 */}
@@ -233,10 +249,10 @@ export function Sidebar({
                         ? "bg-purple-50 text-purple-600"
                         : "text-gray-600 hover:bg-gray-50"
                     }`}
-                    title={isCollapsed ? "결제내역" : undefined}
+                    title={isCollapsed ? t('menu.paymentHistory') : undefined}
                   >
                     <FileText className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                    {!isCollapsed && <span>결제내역</span>}
+                    {!isCollapsed && <span>{t('menu.paymentHistory')}</span>}
                   </button>
                 )}
                 {/* 갤러리 */}

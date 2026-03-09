@@ -11,6 +11,7 @@ import paymentRequestRoutes from './paymentRequests.js';
 import permissionRoutes from './permissions.js';
 import stockOutboundRoutes from './stockOutbound.js';
 import qwenRoutes from './qwen.js';
+import productCollabRoutes from './productCollab.js';
 
 const router = Router();
 
@@ -29,6 +30,7 @@ router.use('/payment-requests', paymentRequestRoutes);
 router.use('/permissions', permissionRoutes);
 router.use('/stock-outbound', stockOutboundRoutes);
 router.use('/qwen', qwenRoutes);
+router.use('/product-collab', productCollabRoutes);
 
 router.get('/', (req, res) => {
   res.json({ 

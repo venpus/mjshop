@@ -8,6 +8,7 @@ import {
 } from '../../api/paymentRequestApi';
 import { PaymentRequestStatusBadge } from './PaymentRequestStatusBadge';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { formatDateKST, getLocalDateString } from '../../utils/dateUtils';
 import { printPaymentRequestLedger } from '../../utils/printUtils';
 
@@ -31,6 +32,7 @@ interface DateGroup {
  * 날짜별로 지급요청을 그룹화하여 표시합니다.
  */
 export function PaymentRequestLedger({ onRefresh }: PaymentRequestLedgerProps) {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const [requests, setRequests] = useState<PaymentRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,7 +54,7 @@ export function PaymentRequestLedger({ onRefresh }: PaymentRequestLedgerProps) {
       groupByDate(data);
     } catch (error: any) {
       console.error('지급요청 조회 오류:', error);
-      alert(error.message || '지급요청 조회에 실패했습니다.');
+      alert(error.message || t('payment.loadFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -121,7 +123,7 @@ export function PaymentRequestLedger({ onRefresh }: PaymentRequestLedgerProps) {
       .map((item) => item.id);
 
     if (pendingIds.length === 0) {
-      alert('지급완료할 항목이 없습니다.');
+      alert(t('payment.noItemsToComplete'));
       return;
     }
 
@@ -136,7 +138,7 @@ export function PaymentRequestLedger({ onRefresh }: PaymentRequestLedgerProps) {
       await loadRequests();
       onRefresh?.();
     } catch (error: any) {
-      alert(error.message || '일괄 지급완료 처리에 실패했습니다.');
+      alert(error.message || t('payment.batchCompleteFailed'));
     } finally {
       setProcessingDates((prev) => {
         const newSet = new Set(prev);
@@ -155,7 +157,7 @@ export function PaymentRequestLedger({ onRefresh }: PaymentRequestLedgerProps) {
       .map((item) => item.id);
 
     if (completedIds.length === 0) {
-      alert('지급해제할 항목이 없습니다.');
+      alert(t('payment.noItemsToRevert'));
       return;
     }
 
@@ -182,11 +184,11 @@ export function PaymentRequestLedger({ onRefresh }: PaymentRequestLedgerProps) {
   const getPaymentTypeLabel = (type: string): string => {
     switch (type) {
       case 'advance':
-        return '선금';
+        return t('payment.advance');
       case 'balance':
-        return '잔금';
+        return t('payment.balance');
       case 'shipping':
-        return '배송비';
+        return t('payment.shippingCost');
       default:
         return type;
     }
@@ -201,16 +203,16 @@ export function PaymentRequestLedger({ onRefresh }: PaymentRequestLedgerProps) {
       printPaymentRequestLedger(group);
     } catch (error: any) {
       console.error('인쇄 오류:', error);
-      alert(error.message || '인쇄에 실패했습니다.');
+      alert(error.message || t('payment.printFailed'));
     }
   };
 
   if (isLoading) {
-    return <div className="text-center py-8 text-gray-500">로딩 중...</div>;
+    return <div className="text-center py-8 text-gray-500">{t('payment.loading')}</div>;
   }
 
   if (dateGroups.length === 0) {
-    return <div className="text-center py-8 text-gray-500">지급요청이 없습니다.</div>;
+    return <div className="text-center py-8 text-gray-500">{t('payment.noRequests')}</div>;
   }
 
   return (
@@ -243,25 +245,25 @@ export function PaymentRequestLedger({ onRefresh }: PaymentRequestLedgerProps) {
                 {/* 총계 정보 */}
                 <div className="flex items-center gap-6 mr-4">
                   <div className="text-right">
-                    <div className="text-xs text-gray-500">선금</div>
+                    <div className="text-xs text-gray-500">{t('payment.advance')}</div>
                     <div className="font-semibold text-gray-900">
                       ¥{group.totals.advance.toLocaleString()}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-gray-500">잔금</div>
+                    <div className="text-xs text-gray-500">{t('payment.balance')}</div>
                     <div className="font-semibold text-gray-900">
                       ¥{group.totals.balance.toLocaleString()}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-gray-500">배송비</div>
+                    <div className="text-xs text-gray-500">{t('payment.shippingCost')}</div>
                     <div className="font-semibold text-gray-900">
                       ¥{group.totals.shipping.toLocaleString()}
                     </div>
                   </div>
                   <div className="text-right border-l pl-6">
-                    <div className="text-xs text-gray-500">총계</div>
+                    <div className="text-xs text-gray-500">{t('payment.total')}</div>
                     <div className="font-bold text-lg text-purple-600">
                       ¥{totalAmount.toLocaleString()}
                     </div>
@@ -284,12 +286,12 @@ export function PaymentRequestLedger({ onRefresh }: PaymentRequestLedgerProps) {
                     {group.allCompleted ? (
                       <>
                         <CheckCircle className="w-5 h-5 text-green-600" />
-                        <span className="text-sm text-green-600 font-medium">모두 완료</span>
+                        <span className="text-sm text-green-600 font-medium">{t('payment.allDone')}</span>
                       </>
                     ) : (
                       <>
                         <Clock className="w-5 h-5 text-yellow-600" />
-                        <span className="text-sm text-yellow-600 font-medium">일부 미완료</span>
+                        <span className="text-sm text-yellow-600 font-medium">{t('payment.someIncomplete')}</span>
                       </>
                     )}
                   </div>
@@ -302,7 +304,7 @@ export function PaymentRequestLedger({ onRefresh }: PaymentRequestLedgerProps) {
                           disabled={isProcessing}
                           className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isProcessing ? '처리 중...' : '지급완료'}
+                          {isProcessing ? t('payment.processing') : t('payment.batchComplete')}
                         </button>
                       )}
                       {group.allCompleted && (
@@ -311,7 +313,7 @@ export function PaymentRequestLedger({ onRefresh }: PaymentRequestLedgerProps) {
                           disabled={isProcessing}
                           className="px-3 py-1.5 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isProcessing ? '처리 중...' : '지급해제'}
+                          {isProcessing ? t('payment.processing') : t('payment.batchRevert')}
                         </button>
                       )}
                     </div>
@@ -348,11 +350,11 @@ function PaymentRequestLedgerItem({ request }: PaymentRequestLedgerItemProps) {
   const getPaymentTypeLabel = (type: string): string => {
     switch (type) {
       case 'advance':
-        return '선금';
+        return t('payment.advance');
       case 'balance':
-        return '잔금';
+        return t('payment.balance');
       case 'shipping':
-        return '배송비';
+        return t('payment.shippingCost');
       default:
         return type;
     }

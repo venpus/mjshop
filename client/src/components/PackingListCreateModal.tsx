@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Search } from 'lucide-react';
 import { PurchaseOrderSearchModal } from './PurchaseOrderSearchModal';
+import { useLanguage } from '../contexts/LanguageContext';
 import type { PurchaseOrderWithUnshipped } from '../api/purchaseOrderApi';
 import { LOGISTICS_COMPANIES } from './packing-list/types';
 
@@ -59,6 +60,7 @@ export function PackingListCreateModal({
   initialPurchaseOrderId,
   mode = 'create',
 }: PackingListCreateModalProps) {
+  const { t } = useLanguage();
   const [formData, setFormData] = useState<PackingListFormData>({
     date: getTodayDate(),
     code: '',
@@ -88,12 +90,12 @@ export function PackingListCreateModal({
             });
             
             if (!response.ok) {
-              throw new Error('발주 정보를 불러오는데 실패했습니다.');
+              throw new Error(t('packing.loadOrderFailed'));
             }
             
             const result = await response.json();
             if (!result.success || !result.data) {
-              throw new Error('발주 정보를 찾을 수 없습니다.');
+              throw new Error(t('packing.orderNotFound'));
             }
             
             const order = result.data;
@@ -128,7 +130,7 @@ export function PackingListCreateModal({
             });
           } catch (error: any) {
             console.error('발주 정보 로드 오류:', error);
-            alert(error.message || '발주 정보를 불러오는 중 오류가 발생했습니다.');
+            alert(error.message || t('packing.loadOrderError'));
             // 오류 발생 시 기본값 사용
             setFormData({
               date: getTodayDate(),
@@ -249,7 +251,7 @@ export function PackingListCreateModal({
     e.preventDefault();
     // 최소 하나의 제품이 있어야 함
     if (formData.products.length === 0) {
-      alert('최소 하나의 제품을 추가해주세요.');
+      alert(t('packing.addOneProduct'));
       return;
     }
     onSubmit(formData);
@@ -313,7 +315,7 @@ export function PackingListCreateModal({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
-            {mode === 'edit' ? '패킹 리스트 수정' : '패킹 리스트 생성'}
+            {mode === 'edit' ? t('packing.editPackingList') : t('packing.createPackingList')}
           </h2>
           <button
             onClick={handleClose}
@@ -329,7 +331,7 @@ export function PackingListCreateModal({
           <div className="grid grid-cols-3 gap-4">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-gray-700 whitespace-nowrap w-12">
-                날짜
+                {t('packing.date')}
               </label>
               <input
                 type="date"
@@ -341,7 +343,7 @@ export function PackingListCreateModal({
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-gray-700 whitespace-nowrap w-12">
-                코드
+                {t('packing.code')}
               </label>
               <input
                 type="text"
@@ -349,20 +351,20 @@ export function PackingListCreateModal({
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 maxLength={6}
                 className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                placeholder="코드"
+                placeholder={t('packing.code')}
                 required
               />
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-gray-700 whitespace-nowrap w-16">
-                물류회사
+                {t('packing.logisticsCompany')}
               </label>
               <select
                 value={formData.logisticsCompany}
                 onChange={(e) => setFormData({ ...formData, logisticsCompany: e.target.value })}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-sm"
               >
-                <option value="">선택하세요</option>
+                <option value="">{t('packing.select')}</option>
                 {LOGISTICS_COMPANIES.map((company) => (
                   <option key={company} value={company}>{company}</option>
                 ))}
@@ -374,7 +376,7 @@ export function PackingListCreateModal({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-gray-700">
-                제품 정보
+                {t('packing.productInfo')}
               </label>
               <button
                 type="button"
@@ -382,41 +384,41 @@ export function PackingListCreateModal({
                 className="flex items-center gap-2 px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                제품 추가
+                {t('packing.addProductBtn')}
               </button>
             </div>
 
             {formData.products.length === 0 ? (
               <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-300 rounded-lg">
-                <p>제품을 추가해주세요</p>
+                <p>{t('packing.addProduct')}</p>
               </div>
             ) : (
               formData.products.map((product, index) => (
                 <div key={product.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-gray-700">제품 {index + 1}</span>
+                    <span className="text-sm font-medium text-gray-700">{t('packing.productN').replace('{n}', String(index + 1))}</span>
                     <button
                       type="button"
                       onClick={() => removeProductGroup(product.id)}
                       className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
-                      title="제품 삭제"
+                      title={t('packing.deleteProduct')}
                     >
                       <Trash2 className="w-4 h-4" />
-                      <span>삭제</span>
+                      <span>{t('common.delete')}</span>
                     </button>
                   </div>
 
                   <div className="space-y-3">
                     {/* 제품명 */}
                     <div className="flex items-center gap-2">
-                      <label className="text-xs text-gray-600 whitespace-nowrap w-16">제품명</label>
+                      <label className="text-xs text-gray-600 whitespace-nowrap w-16">{t('packing.productName')}</label>
                       <div className="flex-1 flex items-center gap-2">
                         <input
                           type="text"
                           value={product.productName || ''}
                           onChange={(e) => updateProductGroup(product.id, 'productName', e.target.value)}
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                          placeholder="제품명을 입력하세요"
+                          placeholder={t('packing.productNamePlaceholder')}
                           required
                         />
                         <button
@@ -425,7 +427,7 @@ export function PackingListCreateModal({
                           className="flex items-center gap-1.5 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm whitespace-nowrap"
                         >
                           <Search className="w-4 h-4" />
-                          검색
+                          {t('common.search')}
                         </button>
                       </div>
                       {product.purchaseOrderNumber && (
@@ -438,7 +440,7 @@ export function PackingListCreateModal({
                     {/* 종 x 수량 x 세트 = 몇개 */}
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">
-                        수량 계산 (종 × 수량 × 세트 = 몇개)
+                        {t('packing.quantityCalc')}
                       </label>
                       <div className="grid grid-cols-5 gap-2">
                         <div>
@@ -447,7 +449,7 @@ export function PackingListCreateModal({
                             value={product.kind || ''}
                             onChange={(e) => updateProductGroup(product.id, 'kind', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                            placeholder="종"
+                            placeholder={t('packing.kind')}
                             min="0"
                             step="1"
                             required
@@ -459,7 +461,7 @@ export function PackingListCreateModal({
                             value={product.quantity || ''}
                             onChange={(e) => updateProductGroup(product.id, 'quantity', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                            placeholder="수량"
+                            placeholder={t('packing.quantity')}
                             min="0"
                             step="1"
                             required
@@ -471,7 +473,7 @@ export function PackingListCreateModal({
                             value={product.set || ''}
                             onChange={(e) => updateProductGroup(product.id, 'set', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                            placeholder="세트"
+                            placeholder={t('packing.set')}
                             min="0"
                             step="1"
                             required
@@ -484,7 +486,7 @@ export function PackingListCreateModal({
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed text-sm"
                             readOnly
                             disabled
-                            placeholder="몇개 (자동 계산)"
+                            placeholder={t('packing.countAuto')}
                           />
                         </div>
                       </div>
@@ -502,7 +504,7 @@ export function PackingListCreateModal({
               <div className="w-24"></div>
               <div className="flex items-center gap-3 flex-1">
                 <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                  중량
+                  {t('packing.weightLabel')}
                 </label>
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -514,7 +516,7 @@ export function PackingListCreateModal({
                       onChange={(e) => setFormData({ ...formData, weightType: e.target.value as '개별 중량' | '합산 중량' })}
                       className="w-4 h-4 text-purple-600 focus:ring-purple-500"
                     />
-                    <span className="text-sm text-gray-700">개별 중량</span>
+                    <span className="text-sm text-gray-700">{t('packing.weightIndividual')}</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -525,7 +527,7 @@ export function PackingListCreateModal({
                       onChange={(e) => setFormData({ ...formData, weightType: e.target.value as '개별 중량' | '합산 중량' })}
                       className="w-4 h-4 text-purple-600 focus:ring-purple-500"
                     />
-                    <span className="text-sm text-gray-700">합산 중량</span>
+                    <span className="text-sm text-gray-700">{t('packing.weightTotal')}</span>
                   </label>
                 </div>
               </div>
@@ -536,7 +538,7 @@ export function PackingListCreateModal({
                 value={formData.boxCount}
                 onChange={(e) => setFormData({ ...formData, boxCount: e.target.value })}
                 className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                placeholder="개수"
+                placeholder={t('packing.count')}
                 min="0"
                 step="1"
               />
@@ -545,15 +547,15 @@ export function PackingListCreateModal({
                 onChange={(e) => setFormData({ ...formData, boxType: e.target.value as '박스' | '마대' })}
                 className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-sm"
               >
-                <option value="박스">박스</option>
-                <option value="마대">마대</option>
+                <option value="박스">{t('packing.box')}</option>
+                <option value="마대">{t('packing.bag')}</option>
               </select>
               <input
                 type="text"
                 value={formData.weight}
                 onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                placeholder="중량을 입력하세요 (예: 50g, 1.2kg)"
+                placeholder={t('packing.weightPlaceholder')}
               />
             </div>
           </div>
@@ -565,13 +567,13 @@ export function PackingListCreateModal({
               onClick={handleClose}
               className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
             >
-              취소
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
               className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
             >
-              {mode === 'edit' ? '수정' : '생성'}
+              {mode === 'edit' ? t('common.edit') : t('packing.create')}
             </button>
           </div>
         </form>
