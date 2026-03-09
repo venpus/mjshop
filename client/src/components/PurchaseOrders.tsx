@@ -191,7 +191,6 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const [hasMoreMobile, setHasMoreMobile] = useState(true);
   const [isLoadingMoreMobile, setIsLoadingMoreMobile] = useState(false);
   const [mobileDisplayCount, setMobileDisplayCount] = useState(20);
-  const mobileScrollRef = useRef<HTMLDivElement>(null);
   const mobileSentinelRef = useRef<HTMLDivElement>(null);
 
   // 필터 유지 상태에서 페이징 시 불필요한 API 재호출 방지: searchTerm/filters 변경 시에만 재요청
@@ -529,7 +528,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       .finally(() => setIsLoadingMoreMobile(false));
   }, [hasActiveStatusFilters, isLoadingMoreMobile, hasMoreMobile, mobilePage, mobileOrders.length, loadPurchaseOrdersPage]);
 
-  // 모바일 스크롤 감지: sentinel이 보이면 더 불러오기
+  // 모바일 스크롤 감지: sentinel이 뷰포트에 보이면 더 불러오기 (단일 페이지 스크롤)
   useEffect(() => {
     const sentinel = mobileSentinelRef.current;
     if (!sentinel) return;
@@ -537,7 +536,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       (entries) => {
         if (entries[0]?.isIntersecting) loadMoreMobile();
       },
-      { root: mobileScrollRef.current, rootMargin: '200px', threshold: 0 }
+      { root: null, rootMargin: '200px', threshold: 0 }
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
@@ -796,8 +795,127 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   }
 
   return (
-    <div className="p-8 min-h-[1080px]">
-      <div className="mb-8 flex items-start justify-between">
+    <div className="p-4 md:p-8 min-h-[1080px]">
+      {/* 모바일: 상단 컴팩트·스티키 */}
+      <div className="block md:hidden sticky top-0 z-10 bg-gray-50 border-b border-gray-200 -mx-4 px-4 pt-3 pb-3 mb-3">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <h2 className="text-base font-semibold text-gray-900 truncate">발주 관리</h2>
+          <CreatePurchaseOrderButton />
+        </div>
+        <div className="flex gap-2 mb-2">
+          <div className="flex-1 min-w-0">
+            <SearchBar
+              value={inputSearchTerm}
+              onChange={handleSearchInputChange}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="발주번호, 공급업체명, 상품명 검색..."
+            />
+          </div>
+          <button
+            onClick={handleSearch}
+            className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium shrink-0"
+          >
+            검색
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <div className="relative">
+            <button
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg transition-colors text-sm ${
+                activeFilterCount > 0
+                  ? 'border-purple-600 bg-purple-50 text-purple-700'
+                  : 'border-gray-300 bg-white hover:bg-gray-50'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              <span>필터{activeFilterCount > 0 ? ` ${activeFilterCount}` : ''}</span>
+            </button>
+            {isFilterOpen && (
+              <div className="absolute top-full left-0 mt-2 right-0 max-w-[calc(100vw-2rem)] w-[320px] bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-y-auto">
+                <div className="p-3">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-gray-900 text-sm">필터 옵션</h3>
+                    <div className="flex items-center gap-2">
+                      {activeFilterCount > 0 && (
+                        <button onClick={clearAllFilters} className="text-xs text-purple-600 hover:text-purple-700">
+                          전체 초기화
+                        </button>
+                      )}
+                      <button onClick={() => setIsFilterOpen(false)} className="p-1 hover:bg-gray-100 rounded">
+                        <X className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="bg-indigo-50 rounded-lg p-2.5 border border-indigo-200">
+                      <h4 className="text-xs text-indigo-900 mb-2 pb-1.5 border-b border-indigo-300">발주 상태</h4>
+                      <div className="space-y-1.5">
+                        {['발주 대기', '발주확인', '취소됨'].map((status) => (
+                          <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-indigo-100 p-1 rounded">
+                            <input
+                              type="checkbox"
+                              checked={filters.orderStatus.includes(status)}
+                              onChange={() => toggleFilter('orderStatus', status)}
+                              className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer"
+                            />
+                            <span className="text-xs text-gray-700">{status}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-purple-50 rounded-lg p-2.5 border border-purple-200">
+                      <h4 className="text-xs text-purple-900 mb-2 pb-1.5 border-b border-purple-300">배송 상태</h4>
+                      <div className="space-y-1.5">
+                        {['대기중', '내륙운송중', '배송중', '한국도착'].map((status) => (
+                          <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-purple-100 p-1 rounded">
+                            <input
+                              type="checkbox"
+                              checked={filters.deliveryStatus.includes(status)}
+                              onChange={() => toggleFilter('deliveryStatus', status)}
+                              className="w-3.5 h-3.5 accent-purple-600 cursor-pointer"
+                            />
+                            <span className="text-xs text-gray-700">{status}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-amber-50 rounded-lg p-2.5 border border-amber-200">
+                      <h4 className="text-xs text-amber-900 mb-2 pb-1.5 border-b border-amber-300">결제 상태</h4>
+                      <div className="space-y-1.5">
+                        {['미결제', '선금결제', '완료'].map((status) => (
+                          <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 p-1 rounded">
+                            <input
+                              type="checkbox"
+                              checked={filters.paymentStatus.includes(status)}
+                              onChange={() => toggleFilter('paymentStatus', status)}
+                              className="w-3.5 h-3.5 accent-amber-600 cursor-pointer"
+                            />
+                            <span className="text-xs text-gray-700">{status}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={handleConfirmOrders}
+            disabled={selectedOrders.size === 0}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors text-sm shrink-0 ${
+              selectedOrders.size > 0 ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            <CheckSquare className="w-4 h-4" />
+            <span>컨펌{selectedOrders.size > 0 ? ` ${selectedOrders.size}` : ''}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 데스크톱: 제목 + 설명 + 생성 버튼 */}
+      <div className="hidden md:flex mb-8 items-start justify-between">
         <div>
           <h2 className="text-gray-900 mb-2">발주 관리</h2>
           <p className="text-gray-600">중국 제조사에 발주한 상품을 확인하고 제조 상태를 관리할 수 있습니다</p>
@@ -805,8 +923,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
         <CreatePurchaseOrderButton />
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
+      {/* 데스크톱: Filters */}
+      <div className="hidden md:flex flex-col md:flex-row gap-4 mb-6">
         <div className="flex gap-2">
           <SearchBar
             value={inputSearchTerm}
@@ -1280,37 +1398,32 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
         />
       </div>
 
-      {/* Purchase Orders Card List (mobile, infinite scroll) */}
-      <div className="block md:hidden bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col max-h-[calc(100vh-12rem)]">
-        <div
-          ref={mobileScrollRef}
-          className="flex-1 overflow-y-auto p-3"
-        >
-          <PurchaseOrderCardList
-            rowDataList={rowDataListForMobile}
-            getProductDisplayName={(po) =>
-              language === 'zh' && po.product?.name_chinese
-                ? (po.product.name_chinese as string)
-                : (po.product?.name || '-')
-            }
-            getFullImageUrl={getFullImageUrl}
-            onNavigateToDetail={(orderId) => {
-              const params = new URLSearchParams();
-              params.set('returnPage', currentPage.toString());
-              params.set('returnItemsPerPage', itemsPerPage.toString());
-              if (searchTerm.trim()) params.set('returnSearch', searchTerm.trim());
-              navigate(`/admin/purchase-orders/${orderId}?${params.toString()}`);
-            }}
-            selectedOrderIds={selectedOrders}
-            onToggleSelect={(orderId) => () => toggleOrderSelection(orderId)}
-          />
-          <div ref={mobileSentinelRef} className="h-4 flex-shrink-0" aria-hidden />
-          {isLoadingMoreMobile && (
-            <div className="py-4 text-center text-sm text-gray-500">
-              {t('purchaseOrder.card.loadingMore')}
-            </div>
-          )}
-        </div>
+      {/* 모바일: 카드 리스트 (풀 너비, 단일 페이지 스크롤) */}
+      <div className="block md:hidden px-1">
+        <PurchaseOrderCardList
+          rowDataList={rowDataListForMobile}
+          getProductDisplayName={(po) =>
+            language === 'zh' && po.product?.name_chinese
+              ? (po.product.name_chinese as string)
+              : (po.product?.name || '-')
+          }
+          getFullImageUrl={getFullImageUrl}
+          onNavigateToDetail={(orderId) => {
+            const params = new URLSearchParams();
+            params.set('returnPage', currentPage.toString());
+            params.set('returnItemsPerPage', itemsPerPage.toString());
+            if (searchTerm.trim()) params.set('returnSearch', searchTerm.trim());
+            navigate(`/admin/purchase-orders/${orderId}?${params.toString()}`);
+          }}
+          selectedOrderIds={selectedOrders}
+          onToggleSelect={(orderId) => () => toggleOrderSelection(orderId)}
+        />
+        <div ref={mobileSentinelRef} className="h-4" aria-hidden />
+        {isLoadingMoreMobile && (
+          <div className="py-4 text-center text-sm text-gray-500">
+            {t('purchaseOrder.card.loadingMore')}
+          </div>
+        )}
       </div>
 
       {/* Product Image Preview */}
