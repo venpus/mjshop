@@ -4,6 +4,7 @@ import { getCancelledProducts, updateProduct } from '../../../api/productCollabA
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useProductCollabCounts } from '../ProductCollabCountsContext';
 import type { ProductCollabProductListItem } from '../types';
+import { PRODUCT_COLLAB_STATUS_LABEL_KEYS } from '../types';
 import { getProductCollabImageUrl } from '../utils/imageUrl';
 import { ImageModal } from '../shared/ImageModal';
 
