@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getProductById, updateProduct, uploadProductImages, deleteProduct } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useProductCollabCounts } from '../ProductCollabCountsContext';
 import type { ProductCollabProductDetail, ProductCollabMessage } from '../types';
 import { getProductCollabImageUrl } from '../utils/imageUrl';
 import { ImageModal } from '../shared/ImageModal';
@@ -12,6 +13,7 @@ import { SpecForm } from '../shared/SpecForm';
 
 export function ProductCollabThread() {
   const { t } = useLanguage();
+  const countsContext = useProductCollabCounts();
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
   const [product, setProduct] = useState<ProductCollabProductDetail | null>(null);
@@ -133,6 +135,7 @@ export function ProductCollabThread() {
               try {
                 const res = await deleteProduct(product.id);
                 if (!res.success) throw new Error(res.error);
+                await countsContext?.refresh();
                 navigate('/admin/product-collab/list');
               } catch (err) {
                 alert(err instanceof Error ? err.message : t('productCollab.deleteFailed'));
