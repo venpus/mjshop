@@ -316,12 +316,66 @@ export function CostPaymentTab({
                   const calculatedCost = item.unit_price * item.quantity;
                   const isEditable = canAddItems;
                   return (
-                    <div key={item.id} className="flex flex-col gap-1 rounded border border-gray-200 bg-gray-50/50 p-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
+                    <div key={item.id} className="space-y-1">
+                      {/* 모바일 전용: 두 줄 (항목이름 / 비용 계산) */}
+                      <div className="md:hidden flex flex-col gap-1 rounded border border-gray-200 bg-gray-50/50 p-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {isEditable && (
+                            <button
+                              onClick={() => onRemoveOptionItem(item.id)}
+                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors shrink-0"
+                              title="항목 삭제"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                          {isEditable ? (
+                            <input
+                              type="text"
+                              value={item.name || ''}
+                              onChange={(e) => onUpdateOptionItemName(item.id, e.target.value)}
+                              placeholder="항목명"
+                              className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
+                          ) : (
+                            <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700 font-medium">
+                              {item.name || '항목명'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                          <span className="text-gray-500">¥</span>
+                          {isEditable ? (
+                            <DecimalInput
+                              value={item.unit_price}
+                              onChange={(v) => onUpdateOptionItemUnitPrice(item.id, v)}
+                              step="0.01"
+                              className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
+                          ) : (
+                            <span className="text-gray-700">{item.unit_price.toFixed(2)}</span>
+                          )}
+                          <span className="text-gray-500">×</span>
+                          {isEditable ? (
+                            <DecimalInput
+                              value={item.quantity}
+                              onChange={(v) => onUpdateOptionItemQuantity(item.id, v)}
+                              step="0.01"
+                              className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
+                          ) : (
+                            <span className="text-gray-700">{item.quantity.toFixed(2)}</span>
+                          )}
+                          <span className="text-gray-500">=</span>
+                          <span className="font-semibold text-green-700">¥{calculatedCost.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      {/* 데스크톱 전용: 한 줄 (원래 레이아웃) */}
+                      <div className="hidden md:flex items-center gap-1.5">
                         {isEditable && (
                           <button
                             onClick={() => onRemoveOptionItem(item.id)}
-                            className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors shrink-0"
+                            className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                             title="항목 삭제"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -336,13 +390,11 @@ export function CostPaymentTab({
                             className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                           />
                         ) : (
-                          <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700 font-medium">
+                          <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700">
                             {item.name || '항목명'}
                           </div>
                         )}
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                        <span className="text-gray-500">¥</span>
+                        <span className="text-gray-500 text-xs">¥</span>
                         {isEditable ? (
                           <DecimalInput
                             value={item.unit_price}
@@ -351,9 +403,11 @@ export function CostPaymentTab({
                             className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                           />
                         ) : (
-                          <span className="text-gray-700">{item.unit_price.toFixed(2)}</span>
+                          <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                            {item.unit_price.toFixed(2)}
+                          </div>
                         )}
-                        <span className="text-gray-500">×</span>
+                        <span className="text-gray-500 text-xs">×</span>
                         {isEditable ? (
                           <DecimalInput
                             value={item.quantity}
@@ -362,10 +416,14 @@ export function CostPaymentTab({
                             className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                           />
                         ) : (
-                          <span className="text-gray-700">{item.quantity.toFixed(2)}</span>
+                          <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                            {item.quantity.toFixed(2)}
+                          </div>
                         )}
-                        <span className="text-gray-500">=</span>
-                        <span className="font-semibold text-green-700">¥{calculatedCost.toFixed(2)}</span>
+                        <span className="text-gray-500 text-xs">=</span>
+                        <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-200 rounded text-right text-xs text-gray-700">
+                          ¥{calculatedCost.toFixed(2)}
+                        </div>
                       </div>
                     </div>
                   );
@@ -394,15 +452,72 @@ export function CostPaymentTab({
                   const calculatedCost = item.unit_price * item.quantity;
                   const isEditable = isLevelA && canWrite;
                   return (
-                    <div key={item.id} className={`flex flex-col gap-1 rounded border p-2 ${isLevelA ? 'bg-blue-50 border-blue-200' : 'bg-gray-50/50 border-gray-200'}`}>
-                      <div className="flex items-center gap-1.5 min-w-0">
+                    <div key={item.id} className="space-y-1">
+                      {/* 모바일 전용: 두 줄 */}
+                      <div className={`md:hidden flex flex-col gap-1 rounded border p-2 ${isLevelA ? 'bg-blue-50 border-blue-200' : 'bg-gray-50/50 border-gray-200'}`}>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {isLevelA && (
+                            <span className="text-blue-600 text-xs font-semibold px-1 shrink-0" title="A 레벨 관리자 전용">A</span>
+                          )}
+                          {isEditable && (
+                            <button
+                              onClick={() => onRemoveOptionItem(item.id)}
+                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors shrink-0"
+                              title="항목 삭제"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                          {isEditable ? (
+                            <input
+                              type="text"
+                              value={item.name || ''}
+                              onChange={(e) => onUpdateOptionItemName(item.id, e.target.value)}
+                              placeholder="항목명"
+                              className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
+                          ) : (
+                            <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700 font-medium">
+                              {item.name || '항목명'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                          <span className="text-gray-500">¥</span>
+                          {isEditable ? (
+                            <DecimalInput
+                              value={item.unit_price}
+                              onChange={(v) => onUpdateOptionItemUnitPrice(item.id, v)}
+                              step="0.01"
+                              className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
+                          ) : (
+                            <span className="text-gray-700">{item.unit_price.toFixed(2)}</span>
+                          )}
+                          <span className="text-gray-500">×</span>
+                          {isEditable ? (
+                            <DecimalInput
+                              value={item.quantity}
+                              onChange={(v) => onUpdateOptionItemQuantity(item.id, v)}
+                              step="0.01"
+                              className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
+                          ) : (
+                            <span className="text-gray-700">{item.quantity.toFixed(2)}</span>
+                          )}
+                          <span className="text-gray-500">=</span>
+                          <span className="font-semibold text-green-700">¥{calculatedCost.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      {/* 데스크톱 전용: 한 줄 */}
+                      <div className={`hidden md:flex items-center gap-1.5 ${isLevelA ? 'bg-blue-50 border border-blue-200 rounded p-1' : ''}`}>
                         {isLevelA && (
-                          <span className="text-blue-600 text-xs font-semibold px-1 shrink-0" title="A 레벨 관리자 전용">A</span>
+                          <span className="text-blue-600 text-xs font-semibold px-1" title="A 레벨 관리자 전용">A</span>
                         )}
                         {isEditable && (
                           <button
                             onClick={() => onRemoveOptionItem(item.id)}
-                            className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors shrink-0"
+                            className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                             title="항목 삭제"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -417,13 +532,11 @@ export function CostPaymentTab({
                             className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                           />
                         ) : (
-                          <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700 font-medium">
+                          <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700">
                             {item.name || '항목명'}
                           </div>
                         )}
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                        <span className="text-gray-500">¥</span>
+                        <span className="text-gray-500 text-xs">¥</span>
                         {isEditable ? (
                           <DecimalInput
                             value={item.unit_price}
@@ -432,9 +545,11 @@ export function CostPaymentTab({
                             className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                           />
                         ) : (
-                          <span className="text-gray-700">{item.unit_price.toFixed(2)}</span>
+                          <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                            {item.unit_price.toFixed(2)}
+                          </div>
                         )}
-                        <span className="text-gray-500">×</span>
+                        <span className="text-gray-500 text-xs">×</span>
                         {isEditable ? (
                           <DecimalInput
                             value={item.quantity}
@@ -443,10 +558,14 @@ export function CostPaymentTab({
                             className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                           />
                         ) : (
-                          <span className="text-gray-700">{item.quantity.toFixed(2)}</span>
+                          <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                            {item.quantity.toFixed(2)}
+                          </div>
                         )}
-                        <span className="text-gray-500">=</span>
-                        <span className="font-semibold text-green-700">¥{calculatedCost.toFixed(2)}</span>
+                        <span className="text-gray-500 text-xs">=</span>
+                        <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-200 rounded text-right text-xs text-gray-700">
+                          ¥{calculatedCost.toFixed(2)}
+                        </div>
                       </div>
                     </div>
                   );
@@ -481,12 +600,66 @@ export function CostPaymentTab({
                 const calculatedCost = item.unit_price * item.quantity;
                 const isEditable = canAddItems;
                 return (
-                  <div key={item.id} className="flex flex-col gap-1 rounded border border-gray-200 bg-gray-50/50 p-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
+                  <div key={item.id} className="space-y-1">
+                    {/* 모바일 전용: 두 줄 */}
+                    <div className="md:hidden flex flex-col gap-1 rounded border border-gray-200 bg-gray-50/50 p-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {isEditable && (
+                          <button
+                            onClick={() => onRemoveLaborCostItem(item.id)}
+                            className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors shrink-0"
+                            title="항목 삭제"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                        {isEditable ? (
+                          <input
+                            type="text"
+                            value={item.name || ''}
+                            onChange={(e) => onUpdateLaborCostItemName(item.id, e.target.value)}
+                            placeholder="항목명"
+                            className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                        ) : (
+                          <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700 font-medium">
+                            {item.name || '항목명'}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                        <span className="text-gray-500">¥</span>
+                        {isEditable ? (
+                          <DecimalInput
+                            value={item.unit_price}
+                            onChange={(v) => onUpdateLaborCostItemUnitPrice(item.id, v)}
+                            step="0.01"
+                            className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                        ) : (
+                          <span className="text-gray-700">{item.unit_price.toFixed(2)}</span>
+                        )}
+                        <span className="text-gray-500">×</span>
+                        {isEditable ? (
+                          <DecimalInput
+                            value={item.quantity}
+                            onChange={(v) => onUpdateLaborCostItemQuantity(item.id, v)}
+                            step="0.01"
+                            className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                        ) : (
+                          <span className="text-gray-700">{item.quantity.toFixed(2)}</span>
+                        )}
+                        <span className="text-gray-500">=</span>
+                        <span className="font-semibold text-orange-700">¥{calculatedCost.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    {/* 데스크톱 전용: 한 줄 */}
+                    <div className="hidden md:flex items-center gap-1.5">
                       {isEditable && (
                         <button
                           onClick={() => onRemoveLaborCostItem(item.id)}
-                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors shrink-0"
+                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                           title="항목 삭제"
                         >
                           <Trash2 className="w-3 h-3" />
@@ -501,13 +674,11 @@ export function CostPaymentTab({
                           className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                         />
                       ) : (
-                        <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700 font-medium">
+                        <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700">
                           {item.name || '항목명'}
                         </div>
                       )}
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                      <span className="text-gray-500">¥</span>
+                      <span className="text-gray-500 text-xs">¥</span>
                       {isEditable ? (
                         <DecimalInput
                           value={item.unit_price}
@@ -516,9 +687,11 @@ export function CostPaymentTab({
                           className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                         />
                       ) : (
-                        <span className="text-gray-700">{item.unit_price.toFixed(2)}</span>
+                        <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                          {item.unit_price.toFixed(2)}
+                        </div>
                       )}
-                      <span className="text-gray-500">×</span>
+                      <span className="text-gray-500 text-xs">×</span>
                       {isEditable ? (
                         <DecimalInput
                           value={item.quantity}
@@ -527,10 +700,14 @@ export function CostPaymentTab({
                           className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                         />
                       ) : (
-                        <span className="text-gray-700">{item.quantity.toFixed(2)}</span>
+                        <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                          {item.quantity.toFixed(2)}
+                        </div>
                       )}
-                      <span className="text-gray-500">=</span>
-                      <span className="font-semibold text-orange-700">¥{calculatedCost.toFixed(2)}</span>
+                      <span className="text-gray-500 text-xs">=</span>
+                      <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-200 rounded text-right text-xs text-gray-700">
+                        ¥{calculatedCost.toFixed(2)}
+                      </div>
                     </div>
                   </div>
                 );
@@ -559,15 +736,72 @@ export function CostPaymentTab({
                     const calculatedCost = item.unit_price * item.quantity;
                     const isEditable = isLevelA && canWrite;
                     return (
-                      <div key={item.id} className={`flex flex-col gap-1 rounded border p-2 ${isLevelA ? 'bg-blue-50 border-blue-200' : 'bg-gray-50/50 border-gray-200'}`}>
-                        <div className="flex items-center gap-1.5 min-w-0">
+                      <div key={item.id} className="space-y-1">
+                        {/* 모바일 전용: 두 줄 */}
+                        <div className={`md:hidden flex flex-col gap-1 rounded border p-2 ${isLevelA ? 'bg-blue-50 border-blue-200' : 'bg-gray-50/50 border-gray-200'}`}>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {isLevelA && (
+                              <span className="text-blue-600 text-xs font-semibold px-1 shrink-0" title="A 레벨 관리자 전용">A</span>
+                            )}
+                            {isEditable && (
+                              <button
+                                onClick={() => onRemoveLaborCostItem(item.id)}
+                                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors shrink-0"
+                                title="항목 삭제"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                            {isEditable ? (
+                              <input
+                                type="text"
+                                value={item.name || ''}
+                                onChange={(e) => onUpdateLaborCostItemName(item.id, e.target.value)}
+                                placeholder="항목명"
+                                className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              />
+                            ) : (
+                              <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700 font-medium">
+                                {item.name || '항목명'}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                            <span className="text-gray-500">¥</span>
+                            {isEditable ? (
+                              <DecimalInput
+                                value={item.unit_price}
+                                onChange={(v) => onUpdateLaborCostItemUnitPrice(item.id, v)}
+                                step="0.01"
+                                className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              />
+                            ) : (
+                              <span className="text-gray-700">{item.unit_price.toFixed(2)}</span>
+                            )}
+                            <span className="text-gray-500">×</span>
+                            {isEditable ? (
+                              <DecimalInput
+                                value={item.quantity}
+                                onChange={(v) => onUpdateLaborCostItemQuantity(item.id, v)}
+                                step="0.01"
+                                className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              />
+                            ) : (
+                              <span className="text-gray-700">{item.quantity.toFixed(2)}</span>
+                            )}
+                            <span className="text-gray-500">=</span>
+                            <span className="font-semibold text-orange-700">¥{calculatedCost.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        {/* 데스크톱 전용: 한 줄 */}
+                        <div className={`hidden md:flex items-center gap-1.5 ${isLevelA ? 'bg-blue-50 border border-blue-200 rounded p-1' : ''}`}>
                           {isLevelA && (
-                            <span className="text-blue-600 text-xs font-semibold px-1 shrink-0" title="A 레벨 관리자 전용">A</span>
+                            <span className="text-blue-600 text-xs font-semibold px-1" title="A 레벨 관리자 전용">A</span>
                           )}
                           {isEditable && (
                             <button
                               onClick={() => onRemoveLaborCostItem(item.id)}
-                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors shrink-0"
+                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                               title="항목 삭제"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -582,13 +816,11 @@ export function CostPaymentTab({
                               className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                             />
                           ) : (
-                            <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700 font-medium">
+                            <div className="flex-1 min-w-0 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded text-xs text-gray-700">
                               {item.name || '항목명'}
                             </div>
                           )}
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                          <span className="text-gray-500">¥</span>
+                          <span className="text-gray-500 text-xs">¥</span>
                           {isEditable ? (
                             <DecimalInput
                               value={item.unit_price}
@@ -597,9 +829,11 @@ export function CostPaymentTab({
                               className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                             />
                           ) : (
-                            <span className="text-gray-700">{item.unit_price.toFixed(2)}</span>
+                            <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                              {item.unit_price.toFixed(2)}
+                            </div>
                           )}
-                          <span className="text-gray-500">×</span>
+                          <span className="text-gray-500 text-xs">×</span>
                           {isEditable ? (
                             <DecimalInput
                               value={item.quantity}
@@ -608,10 +842,14 @@ export function CostPaymentTab({
                               className="w-16 px-1.5 py-1.5 border border-gray-300 rounded text-right text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                             />
                           ) : (
-                            <span className="text-gray-700">{item.quantity.toFixed(2)}</span>
+                            <div className="w-16 px-1.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-right text-xs text-gray-700">
+                              {item.quantity.toFixed(2)}
+                            </div>
                           )}
-                          <span className="text-gray-500">=</span>
-                          <span className="font-semibold text-orange-700">¥{calculatedCost.toFixed(2)}</span>
+                          <span className="text-gray-500 text-xs">=</span>
+                          <div className="w-20 px-1.5 py-1.5 bg-gray-50 border border-gray-200 rounded text-right text-xs text-gray-700">
+                            ¥{calculatedCost.toFixed(2)}
+                          </div>
                         </div>
                       </div>
                     );
