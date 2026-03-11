@@ -215,6 +215,7 @@ export class ProductCollabController {
       const updated = await this.service.updateMessage(messageId, productId, {
         body: req.body.body,
         tag: req.body.tag,
+        attachment_urls: req.body.attachment_urls,
       });
       if (!updated) {
         return res.status(400).json({ success: false, error: '수정할 내용이 없습니다.' });

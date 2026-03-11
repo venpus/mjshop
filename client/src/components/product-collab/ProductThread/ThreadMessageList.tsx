@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import type { ProductCollabMessage, MessageTag } from '../types';
 import { getProductCollabImageUrl, getProductCollabDownloadUrl } from '../utils/imageUrl';
-import { updateMessage, deleteMessage, createMessage, completeTask, getAuthHeaders } from '../../../api/productCollabApi';
+import { updateMessage, deleteMessage, createMessage, completeTask, getAuthHeaders, uploadProductImages } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { MessageAttachmentImage } from './MessageAttachmentImage';
+import { ImagePlus } from 'lucide-react';
 
 const TAG_VALUES: (MessageTag | '')[] = [
   '',
@@ -92,9 +93,13 @@ function MessageItem({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editBody, setEditBody] = useState('');
   const [editTag, setEditTag] = useState<MessageTag | ''>('');
+  const [removedAttachmentIds, setRemovedAttachmentIds] = useState<Set<number>>(new Set());
+  const [newAttachments, setNewAttachments] = useState<{ kind: 'image' | 'file'; url: string; original_filename?: string | null }[]>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   const isOwner = currentUserId != null && m.author_id === currentUserId;
 
@@ -102,6 +107,8 @@ function MessageItem({
     setEditingId(m.id);
     setEditBody(m.body ?? '');
     setEditTag(m.tag ?? '');
+    setRemovedAttachmentIds(new Set());
+    setNewAttachments([]);
     setError(null);
   };
 
@@ -109,16 +116,33 @@ function MessageItem({
     setEditingId(null);
     setEditBody('');
     setEditTag('');
+    setRemovedAttachmentIds(new Set());
+    setNewAttachments([]);
     setError(null);
   };
 
   const saveEdit = async () => {
     setSubmitting(true);
     setError(null);
-    const res = await updateMessage(productId, m.id, { body: editBody || null, tag: editTag || null });
+    const keptExisting = (m.attachments ?? []).filter((a) => !removedAttachmentIds.has(a.id));
+    const attachment_urls = [
+      ...keptExisting.map((a) => ({
+        kind: a.kind as 'image' | 'file',
+        url: a.url,
+        original_filename: a.original_filename ?? null,
+      })),
+      ...newAttachments,
+    ];
+    const res = await updateMessage(productId, m.id, {
+      body: editBody || null,
+      tag: editTag || null,
+      attachment_urls,
+    });
     setSubmitting(false);
     if (res.success) {
       setEditingId(null);
+      setNewAttachments([]);
+      setRemovedAttachmentIds(new Set());
       onMessageUpdated();
     } else {
       setError(res.error ?? t('productCollab.editFailed'));
@@ -209,6 +233,99 @@ function MessageItem({
               </option>
             ))}
           </select>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={editFileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              accept="image/*,*/*"
+              onChange={async (e) => {
+                const files = e.target.files;
+                if (!files?.length) return;
+                const filesToUpload = Array.from(files);
+                e.target.value = '';
+                setUploadingAttachment(true);
+                setError(null);
+                try {
+                  const uploadRes = await uploadProductImages(productId, filesToUpload);
+                  if (!uploadRes.success || !uploadRes.data?.urls?.length) {
+                    throw new Error(uploadRes.error ?? t('productCollab.uploadFailed'));
+                  }
+                  const urls = uploadRes.data.urls;
+                  const added = filesToUpload.map((file, i) => ({
+                    kind: (file.type.startsWith('image/') ? 'image' : 'file') as 'image' | 'file',
+                    url: urls[i] ?? '',
+                    original_filename: file.name,
+                  })).filter((a) => a.url);
+                  setNewAttachments((prev) => [...prev, ...added]);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : t('productCollab.uploadFailed'));
+                } finally {
+                  setUploadingAttachment(false);
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => editFileInputRef.current?.click()}
+              disabled={uploadingAttachment || submitting}
+              className="flex items-center gap-1.5 px-2 py-1 text-xs text-[#2563EB] hover:bg-[#EFF6FF] rounded border border-[#E5E7EB] disabled:opacity-50"
+            >
+              <ImagePlus className="w-3.5 h-3.5" />
+              {uploadingAttachment ? t('productCollab.processing') : t('productCollab.uploadImageAndFile')}
+            </button>
+          </div>
+          {((m.attachments ?? []).filter((a) => !removedAttachmentIds.has(a.id)).length > 0 || newAttachments.length > 0) && (
+            <div className="flex flex-wrap gap-2">
+              {(m.attachments ?? []).filter((a) => !removedAttachmentIds.has(a.id)).map((att) => (
+                <div key={att.id} className="relative group inline-flex">
+                  {att.kind === 'image' ? (
+                    <div className="w-16 h-16 rounded border border-[#E5E7EB] overflow-hidden bg-[#F3F4F6]">
+                      <img src={getProductCollabImageUrl(att.url)} alt="" className="w-full h-full object-contain" />
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 px-2 py-1.5 rounded border border-[#E5E7EB] bg-[#F8FAFC]">
+                      <span className="text-xs max-w-[120px] truncate" title={att.original_filename ?? att.url}>
+                        {att.original_filename ?? att.url.split('/').pop() ?? t('productCollab.attachment')}
+                      </span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setRemovedAttachmentIds((prev) => new Set(prev).add(att.id))}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-600"
+                    aria-label={t('common.delete')}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              {newAttachments.map((att, idx) => (
+                <div key={`new-${idx}-${att.url}`} className="relative group inline-flex">
+                  {att.kind === 'image' ? (
+                    <div className="w-16 h-16 rounded border border-[#E5E7EB] overflow-hidden bg-[#F3F4F6]">
+                      <img src={getProductCollabImageUrl(att.url)} alt="" className="w-full h-full object-contain" />
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 px-2 py-1.5 rounded border border-[#E5E7EB] bg-[#F8FAFC]">
+                      <span className="text-xs max-w-[120px] truncate" title={att.original_filename ?? att.url}>
+                        {att.original_filename ?? att.url.split('/').pop() ?? t('productCollab.attachment')}
+                      </span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setNewAttachments((prev) => prev.filter((_, i) => i !== idx))}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-600"
+                    aria-label={t('common.delete')}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           {error && <p className="text-xs text-red-600">{error}</p>}
           <div className="flex gap-2">
             <button

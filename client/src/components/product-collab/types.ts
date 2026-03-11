@@ -52,6 +52,10 @@ export interface ProductCollabProductListItem {
   next_action?: string | null;
   /** 최신 스레드 메시지 본문 */
   last_message_body?: string | null;
+  /** 최신 스레드 메시지 번역문 (한↔중) */
+  last_message_body_translated?: string | null;
+  /** 최신 스레드 메시지 원문 언어 (ko / zh) */
+  last_message_body_lang?: string | null;
   /** 최신 스레드 메시지의 멘션 목록 (이름 포함) */
   last_message_mentions?: { user_id: string; user_name?: string | null }[];
 }

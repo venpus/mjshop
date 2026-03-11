@@ -30,7 +30,7 @@ const statusBadgeClass: Record<ProductCollabStatus, string> = {
 };
 
 export function ProductCollabList() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { counts } = useProductCollabCounts() ?? {};
   const navigate = useNavigate();
   const [list, setList] = useState<ProductCollabProductListItem[]>([]);
@@ -190,7 +190,14 @@ export function ProductCollabList() {
                   </span>
                 ))}
                 {p.last_message_mentions?.length ? ' ' : null}
-                {p.last_message_body ?? ''}
+                {(() => {
+                  const bodyLang = p.last_message_body_lang ?? null;
+                  const body = p.last_message_body ?? '';
+                  const translated = p.last_message_body_translated?.trim() || null;
+                  if (bodyLang == null) return body;
+                  if (language === bodyLang) return body;
+                  return translated || body;
+                })()}
               </div>
             ) : null}
             <div className="text-xs text-[#6B7280] mt-1">

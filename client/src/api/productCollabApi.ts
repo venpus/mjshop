@@ -192,7 +192,11 @@ export async function createMessage(
 export async function updateMessage(
   productId: number,
   messageId: number,
-  body: { body?: string | null; tag?: string | null }
+  body: {
+    body?: string | null;
+    tag?: string | null;
+    attachment_urls?: { kind: 'image' | 'file'; url: string; original_filename?: string | null }[];
+  }
 ): Promise<ApiResponse<ProductCollabMessage>> {
   const res = await fetch(
     `${API_BASE_URL}/product-collab/products/${productId}/messages/${messageId}`,

@@ -207,6 +207,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'productCollab.addUrl': 'URL 추가',
     'productCollab.addMention': '멘션할 사람 추가',
     'productCollab.attachment': '첨부 파일',
+    'productCollab.uploadImageAndFile': '업로드파일',
 
     'productCollab.urlCandidateAdd': 'URL 후보 추가',
     'productCollab.urlMainSet': 'URL 대표 설정',

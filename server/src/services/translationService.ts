@@ -172,7 +172,11 @@ export async function translateKoreanChinese(text: string): Promise<TranslateRes
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         const content = await provider.fn();
-        if (content) return { translated: content };
+        if (content) {
+          const detectedLang: 'ko' | 'zh' | undefined =
+            sourceLang === 'ko' ? 'ko' : sourceLang === 'zh' ? 'zh' : undefined;
+          return { translated: content, detectedLang };
+        }
         break;
       } catch (err) {
         lastErr = err;

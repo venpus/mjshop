@@ -15,10 +15,6 @@ router.get('/products/counts', controller.getProductCounts);
 router.get('/products/archive', controller.getCompletedProducts);
 router.get('/products/cancelled', controller.getCancelledProducts);
 router.get('/products/:productId/download', controller.downloadAttachment);
-router.get('/products/:id', controller.getProductById);
-router.post('/products', controller.createProduct);
-router.put('/products/:id', controller.updateProduct);
-router.delete('/products/:id', controller.deleteProduct);
 router.post(
   '/products/:id/upload',
   (req, res, next) => {
@@ -42,6 +38,10 @@ router.post(
   },
   controller.uploadProductImages
 );
+router.get('/products/:id', controller.getProductById);
+router.post('/products', controller.createProduct);
+router.put('/products/:id', controller.updateProduct);
+router.delete('/products/:id', controller.deleteProduct);
 router.post('/products/:productId/messages', controller.createMessage);
 router.put('/products/:productId/messages/:messageId', controller.updateMessage);
 router.delete('/products/:productId/messages/:messageId', controller.deleteMessage);

@@ -112,6 +112,8 @@ export class ProductCollabRepository {
         JSON_UNQUOTE(JSON_EXTRACT(p.request_image_urls, '$[0]')) as request_first_image_url,
         p.price, p.last_activity_at,
         (SELECT m.body FROM product_collab_messages m WHERE m.product_id = p.id ORDER BY m.created_at DESC LIMIT 1) as last_message_body,
+        (SELECT m.body_translated FROM product_collab_messages m WHERE m.product_id = p.id ORDER BY m.created_at DESC LIMIT 1) as last_message_body_translated,
+        (SELECT m.body_lang FROM product_collab_messages m WHERE m.product_id = p.id ORDER BY m.created_at DESC LIMIT 1) as last_message_body_lang,
         (SELECT JSON_ARRAYAGG(JSON_OBJECT('user_id', pm.user_id, 'user_name', a2.name))
          FROM product_collab_mentions pm
          LEFT JOIN admin_accounts a2 ON a2.id = pm.user_id
@@ -160,6 +162,8 @@ export class ProductCollabRepository {
         last_activity_at: r.last_activity_at,
         next_action: null,
         last_message_body: raw.last_message_body ?? null,
+        last_message_body_translated: (raw as RowDataPacket).last_message_body_translated ?? null,
+        last_message_body_lang: (raw as RowDataPacket).last_message_body_lang ?? null,
         last_message_mentions,
       };
     });
@@ -581,12 +585,24 @@ export class ProductCollabRepository {
       fields.push('tag = ?');
       values.push(dto.tag);
     }
-    if (fields.length === 0) return null;
-    values.push(messageId);
-    await pool.execute(
-      `UPDATE product_collab_messages SET ${fields.join(', ')} WHERE id = ? AND product_id = ?`,
-      [...values, productId]
-    );
+    if (fields.length > 0) {
+      values.push(messageId);
+      await pool.execute(
+        `UPDATE product_collab_messages SET ${fields.join(', ')} WHERE id = ? AND product_id = ?`,
+        [...values, productId]
+      );
+    }
+    if (dto.attachment_urls !== undefined) {
+      await pool.execute('DELETE FROM product_collab_attachments WHERE message_id = ?', [messageId]);
+      for (let i = 0; i < dto.attachment_urls.length; i++) {
+        const a = dto.attachment_urls[i];
+        await pool.execute(
+          'INSERT INTO product_collab_attachments (message_id, kind, url, original_filename, display_order) VALUES (?, ?, ?, ?, ?)',
+          [messageId, a.kind, a.url, a.original_filename ?? null, i]
+        );
+      }
+    }
+    if (fields.length === 0 && dto.attachment_urls === undefined) return null;
     await this.updateLastActivity(productId);
     const product = await this.findProductById(productId);
     const msg = product?.messages?.find((m) => m.id === messageId) ?? product?.messages?.flatMap((m) => m.replies ?? []).find((r) => r.id === messageId);

@@ -1042,8 +1042,13 @@ if (!fs.existsSync(productCollabUploadDir)) {
 
 const productCollabStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const id = (req as unknown as { params?: { id?: string } }).params?.id ?? 'temp';
-    const dir = path.join(productCollabUploadDir, String(id));
+    const r = req as unknown as { params?: { id?: string }; path?: string };
+    let id = r.params?.id;
+    if (id == null && r.path) {
+      const m = /\/products\/(\d+)\/upload/.exec(r.path);
+      if (m) id = m[1];
+    }
+    const dir = path.join(productCollabUploadDir, String(id ?? 'temp'));
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
