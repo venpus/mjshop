@@ -14,6 +14,7 @@ import { StockDetail } from './components/inventory/StockDetail';
 import { PurchaseOrders } from './components/PurchaseOrders';
 import { PurchaseOrderDetail } from './components/PurchaseOrderDetail';
 import { NotArrivedAnalysis } from './components/NotArrivedAnalysis';
+import { CostAnalysis } from './components/cost-analysis/CostAnalysis';
 import { ShippingHistory } from './components/ShippingHistory';
 import { ChinaPayment } from './components/ChinaPayment';
 import { Members } from './components/Members';
@@ -292,6 +293,13 @@ function AdminLayout() {
                 <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
                   <NotArrivedAnalysis />
                 </PermissionCheckWrapper>
+              } />
+              <Route path="/cost-analysis" element={
+                user?.id === 'venpus' ? (
+                  <CostAnalysis />
+                ) : (
+                  <Navigate to="/admin/dashboard" replace />
+                )
               } />
               <Route path="/shipping-history" element={
                 <PermissionCheckWrapper resource="shipping-history" permissionType="read">

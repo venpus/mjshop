@@ -31,8 +31,6 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
   const { t } = useLanguage();
   const [body, setBody] = useState('');
   const [tag, setTag] = useState<MessageTag | ''>('');
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [pendingUrl, setPendingUrl] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<FileWithPreview[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,35 +52,6 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
     };
   }, [selectedFiles]);
 
-  const addImageUrl = () => {
-    const url = pendingUrl.trim();
-    if (!url) return;
-    try {
-      new URL(url);
-      setImageUrls((prev) => [...prev, url]);
-      setPendingUrl('');
-      setError(null);
-    } catch {
-      setError(t('productCollab.invalidUrl'));
-    }
-  };
-
-  const removeImageUrl = (index: number) => {
-    setImageUrls((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files?.length) return;
-    const newEntries: FileWithPreview[] = Array.from(files).map((file) => ({
-      file,
-      objectUrl: URL.createObjectURL(file),
-    }));
-    setSelectedFiles((prev) => [...prev, ...newEntries]);
-    setError(null);
-    e.target.value = '';
-  };
-
   const removeFile = (index: number) => {
     setSelectedFiles((prev) => {
       const next = prev.filter((_, i) => i !== index);
@@ -91,9 +60,21 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
     });
   };
 
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    const newEntries: FileWithPreview[] = Array.from(files).map((file) => ({
+      file,
+      objectUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : '',
+    }));
+    setSelectedFiles((prev) => [...prev, ...newEntries]);
+    setError(null);
+    e.target.value = '';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const hasContent = body.trim() || imageUrls.length > 0 || selectedFiles.length > 0;
+    const hasContent = body.trim() || selectedFiles.length > 0;
     if (!hasContent) {
       setError(t('productCollab.enterContentOrImage'));
       return;
@@ -101,20 +82,21 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
     setError(null);
     setSubmitting(true);
     try {
-      let uploadedUrls: string[] = [];
+      let attachment_urls: { kind: 'image' | 'file'; url: string; original_filename: string }[] = [];
       if (selectedFiles.length > 0) {
         const filesToUpload = selectedFiles.map(({ file }) => file);
         const uploadRes = await uploadProductImages(productId, filesToUpload);
         if (!uploadRes.success || !uploadRes.data?.urls?.length) {
           throw new Error(uploadRes.error ?? t('productCollab.uploadFailed'));
         }
-        uploadedUrls = uploadRes.data.urls;
-        selectedFiles.forEach(({ objectUrl }) => URL.revokeObjectURL(objectUrl));
+        const urls = uploadRes.data.urls;
+        attachment_urls = selectedFiles.map((item, i) => ({
+          kind: (item.file.type.startsWith('image/') ? 'image' : 'file') as 'image' | 'file',
+          url: urls[i] ?? '',
+          original_filename: item.file.name,
+        })).filter((a) => a.url);
+        selectedFiles.forEach(({ objectUrl }) => objectUrl && URL.revokeObjectURL(objectUrl));
       }
-      const attachment_urls = [
-        ...uploadedUrls.map((url) => ({ kind: 'image' as const, url })),
-        ...imageUrls.map((url) => ({ kind: 'image' as const, url })),
-      ];
       const res = await createMessage(productId, {
         body: body.trim() || null,
         tag: tag || null,
@@ -124,7 +106,6 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
       if (!res.success) throw new Error(res.error);
       setBody('');
       setTag('');
-      setImageUrls([]);
       setSelectedFiles([]);
       setSelectedMentionIds([]);
       onSent(res.data ?? undefined);
@@ -160,7 +141,6 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
             multiple
             className="hidden"
             onChange={onFileChange}
@@ -171,29 +151,8 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#2563EB] hover:bg-[#EFF6FF] rounded-lg border border-[#E5E7EB]"
           >
             <ImagePlus className="w-4 h-4" />
-            {t('productCollab.uploadImage')}
+            {t('productCollab.uploadImageAndFile')}
           </button>
-        </div>
-        {/* URL 입력: 새 줄에 전체 너비로 배치 (모바일에서 넓게) */}
-        <div className="w-full flex flex-col sm:flex-row gap-2">
-          <input
-            type="url"
-            value={pendingUrl}
-            onChange={(e) => setPendingUrl(e.target.value)}
-            placeholder={t('productCollab.addImageUrl')}
-            className="w-full min-w-0 px-3 py-2.5 sm:py-1.5 border border-[#E5E7EB] rounded-lg text-sm text-[#1F2937]"
-          />
-          <button
-            type="button"
-            onClick={addImageUrl}
-            className="px-3 py-2.5 sm:py-1.5 text-sm text-[#2563EB] hover:bg-[#EFF6FF] rounded-lg shrink-0 border border-[#E5E7EB]"
-          >
-            {t('productCollab.addUrl')}
-          </button>
-        </div>
-        {/* 멘션할 사람 */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-[#6B7280]">{t('productCollab.mention')}:</span>
           <div className="relative">
             <button
               type="button"
@@ -234,48 +193,65 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
               </>
             )}
           </div>
-          {selectedMentionIds.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {selectedMentionIds.map((id) => {
-                const u = mentionableUsers.find((x) => x.id === id);
-                return (
-                  <span
-                    key={id}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-[#EFF6FF] text-[#2563EB] rounded-full"
-                  >
-                    @{u?.name ?? id}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedMentionIds((prev) => prev.filter((x) => x !== id))}
-                      className="hover:text-[#1D4ED8]"
-                      aria-label={t('productCollab.remove')}
-                    >
-                      ×
-                    </button>
-                  </span>
-                );
-              })}
-            </div>
-          )}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="ml-auto px-4 py-2 text-sm font-medium text-white bg-[#2563EB] rounded-lg hover:bg-[#1D4ED8] disabled:opacity-50"
+          >
+            {submitting ? t('productCollab.sending') : t('productCollab.send')}
+          </button>
         </div>
+        {selectedMentionIds.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {selectedMentionIds.map((id) => {
+              const u = mentionableUsers.find((x) => x.id === id);
+              return (
+                <span
+                  key={id}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-[#EFF6FF] text-[#2563EB] rounded-full"
+                >
+                  @{u?.name ?? id}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMentionIds((prev) => prev.filter((x) => x !== id))}
+                    className="hover:text-[#1D4ED8]"
+                    aria-label={t('productCollab.remove')}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
         {selectedFiles.length > 0 && (
           <ul className="flex flex-wrap gap-3">
             {selectedFiles.map((item, i) => (
-              <li key={item.objectUrl} className="relative group">
-                <button
-                  type="button"
-                  onClick={() => setModalImageUrl(item.objectUrl)}
-                  className="w-20 h-20 rounded-lg border border-[#E5E7EB] overflow-hidden bg-[#F8F9FB] flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-                >
-                  <img
-                    src={item.objectUrl}
-                    alt={item.file.name}
-                    className="max-w-full max-h-full object-contain cursor-pointer"
-                  />
-                </button>
-                <p className="mt-1 text-xs text-[#6B7280] max-w-[88px] truncate" title={item.file.name}>
-                  {item.file.name}
-                </p>
+              <li key={`${i}-${item.file.name}`} className="relative group">
+                {item.file.type.startsWith('image/') ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setModalImageUrl(item.objectUrl)}
+                      className="w-20 h-20 rounded-lg border border-[#E5E7EB] overflow-hidden bg-[#F8F9FB] flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                    >
+                      <img
+                        src={item.objectUrl}
+                        alt={item.file.name}
+                        className="max-w-full max-h-full object-contain cursor-pointer"
+                      />
+                    </button>
+                    <p className="mt-1 text-xs text-[#6B7280] max-w-[88px] truncate" title={item.file.name}>
+                      {item.file.name}
+                    </p>
+                  </>
+                ) : (
+                  <div className="relative flex items-center gap-2 px-3 py-2 rounded-lg border border-[#E5E7EB] bg-[#F8F9FB] min-w-0 max-w-[200px] sm:max-w-[240px]">
+                    <span className="text-sm font-medium text-[#1F2937] truncate" title={item.file.name}>
+                      {item.file.name}
+                    </span>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => removeFile(i)}
@@ -289,32 +265,7 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
           </ul>
         )}
         <ImageModal imageUrl={modalImageUrl} onClose={() => setModalImageUrl(null)} />
-        {imageUrls.length > 0 && (
-          <ul className="flex flex-wrap gap-2">
-            {imageUrls.map((url, i) => (
-              <li key={i} className="flex items-center gap-1 text-xs">
-                <span className="max-w-[120px] truncate text-[#6B7280]">{url}</span>
-                <button
-                  type="button"
-                  onClick={() => removeImageUrl(i)}
-                  className="text-red-600 hover:underline"
-                >
-                  {t('common.delete')}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-[#2563EB] rounded-lg hover:bg-[#1D4ED8] disabled:opacity-50"
-          >
-            {submitting ? t('productCollab.sending') : t('productCollab.send')}
-          </button>
-        </div>
       </div>
     </form>
   );

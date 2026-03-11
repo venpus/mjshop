@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { addProductImage, setMainImage, uploadProductImages, deleteProductImage } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import type { ProductCollabProductImage } from '../types';
+import type { ProductCollabProductImage, ProductCollabStatus } from '../types';
+import { PRODUCT_COLLAB_STATUS_LABEL_KEYS } from '../types';
 import { getProductCollabImageUrl } from '../utils/imageUrl';
 import { ImageModal } from '../shared/ImageModal';
 import { ImagePlus, MoreVertical, Star, Trash2 } from 'lucide-react';
@@ -20,6 +21,10 @@ interface MainImageSectionProps {
   mainImageUrl: string | null;
   productImages: ProductCollabProductImage[];
   onUpdate: () => void;
+  /** 진행 상태 드롭다운을 대표이미지 영역에 함께 표시 */
+  status?: ProductCollabStatus | null;
+  onStatusChange?: (status: ProductCollabStatus) => void;
+  updatingStatus?: boolean;
 }
 
 export function MainImageSection({
@@ -28,9 +33,12 @@ export function MainImageSection({
   mainImageUrl,
   productImages,
   onUpdate,
+  status,
+  onStatusChange,
+  updatingStatus = false,
 }: MainImageSectionProps) {
+  const PROGRESS_STATUSES: ProductCollabStatus[] = ['RESEARCH', 'SAMPLE_TEST', 'CONFIG_CONFIRM', 'ORDER_PENDING', 'INCOMING', 'IN_PRODUCTION', 'PRODUCTION_COMPLETE', 'CANCELLED'];
   const { t } = useLanguage();
-  const [imageUrl, setImageUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -49,26 +57,6 @@ export function MainImageSection({
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [selectedFile]);
-
-  const addByUrl = async (asMain: boolean) => {
-    const url = imageUrl.trim();
-    if (!url) {
-      setError(t('productCollab.enterImageUrl'));
-      return;
-    }
-    setError(null);
-    setAdding(true);
-    try {
-      const res = await addProductImage(productId, { image_url: url, set_as_main: asMain });
-      if (!res.success) throw new Error(res.error);
-      setImageUrl('');
-      onUpdate();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('productCollab.addFailed'));
-    } finally {
-      setAdding(false);
-    }
-  };
 
   const addByUpload = async (asMain: boolean) => {
     if (!selectedFile) {
@@ -139,7 +127,30 @@ export function MainImageSection({
 
   return (
     <div className="bg-white rounded-lg border border-[#E5E7EB] p-4">
-      <h3 className="text-sm font-medium text-[#1F2937] mb-3">{t('productCollab.repImage')}</h3>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <h3 className="text-sm font-medium text-[#1F2937]">{t('productCollab.repImage')}</h3>
+        {onStatusChange != null && status != null && (
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-[#6B7280]">{t('productCollab.setProgressStatus')}:</label>
+            <select
+              value={status ?? 'RESEARCH'}
+              onChange={(e) => {
+                const newStatus = e.target.value as ProductCollabStatus;
+                if (newStatus !== (status ?? 'RESEARCH')) onStatusChange(newStatus);
+              }}
+              disabled={updatingStatus}
+              className="rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#1F2937] focus:border-[#2563EB] focus:outline-none focus:ring-1 focus:ring-[#2563EB] disabled:opacity-50 min-w-[160px]"
+            >
+              {PROGRESS_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {t(PRODUCT_COLLAB_STATUS_LABEL_KEYS[s])}
+                </option>
+              ))}
+            </select>
+            {updatingStatus && <span className="text-xs text-[#6B7280]">{t('productCollab.saving')}</span>}
+          </div>
+        )}
+      </div>
       {mainImageUrl && (
         <div className="mb-4">
           <button
@@ -262,33 +273,6 @@ export function MainImageSection({
             </>
           )}
         </div>
-      </div>
-
-      {/* 또는 URL 입력 */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        <input
-          type="url"
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          placeholder={t('productCollab.orImageUrl')}
-          className="flex-1 min-w-[200px] px-3 py-2 border border-[#E5E7EB] rounded-lg text-sm"
-        />
-        <button
-          type="button"
-          disabled={adding || !imageUrl.trim()}
-          onClick={() => addByUrl(false)}
-          className="px-3 py-2 text-sm text-[#1F2937] bg-[#E5E7EB] rounded-lg hover:bg-[#D1D5DB] disabled:opacity-50"
-        >
-          {t('productCollab.urlCandidateAdd')}
-        </button>
-        <button
-          type="button"
-          disabled={adding || !imageUrl.trim()}
-          onClick={() => addByUrl(true)}
-          className="px-3 py-2 text-sm text-white bg-[#2563EB] rounded-lg hover:bg-[#1D4ED8] disabled:opacity-50"
-        >
-          {t('productCollab.urlMainSet')}
-        </button>
       </div>
 
       {error && <p className="text-sm text-red-600 mb-2">{error}</p>}

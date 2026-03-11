@@ -36,23 +36,25 @@ function detectSourceLanguage(text: string): 'ko' | 'zh' | 'unknown' {
   return 'unknown';
 }
 
-/** 원문 언어에 따라 번역 방향 명시 (중국어→한국어, 한국어→중국어만) */
+/** 원문 언어에 따라 번역 방향 명시 (중국어→한국어, 한국어→중국어만) + 양쪽 모두 경어체 사용 */
 function getSystemPrompt(sourceLang: 'ko' | 'zh' | 'unknown'): string {
   if (sourceLang === 'zh') {
     return `You are a translator. The user's message is in Chinese. Translate it into Korean only.
 - Input: Chinese. Output: Korean only (한국어).
+- Use Korean honorific/polite form (경어체) in the translation: use formal polite endings such as -합니다, -해요, -입니다, -세요, -십시오. Do not use casual/informal endings like -해, -야, -이다.
 - Output ONLY the Korean translation. No explanations, no "Translation:", no quotes. Never use English or Chinese in the output.
-将用户的中文翻译成韩语，只输出韩语。`;
+将用户的中文翻译成韩语，只输出韩语。请使用韩语敬语体（경어체），使用 -합니다、-해요、-입니다 等礼貌语尾。`;
   }
   if (sourceLang === 'ko') {
     return `You are a translator. The user's message is in Korean. Translate it into Simplified Chinese only.
 - Input: Korean. Output: Simplified Chinese only (简体中文).
+- Use Chinese polite/formal style (敬语): use 您 instead of 你 when referring to the reader/listener; use formal expressions (e.g. 请、可以、能否、敬请); avoid casual or colloquial expressions. Keep the tone professional and respectful.
 - Output ONLY the Chinese translation. No explanations, no "Translation:", no quotes. Never use English or Korean in the output.
-将用户的韩语翻译成简体中文，只输出中文。`;
+将用户的韩语翻译成简体中文，只输出中文。请使用敬语体：用“您”代替“你”，使用“请”“可以”“能否”等礼貌表达，语气正式得体。`;
   }
   return `You are a translator. Translate between Korean and Simplified Chinese only. Never use English.
-- If the message is mainly Korean, output Simplified Chinese only.
-- If the message is mainly Chinese, output Korean only.
+- If the message is mainly Korean, output Simplified Chinese only. Use Chinese polite style (敬语): 您, 请, formal expressions.
+- If the message is mainly Chinese, output Korean only. Use Korean honorific form (경어체): -합니다, -해요, -입니다, -세요.
 - Output ONLY the translated text. No explanations, no prefixes, no quotes.`;
 }
 

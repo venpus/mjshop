@@ -76,3 +76,28 @@ export function isNewCommissionCalculationDate(orderDate: Date | string | null |
   return compareDate >= targetDate;
 }
 
+/**
+ * 발주일자가 2026-03-05 이후인지 확인합니다.
+ * 수수료 계산 시 옵션·인건비 전체 합계 사용 여부 기준일입니다.
+ * @param orderDate 발주일자 (YYYY-MM-DD 형식 문자열, Date 객체, 또는 null)
+ * @returns 2026-03-05 이후이면 true
+ */
+export function isCommissionUseFullOptionLaborFromDate(orderDate: Date | string | null | undefined): boolean {
+  if (!orderDate) return false;
+
+  const targetDate = new Date('2026-03-05');
+  targetDate.setHours(0, 0, 0, 0);
+
+  let compareDate: Date;
+
+  if (typeof orderDate === 'string') {
+    compareDate = /^\d{4}-\d{2}-\d{2}$/.test(orderDate) ? new Date(orderDate) : new Date(orderDate);
+  } else {
+    compareDate = new Date(orderDate);
+  }
+
+  if (isNaN(compareDate.getTime())) return false;
+  compareDate.setHours(0, 0, 0, 0);
+  return compareDate >= targetDate;
+}
+

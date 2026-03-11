@@ -14,6 +14,8 @@ import type {
   DashboardTeamTask,
   DashboardAllAssigneeTask,
   DashboardStatusCount,
+  DashboardConfirmation,
+  DashboardReplyItem,
 } from '../models/productCollab.js';
 
 export class ProductCollabService {
@@ -36,8 +38,12 @@ export class ProductCollabService {
     return this.repository.findCompletedProducts(params);
   }
 
-  async getProductById(id: number): Promise<ProductCollabProductDetail | null> {
-    return this.repository.findProductById(id);
+  async getCancelledProducts(params: { search?: string }): Promise<ProductCollabProductListItem[]> {
+    return this.repository.findCancelledProducts(params);
+  }
+
+  async getProductById(id: number, currentUserId?: string | null): Promise<ProductCollabProductDetail | null> {
+    return this.repository.findProductById(id, currentUserId);
   }
 
   async createProduct(dto: CreateProductCollabProductDTO): Promise<ProductCollabProduct> {
@@ -128,12 +134,24 @@ export class ProductCollabService {
     return this.repository.findTeamTasks(currentUserId);
   }
 
-  async getAllAssigneeTasks(): Promise<DashboardAllAssigneeTask[]> {
-    return this.repository.findAllAssigneeTasks();
+  async getAllAssigneeTasks(excludeUserId: string | null): Promise<DashboardAllAssigneeTask[]> {
+    return this.repository.findAllAssigneeTasks(excludeUserId);
   }
 
   async getStatusCounts(): Promise<DashboardStatusCount[]> {
     return this.repository.getStatusCounts();
+  }
+
+  async getProductCounts(): Promise<{ activeCount: number; archiveCount: number; cancelledCount: number }> {
+    return this.repository.getProductCounts();
+  }
+
+  async getConfirmationsReceived(authorId: string): Promise<DashboardConfirmation[]> {
+    return this.repository.findConfirmationsReceived(authorId);
+  }
+
+  async getRepliesToMyMessages(userId: string): Promise<DashboardReplyItem[]> {
+    return this.repository.findRepliesToMyMessages(userId);
   }
 
   async addProductImage(

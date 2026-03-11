@@ -1,4 +1,6 @@
 import { Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { ProductCollabService } from '../services/productCollabService.js';
 import { AdminAccountService } from '../services/adminAccountService.js';
 import type {
@@ -6,7 +8,7 @@ import type {
   UpdateProductCollabProductDTO,
   CreateMessageDTO,
 } from '../models/productCollab.js';
-import { getProductCollabImageUrl } from '../utils/upload.js';
+import { getProductCollabImageUrl, getProductCollabFilePathFromUrl } from '../utils/upload.js';
 
 export class ProductCollabController {
   private service: ProductCollabService;
@@ -42,13 +44,35 @@ export class ProductCollabController {
     }
   };
 
+  getCancelledProducts = async (req: Request, res: Response) => {
+    try {
+      const search = req.query.search as string | undefined;
+      const list = await this.service.getCancelledProducts({ search });
+      res.json({ success: true, data: list });
+    } catch (error: unknown) {
+      console.error('Product collab cancelled list error:', error);
+      res.status(500).json({ success: false, error: '취소 제품 목록 조회 중 오류가 발생했습니다.' });
+    }
+  };
+
+  getProductCounts = async (_req: Request, res: Response) => {
+    try {
+      const counts = await this.service.getProductCounts();
+      res.json({ success: true, data: counts });
+    } catch (error: unknown) {
+      console.error('Product collab counts error:', error);
+      res.status(500).json({ success: false, error: '제품 수 조회 중 오류가 발생했습니다.' });
+    }
+  };
+
   getProductById = async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) {
         return res.status(400).json({ success: false, error: '유효하지 않은 제품 ID입니다.' });
       }
-      const product = await this.service.getProductById(id);
+      const userId = (req as unknown as { user?: { id: string } }).user?.id ?? null;
+      const product = await this.service.getProductById(id, userId);
       if (!product) {
         return res.status(404).json({ success: false, error: '제품을 찾을 수 없습니다.' });
       }
@@ -66,6 +90,8 @@ export class ProductCollabController {
         name: req.body.name,
         category: req.body.category ?? null,
         request_note: req.body.request_note?.trim() || null,
+        request_links: Array.isArray(req.body.request_links) ? req.body.request_links.filter((u: unknown) => typeof u === 'string' && u.trim()) : null,
+        request_image_urls: Array.isArray(req.body.request_image_urls) ? req.body.request_image_urls.filter((u: unknown) => typeof u === 'string' && u.trim()) : null,
         created_by: userId ?? null,
       };
       if (!dto.name?.trim()) {
@@ -98,6 +124,12 @@ export class ProductCollabController {
         packaging: req.body.packaging,
         sku_count: req.body.sku_count,
         request_note: req.body.request_note !== undefined ? (req.body.request_note?.trim() || null) : undefined,
+        request_links: req.body.request_links !== undefined
+          ? (Array.isArray(req.body.request_links) ? req.body.request_links.filter((u: unknown) => typeof u === 'string' && u.trim()) : null)
+          : undefined,
+        request_image_urls: req.body.request_image_urls !== undefined
+          ? (Array.isArray(req.body.request_image_urls) ? req.body.request_image_urls.filter((u: unknown) => typeof u === 'string' && u.trim()) : null)
+          : undefined,
         updated_by: userId ?? undefined,
       };
       const product = await this.service.updateProduct(id, dto);
@@ -202,15 +234,16 @@ export class ProductCollabController {
   getDashboard = async (req: Request, res: Response) => {
     try {
       const userId = (req as unknown as { user?: { id: string } }).user?.id ?? '';
-      const [myTasks, teamTasks, allAssigneeTasks, statusCounts] = await Promise.all([
+      const [myTasks, allAssigneeTasks, statusCounts, confirmationsReceived, repliesToMyMessages] = await Promise.all([
         this.service.getMyTasks(userId),
-        this.service.getTeamTasks(userId),
-        this.service.getAllAssigneeTasks(),
+        this.service.getAllAssigneeTasks(userId || null),
         this.service.getStatusCounts(),
+        userId ? this.service.getConfirmationsReceived(userId) : Promise.resolve([]),
+        userId ? this.service.getRepliesToMyMessages(userId) : Promise.resolve([]),
       ]);
       res.json({
         success: true,
-        data: { myTasks, teamTasks, allAssigneeTasks, statusCounts },
+        data: { myTasks, allAssigneeTasks, statusCounts, confirmationsReceived, repliesToMyMessages },
       });
     } catch (error: unknown) {
       console.error('Product collab dashboard error:', error);
@@ -326,7 +359,7 @@ export class ProductCollabController {
       }
       const files = (req.files as Express.Multer.File[] | undefined) ?? [];
       if (files.length === 0) {
-        return res.status(400).json({ success: false, error: '업로드할 이미지 파일이 없습니다.' });
+        return res.status(400).json({ success: false, error: '업로드할 파일이 없습니다.' });
       }
       const urls = files.map((file) => {
         const relativePath = `product-collab/${productId}/${file.filename}`;
@@ -335,7 +368,29 @@ export class ProductCollabController {
       res.json({ success: true, data: { urls } });
     } catch (error: unknown) {
       console.error('Product collab upload images error:', error);
-      res.status(500).json({ success: false, error: '이미지 업로드 중 오류가 발생했습니다.' });
+      res.status(500).json({ success: false, error: '파일 업로드 중 오류가 발생했습니다.' });
+    }
+  };
+
+  /** 스레드 첨부 파일 다운로드 (Content-Disposition으로 원본 파일명 적용) */
+  downloadAttachment = async (req: Request, res: Response) => {
+    try {
+      const productId = req.params.productId;
+      const pathParam = (req.query.path as string)?.replace(/^\/+/, '');
+      const name = (req.query.name as string) || 'download';
+      if (!pathParam || !pathParam.startsWith('product-collab/')) {
+        return res.status(400).json({ success: false, error: '유효하지 않은 경로입니다.' });
+      }
+      const filePath = getProductCollabFilePathFromUrl(pathParam);
+      if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+        return res.status(404).json({ success: false, error: '파일을 찾을 수 없습니다.' });
+      }
+      const safeName = path.basename(name).replace(/[^a-zA-Z0-9._-]/g, '_') || 'download';
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(safeName)}"`);
+      res.sendFile(path.resolve(filePath));
+    } catch (error: unknown) {
+      console.error('Product collab download error:', error);
+      res.status(500).json({ success: false, error: '다운로드 중 오류가 발생했습니다.' });
     }
   };
 }

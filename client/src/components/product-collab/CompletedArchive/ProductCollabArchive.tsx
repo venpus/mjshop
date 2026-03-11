@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCompletedProducts, updateProduct } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useProductCollabCounts } from '../ProductCollabCountsContext';
 import type { ProductCollabProductListItem } from '../types';
 import { getProductCollabImageUrl } from '../utils/imageUrl';
 
 export function ProductCollabArchive() {
   const { t } = useLanguage();
+  const { counts } = useProductCollabCounts() ?? {};
   const navigate = useNavigate();
   const [list, setList] = useState<ProductCollabProductListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +30,7 @@ export function ProductCollabArchive() {
   const handleHold = async (e: React.MouseEvent, productId: number) => {
     e.stopPropagation();
     setHoldingId(productId);
-    const res = await updateProduct(productId, { status: 'READY_FOR_ORDER' });
+    const res = await updateProduct(productId, { status: 'ORDER_PENDING' });
     setHoldingId(null);
     if (res.success) loadList();
   };
@@ -38,7 +40,12 @@ export function ProductCollabArchive() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-lg font-semibold text-[#1F2937] mb-4">{t('productCollab.archive')}</h1>
+      <h1 className="text-lg font-semibold text-[#1F2937] mb-4">
+        {t('productCollab.archive')}
+        {counts && (
+          <span className="ml-2 text-base font-medium text-[#6B7280]">({counts.archiveCount})</span>
+        )}
+      </h1>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {list.map((p) => (
           <div
@@ -64,7 +71,7 @@ export function ProductCollabArchive() {
                 </div>
               )}
               <div className="font-medium text-[#1F2937]">{p.name}</div>
-              <div className="text-xs text-[#6B7280] mt-1">{t('productCollab.statusDone')}</div>
+              <div className="text-xs text-[#6B7280] mt-1">{t('productCollab.statusProductionComplete')}</div>
               <div className="text-xs text-[#6B7280] mt-1">
                 {new Date(p.last_activity_at).toLocaleString('ko-KR')}
               </div>

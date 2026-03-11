@@ -1424,7 +1424,6 @@ export class PurchaseOrderController {
     try {
       const result = await this.service.getNotArrivedAnalysis();
 
-      // 날짜 필드 포맷팅 (YYYY-MM-DD 형식)
       const { formatDateToKSTString } = await import('../utils/dateUtils.js');
       const formattedItems = result.items.map(item => ({
         ...item,
@@ -1447,5 +1446,55 @@ export class PurchaseOrderController {
       });
     }
   };
-}
 
+  /**
+   * 비용 분석 조회 (ID가 venpus인 사용자만 허용)
+   * GET /api/purchase-orders/analysis/cost?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+   */
+  getCostAnalysis = async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user?.id as string | undefined;
+      if (userId !== 'venpus') {
+        return res.status(403).json({
+          success: false,
+          error: '이 메뉴는 허용된 사용자만 이용할 수 있습니다.',
+        });
+      }
+
+      const startDate = (req.query.startDate as string)?.trim();
+      const endDate = (req.query.endDate as string)?.trim();
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+      if (!startDate || !dateRegex.test(startDate)) {
+        return res.status(400).json({
+          success: false,
+          error: 'startDate는 YYYY-MM-DD 형식이어야 합니다.',
+        });
+      }
+      if (!endDate || !dateRegex.test(endDate)) {
+        return res.status(400).json({
+          success: false,
+          error: 'endDate는 YYYY-MM-DD 형식이어야 합니다.',
+        });
+      }
+      if (startDate > endDate) {
+        return res.status(400).json({
+          success: false,
+          error: 'startDate는 endDate 이전이어야 합니다.',
+        });
+      }
+
+      const result = await this.service.getCostAnalysis(startDate, endDate);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      console.error('비용 분석 조회 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '비용 분석 조회에 실패했습니다.',
+      });
+    }
+  };
+}

@@ -14,6 +14,9 @@ router.get('/unshipped', purchaseOrderController.getPurchaseOrdersWithUnshipped)
 // 한국에 도착하지 않은 물품 분석 조회
 router.get('/analysis/not-arrived', purchaseOrderController.getNotArrivedAnalysis);
 
+// 비용 분석 조회 (venpus 전용)
+router.get('/analysis/cost', purchaseOrderController.getCostAnalysis);
+
 // 발주 상세 조회
 router.get('/:id', purchaseOrderController.getPurchaseOrderById);
 

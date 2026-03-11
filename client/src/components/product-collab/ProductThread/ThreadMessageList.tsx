@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { ProductCollabMessage, MessageTag } from '../types';
-import { getProductCollabImageUrl } from '../utils/imageUrl';
-import { updateMessage, deleteMessage, createMessage } from '../../../api/productCollabApi';
+import { getProductCollabImageUrl, getProductCollabDownloadUrl } from '../utils/imageUrl';
+import { updateMessage, deleteMessage, createMessage, completeTask, getAuthHeaders } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { MessageAttachmentImage } from './MessageAttachmentImage';
 
@@ -19,6 +19,52 @@ const TAG_VALUES: (MessageTag | '')[] = [
 function formatDateKey(iso: string): string {
   const d = new Date(iso);
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+function FileDownloadLink({
+  productId,
+  url,
+  originalFilename,
+}: {
+  productId: number;
+  url: string;
+  originalFilename?: string | null;
+}) {
+  const { t } = useLanguage();
+  const [downloading, setDownloading] = useState(false);
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const downloadUrl = getProductCollabDownloadUrl(productId, url, originalFilename);
+      const res = await fetch(downloadUrl, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Download failed');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = originalFilename || url.split('/').pop() || 'download';
+      link.click();
+      URL.revokeObjectURL(blobUrl);
+    } finally {
+      setDownloading(false);
+    }
+  };
+  const displayName = originalFilename || url.split('/').pop() || t('productCollab.attachment');
+  return (
+    <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#E5E7EB] bg-[#F8FAFC]">
+      <span className="text-sm font-medium text-[#1F2937] max-w-[200px] sm:max-w-[280px] truncate" title={displayName}>
+        {displayName}
+      </span>
+      <button
+        type="button"
+        onClick={handleDownload}
+        disabled={downloading}
+        className="shrink-0 px-2 py-1 text-xs font-medium text-[#2563EB] hover:bg-[#EFF6FF] rounded disabled:opacity-50"
+      >
+        {downloading ? t('productCollab.downloading') : t('productCollab.download')}
+      </button>
+    </div>
+  );
 }
 
 interface ThreadMessageListProps {
@@ -47,6 +93,7 @@ function MessageItem({
   const [editBody, setEditBody] = useState('');
   const [editTag, setEditTag] = useState<MessageTag | ''>('');
   const [submitting, setSubmitting] = useState(false);
+  const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const isOwner = currentUserId != null && m.author_id === currentUserId;
@@ -102,8 +149,29 @@ function MessageItem({
         <span className="text-xs text-[#6B7280]">
           {new Date(m.created_at).toLocaleString('ko-KR')}
         </span>
+        {m.current_user_task && (
+          m.current_user_task.completed_at ? (
+            <span className="text-xs text-[#059669] font-medium ml-auto">
+              {t('productCollab.confirmed')}
+            </span>
+          ) : (
+            <button
+              type="button"
+              disabled={completingTaskId === m.current_user_task.task_id}
+              onClick={async () => {
+                setCompletingTaskId(m.current_user_task!.task_id);
+                const res = await completeTask(productId, m.current_user_task!.task_id);
+                setCompletingTaskId(null);
+                if (res.success) onMessageUpdated();
+              }}
+              className="ml-auto px-2 py-1 text-xs font-medium text-white bg-[#10B981] hover:bg-[#059669] rounded disabled:opacity-50"
+            >
+              {t('productCollab.confirm')}
+            </button>
+          )
+        )}
         {isOwner && editingId !== m.id && (
-          <span className="flex items-center gap-1 ml-auto">
+          <span className="flex items-center gap-1">
             <button
               type="button"
               onClick={startEdit}
@@ -163,48 +231,54 @@ function MessageItem({
         </div>
       ) : (
         <>
-          {m.body && <p className="text-[#1F2937] text-sm mt-1 whitespace-pre-wrap">{m.body}</p>}
-          {m.body_translated && (
-            <p className="text-sm mt-0.5 whitespace-pre-wrap border-l-2 border-[#93C5FD] pl-2 text-[#1d4ed8]">
-              {m.body_translated}
-            </p>
-          )}
+          {(() => {
+            const mentionNodes = m.mentions?.length ? (
+              <>
+                {m.mentions.map((x) => (
+                  <span
+                    key={x.user_id}
+                    className="font-semibold text-[#1D4ED8] bg-[#EFF6FF] px-1 rounded"
+                  >
+                    @{x.user_name ?? x.user_id}
+                  </span>
+                ))}{' '}
+              </>
+            ) : null;
+            return (
+              <>
+                {(mentionNodes || m.body) && (
+                  <p className="text-[#1F2937] text-sm mt-1 whitespace-pre-wrap">
+                    {mentionNodes}{m.body ?? ''}
+                  </p>
+                )}
+                {m.body_translated && (
+                  <p className="text-sm mt-0.5 whitespace-pre-wrap border-l-2 border-[#93C5FD] pl-2 text-[#1d4ed8]">
+                    {mentionNodes}{m.body_translated}
+                  </p>
+                )}
+              </>
+            );
+          })()}
           {m.attachments?.length ? (
             <div className="flex flex-wrap gap-2 mt-2">
-              {m.attachments.map((a) =>
-                a.kind === 'image' ? (
+              {m.attachments.map((att) =>
+                att.kind === 'image' ? (
                   <MessageAttachmentImage
-                    key={a.id}
-                    imageUrl={a.url}
+                    key={att.id}
+                    imageUrl={att.url}
                     productId={productId}
                     onAdded={onMessageUpdated}
                   />
                 ) : (
-                  <a
-                    key={a.id}
-                    href={getProductCollabImageUrl(a.url)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-[#2563EB]"
-                  >
-                    {t('productCollab.attachment')}
-                  </a>
+                  <FileDownloadLink
+                    key={att.id}
+                    productId={productId}
+                    url={att.url}
+                    originalFilename={att.original_filename}
+                  />
                 )
               )}
             </div>
-          ) : null}
-          {m.mentions?.length ? (
-            <p className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="text-xs font-medium text-[#6B7280]">{t('productCollab.mention')}:</span>
-              {m.mentions.map((x) => (
-                <span
-                  key={x.user_id}
-                  className="inline-flex items-center px-2 py-0.5 rounded-md text-sm font-semibold text-[#1D4ED8] bg-[#EFF6FF]"
-                >
-                  @{x.user_name ?? x.user_id}
-                </span>
-              ))}
-            </p>
           ) : null}
         </>
       )}

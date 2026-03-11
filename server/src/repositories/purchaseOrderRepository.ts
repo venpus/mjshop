@@ -1802,6 +1802,55 @@ export class PurchaseOrderRepository {
   }
 
   /**
+   * 비용 분석용: 날짜 범위 내 발주 목록 + 비용 항목 집계
+   * order_date 기준, 취소됨 제외
+   */
+  async findForCostAnalysis(startDate: string, endDate: string): Promise<Array<PurchaseOrder & {
+    total_option_cost: number;
+    total_labor_cost: number;
+    admin_only_cost: number;
+    option_cost_for_commission: number;
+    labor_cost_for_commission: number;
+  }>> {
+    const [rows] = await pool.execute<RowDataPacket[]>(`
+      SELECT
+        po.id, po.po_number, po.product_id, po.unit_price, po.back_margin,
+        po.order_unit_price, po.expected_final_unit_price, po.quantity, po.size, po.weight, po.packaging,
+        po.product_name, po.product_name_chinese, po.product_category, po.product_main_image,
+        po.product_size, po.product_weight, po.product_packaging_size,
+        po.product_set_count, po.product_small_pack_count, po.product_box_count,
+        po.delivery_status, po.payment_status, po.is_confirmed, po.order_status,
+        po.order_date, po.estimated_delivery, po.estimated_shipment_date,
+        po.work_start_date, po.work_end_date,
+        po.shipping_cost, po.warehouse_shipping_cost, po.commission_rate, po.commission_type,
+        po.advance_payment_rate, po.advance_payment_amount, po.advance_payment_date,
+        po.balance_payment_amount, po.balance_payment_date,
+        po.admin_cost_paid, po.admin_cost_paid_date,
+        po.created_at, po.updated_at, po.created_by, po.updated_by,
+        COALESCE(SUM(CASE WHEN ci.item_type = 'option' THEN ci.cost ELSE 0 END), 0) AS total_option_cost,
+        COALESCE(SUM(CASE WHEN ci.item_type = 'labor' THEN ci.cost ELSE 0 END), 0) AS total_labor_cost,
+        COALESCE(SUM(CASE WHEN ci.is_admin_only = 1 THEN ci.cost ELSE 0 END), 0) AS admin_only_cost,
+        COALESCE(SUM(CASE WHEN ci.item_type = 'option' AND ci.is_admin_only = 0 THEN ci.cost ELSE 0 END), 0) AS option_cost_for_commission,
+        COALESCE(SUM(CASE WHEN ci.item_type = 'labor' AND ci.is_admin_only = 0 THEN ci.cost ELSE 0 END), 0) AS labor_cost_for_commission
+      FROM purchase_orders po
+      LEFT JOIN po_cost_items ci ON po.id = ci.purchase_order_id
+      WHERE po.order_date BETWEEN ? AND ?
+        AND (po.order_status IS NULL OR po.order_status != '취소됨')
+      GROUP BY po.id
+      ORDER BY po.order_date ASC, po.po_number ASC
+    `, [startDate, endDate]);
+
+    return rows.map((row: any) => ({
+      ...this.mapRowToPurchaseOrder(row),
+      total_option_cost: Number(row.total_option_cost) || 0,
+      total_labor_cost: Number(row.total_labor_cost) || 0,
+      admin_only_cost: Number(row.admin_only_cost) || 0,
+      option_cost_for_commission: Number(row.option_cost_for_commission) || 0,
+      labor_cost_for_commission: Number(row.labor_cost_for_commission) || 0,
+    }));
+  }
+
+  /**
    * 한국에 도착하지 않은 물품 분석 조회
    * - 납기일, 수량, 단가, 총금액 분석
    * - 모든 물품들의 수량 합계와 총 금액 합계 포함

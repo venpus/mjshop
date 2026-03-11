@@ -8,7 +8,7 @@ import {
   ReorderPurchaseOrderDTO,
 } from '../models/purchaseOrder.js';
 import { RowDataPacket } from 'mysql2';
-import { getKSTDateString, formatDateToKSTString, isNewCommissionCalculationDate } from '../utils/dateUtils.js';
+import { getKSTDateString, formatDateToKSTString, isNewCommissionCalculationDate, isCommissionUseFullOptionLaborFromDate } from '../utils/dateUtils.js';
 
 export class PurchaseOrderService {
   private repository: PurchaseOrderRepository;
@@ -944,6 +944,105 @@ export class PurchaseOrderService {
    */
   async getNotArrivedAnalysis() {
     return await this.repository.findNotArrivedAnalysis();
+  }
+
+  /**
+   * 비용 분석: 날짜 범위 내 발주 총 금액, 수수료 금액, A레벨 비용 집계
+   * 클라이언트 purchaseOrderCalculations 로직과 동일하게 계산
+   */
+  async getCostAnalysis(startDate: string, endDate: string): Promise<{
+    totalOrderAmount: number;
+    totalCommissionAmount: number;
+    totalAdminCost: number;
+    orderCount: number;
+    totalQuantity: number;
+    items: Array<{
+      id: string;
+      po_number: string;
+      order_date: string | null;
+      product_name: string;
+      quantity: number;
+      totalOrderAmount: number;
+      commissionAmount: number;
+      adminCost: number;
+    }>;
+  }> {
+    const rows = await this.repository.findForCostAnalysis(startDate, endDate);
+
+    let totalOrderAmount = 0;
+    let totalCommissionAmount = 0;
+    let totalAdminCost = 0;
+    let totalQuantity = 0;
+    const items: Array<{
+      id: string;
+      po_number: string;
+      order_date: string | null;
+      product_name: string;
+      quantity: number;
+      totalOrderAmount: number;
+      commissionAmount: number;
+      adminCost: number;
+    }> = [];
+
+    for (const po of rows) {
+      const backMargin = po.back_margin ?? 0;
+      const orderUnitPrice = po.unit_price + backMargin;
+      const orderDate = po.order_date ? formatDateToKSTString(po.order_date) : null;
+
+      // 기본 비용 (발주단가×수량, 2025-01-06 이후는 수수료 미포함)
+      const basicCostTotal = orderDate && isNewCommissionCalculationDate(orderDate)
+        ? orderUnitPrice * po.quantity
+        : orderUnitPrice * po.quantity * (1 + (po.commission_rate || 0) / 100);
+
+      // 수수료 금액
+      const baseAmount = orderUnitPrice * po.quantity;
+      let commissionAmount: number;
+      if (orderDate && isNewCommissionCalculationDate(orderDate)) {
+        let optionForCommission = po.total_option_cost;
+        let laborForCommission = po.total_labor_cost;
+        if (!isCommissionUseFullOptionLaborFromDate(orderDate)) {
+          optionForCommission = po.option_cost_for_commission;
+          laborForCommission = po.labor_cost_for_commission;
+        }
+        commissionAmount = (baseAmount + optionForCommission + laborForCommission) * ((po.commission_rate || 0) / 100);
+      } else {
+        commissionAmount = baseAmount * ((po.commission_rate || 0) / 100);
+      }
+
+      const shippingTotal = (po.shipping_cost || 0) + (po.warehouse_shipping_cost || 0);
+
+      // 최종 결제 금액
+      const finalPaymentAmount = orderDate && isNewCommissionCalculationDate(orderDate)
+        ? basicCostTotal + commissionAmount + shippingTotal + po.total_option_cost + po.total_labor_cost
+        : basicCostTotal + shippingTotal + po.total_option_cost + po.total_labor_cost;
+
+      totalOrderAmount += finalPaymentAmount;
+      totalCommissionAmount += commissionAmount;
+      // 결제내역과 동일: A레벨 비용 = 발주 주가비(back_margin×수량) + A레벨 전용 비용 항목
+      const adminCostPerPo = (po.back_margin ?? 0) * po.quantity + po.admin_only_cost;
+      totalAdminCost += adminCostPerPo;
+      totalQuantity += po.quantity;
+
+      items.push({
+        id: po.id,
+        po_number: po.po_number,
+        order_date: orderDate,
+        product_name: po.product_name || '',
+        quantity: po.quantity,
+        totalOrderAmount: finalPaymentAmount,
+        commissionAmount,
+        adminCost: adminCostPerPo,
+      });
+    }
+
+    return {
+      totalOrderAmount,
+      totalCommissionAmount,
+      totalAdminCost,
+      orderCount: rows.length,
+      totalQuantity,
+      items,
+    };
   }
 }
 

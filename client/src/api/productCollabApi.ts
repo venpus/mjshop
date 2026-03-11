@@ -1,6 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-function getAuthHeaders(): HeadersInit {
+export function getAuthHeaders(): HeadersInit {
   const headers: HeadersInit = {};
   const savedUser = localStorage.getItem('admin_user');
   if (savedUser) {
@@ -80,11 +80,38 @@ export async function getActiveProducts(params?: {
   return { success: true, data: json.data };
 }
 
+export interface ProductCollabCounts {
+  activeCount: number;
+  archiveCount: number;
+  cancelledCount: number;
+}
+
+export async function getProductCounts(): Promise<ApiResponse<ProductCollabCounts>> {
+  const res = await fetch(`${API_BASE_URL}/product-collab/products/counts`, {
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) return { success: false, error: json.error || '제품 수 조회 실패' };
+  return { success: true, data: json.data };
+}
+
 export async function getCompletedProducts(params?: {
   search?: string;
 }): Promise<ApiResponse<ProductCollabProductListItem[]>> {
   const q = params?.search ? `?search=${encodeURIComponent(params.search)}` : '';
   const res = await fetch(`${API_BASE_URL}/product-collab/products/archive${q}`, {
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) return { success: false, error: json.error || '조회 실패' };
+  return { success: true, data: json.data };
+}
+
+export async function getCancelledProducts(params?: {
+  search?: string;
+}): Promise<ApiResponse<ProductCollabProductListItem[]>> {
+  const q = params?.search ? `?search=${encodeURIComponent(params.search)}` : '';
+  const res = await fetch(`${API_BASE_URL}/product-collab/products/cancelled${q}`, {
     headers: getAuthHeaders(),
   });
   const json = await res.json();
@@ -105,6 +132,8 @@ export async function createProduct(body: {
   name: string;
   category?: string | null;
   request_note?: string | null;
+  request_links?: string[] | null;
+  request_image_urls?: string[] | null;
 }): Promise<ApiResponse<unknown>> {
   const res = await fetch(`${API_BASE_URL}/product-collab/products`, {
     method: 'POST',
@@ -136,7 +165,7 @@ export async function createMessage(
     body?: string | null;
     tag?: string | null;
     parent_id?: number | null;
-    attachment_urls?: { kind: 'image' | 'file'; url: string }[];
+    attachment_urls?: { kind: 'image' | 'file'; url: string; original_filename?: string | null }[];
     mention_user_ids?: string[];
   }
 ): Promise<ApiResponse<ProductCollabMessage>> {

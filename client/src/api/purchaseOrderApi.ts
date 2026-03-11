@@ -280,3 +280,53 @@ export async function getNotArrivedAnalysis(): Promise<NotArrivedAnalysis> {
   return responseData.data;
 }
 
+/** 비용 분석 결과 (날짜 범위 내 발주 기준) */
+export interface CostAnalysisResult {
+  totalOrderAmount: number;
+  totalCommissionAmount: number;
+  totalAdminCost: number;
+  orderCount: number;
+  totalQuantity: number;
+  items: Array<{
+    id: string;
+    po_number: string;
+    order_date: string | null;
+    product_name: string;
+    quantity: number;
+    totalOrderAmount: number;
+    commissionAmount: number;
+    adminCost: number;
+  }>;
+}
+
+/**
+ * 비용 분석 조회 (발주 총 금액, 수수료 금액, A레벨 비용)
+ * ID가 venpus인 사용자만 호출 가능.
+ * 서버 인증을 위해 headers에 X-User-Id를 포함해 호출하세요.
+ */
+export async function getCostAnalysis(
+  startDate: string,
+  endDate: string,
+  headers?: Record<string, string>
+): Promise<CostAnalysisResult> {
+  const params = new URLSearchParams({ startDate, endDate });
+  const response = await fetch(`${API_BASE_URL}/purchase-orders/analysis/cost?${params}`, {
+    credentials: 'include',
+    headers: {
+      ...headers,
+    },
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || '비용 분석 조회에 실패했습니다.');
+  }
+
+  const responseData = await response.json();
+  if (!responseData.success) {
+    throw new Error(responseData.error || '비용 분석 조회에 실패했습니다.');
+  }
+
+  return responseData.data;
+}
+

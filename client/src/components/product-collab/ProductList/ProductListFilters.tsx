@@ -3,15 +3,13 @@ import { useLanguage } from '../../../contexts/LanguageContext';
 
 const STATUS_OPTIONS: { value: string; labelKey: string }[] = [
   { value: '', labelKey: 'productCollab.statusAll' },
-  { value: 'REQUEST', labelKey: 'productCollab.statusRequest' },
   { value: 'RESEARCH', labelKey: 'productCollab.statusResearch' },
-  { value: 'CANDIDATE_REVIEW', labelKey: 'productCollab.statusCandidateReview' },
-  { value: 'SAMPLE', labelKey: 'productCollab.statusSample' },
-  { value: 'MODEL_SELECT', labelKey: 'productCollab.statusModelSelect' },
-  { value: 'SPEC_INPUT', labelKey: 'productCollab.statusSpecInput' },
-  { value: 'READY_FOR_ORDER', labelKey: 'productCollab.statusReadyForOrder' },
-  { value: 'ORDER_APPROVAL', labelKey: 'productCollab.statusOrderApproval' },
-  { value: 'ORDER_REGISTERED', labelKey: 'productCollab.statusOrderRegistered' },
+  { value: 'SAMPLE_TEST', labelKey: 'productCollab.statusSampleTest' },
+  { value: 'CONFIG_CONFIRM', labelKey: 'productCollab.statusConfigConfirm' },
+  { value: 'ORDER_PENDING', labelKey: 'productCollab.statusOrderPending' },
+  { value: 'INCOMING', labelKey: 'productCollab.statusIncoming' },
+  { value: 'IN_PRODUCTION', labelKey: 'productCollab.statusInProduction' },
+  { value: 'PRODUCTION_COMPLETE', labelKey: 'productCollab.statusProductionComplete' },
 ];
 
 const CATEGORY_OPTIONS: { value: '' | ProductCollabCategory; labelKey: string }[] = [

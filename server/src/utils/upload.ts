@@ -1055,14 +1055,30 @@ const productCollabStorage = multer.diskStorage({
   },
 });
 
+/** 이미지 전용 (제품 대표 이미지 등) */
 export const productCollabImageUpload = multer({
   storage: productCollabStorage,
   fileFilter: fileFilter,
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
+/** 스레드 첨부용: 모든 파일 형식 허용 */
+export const productCollabFileUpload = multer({
+  storage: productCollabStorage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
+
 export function getProductCollabImageUrl(relativePath: string): string {
   return `/uploads/${relativePath}`;
+}
+
+/** product-collab URL을 파일 시스템 절대 경로로 변환 (다운로드용) */
+export function getProductCollabFilePathFromUrl(urlPath: string): string {
+  const normalized = urlPath.replace(/^\/uploads\//, '').replace(/^\/?/, '');
+  if (!normalized.startsWith('product-collab/')) {
+    throw new Error('Invalid path');
+  }
+  return path.join(productCollabUploadDir, normalized.replace(/^product-collab\//, ''));
 }
 /**
  * 프로젝트 초기 이미지 저장 경로

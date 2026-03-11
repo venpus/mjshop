@@ -26,6 +26,7 @@ import {
   Folder,
   Shield,
   TrendingUp,
+  Calculator,
   MessageCircle,
   Sparkles,
   Package,
@@ -42,6 +43,7 @@ type PageType =
   | "inventory"
   | "purchase-orders"
   | "not-arrived-analysis"
+  | "cost-analysis"
   | "shipping-history"
   | "china-payment"
   | "members"
@@ -223,6 +225,21 @@ export function Sidebar({
                   >
                     <TrendingUp className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
                     {!isCollapsed && <span>{t('menu.notArrivedAnalysis')}</span>}
+                  </button>
+                )}
+                {/* 비용분석 (venpus 전용) */}
+                {user?.id === 'venpus' && (
+                  <button
+                    onClick={() => onPageChange("cost-analysis")}
+                    className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
+                      currentPage === "cost-analysis"
+                        ? "bg-purple-50 text-purple-600"
+                        : "text-gray-600 hover:bg-gray-50"
+                    }`}
+                    title={isCollapsed ? t('menu.costAnalysis') : undefined}
+                  >
+                    <Calculator className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
+                    {!isCollapsed && <span>{t('menu.costAnalysis')}</span>}
                   </button>
                 )}
                 {/* 패킹리스트 */}

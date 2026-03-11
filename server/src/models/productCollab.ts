@@ -3,17 +3,18 @@
  * 기존 시스템과 독립된 데이터 구조
  */
 
+/**
+ * 제품 진행 상태 (표기: 조사중, 샘플테스트, 구성확정중, 발주대기, 입고중, 생산중, 생산 완료, 취소)
+ */
 export const PRODUCT_COLLAB_STATUS = [
-  'REQUEST',
-  'RESEARCH',
-  'CANDIDATE_REVIEW',
-  'SAMPLE',
-  'MODEL_SELECT',
-  'SPEC_INPUT',
-  'ORDER_APPROVAL',
-  'ORDER_REGISTERED',
-  'READY_FOR_ORDER',
-  'COMPLETED',
+  'RESEARCH',           // 조사중
+  'SAMPLE_TEST',        // 샘플테스트
+  'CONFIG_CONFIRM',     // 구성확정중
+  'ORDER_PENDING',      // 발주대기
+  'INCOMING',           // 입고중
+  'IN_PRODUCTION',      // 생산중
+  'PRODUCTION_COMPLETE',// 생산 완료
+  'CANCELLED',          // 취소
 ] as const;
 
 export type ProductCollabStatus = (typeof PRODUCT_COLLAB_STATUS)[number];
@@ -47,6 +48,8 @@ export interface ProductCollabProduct {
   request_note: string | null;
   request_note_translated?: string | null;
   request_note_lang?: string | null;
+  request_links?: string[] | null;
+  request_image_urls?: string[] | null;
   last_activity_at: Date;
   created_at: Date;
   updated_at: Date;
@@ -69,6 +72,8 @@ export interface ProductCollabMessage {
   attachments?: ProductCollabAttachment[];
   mentions?: ProductCollabMention[];
   replies?: ProductCollabMessage[];
+  /** 로그인 사용자가 이 메시지에서 멘션된 경우 해당 태스크 정보 (스레드 확인 버튼용) */
+  current_user_task?: { task_id: number; completed_at: Date | null } | null;
 }
 
 export interface ProductCollabAttachment {
@@ -76,6 +81,7 @@ export interface ProductCollabAttachment {
   message_id: number;
   kind: 'image' | 'file';
   url: string;
+  original_filename?: string | null;
   display_order: number;
   created_at: Date;
 }
@@ -118,9 +124,14 @@ export interface ProductCollabProductListItem {
   assignee_name?: string | null;
   main_image_id: number | null;
   main_image_url?: string | null;
+  request_first_image_url?: string | null;
   price: string | null;
   last_activity_at: Date;
   next_action?: string | null;
+  /** 최신 스레드 메시지 본문 */
+  last_message_body?: string | null;
+  /** 최신 스레드 메시지의 멘션 목록 (이름 포함) */
+  last_message_mentions?: { user_id: string; user_name?: string | null }[];
 }
 
 export interface ProductCollabProductDetail extends ProductCollabProduct {
@@ -137,6 +148,8 @@ export interface CreateProductCollabProductDTO {
   /** 서비스에서 번역 후 설정. API에서는 보내지 않음 */
   request_note_translated?: string | null;
   request_note_lang?: string | null;
+  request_links?: string[] | null;
+  request_image_urls?: string[] | null;
   created_by?: string | null;
 }
 
@@ -154,6 +167,8 @@ export interface UpdateProductCollabProductDTO {
   request_note?: string | null;
   request_note_translated?: string | null;
   request_note_lang?: string | null;
+  request_links?: string[] | null;
+  request_image_urls?: string[] | null;
   updated_by?: string | null;
 }
 
@@ -163,7 +178,7 @@ export interface CreateMessageDTO {
   author_id: string;
   body?: string | null;
   tag?: MessageTag | null;
-  attachment_urls?: { kind: 'image' | 'file'; url: string }[];
+  attachment_urls?: { kind: 'image' | 'file'; url: string; original_filename?: string | null }[];
   mention_user_ids?: string[];
 }
 
@@ -208,4 +223,31 @@ export interface DashboardAllAssigneeTask {
 export interface DashboardStatusCount {
   status: string;
   count: number;
+}
+
+/** 내가 작성한 메시지를 멘션된 사람이 확인한 목록 (대시보드용) */
+export interface DashboardConfirmation {
+  task_id: number;
+  product_id: number;
+  product_name: string;
+  message_id: number;
+  assignee_id: string;
+  assignee_name: string | null;
+  completed_at: Date;
+  body: string | null;
+  body_translated?: string | null;
+}
+
+/** 내가 작성한 글에 달린 답글 (직접·중첩 모두, 대시보드용) */
+export interface DashboardReplyItem {
+  message_id: number;
+  product_id: number;
+  product_name: string;
+  parent_id: number;
+  author_id: string;
+  author_name: string | null;
+  body: string | null;
+  body_translated?: string | null;
+  created_at: Date;
+  depth: number;
 }
