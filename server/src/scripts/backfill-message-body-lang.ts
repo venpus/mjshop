@@ -10,15 +10,14 @@
  */
 
 import dotenv from 'dotenv';
+import type { RowDataPacket } from 'mysql2';
 import { pool } from '../config/database.js';
 import { detectSourceLanguage } from '../services/translationService.js';
 
 dotenv.config();
 
 async function main() {
-  const [rows] = await pool.execute<
-    { id: number; product_id: number; body: string | null }[]
-  >(
+  const [rows] = await pool.execute<RowDataPacket[]>(
     `SELECT id, product_id, body FROM product_collab_messages
      WHERE body_lang IS NULL AND body IS NOT NULL AND TRIM(COALESCE(body, '')) != ''`
   );
@@ -27,7 +26,7 @@ async function main() {
   let skipped = 0;
 
   for (const row of rows) {
-    const body = (row.body ?? '').trim();
+    const body = String(row.body ?? '').trim();
     if (!body) continue;
 
     const lang = detectSourceLanguage(body);
