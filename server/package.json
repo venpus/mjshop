@@ -11,7 +11,8 @@
     "lint": "eslint . --ext .ts",
     "type-check": "tsc --noEmit",
     "migrate": "tsx src/database/migrate.ts",
-    "migrate:status": "tsx src/database/migrate.ts status"
+    "migrate:status": "tsx src/database/migrate.ts status",
+    "backfill:body-lang": "tsx src/scripts/backfill-message-body-lang.ts"
   },
   "keywords": [],
   "author": "",

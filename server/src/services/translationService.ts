@@ -19,8 +19,8 @@ const OPENAI_MODEL = process.env.OPENAI_TRANSLATION_MODEL || 'gpt-4o-mini';
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 1500;
 
-/** 한글/중문 비율로 원문 언어 추정 (번역 방향 결정용) */
-function detectSourceLanguage(text: string): 'ko' | 'zh' | 'unknown' {
+/** 한글/중문 비율로 원문 언어 추정 (번역 방향 결정용). 스크립트에서도 사용 */
+export function detectSourceLanguage(text: string): 'ko' | 'zh' | 'unknown' {
   const t = text.replace(/\s/g, '');
   if (!t.length) return 'unknown';
   let korean = 0;
