@@ -18,6 +18,7 @@ router.get('/products/:productId/download', controller.downloadAttachment);
 router.get('/products/:id', controller.getProductById);
 router.post('/products', controller.createProduct);
 router.put('/products/:id', controller.updateProduct);
+router.delete('/products/:id', controller.deleteProduct);
 router.post(
   '/products/:id/upload',
   (req, res, next) => {

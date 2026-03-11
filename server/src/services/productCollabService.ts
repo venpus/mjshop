@@ -17,6 +17,8 @@ import type {
   DashboardConfirmation,
   DashboardReplyItem,
 } from '../models/productCollab.js';
+import { getProductCollabProductUploadDir } from '../utils/upload.js';
+import fs from 'fs';
 
 export class ProductCollabService {
   private repository: ProductCollabRepository;
@@ -169,5 +171,25 @@ export class ProductCollabService {
 
   async deleteProductImage(productId: number, imageId: number): Promise<boolean> {
     return this.repository.deleteProductImage(productId, imageId);
+  }
+
+  /** 진행중/취소 상태인 제품만 삭제 가능. DB 삭제 후 해당 제품 업로드 폴더 제거. */
+  async deleteProduct(id: number, currentStatus?: string | null): Promise<boolean> {
+    const allowedStatuses = ['RESEARCH', 'SAMPLE_TEST', 'CONFIG_CONFIRM', 'ORDER_PENDING', 'INCOMING', 'IN_PRODUCTION', 'CANCELLED'];
+    if (currentStatus != null && !allowedStatuses.includes(currentStatus)) {
+      return false;
+    }
+    const ok = await this.repository.deleteProduct(id);
+    if (ok) {
+      try {
+        const dir = getProductCollabProductUploadDir(id);
+        if (fs.existsSync(dir)) {
+          fs.rmSync(dir, { recursive: true });
+        }
+      } catch (e) {
+        console.error('Product collab upload dir remove failed:', e);
+      }
+    }
+    return ok;
   }
 }

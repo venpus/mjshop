@@ -1080,6 +1080,12 @@ export function getProductCollabFilePathFromUrl(urlPath: string): string {
   }
   return path.join(productCollabUploadDir, normalized.replace(/^product-collab\//, ''));
 }
+
+/** 제품별 업로드 디렉터리 경로 (제품 삭제 시 폴더 제거용) */
+export function getProductCollabProductUploadDir(productId: number): string {
+  return path.join(productCollabUploadDir, String(productId));
+}
+
 /**
  * 프로젝트 초기 이미지 저장 경로
  * uploads/projects/{project_id}/initial/{image_filename}

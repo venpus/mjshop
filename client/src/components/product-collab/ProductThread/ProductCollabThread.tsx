@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getProductById, updateProduct, uploadProductImages } from '../../../api/productCollabApi';
+import { getProductById, updateProduct, uploadProductImages, deleteProduct } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import type { ProductCollabProductDetail, ProductCollabMessage } from '../types';
 import { getProductCollabImageUrl } from '../utils/imageUrl';
@@ -27,6 +27,7 @@ export function ProductCollabThread() {
   const [savingRequestNote, setSavingRequestNote] = useState(false);
   const [requestNoteError, setRequestNoteError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const requestImageInputRef = useRef<HTMLInputElement>(null);
 
   const id = productId ? parseInt(productId, 10) : NaN;
@@ -113,7 +114,7 @@ export function ProductCollabThread() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <button
           type="button"
           onClick={() => navigate('/admin/product-collab/list')}
@@ -123,6 +124,28 @@ export function ProductCollabThread() {
         </button>
         <h1 className="text-lg font-semibold text-[#1F2937]">{product.name}</h1>
         <span className="text-xs text-[#6B7280]">{product.status}</span>
+        {product.status !== 'PRODUCTION_COMPLETE' && (
+          <button
+            type="button"
+            onClick={async () => {
+              if (!confirm(t('productCollab.deleteProductConfirm'))) return;
+              setDeleting(true);
+              try {
+                const res = await deleteProduct(product.id);
+                if (!res.success) throw new Error(res.error);
+                navigate('/admin/product-collab/list');
+              } catch (err) {
+                alert(err instanceof Error ? err.message : t('productCollab.deleteFailed'));
+              } finally {
+                setDeleting(false);
+              }
+            }}
+            disabled={deleting}
+            className="ml-auto text-sm px-3 py-1.5 text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50"
+          >
+            {deleting ? t('productCollab.processing') : t('productCollab.deleteProduct')}
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">

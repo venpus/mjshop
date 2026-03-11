@@ -159,6 +159,16 @@ export async function updateProduct(
   return { success: true, data: json.data };
 }
 
+export async function deleteProduct(id: number): Promise<ApiResponse<void>> {
+  const res = await fetch(`${API_BASE_URL}/product-collab/products/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) return { success: false, error: json.error || '제품 삭제 실패' };
+  return { success: true };
+}
+
 export async function createMessage(
   productId: number,
   body: {

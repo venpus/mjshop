@@ -143,6 +143,30 @@ export class ProductCollabController {
     }
   };
 
+  deleteProduct = async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ success: false, error: '유효하지 않은 제품 ID입니다.' });
+      }
+      const product = await this.service.getProductById(id, null);
+      if (!product) {
+        return res.status(404).json({ success: false, error: '제품을 찾을 수 없습니다.' });
+      }
+      if (product.status === 'PRODUCTION_COMPLETE') {
+        return res.status(400).json({ success: false, error: '생산 완료된 제품은 삭제할 수 없습니다.' });
+      }
+      const deleted = await this.service.deleteProduct(id, product.status ?? undefined);
+      if (!deleted) {
+        return res.status(400).json({ success: false, error: '제품을 삭제할 수 없습니다.' });
+      }
+      res.json({ success: true });
+    } catch (error: unknown) {
+      console.error('Product collab delete error:', error);
+      res.status(500).json({ success: false, error: '제품 삭제 중 오류가 발생했습니다.' });
+    }
+  };
+
   createMessage = async (req: Request, res: Response) => {
     try {
       const productId = parseInt(req.params.productId, 10);

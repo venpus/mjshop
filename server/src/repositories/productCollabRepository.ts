@@ -830,4 +830,13 @@ export class ProductCollabRepository {
     ]);
     return true;
   }
+
+  /** 제품(및 CASCADE된 메시지·태스크·이미지·첨부·멘션) 삭제. 진행중/취소만 허용할지 여부는 서비스에서 검사. */
+  async deleteProduct(id: number): Promise<boolean> {
+    const [res] = await pool.execute<ResultSetHeader>(
+      'DELETE FROM product_collab_products WHERE id = ?',
+      [id]
+    );
+    return res.affectedRows > 0;
+  }
 }
