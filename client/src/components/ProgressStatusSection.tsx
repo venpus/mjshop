@@ -38,7 +38,7 @@ export function ProgressStatusSection({
   const totalWorkCount = workItems.length;
   
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
       <div className="flex items-center gap-2 bg-gradient-to-r from-cyan-50 to-sky-50 px-4 py-2 rounded-lg border border-cyan-200 mb-4">
         <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-sky-500 rounded-lg flex items-center justify-center shadow-md">
           <Factory className="w-4 h-4 text-white" />

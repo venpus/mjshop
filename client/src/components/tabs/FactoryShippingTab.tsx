@@ -59,16 +59,16 @@ export function FactoryShippingTab({
   return (
     <div className="space-y-6">
       {/* Factory Status */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <Factory className="w-6 h-6 text-gray-700" />
-            <h3 className="text-xl font-bold text-gray-900">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
+            <Factory className="w-5 h-5 md:w-6 md:h-6 text-gray-700 shrink-0" />
+            <h3 className="text-lg md:text-xl font-bold text-gray-900">
               업체 출고 상태
             </h3>
             {(factoryShipments.length > 0 ||
               returnExchangeItems.length > 0) && (
-              <span className="text-lg text-gray-600">
+              <span className="text-sm md:text-lg text-gray-600">
                 (총 입고수량:{" "}
                 <span className="font-semibold text-blue-600">
                   {(
@@ -102,29 +102,29 @@ export function FactoryShippingTab({
         </div>
 
         {/* 출고 항목 추가 버튼 */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 shrink-0">
           {onFactoryToWarehouse && (
             <button
               onClick={onFactoryToWarehouse}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              className="flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
             >
-              <Truck className="w-4 h-4" />
-              <span>공장→물류창고</span>
+              <Truck className="w-3.5 h-3.5 md:w-4 md:h-4" />
+              <span>공장→물류</span>
             </button>
           )}
           <button
             onClick={onAddFactoryShipment}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
           >
-            <Plus className="w-4 h-4" />
-            <span>출고 항목 추가</span>
+            <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            <span>출고 추가</span>
           </button>
           <button
             onClick={onAddReturnExchangeItem}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+            className="flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
           >
-            <Plus className="w-4 h-4" />
-            <span>반품/교환 추가</span>
+            <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            <span>반품/교환</span>
           </button>
         </div>
       </div>

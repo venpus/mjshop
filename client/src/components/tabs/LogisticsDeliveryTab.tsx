@@ -111,10 +111,10 @@ export function LogisticsDeliveryTab({
   return (
     <div className="space-y-6">
       {/* 연관 패킹리스트 목록 - 상단에 먼저 표시 */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Package className="w-5 h-5 text-orange-600" />
-          <h3 className="text-lg font-bold text-gray-900">연관 패킹리스트</h3>
+          <Package className="w-5 h-5 text-orange-600 shrink-0" />
+          <h3 className="text-base md:text-lg font-bold text-gray-900">연관 패킹리스트</h3>
         </div>
 
         {isLoadingPackingLists ? (
@@ -199,9 +199,9 @@ export function LogisticsDeliveryTab({
       </div>
 
       {/* 포장 코드 및 날짜 입력 */}
-      <div className="bg-orange-50 p-5 rounded-lg border border-orange-200">
-        <div className="grid grid-cols-12 gap-6 items-end">
-          <div className="col-span-5">
+      <div className="bg-orange-50 p-4 md:p-5 rounded-lg border border-orange-200">
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 md:gap-6 items-end">
+          <div className="sm:col-span-5">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               포장 코드
             </label>
@@ -213,7 +213,7 @@ export function LogisticsDeliveryTab({
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
-          <div className="col-span-5">
+          <div className="sm:col-span-5">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               날짜
             </label>
@@ -224,7 +224,7 @@ export function LogisticsDeliveryTab({
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
-          <div className="col-span-2">
+          <div className="sm:col-span-2">
             <button
               onClick={onAddDeliverySet}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
@@ -239,10 +239,10 @@ export function LogisticsDeliveryTab({
       {/* 배송 세트 목록 */}
       <div className="space-y-6">
         {(deliverySets || []).map((set) => (
-          <div key={set.id} className="bg-white border-2 border-orange-200 rounded-lg p-5">
+          <div key={set.id} className="bg-white border-2 border-orange-200 rounded-lg p-4 md:p-5">
             {/* 헤더: 포장 코드와 날짜 */}
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-orange-200">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 pb-3 border-b border-orange-200">
+              <div className="flex flex-wrap items-center gap-3 md:gap-4">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-gray-600">포장 코드:</span>
                   <span className="px-3 py-1 bg-orange-100 text-orange-800 rounded font-semibold">
@@ -277,7 +277,8 @@ export function LogisticsDeliveryTab({
                 </button>
               </div>
               
-              <table className="w-full border-collapse border border-gray-300 text-xs">
+              <div className="overflow-x-auto -mx-1">
+              <table className="w-full border-collapse border border-gray-300 text-xs min-w-[600px]">
                 <thead className="bg-gray-100">
                   <tr>
                     <th className="border border-gray-300 px-2 py-1.5 text-left">종</th>
@@ -380,6 +381,7 @@ export function LogisticsDeliveryTab({
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
 
             {/* 물류 정보 영역 */}
@@ -395,7 +397,8 @@ export function LogisticsDeliveryTab({
                 </button>
               </div>
               
-              <table className="w-full border-collapse border border-gray-300 text-xs">
+              <div className="overflow-x-auto -mx-1">
+              <table className="w-full border-collapse border border-gray-300 text-xs min-w-[500px]">
                 <thead className="bg-gray-100">
                   <tr>
                     <th className="border border-gray-300 px-2 py-1.5 text-left">송장번호</th>
@@ -518,6 +521,7 @@ export function LogisticsDeliveryTab({
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         ))}

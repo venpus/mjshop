@@ -39,18 +39,18 @@ export function ProcessingPackagingTab({
   return (
     <div className="space-y-4">
       {/* Work Status & Add Button */}
-      <div className="flex items-center justify-between bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-200">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 md:p-4 border border-purple-200">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 min-w-0">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center shadow-md">
-              <Wrench className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center shadow-md shrink-0">
+              <Wrench className="w-4 h-4 md:w-5 md:h-5 text-white" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900">
+            <h3 className="text-base md:text-xl font-bold text-gray-900">
               가공/포장 작업
             </h3>
             {/* 작업 항목 개수 배지 */}
             {workItems.length > 0 && (
-              <span className="inline-flex items-center justify-center px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full text-sm font-bold shadow-md">
+              <span className="inline-flex items-center justify-center px-2 py-0.5 md:px-3 md:py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full text-xs md:text-sm font-bold shadow-md">
                 {workItems.length}개
               </span>
             )}
@@ -58,7 +58,7 @@ export function ProcessingPackagingTab({
 
           {/* 작업 상태 배지 */}
           <span
-            className={`inline-flex px-4 py-1.5 rounded-full text-sm font-bold shadow-sm ${
+            className={`inline-flex px-3 py-1 md:px-4 md:py-1.5 rounded-full text-xs md:text-sm font-bold shadow-sm ${
               workStatus === "완료"
                 ? "bg-green-500 text-white"
                 : workStatus === "작업중"
@@ -70,7 +70,7 @@ export function ProcessingPackagingTab({
           </span>
 
           {/* 작업 일정 */}
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             {/* 작업시작일 */}
             <div className="flex items-center gap-1">
               <label className="text-gray-600">
@@ -105,7 +105,7 @@ export function ProcessingPackagingTab({
         </div>
 
         {/* 사진 추가 버튼 */}
-        <label className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer transition-colors">
+        <label className="flex items-center justify-center gap-1.5 md:gap-2 px-3 py-2 md:px-4 md:py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer transition-colors text-sm shrink-0">
           <Plus className="w-4 h-4" />
           <span>작업 항목 추가</span>
           <input

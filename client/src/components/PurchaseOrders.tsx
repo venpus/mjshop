@@ -192,6 +192,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const [isLoadingMoreMobile, setIsLoadingMoreMobile] = useState(false);
   const [mobileDisplayCount, setMobileDisplayCount] = useState(20);
   const mobileSentinelRef = useRef<HTMLDivElement>(null);
+  /** 모바일 무필터 첫 로드 중복 방지 (검색/필터 변경 시 리셋) */
+  const mobileInitialLoadStartedRef = useRef(false);
 
   // 필터 유지 상태에서 페이징 시 불필요한 API 재호출 방지: searchTerm/filters 변경 시에만 재요청
   const prevSearchTermRef = useRef<string | null>(null);
@@ -444,20 +446,26 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
   // 검색/필터 변경 시 모바일 무한스크롤 상태 초기화
   useEffect(() => {
+    mobileInitialLoadStartedRef.current = false;
     setMobileOrders([]);
     setMobilePage(1);
     setHasMoreMobile(true);
     setMobileDisplayCount(20);
   }, [searchTerm, filters]);
 
-  // 필터 없을 때 모바일: 첫 데이터는 purchaseOrders와 동기화 (데스크톱과 동일 1페이지)
+  // 필터 없을 때 모바일: 첫 데이터는 20개 단위 1페이지 직접 로드 (데스크 15개와 섞이면 16~20번 누락 방지)
   useEffect(() => {
-    if (!hasActiveStatusFilters && mobileOrders.length === 0 && purchaseOrders.length > 0 && !isLoading) {
-      setMobileOrders([...purchaseOrders]);
-      setMobilePage(2);
-      setHasMoreMobile(totalItems > purchaseOrders.length);
-    }
-  }, [hasActiveStatusFilters, purchaseOrders.length, totalItems, isLoading]);
+    if (hasActiveStatusFilters || mobileOrders.length > 0 || mobileInitialLoadStartedRef.current) return;
+    mobileInitialLoadStartedRef.current = true;
+    loadPurchaseOrdersPage(1)
+      .then(({ orders, total }) => {
+        setMobileOrders(orders);
+        setMobilePage(2);
+        setHasMoreMobile(total > orders.length);
+      })
+      .catch(() => setHasMoreMobile(false))
+      .finally(() => { mobileInitialLoadStartedRef.current = false; });
+  }, [hasActiveStatusFilters, mobileOrders.length, loadPurchaseOrdersPage]);
 
   // 모바일용 목록 소스 (필터 있으면 슬라이스, 없으면 누적 목록)
   const mobileOrdersSource = hasActiveStatusFilters
@@ -797,39 +805,35 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   return (
     <div className="p-4 md:p-8 min-h-[1080px]">
       {/* 모바일: 상단 컴팩트·스티키 */}
-      <div className="block md:hidden sticky top-0 z-10 bg-gray-50 border-b border-gray-200 -mx-4 px-4 pt-3 pb-3 mb-3">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <h2 className="text-base font-semibold text-gray-900 truncate">발주 관리</h2>
-          <CreatePurchaseOrderButton />
-        </div>
-        <div className="flex gap-2 mb-2">
+      {/* 모바일: 상단 컴팩트·스티키 (검색/필터 1줄, 컨펌/생성 1줄) */}
+      <div className="block md:hidden sticky top-0 z-10 bg-gray-50 border-b border-gray-200 -mx-4 px-4 pt-2 pb-2 mb-2">
+        <div className="flex items-center gap-1.5 mb-1.5">
           <div className="flex-1 min-w-0">
             <SearchBar
               value={inputSearchTerm}
               onChange={handleSearchInputChange}
               onKeyDown={handleSearchKeyDown}
-              placeholder="발주번호, 공급업체명, 상품명 검색..."
+              placeholder="검색..."
+              className="[&_input]:py-1.5 [&_input]:text-sm"
             />
           </div>
           <button
             onClick={handleSearch}
-            className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium shrink-0"
+            className="px-2.5 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm shrink-0"
           >
             검색
           </button>
-        </div>
-        <div className="flex gap-2">
-          <div className="relative">
+          <div className="relative shrink-0">
             <button
               onClick={() => setIsFilterOpen(!isFilterOpen)}
-              className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg transition-colors text-sm ${
+              className={`flex items-center gap-1 px-2.5 py-1.5 border rounded-lg transition-colors text-sm ${
                 activeFilterCount > 0
                   ? 'border-purple-600 bg-purple-50 text-purple-700'
                   : 'border-gray-300 bg-white hover:bg-gray-50'
               }`}
             >
               <Filter className="w-4 h-4" />
-              <span>필터{activeFilterCount > 0 ? ` ${activeFilterCount}` : ''}</span>
+              <span>{activeFilterCount > 0 ? activeFilterCount : '필터'}</span>
             </button>
             {isFilterOpen && (
               <div className="absolute top-full left-0 mt-2 right-0 max-w-[calc(100vw-2rem)] w-[320px] bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-y-auto">
@@ -901,16 +905,19 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
               </div>
             )}
           </div>
+        </div>
+        <div className="flex items-center gap-2">
           <button
             onClick={handleConfirmOrders}
             disabled={selectedOrders.size === 0}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors text-sm shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors text-sm ${
               selectedOrders.size > 0 ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
-            <CheckSquare className="w-4 h-4" />
-            <span>컨펌{selectedOrders.size > 0 ? ` ${selectedOrders.size}` : ''}</span>
+            <CheckSquare className="w-4 h-4 shrink-0" />
+            <span>발주 컨펌{selectedOrders.size > 0 ? ` ${selectedOrders.size}` : ''}</span>
           </button>
+          <CreatePurchaseOrderButton className="!px-2.5 !py-1.5 !text-sm shrink-0" />
         </div>
       </div>
 

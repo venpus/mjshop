@@ -191,58 +191,81 @@ export function ProductInfoSection({
     }
   };
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 rounded-lg border border-blue-200">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center shadow-md">
-              <Package className="w-4 h-4 text-white" />
-            </div>
-            {isEditable ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={productName}
-                  onChange={(e) => onProductNameChange?.(e.target.value)}
-                  placeholder="상품명을 입력하세요"
-                  className="text-xl font-bold text-blue-600 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[200px]"
-                />
-                <span className="text-xl font-bold text-gray-600">({poNumber})</span>
-              </div>
-            ) : (
-              <span className="text-xl font-bold text-gray-900">
-                {productName || '(상품명 없음)'} ({poNumber})
-              </span>
-            )}
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
+      {/* 모바일 전용: 제품명 한 줄로 전체 표시 */}
+      <div className="md:hidden mb-2 w-full min-w-0">
+        <div className="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-2 rounded-lg border border-blue-200 w-full min-w-0">
+          <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center shadow-md shrink-0">
+            <Package className="w-3.5 h-3.5 text-white" />
           </div>
+          {isEditable ? (
+            <input
+              type="text"
+              value={productName}
+              onChange={(e) => onProductNameChange?.(e.target.value)}
+              placeholder="상품명을 입력하세요"
+              className="flex-1 min-w-0 text-sm font-bold text-blue-600 px-2 py-1.5 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            />
+          ) : (
+            <span className="flex-1 min-w-0 text-sm font-bold text-gray-900 overflow-x-auto whitespace-nowrap block">
+              {productName || '(상품명 없음)'} ({poNumber})
+            </span>
+          )}
+          {isEditable && <span className="text-sm font-bold text-gray-600 shrink-0">({poNumber})</span>}
+        </div>
+      </div>
 
-          {/* 사진첩 버튼 */}
-          <button
-            onClick={onPhotoGalleryClick}
-            className="flex items-center gap-2 px-4 py-3 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg border border-purple-200 transition-colors"
-            title="사진첩"
-          >
-            <Images className="w-5 h-5" />
-            <span className="font-semibold">사진첩</span>
-          </button>
-          {/* 패킹 리스트 검색 (새 탭에서 이 발주 관련 패킹리스트만 보기) */}
-          {onViewPackingListClick && (
-            <button
-              type="button"
-              onClick={onViewPackingListClick}
-              className="flex items-center gap-2 px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 transition-colors"
-              title="패킹리스트에서 이 발주 관련 목록 보기"
-            >
-              <Search className="w-5 h-5" />
-              <span className="font-semibold">패킹 리스트 검색</span>
-            </button>
+      {/* 버튼·발주컨펌 행 (모바일: 사진첩·패킹리스트·발주컨펌 한 줄 / 데스크톱: 제품명+버튼+컨펌+취소) */}
+      <div className="flex flex-nowrap items-center gap-1.5 md:flex-row md:flex-wrap md:gap-3 min-w-0 mb-4 overflow-x-auto md:overflow-visible">
+        {/* 데스크톱 전용: 제품명 박스 */}
+        <div className="hidden md:flex items-center gap-2 md:gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 rounded-lg border border-blue-200 min-w-0 flex-1 md:flex-initial">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center shadow-md shrink-0">
+            <Package className="w-4 h-4 text-white" />
+          </div>
+          {isEditable ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <input
+                type="text"
+                value={productName}
+                onChange={(e) => onProductNameChange?.(e.target.value)}
+                placeholder="상품명을 입력하세요"
+                className="text-xl font-bold text-blue-600 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[200px]"
+              />
+              <span className="text-xl font-bold text-gray-600 shrink-0">({poNumber})</span>
+            </div>
+          ) : (
+            <span className="text-xl font-bold text-gray-900 truncate">
+              {productName || '(상품명 없음)'} ({poNumber})
+            </span>
           )}
         </div>
+
+        {/* 사진첩 버튼 */}
+        <button
+          onClick={onPhotoGalleryClick}
+          className="flex items-center gap-1 md:gap-2 px-2 py-1.5 md:px-4 md:py-3 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg border border-purple-200 transition-colors text-xs md:text-base shrink-0"
+          title="사진첩"
+        >
+          <Images className="w-3.5 h-3.5 md:w-5 md:h-5 shrink-0" />
+          <span className="font-semibold whitespace-nowrap">사진첩</span>
+        </button>
+        {/* 패킹 리스트 검색 */}
+        {onViewPackingListClick && (
+          <button
+            type="button"
+            onClick={onViewPackingListClick}
+            className="flex items-center gap-1 md:gap-2 px-2 py-1.5 md:px-4 md:py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 transition-colors text-xs md:text-base shrink-0"
+            title="패킹리스트에서 이 발주 관련 목록 보기"
+          >
+            <Search className="w-3.5 h-3.5 md:w-5 md:h-5 shrink-0" />
+            <span className="font-semibold whitespace-nowrap">패킹리스트</span>
+          </button>
+        )}
 
         {/* 발주 컨펌 체크박스 (C0 레벨에서는 숨김) */}
         {userLevel !== 'C0: 한국Admin' && (
           <label
-            className={`flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer transition-all ${
+            className={`flex items-center gap-1.5 md:gap-3 px-2 py-1.5 md:px-4 md:py-2 rounded-lg cursor-pointer transition-all shrink-0 ${
               isOrderConfirmed
                 ? "bg-green-100 border-2 border-green-500"
                 : "bg-orange-100 border-2 border-orange-500"
@@ -253,33 +276,33 @@ export function ProductInfoSection({
               checked={isOrderConfirmed}
               onChange={(e) => onOrderConfirmedChange(e.target.checked)}
               disabled={orderStatus === '취소됨'}
-              className="w-5 h-5 cursor-pointer accent-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-3.5 h-3.5 md:w-5 md:h-5 cursor-pointer accent-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <span
-              className={`font-semibold ${
+              className={`font-semibold text-xs md:text-base whitespace-nowrap ${
                 isOrderConfirmed ? "text-green-800" : "text-orange-800"
               }`}
             >
-              {isOrderConfirmed ? "발주 컨펌" : "발주 컨펌 대기"}
+              {isOrderConfirmed ? "발주 컨펌" : "컨펌 대기"}
             </span>
           </label>
         )}
         
-        {/* 취소 버튼 (C0 레벨에서는 숨김) */}
+        {/* 취소 버튼 (C0 레벨에서는 숨김, 모바일에서는 숨김) */}
         {userLevel !== 'C0: 한국Admin' && orderStatus !== '취소됨' && (
           <button
             onClick={onCancelOrder}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold"
+            className="hidden md:inline-flex px-3 py-1.5 md:px-4 md:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm shrink-0"
           >
             취소
           </button>
         )}
       </div>
 
-      <div className="flex gap-6">
-        <div className="relative">
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+        <div className="relative shrink-0">
           <div
-            className={`w-32 h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 transition-opacity relative group ${
+            className={`w-24 h-24 md:w-32 md:h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 transition-opacity relative group ${
               productImage ? 'cursor-pointer hover:opacity-90' : ''
             }`}
             onClick={handleImageClick}
@@ -321,12 +344,12 @@ export function ProductInfoSection({
           </div>
         </div>
 
-        <div className="flex-1 grid grid-cols-2 gap-6">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           {/* 상품 정보 영역 */}
           <div className="bg-gray-50 rounded-lg p-4 space-y-3">
             <div>
               {/* 첫 번째 줄: 사이즈와 무게 */}
-              <div className="flex items-center gap-6 mb-4">
+              <div className="flex flex-wrap items-center gap-4 md:gap-6 mb-4">
                 <div className="flex items-center gap-2">
                   <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Ruler className="w-5 h-5 text-purple-600" />
@@ -368,7 +391,7 @@ export function ProductInfoSection({
               </div>
               
               {/* 두 번째 줄: 소포장과 포장박스 사이즈 */}
-              <div className="flex items-center gap-6">
+              <div className="flex flex-wrap items-center gap-4 md:gap-6">
                 <div className="flex items-center gap-2">
                   <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Box className="w-5 h-5 text-green-600" />

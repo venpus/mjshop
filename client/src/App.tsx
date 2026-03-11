@@ -169,47 +169,47 @@ function AdminLayout() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Header */}
-        <div className="shrink-0 bg-white border-b border-gray-200 px-4 py-3 lg:px-8 lg:py-4 flex items-center justify-between">
+        <div className="shrink-0 bg-white border-b border-gray-200 px-2 py-2 sm:px-4 sm:py-3 lg:px-8 lg:py-4 flex items-center gap-1 sm:gap-2 min-w-0">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors lg:hidden"
+            className="shrink-0 p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 transition-colors lg:hidden"
           >
             {isSidebarOpen ? (
-              <X className="w-6 h-6 text-gray-700" />
+              <X className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
             ) : (
-              <Menu className="w-6 h-6 text-gray-700" />
+              <Menu className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
             )}
           </button>
 
-          <div className="flex-1"></div>
+          <div className="flex-1 min-w-0" />
 
           {/* User Info and Logout */}
-          <div className="flex items-center gap-4 mr-4">
+          <div className="flex items-center gap-1 sm:gap-2 lg:gap-4 shrink-0 min-w-0">
             {user && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg">
-                <User className="w-4 h-4 text-gray-600" />
-                <span className="text-sm text-gray-700 font-medium">{user.name}</span>
-                <span className="text-xs text-gray-500">({user.id})</span>
+              <div className="flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 bg-gray-100 rounded-lg min-w-0 max-w-[40vw] sm:max-w-none">
+                <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 shrink-0" />
+                <span className="text-xs sm:text-sm text-gray-700 font-medium truncate" title={user.name}>{user.name}</span>
+                <span className="text-[10px] sm:text-xs text-gray-500 truncate shrink-0" title={user.id}>({user.id})</span>
               </div>
             )}
             <button
               onClick={logout}
-              className="flex items-center gap-2 px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
               title={t('common.logout')}
             >
-              <LogOut className="w-4 h-4" />
-              <span className="text-sm font-medium">{t('common.logout')}</span>
+              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm font-medium whitespace-nowrap">{t('common.logout')}</span>
             </button>
           </div>
 
           {/* Language Dropdown */}
-          <div className="relative">
+          <div className="relative shrink-0">
             <button
               onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-1 sm:gap-2 px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg hover:bg-gray-100 transition-colors"
             >
-              <Globe className="w-5 h-5 text-gray-700" />
-              <span className="text-sm text-gray-700">{languages[language].flag} {languages[language].name}</span>
+              <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 shrink-0" />
+              <span className="text-xs sm:text-sm text-gray-700 whitespace-nowrap">{languages[language].flag} {languages[language].name}</span>
             </button>
 
             {isLanguageDropdownOpen && (

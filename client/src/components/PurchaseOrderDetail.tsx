@@ -1150,7 +1150,7 @@ export function PurchaseOrderDetail({
   // 로딩 중일 때 로딩 화면 표시 (새 발주가 아닌 경우에만)
   if (!isNewOrder && isLoading) {
     return (
-      <div className="p-6 min-h-[1080px] flex items-center justify-center">
+      <div className="p-4 md:p-6 min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
           <p className="text-gray-600">발주 정보를 불러오는 중...</p>
@@ -1205,7 +1205,7 @@ export function PurchaseOrderDetail({
   // 새 발주인 경우 빈 폼 화면 표시
   if (isNewOrder) {
     return (
-      <div className="p-6 min-h-[1080px]">
+      <div className="p-4 md:p-6 min-h-0 pb-8">
         <HeaderSection
           onBack={handleBackWithConfirm}
           onSave={() => handleSave(true)}
@@ -1254,13 +1254,13 @@ export function PurchaseOrderDetail({
           paymentStatus="미결제"
         />
 
-        <div className="grid grid-cols-[2fr_1fr] gap-6 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4 md:gap-6 mt-4 md:mt-6">
         {/* Left Column - Main Info */}
         <div className="space-y-6">
 
           {/* Cost Breakdown - Editable */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
               <div className="flex items-center gap-2 bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-2 rounded-lg border border-green-200">
                 <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center shadow-md">
                   <DollarSign className="w-4 h-4 text-white" />
@@ -1427,7 +1427,7 @@ export function PurchaseOrderDetail({
 
   // 기존 발주 화면
   return (
-    <div className="p-6 min-h-[1080px]">
+    <div className="p-4 md:p-6 min-h-0 pb-8">
       <HeaderSection
         onBack={handleBackWithConfirm}
         onSave={() => handleSave(true)}
@@ -1481,12 +1481,12 @@ export function PurchaseOrderDetail({
         paymentStatus={order!.paymentStatus}
       />
 
-      <div className="grid grid-cols-[2fr_1fr] gap-6 mt-6">
+      <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4 md:gap-6 mt-4 md:mt-6">
         {/* Left Column - Main Info */}
         <div className="space-y-6">
           {/* Cost Breakdown - Editable */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
               <div className="flex items-center gap-2 bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-2 rounded-lg border border-green-200">
                 <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center shadow-md">
                   <DollarSign className="w-4 h-4 text-white" />

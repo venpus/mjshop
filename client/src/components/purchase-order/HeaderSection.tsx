@@ -117,7 +117,7 @@ export function HeaderSection({
         lastSavedAt={lastSavedAt}
       />
 
-      <div className="grid grid-cols-[2fr_1fr] gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4 md:gap-6">
         {/* Left Column - Main Info */}
         <div className="space-y-6">
           {/* Product Information */}
@@ -153,8 +153,8 @@ export function HeaderSection({
           />
         </div>
 
-        {/* Right Column - Status */}
-        <div className="space-y-6">
+        {/* Right Column - Status (모바일에서는 숨김) */}
+        <div className="hidden md:block space-y-6">
           {/* Status Information */}
           <ProgressStatusSection
             currentFactoryStatus={currentFactoryStatus}
