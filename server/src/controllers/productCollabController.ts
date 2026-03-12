@@ -125,6 +125,7 @@ export class ProductCollabController {
         moq: req.body.moq,
         lead_time: req.body.lead_time,
         packaging: req.body.packaging,
+        inner_packaging: req.body.inner_packaging,
         sku_count: req.body.sku_count,
         request_note: req.body.request_note !== undefined ? (req.body.request_note?.trim() || null) : undefined,
         request_links: req.body.request_links !== undefined

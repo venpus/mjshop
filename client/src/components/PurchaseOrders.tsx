@@ -26,6 +26,7 @@ import {
   calculatePackingListShippingCost
 } from '../utils/purchaseOrderCalculations';
 import { getShippingCostByPurchaseOrder } from '../api/packingListApi';
+import { useForceMobileLayout } from '../hooks/useForceMobileLayout';
 
 interface PurchaseOrdersProps {
   onViewDetail: (orderId: string, tab?: 'cost' | 'factory' | 'work' | 'delivery', autoSave?: boolean) => void;
@@ -791,6 +792,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   // 활성 필터 개수
   const activeFilterCount = Object.values(filters).reduce((sum, arr) => sum + arr.length, 0);
 
+  const forceMobileLayout = useForceMobileLayout();
+
   if (isLoading) {
     return (
       <div className="p-8 min-h-[1080px] flex items-center justify-center">
@@ -805,25 +808,25 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   return (
     <div className="p-4 md:p-8 min-h-[1080px]">
       {/* 모바일: 상단 컴팩트·스티키 */}
-      {/* 모바일: 상단 컴팩트·스티키 (검색/필터 1줄, 컨펌/생성 1줄) */}
-      <div className="block md:hidden sticky top-0 z-10 bg-gray-50 border-b border-gray-200 -mx-4 px-4 pt-2 pb-2 mb-2">
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <div className="flex-1 min-w-0">
+      {/* 모바일: 상단 컴팩트·스티키 (검색/필터 1줄, 컨펌/생성 1줄) - 앱 WebView에서 배경 투명 방지 */}
+      <div className={`${forceMobileLayout ? 'block' : 'block md:hidden'} sticky top-0 z-10 bg-white border-b border-gray-200 -mx-4 px-4 pt-2 pb-2 mb-2 shadow-sm`}>
+        <div className="flex items-center gap-1.5 mb-1.5 min-h-[2.25rem]">
+          <div className="flex-1 min-w-0 flex items-stretch">
             <SearchBar
               value={inputSearchTerm}
               onChange={handleSearchInputChange}
               onKeyDown={handleSearchKeyDown}
               placeholder="검색..."
-              className="[&_input]:py-1.5 [&_input]:text-sm"
+              className="[&_input]:py-1.5 [&_input]:text-sm [&_input]:h-9 w-full min-w-0"
             />
           </div>
           <button
             onClick={handleSearch}
-            className="px-2.5 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm shrink-0"
+            className="px-2.5 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm shrink-0 flex-shrink-0"
           >
             검색
           </button>
-          <div className="relative shrink-0">
+          <div className="relative shrink-0 flex-shrink-0">
             <button
               onClick={() => setIsFilterOpen(!isFilterOpen)}
               className={`flex items-center gap-1 px-2.5 py-1.5 border rounded-lg transition-colors text-sm ${
@@ -906,23 +909,23 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={handleConfirmOrders}
             disabled={selectedOrders.size === 0}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors text-sm ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors text-sm shrink-0 min-w-[6.5rem] ${
               selectedOrders.size > 0 ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
             <CheckSquare className="w-4 h-4 shrink-0" />
-            <span>발주 컨펌{selectedOrders.size > 0 ? ` ${selectedOrders.size}` : ''}</span>
+            <span className="whitespace-nowrap">발주 컨펌{selectedOrders.size > 0 ? ` ${selectedOrders.size}` : ''}</span>
           </button>
           <CreatePurchaseOrderButton className="!px-2.5 !py-1.5 !text-sm shrink-0" />
         </div>
       </div>
 
       {/* 데스크톱: 제목 + 설명 + 생성 버튼 */}
-      <div className="hidden md:flex mb-8 items-start justify-between">
+      <div className={`${forceMobileLayout ? 'hidden' : 'hidden md:flex'} mb-8 items-start justify-between`}>
         <div>
           <h2 className="text-gray-900 mb-2">발주 관리</h2>
           <p className="text-gray-600">중국 제조사에 발주한 상품을 확인하고 제조 상태를 관리할 수 있습니다</p>
@@ -931,7 +934,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       </div>
 
       {/* 데스크톱: Filters */}
-      <div className="hidden md:flex flex-col md:flex-row gap-4 mb-6">
+      <div className={`${forceMobileLayout ? 'hidden' : 'hidden md:flex'} flex-col md:flex-row gap-4 mb-6`}>
         <div className="flex gap-2">
           <SearchBar
             value={inputSearchTerm}
@@ -1056,7 +1059,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             <CheckSquare className="w-5 h-5" />
             <span>발주 컨펌{selectedOrders.size > 0 ? ` (${selectedOrders.size})` : ''}</span>
           </button>
-          <button className="hidden md:flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          <button className={`${forceMobileLayout ? 'hidden' : 'hidden md:flex'} items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors`}>
             <Download className="w-5 h-5" />
             <span>내보내기</span>
           </button>
@@ -1064,7 +1067,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       </div>
 
       {/* Purchase Orders Table (desktop) */}
-      <div className="hidden md:block bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className={`${forceMobileLayout ? 'hidden' : 'hidden md:block'} bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden`}>
         {/* 상단 페이징 */}
         <TablePagination
           currentPage={currentPage}
@@ -1406,7 +1409,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       </div>
 
       {/* 모바일: 카드 리스트 (풀 너비, 단일 페이지 스크롤) */}
-      <div className="block md:hidden px-1">
+      <div className={`${forceMobileLayout ? 'block' : 'block md:hidden'} px-1`}>
         <PurchaseOrderCardList
           rowDataList={rowDataListForMobile}
           getProductDisplayName={(po) =>

@@ -126,6 +126,7 @@ export interface ProductCollabProductDetail extends ProductCollabProductListItem
   moq: string | null;
   lead_time: string | null;
   packaging: string | null;
+  inner_packaging: string | null;
   sku_count: string | null;
   request_note: string | null;
   request_note_translated?: string | null;

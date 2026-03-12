@@ -36,6 +36,7 @@ import { useAuth } from './contexts/AuthContext';
 import { usePermission } from './contexts/PermissionContext';
 import { LanguageProvider, useLanguage, Language } from './contexts/LanguageContext';
 import { PackingListUnsavedProvider, usePackingListUnsaved } from './contexts/PackingListUnsavedContext';
+import { useForceMobileLayout } from './hooks/useForceMobileLayout';
 
 /** 권한 체크 래퍼 — 반드시 모듈 레벨에 두어 매 렌더마다 새 참조가 되지 않게 함. 그렇지 않으면 Route 자식(ShippingHistory 등)이 매번 리마운트되어 state가 초기화됨. */
 function PermissionCheckWrapper({
@@ -106,6 +107,8 @@ function AdminLayout() {
   const currentPage = getCurrentPage();
   const { hasUnsavedChanges: packingListHasUnsaved } = usePackingListUnsaved();
 
+  const useMobileLayout = useForceMobileLayout();
+
   // 경로가 변경될 때 패킹리스트 또는 발주관리면 사이드바 접기, 아니면 펼치기
   useEffect(() => {
     setIsSidebarCollapsed(isCollapsedPage);
@@ -141,11 +144,16 @@ function AdminLayout() {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - 앱/모바일일 때는 닫혀 있으면 화면 밖으로 밀어서 완전히 숨김 */}
       <div
-        className={`fixed lg:static inset-y-0 left-0 z-30 transform transition-transform duration-300 ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
+        className={`fixed inset-y-0 left-0 z-30 transform transition-transform duration-300 ${
+          useMobileLayout ? '' : 'lg:static lg:translate-x-0'
+        } ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={
+          useMobileLayout && !isSidebarOpen
+            ? { transform: 'translateX(-100%)' }
+            : undefined
+        }
       >
         <Sidebar 
           currentPage={currentPage as any} 
@@ -173,7 +181,7 @@ function AdminLayout() {
         <div className="shrink-0 bg-white border-b border-gray-200 px-2 py-2 sm:px-4 sm:py-3 lg:px-8 lg:py-4 flex items-center gap-1 sm:gap-2 min-w-0">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="shrink-0 p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 transition-colors lg:hidden"
+            className={`shrink-0 p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 transition-colors ${useMobileLayout ? '' : 'lg:hidden'}`}
           >
             {isSidebarOpen ? (
               <X className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />

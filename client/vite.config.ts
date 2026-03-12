@@ -5,6 +5,7 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: process.env.VITE_APP_BUILD === 'true' ? './' : '/',
   server: {
     host: true, // 0.0.0.0 - 같은 네트워크의 다른 기기(모바일 등)에서 접속 가능
   },

@@ -351,6 +351,7 @@ export function ProductCollabThread() {
           moq: product.moq,
           lead_time: product.lead_time,
           packaging: product.packaging,
+          inner_packaging: product.inner_packaging ?? null,
           sku_count: product.sku_count,
         }}
         onSave={loadProduct}

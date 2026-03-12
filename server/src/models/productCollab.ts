@@ -45,6 +45,7 @@ export interface ProductCollabProduct {
   moq: string | null;
   lead_time: string | null;
   packaging: string | null;
+  inner_packaging: string | null;
   sku_count: string | null;
   request_note: string | null;
   request_note_translated?: string | null;
@@ -168,6 +169,7 @@ export interface UpdateProductCollabProductDTO {
   moq?: string | null;
   lead_time?: string | null;
   packaging?: string | null;
+  inner_packaging?: string | null;
   sku_count?: string | null;
   request_note?: string | null;
   request_note_translated?: string | null;

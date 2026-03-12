@@ -31,6 +31,7 @@ interface ProductRow extends RowDataPacket {
   moq: string | null;
   lead_time: string | null;
   packaging: string | null;
+  inner_packaging?: string | null;
   sku_count: string | null;
   last_activity_at: Date;
   created_at: Date;
@@ -274,6 +275,7 @@ export class ProductCollabRepository {
       moq: p.moq,
       lead_time: p.lead_time,
       packaging: p.packaging,
+      inner_packaging: (p as RowDataPacket).inner_packaging ?? null,
       sku_count: p.sku_count,
       request_note: (p as RowDataPacket).request_note ?? null,
       request_note_translated: (p as RowDataPacket).request_note_translated ?? null,
@@ -484,6 +486,10 @@ export class ProductCollabRepository {
     if (dto.packaging !== undefined) {
       fields.push('packaging = ?');
       values.push(dto.packaging);
+    }
+    if (dto.inner_packaging !== undefined) {
+      fields.push('inner_packaging = ?');
+      values.push(dto.inner_packaging);
     }
     if (dto.sku_count !== undefined) {
       fields.push('sku_count = ?');

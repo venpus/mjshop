@@ -19,7 +19,8 @@ const PORT = Number(process.env.PORT) || 3000;
 
 // 미들웨어 설정
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  originAgentCluster: false, // 동일 origin 내 일부 페이지만 헤더가 달라서 Chromium 경고 방지
 })); // 보안 헤더 설정
 // CORS 설정 - 개발 환경에서는 여러 origin 허용
 const allowedOrigins: (string | RegExp)[] = process.env.CLIENT_URL
@@ -104,6 +105,19 @@ app.use('/uploads', express.static(uploadsPath));
 // API 라우트 등록
 import apiRoutes from './routes/index.js';
 app.use('/api', apiRoutes);
+
+// 클라이언트(SPA) 정적 서빙 — 앱(방법 A)이 같은 origin으로 웹 로드할 때 필요
+const clientDistPath = path.join(__dirname, '..', '..', 'client', 'dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+    const indexPath = path.join(clientDistPath, 'index.html');
+    if (fs.existsSync(indexPath)) res.sendFile(indexPath);
+    else next();
+  });
+  logger.info('📂 클라이언트 SPA 서빙: client/dist');
+}
 
 // 404 핸들러
 app.use((req, res) => {
