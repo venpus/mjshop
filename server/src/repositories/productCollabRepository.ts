@@ -434,6 +434,7 @@ export class ProductCollabRepository {
       moq: r.moq,
       lead_time: r.lead_time,
       packaging: r.packaging,
+      inner_packaging: (r as RowDataPacket).inner_packaging ?? null,
       sku_count: r.sku_count,
       request_note: (r as RowDataPacket).request_note ?? null,
       request_note_translated: (r as RowDataPacket).request_note_translated ?? null,
