@@ -42,6 +42,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const login = async (id: string, password: string) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15초 타임아웃
+
     try {
       const response = await fetch(`${getApiBaseUrl()}/admin-accounts/login`, {
         method: 'POST',
@@ -50,7 +53,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         },
         credentials: 'include',
         body: JSON.stringify({ id, password }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -58,7 +64,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       const data = await response.json();
-      
+
       if (data.success && data.data) {
         const userData: AdminUser = {
           id: data.data.id,
@@ -66,14 +72,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
           email: data.data.email,
           level: data.data.level,
         };
-        
+
         setUser(userData);
         localStorage.setItem('admin_user', JSON.stringify(userData));
       } else {
         throw new Error('로그인에 실패했습니다.');
       }
     } catch (error: any) {
-      throw new Error(error.message || '로그인 중 오류가 발생했습니다.');
+      clearTimeout(timeoutId);
+      const msg = error?.message || '';
+      if (error?.name === 'AbortError') {
+        throw new Error('서버 응답이 없습니다. 네트워크와 서버 주소를 확인한 뒤 다시 시도해 주세요.');
+      }
+      if (msg === 'Failed to fetch' || error?.name === 'TypeError') {
+        throw new Error('서버에 연결할 수 없습니다. 네트워크와 API 주소(.env의 VITE_API_URL)를 확인한 뒤 앱을 다시 빌드해 주세요.');
+      }
+      throw new Error(msg || '로그인 중 오류가 발생했습니다.');
     }
   };
 

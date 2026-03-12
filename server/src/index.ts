@@ -22,14 +22,22 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 })); // 보안 헤더 설정
 // CORS 설정 - 개발 환경에서는 여러 origin 허용
-const allowedOrigins: (string | RegExp)[] = process.env.CLIENT_URL 
-  ? process.env.CLIENT_URL.split(',').map(url => url.trim())
+const allowedOrigins: (string | RegExp)[] = process.env.CLIENT_URL
+  ? [
+      ...process.env.CLIENT_URL.split(',').map(url => url.trim()),
+      'capacitor://localhost',
+      'capacitor://android',
+      'http://localhost',
+    ]
   : [
       'http://localhost:5173',  // 클라이언트 (Vite)
       'http://localhost:8081',  // Expo 웹 (기본 포트)
       'http://localhost:8082',  // Expo 웹 (다른 포트)
       'http://wkshop.kr',       // 상용 서버 (HTTP)
       'https://wkshop.kr',      // 상용 서버 (HTTPS)
+      'capacitor://localhost',  // Capacitor 앱 (WebView)
+      'capacitor://android',
+      'http://localhost',
       /^http:\/\/192\.168\.\d+\.\d+:\d+$/,  // 로컬 네트워크 IP (모든 포트)
       /^http:\/\/localhost:\d+$/,  // localhost (모든 포트)
     ];

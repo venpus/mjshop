@@ -47,19 +47,19 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
   const displayError = error || externalError;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-4">
-      <div className="w-full max-w-md">
-        {/* Logo/Title */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-600 rounded-2xl mb-4">
-            <LogIn className="w-8 h-8 text-white" />
+    <div className="h-screen max-h-[100dvh] overflow-y-auto overflow-x-hidden bg-gradient-to-br from-purple-50 to-blue-50 p-4">
+      <div className="w-full max-w-md mx-auto pt-4 pb-8">
+        {/* Logo/Title - 앱에서 잘 보이도록 간격 축소 */}
+        <div className="text-center mb-4 sm:mb-6">
+          <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-purple-600 rounded-2xl mb-3">
+            <LogIn className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('login.title')}</h1>
-          <p className="text-gray-600">{t('login.subtitle')}</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{t('login.title')}</h1>
+          <p className="text-sm sm:text-base text-gray-600">{t('login.subtitle')}</p>
         </div>
 
         {/* Login Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Success Message */}
             {signupSuccess && (
@@ -132,7 +132,7 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
               </button>
             </div>
 
-            {/* Login Button */}
+            {/* Login Button - 항상 보이도록 폼 상단과 간격 유지 */}
             <Button
               type="submit"
               className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white font-medium text-base"
@@ -167,7 +167,7 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
         </div>
 
         {/* Footer */}
-        <div className="text-center text-sm text-gray-500 mt-6 space-y-1">
+        <div className="text-center text-xs sm:text-sm text-gray-500 mt-4 space-y-1">
           <p>© 2025-2026 WK 관리 시스템. All rights reserved.</p>
           <p>Development By INVENTIO</p>
         </div>
