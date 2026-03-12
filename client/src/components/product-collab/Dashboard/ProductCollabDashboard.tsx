@@ -4,11 +4,13 @@ import { getDashboard, completeTask } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useProductCollabCounts } from '../ProductCollabCountsContext';
 import { getDashboardShowBothLanguages } from '../../../constants/settings';
+import { useIsMobile } from '../../ui/use-mobile';
 import type { DashboardData } from '../types';
 import { PRODUCT_COLLAB_STATUS_LABEL_KEYS, PRODUCT_COLLAB_STATUS_BADGE_CLASS } from '../types';
 
 export function ProductCollabDashboard() {
   const { t, language } = useLanguage();
+  const isMobile = useIsMobile();
   const { counts } = useProductCollabCounts() ?? {};
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,6 +54,9 @@ export function ProductCollabDashboard() {
   if (error) return <div className="p-6 text-red-600">{error}</div>;
 
   const showBothLanguages = getDashboardShowBothLanguages();
+
+  /** 모바일 3개, 웹 4개 */
+  const dashboardListLimit = isMobile ? 3 : 4;
 
   /** 시스템 언어에 맞는 본문만 반환 (한국어면 원문이 한이면 원문, 원문이 중이면 번역문) */
   const bodyForLanguage = (item: { body?: string | null; body_translated?: string | null; body_lang?: string | null }) => {
@@ -102,14 +107,21 @@ export function ProductCollabDashboard() {
 
       {/* 내 업무 - 파란 계열 */}
       <section className="rounded-xl border-2 border-[#BFDBFE] overflow-hidden bg-[#EFF6FF]">
-        <div className="px-4 py-3 bg-[#DBEAFE] border-b border-[#BFDBFE]">
+        <div className="px-4 py-3 bg-[#DBEAFE] border-b border-[#BFDBFE] flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-[#1E40AF]">{t('productCollab.myTasksSection')}</h2>
+          <Link
+            to="/admin/product-collab/dashboard/more/my-tasks"
+            className="text-base font-bold text-[#1E40AF] hover:underline underline-offset-2 shrink-0"
+          >
+            {t('productCollab.seeMore')} ({(data?.myTasksTotal ?? data?.myTasks?.length) ?? 0})
+          </Link>
         </div>
         <div className="p-4 bg-white">
         <p className="text-xs text-[#6B7280] mb-3">{t('productCollab.mentionDesc')}</p>
         {data?.myTasks?.length ? (
-          <ul className="space-y-2 text-sm text-[#1F2937]">
-            {data.myTasks.slice(0, 20).map((tItem) => (
+          <div>
+            <ul className="space-y-2 text-sm text-[#1F2937]">
+            {data.myTasks.map((tItem) => (
               <li
                 key={tItem.task_id}
                 className="flex items-center justify-between gap-3 py-2 border-b border-[#F3F4F6] last:border-0"
@@ -182,6 +194,7 @@ export function ProductCollabDashboard() {
               </li>
             ))}
           </ul>
+          </div>
         ) : (
           <p className="text-[#6B7280] text-sm">{t('productCollab.noAssignedTasks')}</p>
         )}
@@ -190,15 +203,22 @@ export function ProductCollabDashboard() {
 
       {/* 내 메시지 확인됨 - 초록 계열 */}
       <section className="rounded-xl border-2 border-[#A7F3D0] overflow-hidden bg-[#ECFDF5]">
-        <div className="px-4 py-3 bg-[#D1FAE5] border-b border-[#A7F3D0]">
+        <div className="px-4 py-3 bg-[#D1FAE5] border-b border-[#A7F3D0] flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-[#047857]">{t('productCollab.confirmationsReceivedSection')}</h2>
+          <Link
+            to="/admin/product-collab/dashboard/more/confirmations"
+            className="text-base font-bold text-[#047857] hover:underline underline-offset-2 shrink-0"
+          >
+            {t('productCollab.seeMore')} ({(data?.confirmationsReceivedTotal ?? data?.confirmationsReceived?.length) ?? 0})
+          </Link>
         </div>
         <div className="p-4 bg-white">
         <p className="text-xs text-[#6B7280] mb-3">
           {t('productCollab.confirmationsReceivedDesc')}
         </p>
         {data?.confirmationsReceived?.length ? (
-          <ul className="space-y-2 text-sm text-[#1F2937]">
+          <div>
+            <ul className="space-y-2 text-sm text-[#1F2937]">
             {data.confirmationsReceived.map((c) => (
               <li
                 key={c.task_id}
@@ -246,7 +266,8 @@ export function ProductCollabDashboard() {
                 </Link>
               </li>
             ))}
-          </ul>
+            </ul>
+          </div>
         ) : (
           <p className="text-[#6B7280] text-sm">{t('productCollab.noConfirmationsReceived')}</p>
         )}
@@ -255,15 +276,22 @@ export function ProductCollabDashboard() {
 
       {/* 내 글에 달린 답글 - 주황/앰버 계열 */}
       <section className="rounded-xl border-2 border-[#FCD34D] overflow-hidden bg-[#FFFBEB]">
-        <div className="px-4 py-3 bg-[#FEF3C7] border-b border-[#FCD34D]">
+        <div className="px-4 py-3 bg-[#FEF3C7] border-b border-[#FCD34D] flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-[#B45309]">{t('productCollab.repliesToMyMessagesSection')}</h2>
+          <Link
+            to="/admin/product-collab/dashboard/more/replies"
+            className="text-base font-bold text-[#B45309] hover:underline underline-offset-2 shrink-0"
+          >
+            {t('productCollab.seeMore')} ({(data?.repliesToMyMessagesTotal ?? data?.repliesToMyMessages?.length) ?? 0})
+          </Link>
         </div>
         <div className="p-4 bg-white">
         <p className="text-xs text-[#6B7280] mb-3">
           {t('productCollab.repliesToMyMessagesDesc')}
         </p>
         {data?.repliesToMyMessages?.length ? (
-          <ul className="space-y-2 text-sm text-[#1F2937]">
+          <div>
+            <ul className="space-y-2 text-sm text-[#1F2937]">
             {(data.repliesToMyMessages ?? []).map((reply) => (
               <li
                 key={reply.message_id}
@@ -298,7 +326,8 @@ export function ProductCollabDashboard() {
                 </Link>
               </li>
             ))}
-          </ul>
+            </ul>
+          </div>
         ) : (
           <p className="text-[#6B7280] text-sm">{t('productCollab.noRepliesToMyMessages')}</p>
         )}
@@ -307,12 +336,19 @@ export function ProductCollabDashboard() {
 
       {/* 담당자별 업무 - 인디고/보라 계열 */}
       <section className="rounded-xl border-2 border-[#C7D2FE] overflow-hidden bg-[#EEF2FF]">
-        <div className="px-4 py-3 bg-[#E0E7FF] border-b border-[#C7D2FE]">
+        <div className="px-4 py-3 bg-[#E0E7FF] border-b border-[#C7D2FE] flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-[#4338CA]">{t('productCollab.allAssigneeTasksSection')}</h2>
+          <Link
+            to="/admin/product-collab/dashboard/more/assignee-tasks"
+            className="text-base font-bold text-[#4338CA] hover:underline underline-offset-2 shrink-0"
+          >
+            {t('productCollab.seeMore')} ({(data?.allAssigneeTasksTotal ?? data?.allAssigneeTasks?.length) ?? 0})
+          </Link>
         </div>
         <div className="p-4 bg-white">
         {data?.allAssigneeTasks?.length ? (
-          <ul className="space-y-2 text-sm text-[#1F2937]">
+          <div>
+            <ul className="space-y-2 text-sm text-[#1F2937]">
             {data.allAssigneeTasks.map((tItem) => (
               <li
                 key={tItem.task_id}
@@ -388,7 +424,8 @@ export function ProductCollabDashboard() {
                 </div>
               </li>
             ))}
-          </ul>
+            </ul>
+          </div>
         ) : (
           <p className="text-[#6B7280] text-sm">{t('productCollab.noAllAssigneeTasks')}</p>
         )}

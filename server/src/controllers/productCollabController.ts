@@ -263,20 +263,72 @@ export class ProductCollabController {
   getDashboard = async (req: Request, res: Response) => {
     try {
       const userId = (req as unknown as { user?: { id: string } }).user?.id ?? '';
-      const [myTasks, allAssigneeTasks, statusCounts, confirmationsReceived, repliesToMyMessages] = await Promise.all([
-        this.service.getMyTasks(userId),
-        this.service.getAllAssigneeTasks(userId || null),
+      const [myTasksResult, assigneePreview, statusCounts, confirmationsResult, repliesResult, assigneeTotalResult] = await Promise.all([
+        this.service.getMyTasks(userId, { limit: 4, offset: 0 }),
+        this.service.getAssigneeTasksForDashboard(userId || null),
         this.service.getStatusCounts(),
-        userId ? this.service.getConfirmationsReceived(userId) : Promise.resolve([]),
-        userId ? this.service.getRepliesToMyMessages(userId) : Promise.resolve([]),
+        userId ? this.service.getConfirmationsReceived(userId, { limit: 4, offset: 0 }) : Promise.resolve({ items: [], total: 0 }),
+        userId ? this.service.getRepliesToMyMessages(userId, { limit: 4, offset: 0 }) : Promise.resolve({ items: [], total: 0 }),
+        this.service.getAllAssigneeTasks(userId || null, { limit: 1, offset: 0 }),
       ]);
       res.json({
         success: true,
-        data: { myTasks, allAssigneeTasks, statusCounts, confirmationsReceived, repliesToMyMessages },
+        data: {
+          myTasks: myTasksResult.items,
+          myTasksTotal: myTasksResult.total,
+          allAssigneeTasks: assigneePreview,
+          allAssigneeTasksTotal: assigneeTotalResult.total,
+          statusCounts,
+          confirmationsReceived: confirmationsResult.items,
+          confirmationsReceivedTotal: confirmationsResult.total,
+          repliesToMyMessages: repliesResult.items,
+          repliesToMyMessagesTotal: repliesResult.total,
+        },
       });
     } catch (error: unknown) {
       console.error('Product collab dashboard error:', error);
       res.status(500).json({ success: false, error: '대시보드 조회 중 오류가 발생했습니다.' });
+    }
+  };
+
+  getDashboardSection = async (req: Request, res: Response) => {
+    try {
+      const userId = (req as unknown as { user?: { id: string } }).user?.id ?? '';
+      const section = req.params.section as string;
+      const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit), 10) || 15));
+      const offset = Math.max(0, parseInt(String(req.query.offset), 10) || 0);
+      const validSections = ['my-tasks', 'confirmations', 'replies', 'assignee-tasks'];
+      if (!validSections.includes(section)) {
+        return res.status(400).json({ success: false, error: '유효하지 않은 섹션입니다.' });
+      }
+      if (section === 'my-tasks' || section === 'confirmations' || section === 'replies') {
+        if (!userId) {
+          return res.status(401).json({ success: false, error: '로그인이 필요합니다.' });
+        }
+      }
+      let items: unknown[];
+      let total: number;
+      if (section === 'my-tasks') {
+        const r = await this.service.getMyTasks(userId, { limit, offset });
+        items = r.items;
+        total = r.total;
+      } else if (section === 'confirmations') {
+        const r = await this.service.getConfirmationsReceived(userId, { limit, offset });
+        items = r.items;
+        total = r.total;
+      } else if (section === 'replies') {
+        const r = await this.service.getRepliesToMyMessages(userId, { limit, offset });
+        items = r.items;
+        total = r.total;
+      } else {
+        const r = await this.service.getAllAssigneeTasks(userId || null, { limit, offset });
+        items = r.items;
+        total = r.total;
+      }
+      res.json({ success: true, data: { items, total } });
+    } catch (error: unknown) {
+      console.error('Product collab dashboard section error:', error);
+      res.status(500).json({ success: false, error: '목록 조회 중 오류가 발생했습니다.' });
     }
   };
 

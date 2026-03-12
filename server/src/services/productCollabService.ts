@@ -124,8 +124,8 @@ export class ProductCollabService {
     return this.repository.deleteMessage(messageId, productId);
   }
 
-  async getMyTasks(userId: string): Promise<DashboardMyTask[]> {
-    return this.repository.findMyTasks(userId);
+  async getMyTasks(userId: string, options?: { limit?: number; offset?: number }): Promise<{ items: DashboardMyTask[]; total: number }> {
+    return this.repository.findMyTasks(userId, options);
   }
 
   async completeTask(taskId: number, productId: number, assigneeId: string): Promise<boolean> {
@@ -136,8 +136,12 @@ export class ProductCollabService {
     return this.repository.findTeamTasks(currentUserId);
   }
 
-  async getAllAssigneeTasks(excludeUserId: string | null): Promise<DashboardAllAssigneeTask[]> {
-    return this.repository.findAllAssigneeTasks(excludeUserId);
+  async getAllAssigneeTasks(excludeUserId: string | null, options?: { limit?: number; offset?: number }): Promise<{ items: DashboardAllAssigneeTask[]; total: number }> {
+    return this.repository.findAllAssigneeTasks(excludeUserId, options);
+  }
+
+  async getAssigneeTasksForDashboard(excludeUserId: string | null): Promise<DashboardAllAssigneeTask[]> {
+    return this.repository.findAssigneeTasksForDashboard(excludeUserId);
   }
 
   async getStatusCounts(): Promise<DashboardStatusCount[]> {
@@ -148,12 +152,12 @@ export class ProductCollabService {
     return this.repository.getProductCounts();
   }
 
-  async getConfirmationsReceived(authorId: string): Promise<DashboardConfirmation[]> {
-    return this.repository.findConfirmationsReceived(authorId);
+  async getConfirmationsReceived(authorId: string, options?: { limit?: number; offset?: number }): Promise<{ items: DashboardConfirmation[]; total: number }> {
+    return this.repository.findConfirmationsReceived(authorId, options);
   }
 
-  async getRepliesToMyMessages(userId: string): Promise<DashboardReplyItem[]> {
-    return this.repository.findRepliesToMyMessages(userId);
+  async getRepliesToMyMessages(userId: string, options?: { limit?: number; offset?: number }): Promise<{ items: DashboardReplyItem[]; total: number }> {
+    return this.repository.findRepliesToMyMessages(userId, options);
   }
 
   async addProductImage(

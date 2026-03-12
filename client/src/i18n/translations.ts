@@ -208,6 +208,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'productCollab.uploadRequestImage': '이미지 업로드',
     'productCollab.noImage': '이미지 없음',
     'productCollab.viewThread': '스레드 보기',
+    'productCollab.seeMore': '더보기',
     'productCollab.myTasksSection': '내 업무',
     'productCollab.teamTasksSection': '팀 업무',
     'productCollab.allAssigneeTasksSection': '담당자별 업무',
@@ -226,6 +227,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'productCollab.skuCount': 'SKU 수 (SKU count)',
     'productCollab.backToList': '목록으로',
     'productCollab.list': '목록',
+    'productCollab.prev': '이전',
+    'productCollab.next': '다음',
 
     'packing.bag': '마대',
     'packing.weightIndividual': '개별 중량',
@@ -505,6 +508,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'productCollab.uploadRequestImage': '上传图片',
     'productCollab.noImage': '无图片',
     'productCollab.viewThread': '查看讨论',
+    'productCollab.seeMore': '更多',
     'productCollab.myTasksSection': '我的任务',
     'productCollab.teamTasksSection': '团队任务',
     'productCollab.allAssigneeTasksSection': '按负责人查看任务',
@@ -526,6 +530,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'productCollab.skuCount': 'SKU 数量 (SKU count)',
     'productCollab.backToList': '返回列表',
     'productCollab.list': '列表',
+    'productCollab.prev': '上一页',
+    'productCollab.next': '下一页',
 
     'packing.bag': '麻袋',
     'packing.box': '箱',

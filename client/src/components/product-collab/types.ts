@@ -217,8 +217,12 @@ export interface DashboardReplyItem {
 
 export interface DashboardData {
   myTasks: DashboardMyTask[];
+  myTasksTotal?: number;
   allAssigneeTasks: DashboardAllAssigneeTask[];
+  allAssigneeTasksTotal?: number;
   statusCounts: DashboardStatusCount[];
   confirmationsReceived: DashboardConfirmation[];
+  confirmationsReceivedTotal?: number;
   repliesToMyMessages: DashboardReplyItem[];
+  repliesToMyMessagesTotal?: number;
 }

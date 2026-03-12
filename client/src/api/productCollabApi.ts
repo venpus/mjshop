@@ -38,6 +38,24 @@ export async function getDashboard(): Promise<ApiResponse<DashboardData>> {
   return { success: true, data: json.data };
 }
 
+export type DashboardSectionKey = 'my-tasks' | 'confirmations' | 'replies' | 'assignee-tasks';
+
+export async function getDashboardSection(
+  section: DashboardSectionKey,
+  params?: { limit?: number; offset?: number }
+): Promise<ApiResponse<{ items: unknown[]; total: number }>> {
+  const limit = params?.limit ?? 15;
+  const offset = params?.offset ?? 0;
+  const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  const res = await fetch(
+    `${getApiBaseUrl()}/product-collab/dashboard/section/${section}?${q}`,
+    { headers: getAuthHeaders() }
+  );
+  const json = await res.json();
+  if (!res.ok) return { success: false, error: json.error || '조회 실패' };
+  return { success: true, data: json.data };
+}
+
 export interface MentionableUser {
   id: string;
   name: string;

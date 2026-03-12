@@ -657,18 +657,29 @@ export class ProductCollabRepository {
     return false;
   }
 
-  async findMyTasks(userId: string): Promise<DashboardMyTask[]> {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT t.id as task_id, t.product_id, p.name as product_name, t.message_id, t.assignee_id, t.completed_at, t.created_at,
-              m.body, m.body_translated, m.body_lang
-       FROM product_collab_tasks t
+  async findMyTasks(userId: string, options?: { limit?: number; offset?: number }): Promise<{ items: DashboardMyTask[]; total: number }> {
+    const limit = options?.limit ?? 0;
+    const offset = Math.max(0, options?.offset ?? 0);
+    const baseSql = `FROM product_collab_tasks t
        JOIN product_collab_products p ON p.id = t.product_id
        LEFT JOIN product_collab_messages m ON m.id = t.message_id AND m.product_id = t.product_id
-       WHERE t.assignee_id = ? AND t.completed_at IS NULL AND p.status NOT IN ('PRODUCTION_COMPLETE', 'CANCELLED')
-       ORDER BY t.created_at DESC`,
+       WHERE t.assignee_id = ? AND t.completed_at IS NULL AND p.status NOT IN ('PRODUCTION_COMPLETE', 'CANCELLED')`;
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      limit > 0
+        ? `SELECT t.id as task_id, t.product_id, p.name as product_name, t.message_id, t.assignee_id, t.completed_at, t.created_at,
+              m.body, m.body_translated, m.body_lang
+           ${baseSql} ORDER BY t.created_at DESC LIMIT ? OFFSET ?`
+        : `SELECT t.id as task_id, t.product_id, p.name as product_name, t.message_id, t.assignee_id, t.completed_at, t.created_at,
+              m.body, m.body_translated, m.body_lang
+           ${baseSql} ORDER BY t.created_at DESC`,
+      limit > 0 ? [userId, limit, offset] : [userId]
+    );
+    const [countRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) as total ${baseSql}`,
       [userId]
     );
-    return rows.map((r: RowDataPacket) => ({
+    const total = Number((countRows as RowDataPacket[])[0]?.total ?? 0);
+    const items = (rows as RowDataPacket[]).map((r) => ({
       task_id: r.task_id,
       product_id: r.product_id,
       product_name: r.product_name,
@@ -680,6 +691,7 @@ export class ProductCollabRepository {
       body_translated: r.body_translated ?? null,
       body_lang: (r as RowDataPacket).body_lang ?? null,
     })) as DashboardMyTask[];
+    return { items, total };
   }
 
   async completeTask(taskId: number, productId: number, assigneeId: string): Promise<boolean> {
@@ -702,22 +714,71 @@ export class ProductCollabRepository {
     return rows as DashboardTeamTask[];
   }
 
-  async findAllAssigneeTasks(excludeUserId: string | null): Promise<DashboardAllAssigneeTask[]> {
+  async findAllAssigneeTasks(excludeUserId: string | null, options?: { limit?: number; offset?: number }): Promise<{ items: DashboardAllAssigneeTask[]; total: number }> {
     const excludeClause = excludeUserId ? ' AND t.assignee_id != ?' : '';
     const params = excludeUserId ? [excludeUserId] : [];
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT t.id as task_id, t.product_id, p.name as product_name, t.message_id,
-              t.assignee_id, a.name as assignee_name, t.completed_at, t.created_at,
-              m.body, m.body_translated, m.body_lang
-       FROM product_collab_tasks t
+    const limit = options?.limit ?? 0;
+    const offset = Math.max(0, options?.offset ?? 0);
+    const baseSql = `FROM product_collab_tasks t
        JOIN product_collab_products p ON p.id = t.product_id AND p.status NOT IN ('PRODUCTION_COMPLETE', 'CANCELLED')
        LEFT JOIN admin_accounts a ON t.assignee_id = a.id
        LEFT JOIN product_collab_messages m ON m.id = t.message_id AND m.product_id = t.product_id
-       WHERE t.completed_at IS NULL${excludeClause}
-       ORDER BY t.created_at DESC`,
+       WHERE t.completed_at IS NULL${excludeClause}`;
+    const listParams = limit > 0 ? [...params, limit, offset] : params;
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      limit > 0
+        ? `SELECT t.id as task_id, t.product_id, p.name as product_name, t.message_id,
+              t.assignee_id, a.name as assignee_name, t.completed_at, t.created_at,
+              m.body, m.body_translated, m.body_lang
+           ${baseSql} ORDER BY t.created_at DESC LIMIT ? OFFSET ?`
+        : `SELECT t.id as task_id, t.product_id, p.name as product_name, t.message_id,
+              t.assignee_id, a.name as assignee_name, t.completed_at, t.created_at,
+              m.body, m.body_translated, m.body_lang
+           ${baseSql} ORDER BY t.created_at DESC`,
+      listParams
+    );
+    const [countRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) as total ${baseSql}`,
       params
     );
-    return rows.map((r: RowDataPacket) => ({
+    const total = Number((countRows as RowDataPacket[])[0]?.total ?? 0);
+    const items = (rows as RowDataPacket[]).map((r) => ({
+      task_id: r.task_id,
+      product_id: r.product_id,
+      product_name: r.product_name,
+      message_id: r.message_id,
+      assignee_id: r.assignee_id,
+      assignee_name: r.assignee_name ?? null,
+      completed_at: r.completed_at ?? null,
+      created_at: r.created_at,
+      body: r.body ?? null,
+      body_translated: r.body_translated ?? null,
+      body_lang: (r as RowDataPacket).body_lang ?? null,
+    })) as DashboardAllAssigneeTask[];
+    return { items, total };
+  }
+
+  /** 담당자별 최대 3건씩만 (대시보드 미리보기용) */
+  async findAssigneeTasksForDashboard(excludeUserId: string | null): Promise<DashboardAllAssigneeTask[]> {
+    const excludeClause = excludeUserId ? ' AND t.assignee_id != ?' : '';
+    const params = excludeUserId ? [excludeUserId] : [];
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT task_id, product_id, product_name, message_id, assignee_id, assignee_name, completed_at, created_at, body, body_translated, body_lang
+       FROM (
+         SELECT t.id as task_id, t.product_id, p.name as product_name, t.message_id,
+                t.assignee_id, a.name as assignee_name, t.completed_at, t.created_at,
+                m.body, m.body_translated, m.body_lang,
+                ROW_NUMBER() OVER (PARTITION BY t.assignee_id ORDER BY t.created_at DESC) AS rn
+         FROM product_collab_tasks t
+         JOIN product_collab_products p ON p.id = t.product_id AND p.status NOT IN ('PRODUCTION_COMPLETE', 'CANCELLED')
+         LEFT JOIN admin_accounts a ON t.assignee_id = a.id
+         LEFT JOIN product_collab_messages m ON m.id = t.message_id AND m.product_id = t.product_id
+         WHERE t.completed_at IS NULL${excludeClause}
+       ) sub WHERE rn <= 3
+       ORDER BY created_at DESC`,
+      params
+    );
+    return (rows as RowDataPacket[]).map((r) => ({
       task_id: r.task_id,
       product_id: r.product_id,
       product_name: r.product_name,
@@ -756,21 +817,32 @@ export class ProductCollabRepository {
   }
 
   /** 내가 작성한 메시지를 멘션된 사람이 확인한 목록 (메시지 작성자 기준, 최근 1일만) */
-  async findConfirmationsReceived(authorId: string): Promise<DashboardConfirmation[]> {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT t.id as task_id, t.product_id, p.name as product_name, t.message_id,
-              t.assignee_id, a.name as assignee_name, t.completed_at, m.body, m.body_translated, m.body_lang
-       FROM product_collab_tasks t
+  async findConfirmationsReceived(authorId: string, options?: { limit?: number; offset?: number }): Promise<{ items: DashboardConfirmation[]; total: number }> {
+    const limit = options?.limit ?? 0;
+    const offset = Math.max(0, options?.offset ?? 0);
+    const baseSql = `FROM product_collab_tasks t
        JOIN product_collab_messages m ON m.id = t.message_id AND m.product_id = t.product_id
        JOIN product_collab_products p ON p.id = t.product_id
        LEFT JOIN admin_accounts a ON t.assignee_id = a.id
        WHERE m.author_id = ? AND t.completed_at IS NOT NULL
-         AND t.completed_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
-       ORDER BY t.completed_at DESC
-       LIMIT 50`,
+         AND t.completed_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)`;
+    const [countRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) as total ${baseSql}`,
       [authorId]
     );
-    return (rows as RowDataPacket[]).map((r) => ({
+    const total = Number((countRows as RowDataPacket[])[0]?.total ?? 0);
+    const listParams = limit > 0 ? [authorId, limit, offset] : [authorId];
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      limit > 0
+        ? `SELECT t.id as task_id, t.product_id, p.name as product_name, t.message_id,
+              t.assignee_id, a.name as assignee_name, t.completed_at, m.body, m.body_translated, m.body_lang
+           ${baseSql} ORDER BY t.completed_at DESC LIMIT ? OFFSET ?`
+        : `SELECT t.id as task_id, t.product_id, p.name as product_name, t.message_id,
+              t.assignee_id, a.name as assignee_name, t.completed_at, m.body, m.body_translated, m.body_lang
+           ${baseSql} ORDER BY t.completed_at DESC LIMIT 50`,
+      listParams
+    );
+    const items = (rows as RowDataPacket[]).map((r) => ({
       task_id: r.task_id,
       product_id: r.product_id,
       product_name: r.product_name,
@@ -782,12 +854,14 @@ export class ProductCollabRepository {
       body_translated: (r as RowDataPacket).body_translated ?? null,
       body_lang: (r as RowDataPacket).body_lang ?? null,
     })) as DashboardConfirmation[];
+    return { items, total };
   }
 
   /** 내가 작성한 메시지에 달린 답글 (직접+중첩, 최근 1일만, 최신순) */
-  async findRepliesToMyMessages(userId: string): Promise<DashboardReplyItem[]> {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      `WITH RECURSIVE reply_tree AS (
+  async findRepliesToMyMessages(userId: string, options?: { limit?: number; offset?: number }): Promise<{ items: DashboardReplyItem[]; total: number }> {
+    const limit = options?.limit ?? 0;
+    const offset = Math.max(0, options?.offset ?? 0);
+    const cte = `WITH RECURSIVE reply_tree AS (
         SELECT m.id, m.product_id, m.parent_id, m.author_id, m.body, m.body_translated, m.body_lang, m.created_at, 1 AS depth
         FROM product_collab_messages m
         INNER JOIN product_collab_messages parent ON m.parent_id = parent.id AND parent.author_id = ?
@@ -795,18 +869,35 @@ export class ProductCollabRepository {
         SELECT m.id, m.product_id, m.parent_id, m.author_id, m.body, m.body_translated, m.body_lang, m.created_at, r.depth + 1
         FROM product_collab_messages m
         INNER JOIN reply_tree r ON m.parent_id = r.id
-      )
-      SELECT r.id AS message_id, r.product_id, p.name AS product_name, r.parent_id, r.author_id,
-             a.name AS author_name, r.body, r.body_translated, r.body_lang, r.created_at, r.depth
-      FROM reply_tree r
-      JOIN product_collab_products p ON p.id = r.product_id
-      LEFT JOIN admin_accounts a ON a.id = r.author_id
-      WHERE r.created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
-      ORDER BY r.created_at DESC
-      LIMIT 100`,
+      )`;
+    const [countRows] = await pool.execute<RowDataPacket[]>(
+      `${cte}
+       SELECT COUNT(*) as total FROM reply_tree r WHERE r.created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)`,
       [userId]
     );
-    return (rows as RowDataPacket[]).map((r) => ({
+    const total = Number((countRows as RowDataPacket[])[0]?.total ?? 0);
+    const listParams = limit > 0 ? [userId, limit, offset] : [userId];
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      limit > 0
+        ? `${cte}
+           SELECT r.id AS message_id, r.product_id, p.name AS product_name, r.parent_id, r.author_id,
+                  a.name AS author_name, r.body, r.body_translated, r.body_lang, r.created_at, r.depth
+           FROM reply_tree r
+           JOIN product_collab_products p ON p.id = r.product_id
+           LEFT JOIN admin_accounts a ON a.id = r.author_id
+           WHERE r.created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
+           ORDER BY r.created_at DESC LIMIT ? OFFSET ?`
+        : `${cte}
+           SELECT r.id AS message_id, r.product_id, p.name AS product_name, r.parent_id, r.author_id,
+                  a.name AS author_name, r.body, r.body_translated, r.body_lang, r.created_at, r.depth
+           FROM reply_tree r
+           JOIN product_collab_products p ON p.id = r.product_id
+           LEFT JOIN admin_accounts a ON a.id = r.author_id
+           WHERE r.created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
+           ORDER BY r.created_at DESC LIMIT 100`,
+      listParams
+    );
+    const items = (rows as RowDataPacket[]).map((r) => ({
       message_id: r.message_id,
       product_id: r.product_id,
       product_name: r.product_name,
@@ -819,6 +910,7 @@ export class ProductCollabRepository {
       created_at: r.created_at,
       depth: Number(r.depth) || 1,
     })) as DashboardReplyItem[];
+    return { items, total };
   }
 
   async createProductImage(
