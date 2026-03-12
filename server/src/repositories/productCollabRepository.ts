@@ -81,12 +81,15 @@ function getMessageLang(row: MessageRow | Record<string, unknown>): string | nul
 }
 
 export class ProductCollabRepository {
-  async findActiveProducts(params: {
-    status?: string;
-    category?: string;
-    assignee_id?: string;
-    search?: string;
-  }): Promise<ProductCollabProductListItem[]> {
+  async findActiveProducts(
+    params: {
+      status?: string;
+      category?: string;
+      assignee_id?: string;
+      search?: string;
+    },
+    options?: { limit?: number; offset?: number }
+  ): Promise<{ items: ProductCollabProductListItem[]; total: number }> {
     const conditions: string[] = ["p.status NOT IN ('PRODUCTION_COMPLETE', 'CANCELLED')"];
     const values: unknown[] = [];
     if (params.status) {
@@ -106,6 +109,21 @@ export class ProductCollabRepository {
       values.push(`%${params.search}%`, `%${params.search}%`);
     }
     const where = conditions.join(' AND ');
+
+    const usePagination = options?.limit != null && options.limit > 0;
+    let total = 0;
+
+    if (usePagination) {
+      const [countRows] = await pool.execute<RowDataPacket[]>(
+        `SELECT COUNT(*) as cnt FROM product_collab_products p WHERE ${where}`,
+        values
+      );
+      total = Number((countRows[0] as { cnt: number }).cnt ?? 0);
+    }
+
+    const limitClause = usePagination
+      ? ` LIMIT ${Math.max(0, options!.limit!)} OFFSET ${Math.max(0, options!.offset ?? 0)}`
+      : '';
     const [rows] = await pool.execute<RowDataPacket[]>(
       `SELECT p.id, p.name, p.status, p.category, p.assignee_id, a.name as assignee_name,
         p.main_image_id, pi.image_url as main_image_url,
@@ -122,10 +140,10 @@ export class ProductCollabRepository {
        LEFT JOIN admin_accounts a ON p.assignee_id = a.id
        LEFT JOIN product_collab_product_images pi ON p.main_image_id = pi.id
        WHERE ${where}
-       ORDER BY p.last_activity_at DESC`,
+       ORDER BY p.last_activity_at DESC${limitClause}`,
       values
     );
-    return rows.map((r: RowDataPacket) => {
+    const items = rows.map((r: RowDataPacket) => {
       const raw = r as RowDataPacket & { last_message_mentions?: string | null };
       let last_message_mentions: { user_id: string; user_name?: string | null }[] | undefined;
       if (raw.last_message_mentions != null) {
@@ -167,6 +185,7 @@ export class ProductCollabRepository {
         last_message_mentions,
       };
     });
+    return { items, total: usePagination ? total : items.length };
   }
 
   async findCompletedProducts(params: { search?: string }): Promise<ProductCollabProductListItem[]> {

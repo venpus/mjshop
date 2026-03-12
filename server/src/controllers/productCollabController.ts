@@ -25,8 +25,11 @@ export class ProductCollabController {
       const category = req.query.category as string | undefined;
       const assignee_id = req.query.assignee_id as string | undefined;
       const search = req.query.search as string | undefined;
-      const list = await this.service.getActiveProducts({ status, category, assignee_id, search });
-      res.json({ success: true, data: list });
+      const limit = req.query.limit != null ? parseInt(String(req.query.limit), 10) : undefined;
+      const offset = req.query.offset != null ? parseInt(String(req.query.offset), 10) : undefined;
+      const options = (limit != null && limit > 0) ? { limit, offset: Math.max(0, offset ?? 0) } : undefined;
+      const result = await this.service.getActiveProducts({ status, category, assignee_id, search }, options);
+      res.json({ success: true, data: result.items, total: result.total });
     } catch (error: unknown) {
       console.error('Product collab list error:', error);
       res.status(500).json({ success: false, error: '제품 목록 조회 중 오류가 발생했습니다.' });

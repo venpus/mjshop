@@ -132,7 +132,7 @@ function AdminLayout() {
   };
 
   return (
-    <div className="flex h-screen min-h-[1080px] bg-gray-50">
+    <div className="flex h-screen min-h-0 lg:min-h-[1080px] bg-gray-50">
       {/* Overlay */}
       {isSidebarOpen && (
         <div

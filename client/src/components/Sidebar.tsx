@@ -86,7 +86,8 @@ export function Sidebar({
   // A, C0 레벨 관리자 (쇼핑몰 관리 메뉴 접근 가능)
   const canAccessShopManagement = isLevelA || isLevelC0;
   const [isChinaExpanded, setIsChinaExpanded] = useState(true);
-  const [isShopExpanded, setIsShopExpanded] = useState(true);
+  const [isShopExpanded, setIsShopExpanded] = useState(false); // 쇼핑몰 관리: 항상 접힌 상태로 표기
+  const [isAdminExpanded, setIsAdminExpanded] = useState(false); // 관리자 메뉴: 접힌 상태
 
   return (
     <aside className={`bg-white border-r border-gray-200 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'} h-full flex flex-col`}>
@@ -138,7 +139,8 @@ export function Sidebar({
               {!isCollapsed && <span>{t('menu.dashboard')}</span>}
             </button>
 
-            {/* AI 데이터 검색 */}
+            {/* AI 데이터 검색 - 숨김 */}
+            {false && (
             <button
               onClick={() => onPageChange("ai-search")}
               className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
@@ -151,6 +153,7 @@ export function Sidebar({
               <MessageCircle className="w-5 h-5 flex-shrink-0" />
               {!isCollapsed && <span>{t('menu.aiSearch')}</span>}
             </button>
+            )}
 
             {/* 제품 개발 협업 */}
             <button
@@ -166,7 +169,8 @@ export function Sidebar({
               {!isCollapsed && <span>{t('menu.productCollab')}</span>}
             </button>
 
-            {/* 악세서리 AI (외부 링크) */}
+            {/* 악세서리 AI (외부 링크) - 숨김 */}
+            {false && (
             <SidebarExternalLink
               href="https://dollapp-g72sj77j.manus.space/"
               icon={<Sparkles className="w-5 h-5" />}
@@ -174,6 +178,7 @@ export function Sidebar({
               isCollapsed={isCollapsed}
               title={isCollapsed ? t("menu.accessoryAi") : undefined}
             />
+            )}
 
         {/* 중국협업 메뉴 (A, B0, C0 레벨만 표시) */}
         {canAccessChinaCooperation && (
@@ -214,8 +219,8 @@ export function Sidebar({
                     {!isCollapsed && <span>{t('menu.purchaseOrders')}</span>}
                   </button>
                 )}
-                {/* 미도착 물품 분석 (임시 테스트) */}
-                {hasPermission('purchase-orders', 'read') && (
+                {/* 미도착 물품 분석 - 숨김 */}
+                {false && hasPermission('purchase-orders', 'read') && (
                   <button
                     onClick={() => onPageChange("not-arrived-analysis")}
                     className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
@@ -304,8 +309,8 @@ export function Sidebar({
                     {!isCollapsed && <span>{t('menu.materials')}</span>}
                   </button>
                 )}
-                {/* 프로젝트 */}
-                {hasPermission('projects', 'read') && (
+                {/* 프로젝트 - 숨김 */}
+                {false && hasPermission('projects', 'read') && (
                   <button
                     onClick={() => onPageChange("projects")}
                     className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
@@ -319,8 +324,8 @@ export function Sidebar({
                     {!isCollapsed && <span>{t('menu.projects')}</span>}
                   </button>
                 )}
-                {/* 중국창고 */}
-                {hasPermission('china-warehouse', 'read') && (
+                {/* 중국창고 (중국 입출고 현황) - 숨김 */}
+                {false && hasPermission('china-warehouse', 'read') && (
                   <button
                     onClick={() => onPageChange("china-warehouse")}
                     className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
@@ -349,8 +354,8 @@ export function Sidebar({
                     {!isCollapsed && <span>{t('menu.invoice')}</span>}
                   </button>
                 )}
-                {/* 포장작업 */}
-                {hasPermission('packaging-work', 'read') && (
+                {/* 포장작업 - 숨김 */}
+                {false && hasPermission('packaging-work', 'read') && (
                   <button
                     onClick={() => onPageChange("packaging-work")}
                     className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
@@ -446,52 +451,69 @@ export function Sidebar({
           </div>
         )}
 
-        {/* 회원 관리 (A레벨만 표시) */}
+        {/* 관리자 메뉴 (A레벨만 표시): 회원관리, 관리자 계정 관리, 권한 관리 */}
         {isLevelA && (
-          <button
-            onClick={() => onPageChange("members")}
-            className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
-              currentPage === "members"
-                ? "bg-purple-50 text-purple-600"
-                : "text-gray-700 hover:bg-gray-50"
-            }`}
-            title={isCollapsed ? t('menu.members') : undefined}
-          >
-            <Users className="w-5 h-5 flex-shrink-0" />
-            {!isCollapsed && <span>{t('menu.members')}</span>}
-          </button>
-        )}
+          <div className="mt-1">
+            <button
+              onClick={() => setIsAdminExpanded(!isAdminExpanded)}
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors text-gray-700 hover:bg-gray-50`}
+              title={isCollapsed ? t('menu.adminMenu') : undefined}
+            >
+              <UserCog className="w-5 h-5 flex-shrink-0" />
+              {!isCollapsed && (
+                <>
+                  <span className="flex-1 text-left">{t('menu.adminMenu')}</span>
+                  {isAdminExpanded ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </>
+              )}
+            </button>
 
-        {/* 관리자 계정 관리 (A레벨 관리자만 표시) */}
-        {isLevelA && (
-          <button
-            onClick={() => onPageChange("admin-account")}
-            className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
-              currentPage === "admin-account"
-                ? "bg-purple-50 text-purple-600"
-                : "text-gray-700 hover:bg-gray-50"
-            }`}
-            title={isCollapsed ? t('menu.adminAccount') : undefined}
-          >
-            <UserCog className="w-5 h-5 flex-shrink-0" />
-            {!isCollapsed && <span>{t('menu.adminAccount')}</span>}
-          </button>
-        )}
-
-        {/* 권한 관리 (A레벨 관리자만 표시) */}
-        {isLevelA && (
-          <button
-            onClick={() => onPageChange("permissions")}
-            className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
-              currentPage === "permissions"
-                ? "bg-purple-50 text-purple-600"
-                : "text-gray-700 hover:bg-gray-50"
-            }`}
-            title={isCollapsed ? t('menu.permissions') : undefined}
-          >
-            <Shield className="w-5 h-5 flex-shrink-0" />
-            {!isCollapsed && <span>{t('menu.permissions')}</span>}
-          </button>
+            {/* 관리자 메뉴 하위 */}
+            {!isCollapsed && isAdminExpanded && (
+              <div className="ml-4 mt-1 space-y-1">
+                <button
+                  onClick={() => onPageChange("members")}
+                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+                    currentPage === "members"
+                      ? "bg-purple-50 text-purple-600"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                  title={t('menu.members')}
+                >
+                  <Users className="w-4 h-4 flex-shrink-0" />
+                  <span>{t('menu.members')}</span>
+                </button>
+                <button
+                  onClick={() => onPageChange("admin-account")}
+                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+                    currentPage === "admin-account"
+                      ? "bg-purple-50 text-purple-600"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                  title={t('menu.adminAccount')}
+                >
+                  <UserCog className="w-4 h-4 flex-shrink-0" />
+                  <span>{t('menu.adminAccount')}</span>
+                </button>
+                <button
+                  onClick={() => onPageChange("permissions")}
+                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+                    currentPage === "permissions"
+                      ? "bg-purple-50 text-purple-600"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                  title={t('menu.permissions')}
+                >
+                  <Shield className="w-4 h-4 flex-shrink-0" />
+                  <span>{t('menu.permissions')}</span>
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {/* 설정 (모든 로그인 사용자) */}

@@ -13,121 +13,8 @@ interface Member {
   totalAmount: number;
 }
 
-const initialMemberData: Member[] = [
-  {
-    id: 'M001',
-    name: '김민수',
-    email: 'minsu.kim@email.com',
-    phone: '010-1234-5678',
-    grade: 'VIP',
-    status: '활동중',
-    joinDate: '2023-01-15',
-    totalOrders: 45,
-    totalAmount: 5600000,
-  },
-  {
-    id: 'M002',
-    name: '이영희',
-    email: 'younghee.lee@email.com',
-    phone: '010-2345-6789',
-    grade: '골드',
-    status: '활동중',
-    joinDate: '2023-03-22',
-    totalOrders: 28,
-    totalAmount: 3200000,
-  },
-  {
-    id: 'M003',
-    name: '박지훈',
-    email: 'jihoon.park@email.com',
-    phone: '010-3456-7890',
-    grade: '실버',
-    status: '활동중',
-    joinDate: '2023-06-10',
-    totalOrders: 15,
-    totalAmount: 1800000,
-  },
-  {
-    id: 'M004',
-    name: '최수진',
-    email: 'sujin.choi@email.com',
-    phone: '010-4567-8901',
-    grade: '일반',
-    status: '활동중',
-    joinDate: '2024-01-05',
-    totalOrders: 8,
-    totalAmount: 950000,
-  },
-  {
-    id: 'M005',
-    name: '정다은',
-    email: 'daeun.jung@email.com',
-    phone: '010-5678-9012',
-    grade: '실버',
-    status: '휴면',
-    joinDate: '2022-11-20',
-    totalOrders: 12,
-    totalAmount: 1400000,
-  },
-  {
-    id: 'M006',
-    name: '한지우',
-    email: 'jiwoo.han@email.com',
-    phone: '010-6789-0123',
-    grade: 'VIP',
-    status: '활동중',
-    joinDate: '2022-08-14',
-    totalOrders: 52,
-    totalAmount: 6800000,
-  },
-  {
-    id: 'M007',
-    name: '강민지',
-    email: 'minji.kang@email.com',
-    phone: '010-7890-1234',
-    grade: '골드',
-    status: '활동중',
-    joinDate: '2023-05-18',
-    totalOrders: 22,
-    totalAmount: 2700000,
-  },
-  {
-    id: 'M008',
-    name: '윤서현',
-    email: 'seohyun.yoon@email.com',
-    phone: '010-8901-2345',
-    grade: '일반',
-    status: '탈퇴',
-    joinDate: '2024-02-28',
-    totalOrders: 3,
-    totalAmount: 280000,
-  },
-  {
-    id: 'M009',
-    name: '송하늘',
-    email: 'haneul.song@email.com',
-    phone: '010-9012-3456',
-    grade: '골드',
-    status: '활동중',
-    joinDate: '2023-07-30',
-    totalOrders: 31,
-    totalAmount: 3900000,
-  },
-  {
-    id: 'M010',
-    name: '배준서',
-    email: 'junseo.bae@email.com',
-    phone: '010-0123-4567',
-    grade: '실버',
-    status: '활동중',
-    joinDate: '2023-09-12',
-    totalOrders: 18,
-    totalAmount: 2100000,
-  },
-];
-
 export function Members() {
-  const [memberData] = useState<Member[]>(initialMemberData);
+  const [memberData] = useState<Member[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [gradeFilter, setGradeFilter] = useState<string>('전체');
 
@@ -234,35 +121,43 @@ export function Members() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredMembers.map((member) => (
-                <tr key={member.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-900">{member.id}</td>
-                  <td className="px-4 py-3 text-gray-900">{member.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{member.email}</td>
-                  <td className="px-4 py-3 text-gray-600">{member.phone}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs ${getGradeColor(
-                        member.grade
-                      )}`}
-                    >
-                      {member.grade}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{member.joinDate}</td>
-                  <td className="px-4 py-3 text-gray-900">{member.totalOrders}건</td>
-                  <td className="px-4 py-3 text-gray-900">₩{member.totalAmount.toLocaleString()}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs ${getStatusColor(
-                        member.status
-                      )}`}
-                    >
-                      {member.status}
-                    </span>
+              {filteredMembers.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-12 text-center text-gray-500">
+                    등록된 회원이 없습니다.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredMembers.map((member) => (
+                  <tr key={member.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-900">{member.id}</td>
+                    <td className="px-4 py-3 text-gray-900">{member.name}</td>
+                    <td className="px-4 py-3 text-gray-600">{member.email}</td>
+                    <td className="px-4 py-3 text-gray-600">{member.phone}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs ${getGradeColor(
+                          member.grade
+                        )}`}
+                      >
+                        {member.grade}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{member.joinDate}</td>
+                    <td className="px-4 py-3 text-gray-900">{member.totalOrders}건</td>
+                    <td className="px-4 py-3 text-gray-900">₩{member.totalAmount.toLocaleString()}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs ${getStatusColor(
+                          member.status
+                        )}`}
+                      >
+                        {member.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

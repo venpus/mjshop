@@ -67,17 +67,21 @@ export async function getActiveProducts(params?: {
   category?: string;
   assignee_id?: string;
   search?: string;
-}): Promise<ApiResponse<ProductCollabProductListItem[]>> {
+  limit?: number;
+  offset?: number;
+}): Promise<ApiResponse<ProductCollabProductListItem[]> & { total?: number }> {
   const q = new URLSearchParams();
   if (params?.status) q.set('status', params.status);
   if (params?.category) q.set('category', params.category);
   if (params?.assignee_id) q.set('assignee_id', params.assignee_id);
   if (params?.search) q.set('search', params.search);
+  if (params?.limit != null && params.limit > 0) q.set('limit', String(params.limit));
+  if (params?.offset != null && params.offset > 0) q.set('offset', String(params.offset));
   const url = `${getApiBaseUrl()}/product-collab/products${q.toString() ? `?${q}` : ''}`;
   const res = await fetch(url, { headers: getAuthHeaders() });
   const json = await res.json();
   if (!res.ok) return { success: false, error: json.error || '조회 실패' };
-  return { success: true, data: json.data };
+  return { success: true, data: json.data, total: json.total };
 }
 
 export interface ProductCollabCounts {

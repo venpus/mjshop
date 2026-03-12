@@ -32,8 +32,8 @@ export class ProductCollabService {
     category?: string;
     assignee_id?: string;
     search?: string;
-  }): Promise<ProductCollabProductListItem[]> {
-    return this.repository.findActiveProducts(params);
+  }, options?: { limit?: number; offset?: number }): Promise<{ items: ProductCollabProductListItem[]; total: number }> {
+    return this.repository.findActiveProducts(params, options);
   }
 
   async getCompletedProducts(params: { search?: string }): Promise<ProductCollabProductListItem[]> {
