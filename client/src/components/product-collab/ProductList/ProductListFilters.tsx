@@ -10,6 +10,7 @@ const STATUS_OPTIONS: { value: string; labelKey: string }[] = [
   { value: 'INCOMING', labelKey: 'productCollab.statusIncoming' },
   { value: 'IN_PRODUCTION', labelKey: 'productCollab.statusInProduction' },
   { value: 'PRODUCTION_COMPLETE', labelKey: 'productCollab.statusProductionComplete' },
+  { value: 'ISSUE_OCCURRED', labelKey: 'productCollab.statusIssueOccurred' },
 ];
 
 const CATEGORY_OPTIONS: { value: '' | ProductCollabCategory; labelKey: string }[] = [

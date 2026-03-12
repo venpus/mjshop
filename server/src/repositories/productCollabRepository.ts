@@ -635,7 +635,7 @@ export class ProductCollabRepository {
   async findMyTasks(userId: string): Promise<DashboardMyTask[]> {
     const [rows] = await pool.execute<RowDataPacket[]>(
       `SELECT t.id as task_id, t.product_id, p.name as product_name, t.message_id, t.assignee_id, t.completed_at, t.created_at,
-              m.body, m.body_translated
+              m.body, m.body_translated, m.body_lang
        FROM product_collab_tasks t
        JOIN product_collab_products p ON p.id = t.product_id
        LEFT JOIN product_collab_messages m ON m.id = t.message_id AND m.product_id = t.product_id
@@ -653,6 +653,7 @@ export class ProductCollabRepository {
       created_at: r.created_at,
       body: r.body ?? null,
       body_translated: r.body_translated ?? null,
+      body_lang: (r as RowDataPacket).body_lang ?? null,
     })) as DashboardMyTask[];
   }
 
@@ -682,7 +683,7 @@ export class ProductCollabRepository {
     const [rows] = await pool.execute<RowDataPacket[]>(
       `SELECT t.id as task_id, t.product_id, p.name as product_name, t.message_id,
               t.assignee_id, a.name as assignee_name, t.completed_at, t.created_at,
-              m.body, m.body_translated
+              m.body, m.body_translated, m.body_lang
        FROM product_collab_tasks t
        JOIN product_collab_products p ON p.id = t.product_id AND p.status NOT IN ('PRODUCTION_COMPLETE', 'CANCELLED')
        LEFT JOIN admin_accounts a ON t.assignee_id = a.id
@@ -702,6 +703,7 @@ export class ProductCollabRepository {
       created_at: r.created_at,
       body: r.body ?? null,
       body_translated: r.body_translated ?? null,
+      body_lang: (r as RowDataPacket).body_lang ?? null,
     })) as DashboardAllAssigneeTask[];
   }
 
@@ -728,17 +730,17 @@ export class ProductCollabRepository {
     };
   }
 
-  /** 내가 작성한 메시지를 멘션된 사람이 확인한 목록 (메시지 작성자 기준, 최근 3일만) */
+  /** 내가 작성한 메시지를 멘션된 사람이 확인한 목록 (메시지 작성자 기준, 최근 1일만) */
   async findConfirmationsReceived(authorId: string): Promise<DashboardConfirmation[]> {
     const [rows] = await pool.execute<RowDataPacket[]>(
       `SELECT t.id as task_id, t.product_id, p.name as product_name, t.message_id,
-              t.assignee_id, a.name as assignee_name, t.completed_at, m.body, m.body_translated
+              t.assignee_id, a.name as assignee_name, t.completed_at, m.body, m.body_translated, m.body_lang
        FROM product_collab_tasks t
        JOIN product_collab_messages m ON m.id = t.message_id AND m.product_id = t.product_id
        JOIN product_collab_products p ON p.id = t.product_id
        LEFT JOIN admin_accounts a ON t.assignee_id = a.id
        WHERE m.author_id = ? AND t.completed_at IS NOT NULL
-         AND t.completed_at >= DATE_SUB(NOW(), INTERVAL 3 DAY)
+         AND t.completed_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
        ORDER BY t.completed_at DESC
        LIMIT 50`,
       [authorId]
@@ -753,27 +755,28 @@ export class ProductCollabRepository {
       completed_at: r.completed_at,
       body: r.body ?? null,
       body_translated: (r as RowDataPacket).body_translated ?? null,
+      body_lang: (r as RowDataPacket).body_lang ?? null,
     })) as DashboardConfirmation[];
   }
 
-  /** 내가 작성한 메시지에 달린 답글 (직접+중첩, 최근 3일만, 최신순) */
+  /** 내가 작성한 메시지에 달린 답글 (직접+중첩, 최근 1일만, 최신순) */
   async findRepliesToMyMessages(userId: string): Promise<DashboardReplyItem[]> {
     const [rows] = await pool.execute<RowDataPacket[]>(
       `WITH RECURSIVE reply_tree AS (
-        SELECT m.id, m.product_id, m.parent_id, m.author_id, m.body, m.body_translated, m.created_at, 1 AS depth
+        SELECT m.id, m.product_id, m.parent_id, m.author_id, m.body, m.body_translated, m.body_lang, m.created_at, 1 AS depth
         FROM product_collab_messages m
         INNER JOIN product_collab_messages parent ON m.parent_id = parent.id AND parent.author_id = ?
         UNION ALL
-        SELECT m.id, m.product_id, m.parent_id, m.author_id, m.body, m.body_translated, m.created_at, r.depth + 1
+        SELECT m.id, m.product_id, m.parent_id, m.author_id, m.body, m.body_translated, m.body_lang, m.created_at, r.depth + 1
         FROM product_collab_messages m
         INNER JOIN reply_tree r ON m.parent_id = r.id
       )
       SELECT r.id AS message_id, r.product_id, p.name AS product_name, r.parent_id, r.author_id,
-             a.name AS author_name, r.body, r.body_translated, r.created_at, r.depth
+             a.name AS author_name, r.body, r.body_translated, r.body_lang, r.created_at, r.depth
       FROM reply_tree r
       JOIN product_collab_products p ON p.id = r.product_id
       LEFT JOIN admin_accounts a ON a.id = r.author_id
-      WHERE r.created_at >= DATE_SUB(NOW(), INTERVAL 3 DAY)
+      WHERE r.created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
       ORDER BY r.created_at DESC
       LIMIT 100`,
       [userId]
@@ -787,6 +790,7 @@ export class ProductCollabRepository {
       author_name: r.author_name ?? null,
       body: r.body ?? null,
       body_translated: (r as RowDataPacket).body_translated ?? null,
+      body_lang: (r as RowDataPacket).body_lang ?? null,
       created_at: r.created_at,
       depth: Number(r.depth) || 1,
     })) as DashboardReplyItem[];

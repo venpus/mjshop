@@ -23,6 +23,7 @@ import { ChinaWarehouse } from './components/ChinaWarehouse';
 import { Invoice } from './components/Invoice';
 import { AdminAccount } from './components/AdminAccount';
 import { PermissionManagement } from './components/PermissionManagement';
+import { Settings } from './components/Settings';
 import { Materials } from './components/Materials';
 import { MaterialDetail } from './components/materials/MaterialDetail';
 import { PackagingWork } from './components/PackagingWork';
@@ -356,6 +357,7 @@ function AdminLayout() {
                   <Navigate to="/admin/dashboard" replace />
                 )
               } />
+              <Route path="/settings" element={<Settings />} />
             </>
           )}
           </Routes>

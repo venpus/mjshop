@@ -175,7 +175,7 @@ export class ProductCollabService {
 
   /** 진행중/취소 상태인 제품만 삭제 가능. DB 삭제 후 해당 제품 업로드 폴더 제거. */
   async deleteProduct(id: number, currentStatus?: string | null): Promise<boolean> {
-    const allowedStatuses = ['RESEARCH', 'SAMPLE_TEST', 'CONFIG_CONFIRM', 'ORDER_PENDING', 'INCOMING', 'IN_PRODUCTION', 'CANCELLED'];
+    const allowedStatuses = ['RESEARCH', 'SAMPLE_TEST', 'CONFIG_CONFIRM', 'ORDER_PENDING', 'INCOMING', 'IN_PRODUCTION', 'ISSUE_OCCURRED', 'CANCELLED'];
     if (currentStatus != null && !allowedStatuses.includes(currentStatus)) {
       return false;
     }

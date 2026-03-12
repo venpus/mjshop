@@ -4,7 +4,7 @@
  */
 
 /**
- * 제품 진행 상태 (표기: 조사중, 샘플테스트, 구성확정중, 발주대기, 입고중, 생산중, 생산 완료, 취소)
+ * 제품 진행 상태 (표기: 조사중, 샘플테스트, 구성확정중, 발주대기, 입고중, 생산중, 생산 완료, 문제발생, 취소)
  */
 export const PRODUCT_COLLAB_STATUS = [
   'RESEARCH',           // 조사중
@@ -14,6 +14,7 @@ export const PRODUCT_COLLAB_STATUS = [
   'INCOMING',           // 입고중
   'IN_PRODUCTION',      // 생산중
   'PRODUCTION_COMPLETE',// 생산 완료
+  'ISSUE_OCCURRED',     // 문제발생
   'CANCELLED',          // 취소
 ] as const;
 
@@ -203,6 +204,7 @@ export interface DashboardMyTask {
   created_at: Date;
   body?: string | null;
   body_translated?: string | null;
+  body_lang?: string | null;
 }
 
 export interface DashboardTeamTask {
@@ -224,6 +226,7 @@ export interface DashboardAllAssigneeTask {
   created_at: Date;
   body?: string | null;
   body_translated?: string | null;
+  body_lang?: string | null;
 }
 
 export interface DashboardStatusCount {
@@ -242,6 +245,7 @@ export interface DashboardConfirmation {
   completed_at: Date;
   body: string | null;
   body_translated?: string | null;
+  body_lang?: string | null;
 }
 
 /** 내가 작성한 글에 달린 답글 (직접·중첩 모두, 대시보드용) */
@@ -254,6 +258,7 @@ export interface DashboardReplyItem {
   author_name: string | null;
   body: string | null;
   body_translated?: string | null;
+  body_lang?: string | null;
   created_at: Date;
   depth: number;
 }

@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+import { getApiBaseUrl } from './baseUrl';
 
 export function getAuthHeaders(): HeadersInit {
   const headers: HeadersInit = {};
@@ -30,7 +30,7 @@ export interface ApiResponse<T> {
 }
 
 export async function getDashboard(): Promise<ApiResponse<DashboardData>> {
-  const res = await fetch(`${API_BASE_URL}/product-collab/dashboard`, {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/dashboard`, {
     headers: getAuthHeaders(),
   });
   const json = await res.json();
@@ -44,7 +44,7 @@ export interface MentionableUser {
 }
 
 export async function getMentionableUsers(): Promise<ApiResponse<MentionableUser[]>> {
-  const res = await fetch(`${API_BASE_URL}/product-collab/mentionable-users`, {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/mentionable-users`, {
     headers: getAuthHeaders(),
   });
   const json = await res.json();
@@ -54,7 +54,7 @@ export async function getMentionableUsers(): Promise<ApiResponse<MentionableUser
 
 export async function completeTask(productId: number, taskId: number): Promise<ApiResponse<void>> {
   const res = await fetch(
-    `${API_BASE_URL}/product-collab/products/${productId}/tasks/${taskId}/complete`,
+    `${getApiBaseUrl()}/product-collab/products/${productId}/tasks/${taskId}/complete`,
     { method: 'PUT', headers: getAuthHeaders() }
   );
   const json = await res.json();
@@ -73,7 +73,7 @@ export async function getActiveProducts(params?: {
   if (params?.category) q.set('category', params.category);
   if (params?.assignee_id) q.set('assignee_id', params.assignee_id);
   if (params?.search) q.set('search', params.search);
-  const url = `${API_BASE_URL}/product-collab/products${q.toString() ? `?${q}` : ''}`;
+  const url = `${getApiBaseUrl()}/product-collab/products${q.toString() ? `?${q}` : ''}`;
   const res = await fetch(url, { headers: getAuthHeaders() });
   const json = await res.json();
   if (!res.ok) return { success: false, error: json.error || '조회 실패' };
@@ -87,7 +87,7 @@ export interface ProductCollabCounts {
 }
 
 export async function getProductCounts(): Promise<ApiResponse<ProductCollabCounts>> {
-  const res = await fetch(`${API_BASE_URL}/product-collab/products/counts`, {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/products/counts`, {
     headers: getAuthHeaders(),
   });
   const json = await res.json();
@@ -99,7 +99,7 @@ export async function getCompletedProducts(params?: {
   search?: string;
 }): Promise<ApiResponse<ProductCollabProductListItem[]>> {
   const q = params?.search ? `?search=${encodeURIComponent(params.search)}` : '';
-  const res = await fetch(`${API_BASE_URL}/product-collab/products/archive${q}`, {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/products/archive${q}`, {
     headers: getAuthHeaders(),
   });
   const json = await res.json();
@@ -111,7 +111,7 @@ export async function getCancelledProducts(params?: {
   search?: string;
 }): Promise<ApiResponse<ProductCollabProductListItem[]>> {
   const q = params?.search ? `?search=${encodeURIComponent(params.search)}` : '';
-  const res = await fetch(`${API_BASE_URL}/product-collab/products/cancelled${q}`, {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/products/cancelled${q}`, {
     headers: getAuthHeaders(),
   });
   const json = await res.json();
@@ -120,7 +120,7 @@ export async function getCancelledProducts(params?: {
 }
 
 export async function getProductById(id: number): Promise<ApiResponse<ProductCollabProductDetail>> {
-  const res = await fetch(`${API_BASE_URL}/product-collab/products/${id}`, {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/products/${id}`, {
     headers: getAuthHeaders(),
   });
   const json = await res.json();
@@ -135,7 +135,7 @@ export async function createProduct(body: {
   request_links?: string[] | null;
   request_image_urls?: string[] | null;
 }): Promise<ApiResponse<unknown>> {
-  const res = await fetch(`${API_BASE_URL}/product-collab/products`, {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/products`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(body),
@@ -149,7 +149,7 @@ export async function updateProduct(
   id: number,
   body: Record<string, unknown>
 ): Promise<ApiResponse<unknown>> {
-  const res = await fetch(`${API_BASE_URL}/product-collab/products/${id}`, {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/products/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(body),
@@ -160,7 +160,7 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(id: number): Promise<ApiResponse<void>> {
-  const res = await fetch(`${API_BASE_URL}/product-collab/products/${id}`, {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/products/${id}`, {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
@@ -179,7 +179,7 @@ export async function createMessage(
     mention_user_ids?: string[];
   }
 ): Promise<ApiResponse<ProductCollabMessage>> {
-  const res = await fetch(`${API_BASE_URL}/product-collab/products/${productId}/messages`, {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/products/${productId}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(body),
@@ -199,7 +199,7 @@ export async function updateMessage(
   }
 ): Promise<ApiResponse<ProductCollabMessage>> {
   const res = await fetch(
-    `${API_BASE_URL}/product-collab/products/${productId}/messages/${messageId}`,
+    `${getApiBaseUrl()}/product-collab/products/${productId}/messages/${messageId}`,
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
@@ -216,7 +216,7 @@ export async function deleteMessage(
   messageId: number
 ): Promise<ApiResponse<void>> {
   const res = await fetch(
-    `${API_BASE_URL}/product-collab/products/${productId}/messages/${messageId}`,
+    `${getApiBaseUrl()}/product-collab/products/${productId}/messages/${messageId}`,
     { method: 'DELETE', headers: getAuthHeaders() }
   );
   const json = await res.json();
@@ -228,7 +228,7 @@ export async function addProductImage(
   productId: number,
   body: { image_url: string; set_as_main?: boolean }
 ): Promise<ApiResponse<{ id: number; image_url: string; kind: string }>> {
-  const res = await fetch(`${API_BASE_URL}/product-collab/products/${productId}/images`, {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/products/${productId}/images`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(body),
@@ -243,7 +243,7 @@ export async function setMainImage(
   imageId: number
 ): Promise<ApiResponse<unknown>> {
   const res = await fetch(
-    `${API_BASE_URL}/product-collab/products/${productId}/images/${imageId}/set-final`,
+    `${getApiBaseUrl()}/product-collab/products/${productId}/images/${imageId}/set-final`,
     { method: 'PUT', headers: getAuthHeaders() }
   );
   const json = await res.json();
@@ -256,7 +256,7 @@ export async function deleteProductImage(
   imageId: number
 ): Promise<ApiResponse<void>> {
   const res = await fetch(
-    `${API_BASE_URL}/product-collab/products/${productId}/images/${imageId}`,
+    `${getApiBaseUrl()}/product-collab/products/${productId}/images/${imageId}`,
     { method: 'DELETE', headers: getAuthHeaders() }
   );
   const json = await res.json();
@@ -271,7 +271,7 @@ export async function uploadProductImages(
 ): Promise<ApiResponse<{ urls: string[] }>> {
   const form = new FormData();
   files.forEach((file) => form.append('images', file));
-  const res = await fetch(`${API_BASE_URL}/product-collab/products/${productId}/upload`, {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/products/${productId}/upload`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: form,

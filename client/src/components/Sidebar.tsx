@@ -30,6 +30,7 @@ import {
   MessageCircle,
   Sparkles,
   Package,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { SidebarExternalLink } from "./sidebar/SidebarExternalLink";
 
@@ -56,7 +57,8 @@ type PageType =
   | "projects"
   | "permissions"
   | "ai-search"
-  | "product-collab";
+  | "product-collab"
+  | "settings";
 
 interface SidebarProps {
   currentPage: PageType | 'purchase-order-detail';
@@ -491,6 +493,20 @@ export function Sidebar({
             {!isCollapsed && <span>{t('menu.permissions')}</span>}
           </button>
         )}
+
+        {/* 설정 (모든 로그인 사용자) */}
+        <button
+          onClick={() => onPageChange("settings")}
+          className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
+            currentPage === "settings"
+              ? "bg-purple-50 text-purple-600"
+              : "text-gray-700 hover:bg-gray-50"
+          }`}
+          title={isCollapsed ? t('menu.settings') : undefined}
+        >
+          <SettingsIcon className="w-5 h-5 flex-shrink-0" />
+          {!isCollapsed && <span>{t('menu.settings')}</span>}
+        </button>
           </>
         )}
       </nav>

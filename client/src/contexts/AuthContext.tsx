@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { getApiBaseUrl } from '../api/baseUrl';
 
 interface AdminUser {
   id: string;
@@ -21,8 +22,6 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,7 +43,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = async (id: string, password: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin-accounts/login`, {
+      const response = await fetch(`${getApiBaseUrl()}/admin-accounts/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

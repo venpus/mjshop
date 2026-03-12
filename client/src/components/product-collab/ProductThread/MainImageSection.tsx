@@ -37,7 +37,7 @@ export function MainImageSection({
   onStatusChange,
   updatingStatus = false,
 }: MainImageSectionProps) {
-  const PROGRESS_STATUSES: ProductCollabStatus[] = ['RESEARCH', 'SAMPLE_TEST', 'CONFIG_CONFIRM', 'ORDER_PENDING', 'INCOMING', 'IN_PRODUCTION', 'PRODUCTION_COMPLETE', 'CANCELLED'];
+  const PROGRESS_STATUSES: ProductCollabStatus[] = ['RESEARCH', 'SAMPLE_TEST', 'CONFIG_CONFIRM', 'ORDER_PENDING', 'INCOMING', 'IN_PRODUCTION', 'PRODUCTION_COMPLETE', 'ISSUE_OCCURRED', 'CANCELLED'];
   const { t } = useLanguage();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);

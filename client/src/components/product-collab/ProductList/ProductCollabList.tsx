@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { getActiveProducts, createProduct, uploadProductImages, updateProduct } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -17,31 +17,38 @@ const defaultFilters: ProductListFiltersValue = {
   category: '',
 };
 
-/** 상태별 뱃지 배경/텍스트 색상 (회색·흰색·검은색 미사용) */
+/** 상태별 뱃지 배경/텍스트 색상 - types의 PRODUCT_COLLAB_STATUS_BADGE_CLASS와 동일 유지 */
 const statusBadgeClass: Record<ProductCollabStatus, string> = {
-  RESEARCH: 'bg-[#CCFBF1] text-[#115E59]',           // teal
-  SAMPLE_TEST: 'bg-[#DBEAFE] text-[#1E40AF]',       // blue
-  CONFIG_CONFIRM: 'bg-[#FEF3C7] text-[#B45309]',    // amber
-  ORDER_PENDING: 'bg-[#FFEDD5] text-[#C2410C]',     // orange
-  INCOMING: 'bg-[#E9D5FF] text-[#6B21A8]',          // purple
-  IN_PRODUCTION: 'bg-[#E0E7FF] text-[#3730A3]',     // indigo
-  PRODUCTION_COMPLETE: 'bg-[#D1FAE5] text-[#047857]', // green
-  CANCELLED: 'bg-[#FEE2E2] text-[#B91C1C]',         // red
+  RESEARCH: 'bg-[#CCFBF1] text-[#115E59]',
+  SAMPLE_TEST: 'bg-[#DBEAFE] text-[#1E40AF]',
+  CONFIG_CONFIRM: 'bg-[#FEF3C7] text-[#B45309]',
+  ORDER_PENDING: 'bg-[#FFEDD5] text-[#C2410C]',
+  INCOMING: 'bg-[#E9D5FF] text-[#6B21A8]',
+  IN_PRODUCTION: 'bg-[#E0E7FF] text-[#3730A3]',
+  PRODUCTION_COMPLETE: 'bg-[#D1FAE5] text-[#047857]',
+  ISSUE_OCCURRED: 'bg-[#FEE2E2] text-[#B91C1C]',
+  CANCELLED: 'bg-[#FEE2E2] text-[#B91C1C]',
 };
 
 export function ProductCollabList() {
   const { t, language } = useLanguage();
   const { counts } = useProductCollabCounts() ?? {};
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const statusFromUrl = searchParams.get('status') ?? '';
   const [list, setList] = useState<ProductCollabProductListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
-  const [filters, setFilters] = useState<ProductListFiltersValue>(defaultFilters);
+  const [filters, setFilters] = useState<ProductListFiltersValue>(() => ({
+    ...defaultFilters,
+    status: statusFromUrl,
+  }));
 
   const loadList = () => {
+    setLoading(true);
     getActiveProducts({
       search: filters.search.trim() || undefined,
       status: filters.status || undefined,
@@ -53,20 +60,27 @@ export function ProductCollabList() {
     });
   };
 
+  // URL 쿼리(status) 변경 시 필터 동기화
+  useEffect(() => {
+    const s = searchParams.get('status') ?? '';
+    setFilters((prev) => (prev.status !== s ? { ...prev, status: s } : prev));
+  }, [searchParams]);
+
+  // 필터 변경 시 목록 조회 (초기 진입 시 + 대시보드에서 현황 클릭 후 진입 시)
   useEffect(() => {
     loadList();
-  }, []);
+  }, [filters.status, filters.search, filters.category]);
 
   const handleApplyFilters = () => {
-    setLoading(true);
-    getActiveProducts({
-      search: filters.search.trim() || undefined,
-      status: filters.status || undefined,
-      category: filters.category || undefined,
-    }).then((res) => {
-      setLoading(false);
-      if (res.success && res.data) setList(res.data);
-    });
+    loadList();
+  };
+
+  const hasActiveFilters = Boolean(
+    (filters.search && filters.search.trim()) || filters.status || filters.category
+  );
+  const handleClearFilters = () => {
+    setFilters(defaultFilters);
+    setSearchParams({});
   };
 
   const handleCreate = async (payload: {
@@ -140,6 +154,17 @@ export function ProductCollabList() {
         onChange={setFilters}
         onApply={handleApplyFilters}
       />
+      {hasActiveFilters && (
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={handleClearFilters}
+            className="text-sm text-[#6B7280] hover:text-[#374151] underline"
+          >
+            {t('productCollab.clearFilters')}
+          </button>
+        </div>
+      )}
       <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {list.map((p) => {
           const imgSrc = getProductCollabImageUrl(p.main_image_url ?? p.request_first_image_url);
@@ -150,7 +175,9 @@ export function ProductCollabList() {
             tabIndex={0}
             onClick={() => navigate(`/admin/product-collab/thread/${p.id}`)}
             onKeyDown={(e) => e.key === 'Enter' && navigate(`/admin/product-collab/thread/${p.id}`)}
-            className="relative bg-white rounded-lg border border-[#E5E7EB] p-4 text-left hover:border-[#2563EB] transition-colors cursor-pointer"
+            className={`relative bg-white rounded-lg border p-4 text-left hover:border-[#2563EB] transition-colors cursor-pointer ${
+              p.status === 'ISSUE_OCCURRED' ? 'border-2 border-red-500' : 'border border-[#E5E7EB]'
+            }`}
           >
             {/* 좌측 상단 상태 뱃지 */}
             <span

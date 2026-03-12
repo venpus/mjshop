@@ -131,8 +131,8 @@ async function startServer() {
     const migrator = new Migrator();
     await migrator.migrate();
 
-    // 서버 시작
-    app.listen(PORT, () => {
+    // 서버 시작 (0.0.0.0 = 모든 네트워크 인터페이스에서 접속 허용, 모바일 테스트용)
+    app.listen(PORT, '0.0.0.0', () => {
       logger.info(`🚀 서버가 포트 ${PORT}에서 실행 중입니다.`);
       logger.info(`📍 Health check: http://localhost:${PORT}/api/health`);
       logger.debug(`📸 이미지 예시 URL: http://localhost:${PORT}/uploads/products/P001/001.png`);

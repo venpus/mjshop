@@ -11,6 +11,7 @@ export type ProductCollabStatus =
   | 'INCOMING'
   | 'IN_PRODUCTION'
   | 'PRODUCTION_COMPLETE'
+  | 'ISSUE_OCCURRED'
   | 'CANCELLED';
 
 /** 진행 상태 표시용 번역 키 */
@@ -22,7 +23,21 @@ export const PRODUCT_COLLAB_STATUS_LABEL_KEYS: Record<ProductCollabStatus, strin
   INCOMING: 'productCollab.statusIncoming',
   IN_PRODUCTION: 'productCollab.statusInProduction',
   PRODUCTION_COMPLETE: 'productCollab.statusProductionComplete',
+  ISSUE_OCCURRED: 'productCollab.statusIssueOccurred',
   CANCELLED: 'productCollab.statusCancelled',
+};
+
+/** 상태별 뱃지/카드 색상 (대시보드 제품 현황, 목록 카드 뱃지 공통) */
+export const PRODUCT_COLLAB_STATUS_BADGE_CLASS: Record<ProductCollabStatus, string> = {
+  RESEARCH: 'bg-[#CCFBF1] text-[#115E59] border-[#99F6E4]',           // teal
+  SAMPLE_TEST: 'bg-[#DBEAFE] text-[#1E40AF] border-[#93C5FD]',       // blue
+  CONFIG_CONFIRM: 'bg-[#FEF3C7] text-[#B45309] border-[#FCD34D]',    // amber
+  ORDER_PENDING: 'bg-[#FFEDD5] text-[#C2410C] border-[#FDBA74]',    // orange
+  INCOMING: 'bg-[#E9D5FF] text-[#6B21A8] border-[#D8B4FE]',          // purple
+  IN_PRODUCTION: 'bg-[#E0E7FF] text-[#3730A3] border-[#C7D2FE]',     // indigo
+  PRODUCTION_COMPLETE: 'bg-[#D1FAE5] text-[#047857] border-[#6EE7B7]', // green
+  ISSUE_OCCURRED: 'bg-[#FEE2E2] text-[#B91C1C] border-[#FCA5A5]',    // red
+  CANCELLED: 'bg-[#FEE2E2] text-[#B91C1C] border-[#FCA5A5]',         // red
 };
 
 export type ProductCollabCategory = 'Plush' | 'Goods' | 'Figure';
@@ -136,6 +151,8 @@ export interface DashboardMyTask {
   /** 멘션된 메시지 본문 */
   body?: string | null;
   body_translated?: string | null;
+  /** 원문 언어 ko / zh */
+  body_lang?: string | null;
 }
 
 export interface DashboardTeamTask {
@@ -164,6 +181,8 @@ export interface DashboardAllAssigneeTask {
   /** 멘션된 메시지 본문 */
   body?: string | null;
   body_translated?: string | null;
+  /** 원문 언어 ko / zh */
+  body_lang?: string | null;
 }
 
 /** 내가 작성한 메시지를 멘션된 사람이 확인한 항목 (대시보드용) */
@@ -177,6 +196,7 @@ export interface DashboardConfirmation {
   completed_at: string;
   body: string | null;
   body_translated?: string | null;
+  body_lang?: string | null;
 }
 
 /** 내가 작성한 글에 달린 답글 (직접·중첩 모두, 대시보드용) */
@@ -189,6 +209,7 @@ export interface DashboardReplyItem {
   author_name: string | null;
   body: string | null;
   body_translated?: string | null;
+  body_lang?: string | null;
   created_at: string;
   depth: number;
 }

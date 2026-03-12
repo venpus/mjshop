@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+import { getApiBaseUrl } from '../api/baseUrl';
 
 // 권한 데이터 타입
 interface ResourcePermissions {
@@ -54,12 +53,12 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
 
     try {
       const [permRes, costRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/permissions`, {
+        fetch(`${getApiBaseUrl()}/permissions`, {
           method: 'GET',
           headers,
           credentials: 'include',
         }),
-        fetch(`${API_BASE_URL}/permissions/can-edit-purchase-order-cost`, {
+        fetch(`${getApiBaseUrl()}/permissions/can-edit-purchase-order-cost`, {
           method: 'GET',
           headers,
           credentials: 'include',

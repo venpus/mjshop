@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom';
 import { getDashboard, completeTask } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useProductCollabCounts } from '../ProductCollabCountsContext';
+import { getDashboardShowBothLanguages } from '../../../constants/settings';
 import type { DashboardData } from '../types';
-import { PRODUCT_COLLAB_STATUS_LABEL_KEYS } from '../types';
+import { PRODUCT_COLLAB_STATUS_LABEL_KEYS, PRODUCT_COLLAB_STATUS_BADGE_CLASS } from '../types';
 
 export function ProductCollabDashboard() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { counts } = useProductCollabCounts() ?? {};
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,8 +40,28 @@ export function ProductCollabDashboard() {
     loadDashboard();
   }, []);
 
+  /** 제품 현황 표시 순서: 문제발생(ISSUE_OCCURRED) 항상 맨 앞 (훅은 조건부 return 이전에 호출) */
+  const sortedStatusCounts = useMemo(() => {
+    const list = data?.statusCounts ?? [];
+    const issue = list.find((s) => s.status === 'ISSUE_OCCURRED');
+    const rest = list.filter((s) => s.status !== 'ISSUE_OCCURRED');
+    return issue ? [issue, ...rest] : list;
+  }, [data?.statusCounts]);
+
   if (loading) return <div className="p-6 text-[#1F2937]">{t('productCollab.loading')}</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
+
+  const showBothLanguages = getDashboardShowBothLanguages();
+
+  /** 시스템 언어에 맞는 본문만 반환 (한국어면 원문이 한이면 원문, 원문이 중이면 번역문) */
+  const bodyForLanguage = (item: { body?: string | null; body_translated?: string | null; body_lang?: string | null }) => {
+    const body = item.body ?? '';
+    const translated = item.body_translated?.trim() || null;
+    const bodyLang = item.body_lang ?? null;
+    if (bodyLang == null) return body;
+    if (language === bodyLang) return body;
+    return translated || body;
+  };
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -50,6 +71,34 @@ export function ProductCollabDashboard() {
           <span className="ml-2 text-base font-semibold text-[#6B7280]">({counts.activeCount})</span>
         )}
       </h1>
+
+      {/* 제품 현황 - 슬레이트 계열 (맨 위로 이동), 클릭 시 해당 상태 목록으로 이동 */}
+      <section className="rounded-xl border-2 border-[#CBD5E1] overflow-hidden bg-[#F8FAFC]">
+        <div className="px-4 py-3 bg-[#E2E8F0] border-b border-[#CBD5E1]">
+          <h2 className="text-lg font-semibold text-[#334155]">{t('productCollab.productStatusSection')}</h2>
+        </div>
+        <div className="p-4 bg-white">
+        <div className="flex flex-wrap gap-3 text-sm">
+          {sortedStatusCounts.map((s) => {
+            const statusKey = s.status as keyof typeof PRODUCT_COLLAB_STATUS_BADGE_CLASS;
+            const badgeClass = PRODUCT_COLLAB_STATUS_BADGE_CLASS[statusKey] ?? 'bg-[#E2E8F0] text-[#475569] border-[#CBD5E1]';
+            return (
+            <Link
+              key={s.status}
+              to={`/admin/product-collab/list?status=${encodeURIComponent(s.status)}`}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border ${badgeClass} hover:opacity-90 transition-opacity`}
+            >
+              <span>{t(PRODUCT_COLLAB_STATUS_LABEL_KEYS[statusKey] ?? s.status)}</span>
+              <span className="font-semibold tabular-nums opacity-90">({s.count})</span>
+            </Link>
+            );
+          })}
+          {!sortedStatusCounts.length && (
+            <p className="text-[#6B7280]">{t('productCollab.noProductsByStage')}</p>
+          )}
+        </div>
+        </div>
+      </section>
 
       {/* 내 업무 - 파란 계열 */}
       <section className="rounded-xl border-2 border-[#BFDBFE] overflow-hidden bg-[#EFF6FF]">
@@ -77,15 +126,21 @@ export function ProductCollabDashboard() {
                       {tItem.completed_at ? t('productCollab.statusDone') : t('productCollab.statusInProgress')}
                     </span>
                   </div>
-                  {(tItem.body?.trim() || tItem.body_translated?.trim()) && (
-                    <div className="text-sm text-[#374151] mt-1 space-y-0.5">
-                      {tItem.body?.trim() && (
-                        <p className="line-clamp-2">{tItem.body.trim()}</p>
-                      )}
-                      {tItem.body_translated?.trim() && (
-                        <p className="line-clamp-2 border-l-2 border-[#93C5FD] pl-2 text-[#1d4ed8]">
-                          {tItem.body_translated.trim()}
-                        </p>
+                  {(showBothLanguages
+                    ? (tItem.body?.trim() || tItem.body_translated?.trim())
+                    : bodyForLanguage(tItem).trim()) && (
+                    <div className="text-sm text-[#374151] mt-1">
+                      {showBothLanguages ? (
+                        <>
+                          {tItem.body?.trim() && <p className="line-clamp-2">{tItem.body.trim()}</p>}
+                          {tItem.body_translated?.trim() && (
+                            <p className="line-clamp-2 border-l-2 border-[#E5E7EB] pl-2 text-[#6B7280] mt-0.5">
+                              {tItem.body_translated.trim()}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="line-clamp-2">{bodyForLanguage(tItem).trim()}</p>
                       )}
                     </div>
                   )}
@@ -102,10 +157,21 @@ export function ProductCollabDashboard() {
                       type="button"
                       disabled={completingTaskId === tItem.task_id}
                       onClick={async () => {
-                        setCompletingTaskId(tItem.task_id);
-                        const res = await completeTask(tItem.product_id, tItem.task_id);
+                        const taskId = tItem.task_id;
+                        const productId = tItem.product_id;
+                        setCompletingTaskId(taskId);
+                        setData((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                myTasks: prev.myTasks.filter((t) => t.task_id !== taskId),
+                                confirmationsReceived: prev.confirmationsReceived?.filter((c) => c.task_id !== taskId) ?? prev.confirmationsReceived,
+                              }
+                            : null
+                        );
+                        const res = await completeTask(productId, taskId);
                         setCompletingTaskId(null);
-                        if (res.success) loadDashboard();
+                        if (!res.success) loadDashboard();
                       }}
                       className="px-2 py-1 text-xs text-white bg-[#10B981] hover:bg-[#059669] rounded disabled:opacity-50"
                     >
@@ -150,15 +216,21 @@ export function ProductCollabDashboard() {
                       {t('productCollab.confirmationBy').replace('{name}', c.assignee_name ?? c.assignee_id)}
                     </span>
                   </div>
-                  {(c.body?.trim() || c.body_translated?.trim()) && (
-                    <div className="text-sm text-[#374151] mt-1 space-y-0.5">
-                      {c.body?.trim() && (
-                        <p className="line-clamp-2">{c.body.trim()}</p>
-                      )}
-                      {c.body_translated?.trim() && (
-                        <p className="line-clamp-2 border-l-2 border-[#93C5FD] pl-2 text-[#1d4ed8]">
-                          {c.body_translated.trim()}
-                        </p>
+                  {(showBothLanguages
+                    ? (c.body?.trim() || c.body_translated?.trim())
+                    : bodyForLanguage(c).trim()) && (
+                    <div className="text-sm text-[#374151] mt-1">
+                      {showBothLanguages ? (
+                        <>
+                          {c.body?.trim() && <p className="line-clamp-2">{c.body.trim()}</p>}
+                          {c.body_translated?.trim() && (
+                            <p className="line-clamp-2 border-l-2 border-[#E5E7EB] pl-2 text-[#6B7280] mt-0.5">
+                              {c.body_translated.trim()}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="line-clamp-2">{bodyForLanguage(c).trim()}</p>
                       )}
                     </div>
                   )}
@@ -212,16 +284,9 @@ export function ProductCollabDashboard() {
                       {reply.author_name ?? reply.author_id} · {new Date(reply.created_at).toLocaleString('ko-KR')}
                     </span>
                   </div>
-                  {(reply.body?.trim() || reply.body_translated?.trim()) && (
-                    <div className="text-sm text-[#374151] mt-1 space-y-0.5">
-                      {reply.body?.trim() && (
-                        <p className="line-clamp-2">{reply.body.trim()}</p>
-                      )}
-                      {reply.body_translated?.trim() && (
-                        <p className="line-clamp-2 border-l-2 border-[#93C5FD] pl-2 text-[#1d4ed8]">
-                          {reply.body_translated.trim()}
-                        </p>
-                      )}
+                  {(bodyForLanguage(reply).trim()) && (
+                    <div className="text-sm text-[#374151] mt-1">
+                      <p className="line-clamp-2">{bodyForLanguage(reply).trim()}</p>
                     </div>
                   )}
                 </div>
@@ -268,15 +333,21 @@ export function ProductCollabDashboard() {
                       {tItem.completed_at ? t('productCollab.statusDone') : t('productCollab.statusInProgress')}
                     </span>
                   </div>
-                  {(tItem.body?.trim() || tItem.body_translated?.trim()) && (
+                  {(showBothLanguages
+                    ? (tItem.body?.trim() || tItem.body_translated?.trim())
+                    : bodyForLanguage(tItem).trim()) && (
                     <div className="text-sm text-[#374151] mt-1 space-y-0.5 sm:ml-[5.5rem]">
-                      {tItem.body?.trim() && (
-                        <p className="line-clamp-2">{tItem.body.trim()}</p>
-                      )}
-                      {tItem.body_translated?.trim() && (
-                        <p className="line-clamp-2 border-l-2 border-[#93C5FD] pl-2 text-[#1d4ed8]">
-                          {tItem.body_translated.trim()}
-                        </p>
+                      {showBothLanguages ? (
+                        <>
+                          {tItem.body?.trim() && <p className="line-clamp-2">{tItem.body.trim()}</p>}
+                          {tItem.body_translated?.trim() && (
+                            <p className="line-clamp-2 border-l-2 border-[#E5E7EB] pl-2 text-[#6B7280] mt-0.5">
+                              {tItem.body_translated.trim()}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="line-clamp-2">{bodyForLanguage(tItem).trim()}</p>
                       )}
                     </div>
                   )}
@@ -293,10 +364,21 @@ export function ProductCollabDashboard() {
                       type="button"
                       disabled={completingTaskId === tItem.task_id}
                       onClick={async () => {
-                        setCompletingTaskId(tItem.task_id);
-                        const res = await completeTask(tItem.product_id, tItem.task_id);
+                        const taskId = tItem.task_id;
+                        const productId = tItem.product_id;
+                        setCompletingTaskId(taskId);
+                        setData((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                allAssigneeTasks: prev.allAssigneeTasks.filter((t) => t.task_id !== taskId),
+                                confirmationsReceived: prev.confirmationsReceived?.filter((c) => c.task_id !== taskId) ?? prev.confirmationsReceived,
+                              }
+                            : null
+                        );
+                        const res = await completeTask(productId, taskId);
                         setCompletingTaskId(null);
-                        if (res.success) loadDashboard();
+                        if (!res.success) loadDashboard();
                       }}
                       className="px-2 py-1 text-xs text-white bg-[#10B981] hover:bg-[#059669] rounded disabled:opacity-50"
                     >
@@ -310,25 +392,6 @@ export function ProductCollabDashboard() {
         ) : (
           <p className="text-[#6B7280] text-sm">{t('productCollab.noAllAssigneeTasks')}</p>
         )}
-        </div>
-      </section>
-
-      {/* 제품 상태 - 슬레이트 계열 */}
-      <section className="rounded-xl border-2 border-[#CBD5E1] overflow-hidden bg-[#F8FAFC]">
-        <div className="px-4 py-3 bg-[#E2E8F0] border-b border-[#CBD5E1]">
-          <h2 className="text-lg font-semibold text-[#334155]">{t('productCollab.productStatusSection')}</h2>
-        </div>
-        <div className="p-4 bg-white">
-        <div className="flex flex-wrap gap-4 text-sm">
-          {data?.statusCounts?.map((s) => (
-            <span key={s.status} className="text-[#1F2937]">
-              {t(PRODUCT_COLLAB_STATUS_LABEL_KEYS[s.status as keyof typeof PRODUCT_COLLAB_STATUS_LABEL_KEYS] ?? s.status)}: {s.count}
-            </span>
-          ))}
-          {!data?.statusCounts?.length && (
-            <p className="text-[#6B7280]">{t('productCollab.noProductsByStage')}</p>
-          )}
-        </div>
         </div>
       </section>
     </div>
