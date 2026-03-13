@@ -1,6 +1,6 @@
 import { useState, useEffect, ReactNode } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
-import { Menu, X, Globe, LogOut, User } from 'lucide-react';
+import { Menu, X, Globe, LogOut, User, Sparkles } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { Products } from './components/Products';
@@ -192,7 +192,7 @@ function AdminLayout() {
 
           <div className="flex-1 min-w-0" />
 
-          {/* User Info and Logout */}
+          {/* User Info, AI 업무 비서, Logout */}
           <div className="flex items-center gap-1 sm:gap-2 lg:gap-4 shrink-0 min-w-0">
             {user && (
               <div className="flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 bg-gray-100 rounded-lg min-w-0 max-w-[40vw] sm:max-w-none">
@@ -202,12 +202,22 @@ function AdminLayout() {
               </div>
             )}
             <button
+              type="button"
+              onClick={() => navigate('/admin/product-collab')}
+              className="flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 text-white rounded-lg shrink-0 shadow-sm border border-[#2563EB]/30 animate-sparkle bg-[#2563EB] hover:bg-[#1D4ED8] hover:animate-none"
+              title={t('productCollab.aiWorkAssistant')}
+            >
+              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm font-medium whitespace-nowrap sm:hidden">{t('productCollab.aiWorkAssistantShort')}</span>
+              <span className="text-xs sm:text-sm font-medium whitespace-nowrap hidden sm:inline">{t('productCollab.aiWorkAssistant')}</span>
+            </button>
+            <button
               onClick={logout}
               className="flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
               title={t('common.logout')}
             >
               <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="text-xs sm:text-sm font-medium whitespace-nowrap">{t('common.logout')}</span>
+              <span className="text-xs sm:text-sm font-medium whitespace-nowrap hidden sm:inline">{t('common.logout')}</span>
             </button>
           </div>
 
@@ -217,8 +227,8 @@ function AdminLayout() {
               onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
               className="flex items-center gap-1 sm:gap-2 px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg hover:bg-gray-100 transition-colors"
             >
-              <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 shrink-0" />
-              <span className="text-xs sm:text-sm text-gray-700 whitespace-nowrap">{languages[language].flag} {languages[language].name}</span>
+              <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 shrink-0 hidden sm:block" />
+              <span className="text-base sm:text-sm text-gray-700 whitespace-nowrap">{languages[language].flag}<span className="hidden sm:inline"> {languages[language].name}</span></span>
             </button>
 
             {isLanguageDropdownOpen && (

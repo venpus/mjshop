@@ -57,6 +57,15 @@ export default {
         sm: "var(--radius-sm)",
         xl: "var(--radius-xl)",
       },
+      keyframes: {
+        "sparkle-color": {
+          "0%, 100%": { backgroundColor: "rgb(37, 99, 235)" },
+          "50%": { backgroundColor: "rgb(96, 165, 250)" },
+        },
+      },
+      animation: {
+        sparkle: "sparkle-color 2s ease-in-out infinite",
+      },
     },
   },
   plugins: [],

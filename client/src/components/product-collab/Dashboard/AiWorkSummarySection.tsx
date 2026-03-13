@@ -61,12 +61,12 @@ export function AiWorkSummarySection() {
     : null;
 
   return (
-    <section className="rounded-xl border-2 border-[#E5E7EB] bg-white overflow-hidden mb-6">
-      <div className="px-4 py-3 bg-[#F3F4F6] border-b border-[#E5E7EB] flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h2 className="text-lg font-semibold text-[#374151]">{t('productCollab.aiWorkAssistant')}</h2>
+    <section className="rounded-none sm:rounded-xl border-2 border-[#E5E7EB] bg-white overflow-hidden mb-6 -mx-6 sm:mx-0">
+      <div className="px-4 py-3 bg-[#F3F4F6] border-b border-[#E5E7EB] flex flex-row items-center justify-between gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 overflow-hidden flex-1">
+          <h2 className="text-base sm:text-lg font-semibold text-[#374151] truncate min-w-0">{t('productCollab.aiWorkAssistant')}</h2>
           {agoText && (
-            <span className="text-sm text-[#6B7280]">
+            <span className="text-xs sm:text-sm text-[#6B7280] truncate min-w-0">
               ({data?.provider ? `${data.provider === 'openai' ? 'OpenAI' : 'Qwen'} · ${agoText}` : agoText})
             </span>
           )}
@@ -75,9 +75,9 @@ export function AiWorkSummarySection() {
           type="button"
           disabled={loading}
           onClick={handleSummarize}
-          className="px-4 py-2 text-sm font-medium text-white bg-[#2563EB] hover:bg-[#1D4ED8] rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm font-medium text-white bg-[#2563EB] hover:bg-[#1D4ED8] rounded-lg disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
         >
-          {loading ? t('productCollab.loading') : t('productCollab.summarize')}
+          {loading ? t('productCollab.loading') : (<><span className="sm:hidden">{t('productCollab.summary')}</span><span className="hidden sm:inline">{t('productCollab.summarize')}</span></>)}
         </button>
       </div>
       <div className="p-4">

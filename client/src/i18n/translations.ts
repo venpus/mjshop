@@ -70,6 +70,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     'productCollab.dashboard': '대시보드',
     'productCollab.aiWorkAssistant': 'AI 업무 비서',
+    'productCollab.aiWorkAssistantShort': 'AI 비서',
     'productCollab.summarize': '요약하기',
     'productCollab.productName': '제품명',
     'productCollab.summary': '요약',
@@ -387,6 +388,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     'productCollab.dashboard': '仪表板',
     'productCollab.aiWorkAssistant': 'AI 工作助理',
+    'productCollab.aiWorkAssistantShort': 'AI 助理',
     'productCollab.summarize': '生成摘要',
     'productCollab.productName': '产品名',
     'productCollab.summary': '摘要',
