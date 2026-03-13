@@ -7,6 +7,7 @@ import { getDashboardShowBothLanguages } from '../../../constants/settings';
 import { useIsMobile } from '../../ui/use-mobile';
 import type { DashboardData } from '../types';
 import { PRODUCT_COLLAB_STATUS_LABEL_KEYS, PRODUCT_COLLAB_STATUS_BADGE_CLASS } from '../types';
+import { AiWorkSummarySection } from './AiWorkSummarySection';
 
 export function ProductCollabDashboard() {
   const { t, language } = useLanguage();
@@ -71,11 +72,13 @@ export function ProductCollabDashboard() {
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <h1 className="text-xl font-bold text-[#1F2937]">
-        {t('productCollab.dashboard')}
+        {t('productCollab.aiWorkAssistant')}
         {counts && (
           <span className="ml-2 text-base font-semibold text-[#6B7280]">({counts.activeCount})</span>
         )}
       </h1>
+
+      <AiWorkSummarySection />
 
       {/* 제품 현황 - 슬레이트 계열 (맨 위로 이동), 클릭 시 해당 상태 목록으로 이동 */}
       <section className="rounded-xl border-2 border-[#CBD5E1] overflow-hidden bg-[#F8FAFC]">

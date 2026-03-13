@@ -29,6 +29,39 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
+export interface OverallSummaryProduct {
+  productId: number;
+  productName: string;
+  summary: string;
+  delayedNote?: string;
+  /** 서버에서 병합: 제품 상태 */
+  status?: string;
+  /** 서버에서 병합: 1=문제발생, 2=지연, 3=그 외 */
+  priority?: 'issue' | 'delayed' | 'normal';
+}
+
+export interface MyTaskSummaryItem {
+  productId: number;
+  productName: string;
+  priority: 'issue' | 'delayed' | 'normal';
+  summary: string;
+}
+
+export interface AiWorkSummaryResult {
+  overallSummary: OverallSummaryProduct[];
+  myTasksSummary: MyTaskSummaryItem[];
+}
+
+export async function postAiWorkSummary(lang: 'ko' | 'zh'): Promise<ApiResponse<AiWorkSummaryResult>> {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/ai-work-summary?lang=${lang}`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) return { success: false, error: json.error || '요약 생성 실패' };
+  return { success: true, data: json.data };
+}
+
 export async function getDashboard(): Promise<ApiResponse<DashboardData>> {
   const res = await fetch(`${getApiBaseUrl()}/product-collab/dashboard`, {
     headers: getAuthHeaders(),

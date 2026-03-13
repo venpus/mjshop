@@ -759,6 +759,99 @@ export class ProductCollabRepository {
     return { items, total };
   }
 
+  /** AI 업무 요약용: 취소·생산완료 제외한 모든 제품 (태스크 유무와 무관) */
+  async findActiveProductsForSummary(): Promise<
+    { product_id: number; product_name: string; product_status: string; last_activity_at: Date }[]
+  > {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT p.id AS product_id, p.name AS product_name, p.status AS product_status, p.last_activity_at
+       FROM product_collab_products p
+       WHERE p.status NOT IN ('PRODUCTION_COMPLETE', 'CANCELLED')
+       ORDER BY p.id`
+    );
+    return (rows as RowDataPacket[]).map((r) => ({
+      product_id: r.product_id,
+      product_name: r.product_name,
+      product_status: r.product_status,
+      last_activity_at: r.last_activity_at,
+    }));
+  }
+
+  /** AI 업무 요약용(레거시): 취소/완료 제외 전체 미완료 태스크 + 제품 상태·마지막 활동일 */
+  async findActiveTasksWithProductInfoForSummary(): Promise<
+    { task_id: number; product_id: number; product_name: string; product_status: string; last_activity_at: Date; assignee_name: string | null; body: string | null; created_at: Date }[]
+  > {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT t.id AS task_id, t.product_id, p.name AS product_name, p.status AS product_status, p.last_activity_at,
+              a.name AS assignee_name, m.body, t.created_at
+       FROM product_collab_tasks t
+       JOIN product_collab_products p ON p.id = t.product_id AND p.status NOT IN ('PRODUCTION_COMPLETE', 'CANCELLED')
+       LEFT JOIN admin_accounts a ON t.assignee_id = a.id
+       LEFT JOIN product_collab_messages m ON m.id = t.message_id AND m.product_id = t.product_id
+       WHERE t.completed_at IS NULL
+       ORDER BY p.id, t.created_at DESC`
+    );
+    return (rows as RowDataPacket[]).map((r) => ({
+      task_id: r.task_id,
+      product_id: r.product_id,
+      product_name: r.product_name,
+      product_status: r.product_status,
+      last_activity_at: r.last_activity_at,
+      assignee_name: r.assignee_name ?? null,
+      body: r.body ?? null,
+      created_at: r.created_at,
+    }));
+  }
+
+  /** AI 업무 요약용: 제품별 쓰레드 전체 메시지 (글+댓글, created_at 오름차순) */
+  async findThreadMessagesForSummary(productIds: number[]): Promise<
+    { product_id: number; id: number; parent_id: number | null; author_name: string | null; body: string | null; created_at: Date }[]
+  > {
+    if (productIds.length === 0) return [];
+    const placeholders = productIds.map(() => '?').join(',');
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT m.product_id, m.id, m.parent_id, a.name AS author_name, m.body, m.created_at
+       FROM product_collab_messages m
+       LEFT JOIN admin_accounts a ON m.author_id = a.id
+       WHERE m.product_id IN (${placeholders})
+       ORDER BY m.product_id, m.created_at ASC`,
+      productIds
+    );
+    return (rows as RowDataPacket[]).map((r) => ({
+      product_id: r.product_id,
+      id: r.id,
+      parent_id: r.parent_id ?? null,
+      author_name: r.author_name ?? null,
+      body: r.body ?? null,
+      created_at: r.created_at,
+    }));
+  }
+
+  /** AI 업무 요약용: 내 미완료 태스크 + 제품 상태·마지막 활동일 */
+  async findMyTasksWithProductInfoForSummary(userId: string): Promise<
+    { task_id: number; product_id: number; product_name: string; product_status: string; last_activity_at: Date; body: string | null; created_at: Date }[]
+  > {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT t.id AS task_id, t.product_id, p.name AS product_name, p.status AS product_status, p.last_activity_at,
+              m.body, t.created_at
+       FROM product_collab_tasks t
+       JOIN product_collab_products p ON p.id = t.product_id AND p.status NOT IN ('PRODUCTION_COMPLETE', 'CANCELLED')
+       LEFT JOIN product_collab_messages m ON m.id = t.message_id AND m.product_id = t.product_id
+       WHERE t.assignee_id = ? AND t.completed_at IS NULL
+       ORDER BY p.id, t.created_at DESC`,
+      [userId]
+    );
+    return (rows as RowDataPacket[]).map((r) => ({
+      task_id: r.task_id,
+      product_id: r.product_id,
+      product_name: r.product_name,
+      product_status: r.product_status,
+      last_activity_at: r.last_activity_at,
+      body: r.body ?? null,
+      created_at: r.created_at,
+    }));
+  }
+
   /** 담당자별 최대 3건씩만 (대시보드 미리보기용) */
   async findAssigneeTasksForDashboard(excludeUserId: string | null): Promise<DashboardAllAssigneeTask[]> {
     const excludeClause = excludeUserId ? ' AND t.assignee_id != ?' : '';

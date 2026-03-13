@@ -291,6 +291,26 @@ export class ProductCollabController {
     }
   };
 
+  postAiWorkSummary = async (req: Request, res: Response) => {
+    try {
+      const userId = (req as unknown as { user?: { id: string } }).user?.id ?? '';
+      if (!userId) {
+        return res.status(401).json({ success: false, error: '로그인이 필요합니다.' });
+      }
+      const lang = (req.query.lang ?? req.body?.lang ?? 'ko') as string;
+      const language = lang === 'zh' ? 'zh' : 'ko';
+      const { getAiWorkSummary } = await import('../services/aiWorkSummaryService.js');
+      const result = await getAiWorkSummary(userId, language);
+      if (!result) {
+        return res.status(503).json({ success: false, error: 'AI 요약을 생성할 수 없습니다. DASHSCOPE_API_KEY를 확인하세요.' });
+      }
+      res.json({ success: true, data: result });
+    } catch (error: unknown) {
+      console.error('Product collab AI work summary error:', error);
+      res.status(500).json({ success: false, error: '업무 요약 중 오류가 발생했습니다.' });
+    }
+  };
+
   getDashboardSection = async (req: Request, res: Response) => {
     try {
       const userId = (req as unknown as { user?: { id: string } }).user?.id ?? '';

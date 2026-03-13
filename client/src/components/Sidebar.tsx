@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { usePermission } from '../contexts/PermissionContext';
 import {
-  LayoutDashboard,
   ShoppingCart,
   Truck,
   CreditCard,
@@ -125,20 +124,6 @@ export function Sidebar({
           </>
         ) : (
           <>
-            {/* 대시보드 */}
-            <button
-              onClick={() => onPageChange("dashboard")}
-              className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
-                currentPage === "dashboard"
-                  ? "bg-purple-50 text-purple-600"
-                  : "text-gray-700 hover:bg-gray-50"
-              }`}
-              title={isCollapsed ? t('menu.dashboard') : undefined}
-            >
-              <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
-              {!isCollapsed && <span>{t('menu.dashboard')}</span>}
-            </button>
-
             {/* AI 데이터 검색 - 숨김 */}
             {false && (
             <button

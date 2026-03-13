@@ -55,7 +55,7 @@ function PermissionCheckWrapper({
   if (hasPermission(resource, permissionType)) {
     return <>{children}</>;
   }
-  return <Navigate to="/admin/dashboard" replace />;
+  return <Navigate to="/admin/product-collab" replace />;
 }
 
 // 메인 레이아웃 컴포넌트
@@ -84,7 +84,7 @@ function AdminLayout() {
   const getCurrentPage = (): string => {
     const path = location.pathname;
     // /admin 접두사 제거
-    const adminPath = path.replace(/^\/admin\/?/, '') || 'dashboard';
+    const adminPath = path.replace(/^\/admin\/?/, '') || 'product-collab';
     
     // purchase-orders 상세 페이지인 경우
     if (adminPath.startsWith('purchase-orders/') && adminPath !== 'purchase-orders') {
@@ -95,9 +95,9 @@ function AdminLayout() {
       return 'product-collab';
     }
     
-    // 루트 경로는 dashboard
+    // 루트 경로는 product-collab(제품 개발 협업 첫 탭)
     if (adminPath === '' || adminPath === '/') {
-      return 'dashboard';
+      return 'product-collab';
     }
     
     // 그 외의 경우 경로 그대로 반환
@@ -264,7 +264,8 @@ function AdminLayout() {
             </>
           ) : (
             <>
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route index element={<Navigate to="/admin/product-collab" replace />} />
+              <Route path="/dashboard" element={<Navigate to="/admin/product-collab" replace />} />
               <Route path="/ai-search" element={
                 <PermissionCheckWrapper resource="dashboard" permissionType="read">
                   <AiSearch />
@@ -275,7 +276,7 @@ function AdminLayout() {
                 (user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin') ? (
                   <Products onNavigateToPurchaseOrder={handleViewOrderDetail} />
                 ) : (
-                  <Navigate to="/admin/dashboard" replace />
+                  <Navigate to="/admin/product-collab" replace />
                 )
               } />
               <Route path="/orders" element={<Orders />} />
@@ -307,7 +308,7 @@ function AdminLayout() {
                 user?.id === 'venpus' ? (
                   <CostAnalysis />
                 ) : (
-                  <Navigate to="/admin/dashboard" replace />
+                  <Navigate to="/admin/product-collab" replace />
                 )
               } />
               <Route path="/shipping-history" element={
@@ -362,7 +363,7 @@ function AdminLayout() {
                 (user?.level === 'A-SuperAdmin') ? (
                   <PermissionManagement />
                 ) : (
-                  <Navigate to="/admin/dashboard" replace />
+                  <Navigate to="/admin/product-collab" replace />
                 )
               } />
               <Route path="/settings" element={<Settings />} />
@@ -450,7 +451,7 @@ function LoginRedirect() {
   if (user?.level === 'D0: 비전 담당자') {
     return <Navigate to="/admin/shipping-history" replace />;
   }
-  return <Navigate to="/admin/dashboard" replace />;
+  return <Navigate to="/admin/product-collab" replace />;
 }
 
 // 루트 경로 리다이렉트 컴포넌트
@@ -460,7 +461,7 @@ function RootRedirect() {
   if (user?.level === 'D0: 비전 담당자') {
     return <Navigate to="/admin/shipping-history" replace />;
   }
-  return <Navigate to="/admin/dashboard" replace />;
+  return <Navigate to="/admin/product-collab" replace />;
 }
 
 // Protected Route 컴포넌트

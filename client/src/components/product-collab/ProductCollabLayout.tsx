@@ -3,7 +3,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { ProductCollabCountsProvider, useProductCollabCounts } from './ProductCollabCountsContext';
 
 const tabConfig = [
-  { to: '', end: true, labelKey: 'productCollab.dashboard', showCount: false, activeBg: 'bg-[#2563EB]', activeText: 'text-white', inactiveBg: 'bg-[#DBEAFE]', inactiveText: 'text-[#1E40AF]' },
+  { to: '', end: true, labelKey: 'productCollab.aiWorkAssistant', showCount: false, activeBg: 'bg-[#2563EB]', activeText: 'text-white', inactiveBg: 'bg-[#DBEAFE]', inactiveText: 'text-[#1E40AF]' },
   { to: 'list', end: false, labelKey: 'productCollab.productList', showCount: true, countKey: 'activeCount', activeBg: 'bg-[#059669]', activeText: 'text-white', inactiveBg: 'bg-[#D1FAE5]', inactiveText: 'text-[#047857]' },
   { to: 'archive', end: false, labelKey: 'productCollab.archive', showCount: true, countKey: 'archiveCount', activeBg: 'bg-[#B45309]', activeText: 'text-white', inactiveBg: 'bg-[#FEF3C7]', inactiveText: 'text-[#B45309]' },
   { to: 'cancelled', end: false, labelKey: 'productCollab.cancelledList', showCount: true, countKey: 'cancelledCount', activeBg: 'bg-[#B91C1C]', activeText: 'text-white', inactiveBg: 'bg-[#FEE2E2]', inactiveText: 'text-[#B91C1C]' },
