@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { getProductById, updateProduct, uploadProductImages, deleteProduct } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useProductCollabCounts } from '../ProductCollabCountsContext';
@@ -16,6 +16,8 @@ export function ProductCollabThread() {
   const countsContext = useProductCollabCounts();
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromSummary = searchParams.get('from') === 'summary';
   const [product, setProduct] = useState<ProductCollabProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,13 +119,23 @@ export function ProductCollabThread() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3 flex-wrap">
-        <button
-          type="button"
-          onClick={() => navigate('/admin/product-collab/list')}
-          className="text-[#2563EB] text-sm"
-        >
-          ← {t('productCollab.list')}
-        </button>
+        {fromSummary ? (
+          <button
+            type="button"
+            onClick={() => navigate('/admin/product-collab')}
+            className="text-[#2563EB] text-sm"
+          >
+            ← {t('productCollab.backToSummary')}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => navigate('/admin/product-collab/list')}
+            className="text-[#2563EB] text-sm"
+          >
+            ← {t('productCollab.list')}
+          </button>
+        )}
         <h1 className="text-lg font-semibold text-[#1F2937]">{product.name}</h1>
         <span className="text-xs text-[#6B7280]">{product.status}</span>
         {product.status !== 'PRODUCTION_COMPLETE' && (

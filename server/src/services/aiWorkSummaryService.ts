@@ -1,11 +1,16 @@
 import { ProductCollabRepository } from '../repositories/productCollabRepository.js';
 import { getDelayInfo } from '../utils/delayRules.js';
 
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+const OPENAI_SUMMARY_MODEL = process.env.OPENAI_SUMMARY_MODEL || process.env.OPENAI_TRANSLATION_MODEL || 'gpt-4o-mini';
+
 const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY;
 const QWEN_BASE_URL = process.env.QWEN_BASE_URL || 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
 const SUMMARY_MODEL = process.env.QWEN_SUMMARY_MODEL || process.env.QWEN_MODEL || 'qwen-plus';
 /** 연결/응답 타임아웃(ms). */
 const QWEN_TIMEOUT_MS = Math.max(15000, parseInt(process.env.QWEN_SUMMARY_TIMEOUT_MS || '60000', 10) || 60000);
+const SUMMARY_TIMEOUT_MS = Math.max(15000, parseInt(process.env.AI_SUMMARY_TIMEOUT_MS || '60000', 10) || 60000);
 const QWEN_MAX_RETRIES = 2;
 const QWEN_RETRY_DELAY_MS = 2000;
 
@@ -13,13 +18,15 @@ const BODY_SNIPPET_LEN = 200;
 
 type ThreadMessageRow = { product_id: number; id: number; parent_id: number | null; author_name: string | null; body: string | null; created_at: Date };
 
-function formatThreadMessages(messages: ThreadMessageRow[]): string {
+function formatThreadMessages(messages: ThreadMessageRow[], lang: 'ko' | 'zh'): string {
+  const replyLabel = lang === 'zh' ? ' (回复)' : ' (댓글)';
+  const emptyBody = lang === 'zh' ? '(无)' : '(없음)';
   return messages
     .map((m) => {
       const dateStr = m.created_at instanceof Date ? m.created_at.toISOString() : String(m.created_at);
       const author = m.author_name ?? '-';
-      const label = m.parent_id != null ? ' (댓글)' : '';
-      const body = (m.body ?? '').trim() || '(없음)';
+      const label = m.parent_id != null ? replyLabel : '';
+      const body = (m.body ?? '').trim() || emptyBody;
       const line = `${dateStr} ${author}${label}`;
       return m.parent_id != null ? `  >> ${line}\n  ${body}` : `--- ${line} ---\n${body}`;
     })
@@ -81,9 +88,13 @@ export interface MyTaskSummaryItem {
   summary: string;
 }
 
+export type SummaryProvider = 'openai' | 'qwen';
+
 export interface AiWorkSummaryResult {
   overallSummary: OverallSummaryProduct[];
   myTasksSummary: MyTaskSummaryItem[];
+  /** 요약 생성에 사용된 AI (OpenAI 1순위, 실패 시 Qwen) */
+  provider?: SummaryProvider;
 }
 
 function snippet(s: string | null): string {
@@ -93,8 +104,9 @@ function snippet(s: string | null): string {
 }
 
 export async function getAiWorkSummary(userId: string, lang: 'ko' | 'zh'): Promise<AiWorkSummaryResult | null> {
-  if (!DASHSCOPE_API_KEY) {
-    console.warn('[AI Work Summary] DASHSCOPE_API_KEY not set.');
+  console.log('[AI Work Summary] getAiWorkSummary 시작 lang=%s', lang);
+  if (!OPENAI_API_KEY && !DASHSCOPE_API_KEY) {
+    console.warn('[AI Work Summary] OPENAI_API_KEY와 DASHSCOPE_API_KEY 중 하나 이상 필요합니다.');
     return null;
   }
 
@@ -215,20 +227,19 @@ export async function getAiWorkSummary(userId: string, lang: 'ko' | 'zh'): Promi
     if (!threadByProduct.has(row.product_id)) threadByProduct.set(row.product_id, []);
     threadByProduct.get(row.product_id)!.push(row);
   }
+  // lang=zh일 때는 모델이 한국어로 잘 나오므로, 한국어로 요약한 뒤 번역 단계로 중국어 변환
+  const promptLang: 'ko' | 'zh' = lang === 'zh' ? 'ko' : lang;
   const threadTextByProductId = new Map<number, string>();
   for (const [pid, msgs] of threadByProduct) {
-    threadTextByProductId.set(pid, formatThreadMessages(msgs));
+    threadTextByProductId.set(pid, formatThreadMessages(msgs, promptLang));
   }
 
-  const langInstruction =
-    lang === 'zh'
-      ? 'Respond in Simplified Chinese only (简体中文).'
-      : 'Respond in Korean only (한국어).';
-
+  const langInstruction = 'Respond in Korean only (한국어).';
+  const noThread = '(쓰레드 없음)';
   const overallText = overallProducts
     .map((p) => {
       const header = `[제품 ${p.productName} (id:${p.productId})] 상태:${p.status} ${p.isDelayed ? `지연(${p.daysOverdue ?? 0}일 초과)` : ''}`;
-      const threadText = threadTextByProductId.get(p.productId) ?? '(쓰레드 없음)';
+      const threadText = threadTextByProductId.get(p.productId) ?? noThread;
       return `${header}\n${threadText}`;
     })
     .join('\n\n');
@@ -236,7 +247,7 @@ export async function getAiWorkSummary(userId: string, lang: 'ko' | 'zh'): Promi
   const myTasksText = myTaskProducts
     .map((p) => {
       const header = `[제품 ${p.productName} (id:${p.productId})] 우선순위:${p.priority} 상태:${p.status} ${p.isDelayed ? '지연' : ''}`;
-      const threadText = threadTextByProductId.get(p.productId) ?? '(쓰레드 없음)';
+      const threadText = threadTextByProductId.get(p.productId) ?? noThread;
       return `${header}\n${threadText}`;
     })
     .join('\n\n');
@@ -265,9 +276,21 @@ ${myTasksText}`;
     let overallSummary: OverallSummaryProduct[] = [];
     let myTasksSummary: MyTaskSummaryItem[] = [];
 
+    let summaryProvider: SummaryProvider | undefined;
     if (overallProducts.length > 0) {
-      const overallRes = await callQwen(overallPrompt);
-      overallSummary = (overallRes?.products as OverallSummaryProduct[] | undefined) ?? [];
+      console.log('[AI Work Summary] 전체 요약 API 호출 (lang=%s, 한국어 요약 후 zh면 번역)', lang);
+      const overallRes = await callChatForSummary(overallPrompt);
+      if (overallRes?.data && typeof overallRes.data === 'object') {
+        summaryProvider = overallRes.provider;
+        const products = overallRes.data.products as OverallSummaryProduct[] | undefined;
+        const first = Array.isArray(products) && products[0] ? products[0] : null;
+        if (first) {
+          console.log('[AI Work Summary] 전체 요약 API 응답 샘플(첫 항목) productId=%s summary=%s delayedNote=%s', first.productId, (first as { summary?: string }).summary ?? '', (first as { delayedNote?: string }).delayedNote ?? '');
+        }
+      } else {
+        console.log('[AI Work Summary] 전체 요약 API 응답: null 또는 비정상');
+      }
+      overallSummary = (overallRes?.data?.products as OverallSummaryProduct[] | undefined) ?? [];
       if (overallSummary.length === 0) {
         overallSummary = overallProducts.map((p) => ({
           productId: p.productId,
@@ -299,8 +322,19 @@ ${myTasksText}`;
     }
 
     if (myTaskProducts.length > 0) {
-      const myRes = await callQwen(myTasksPrompt);
-      myTasksSummary = (myRes?.items as MyTaskSummaryItem[] | undefined) ?? [];
+      console.log('[AI Work Summary] 내 업무 요약 API 호출 (lang=%s)', lang);
+      const myRes = await callChatForSummary(myTasksPrompt);
+      if (myRes?.data && typeof myRes.data === 'object') {
+        if (summaryProvider === undefined) summaryProvider = myRes.provider;
+        const items = myRes.data.items as MyTaskSummaryItem[] | undefined;
+        const first = Array.isArray(items) && items[0] ? items[0] : null;
+        if (first) {
+          console.log('[AI Work Summary] 내 업무 요약 API 응답 샘플(첫 항목) productId=%s summary=%s', first.productId, (first as { summary?: string }).summary ?? '');
+        }
+      } else {
+        console.log('[AI Work Summary] 내 업무 요약 API 응답: null 또는 비정상');
+      }
+      myTasksSummary = (myRes?.data?.items as MyTaskSummaryItem[] | undefined) ?? [];
       if (myTasksSummary.length === 0) {
         myTasksSummary = myTaskProducts.map((p) => ({
           productId: p.productId,
@@ -311,19 +345,123 @@ ${myTasksText}`;
       }
     }
 
-    return { overallSummary, myTasksSummary };
+    if (lang === 'zh' && (overallSummary.length > 0 || myTasksSummary.length > 0)) {
+      console.log('[AI Work Summary] lang=zh: 한국어 요약을 중국어로 번역 단계 시작');
+      const translated = await translateSummaryToChinese({ overallSummary, myTasksSummary });
+      if (translated) {
+        overallSummary = translated.overallSummary;
+        myTasksSummary = translated.myTasksSummary;
+        console.log('[AI Work Summary] 번역 완료');
+      } else {
+        console.warn('[AI Work Summary] 번역 실패, 한국어 결과 반환');
+      }
+    }
+    console.log('[AI Work Summary] 반환: overallSummary %d건, myTasksSummary %d건, provider=%s', overallSummary.length, myTasksSummary.length, summaryProvider ?? '');
+    if (overallSummary.length > 0 && overallSummary[0]) {
+      console.log('[AI Work Summary] 최종 전체 요약 첫 건 summary=%s', overallSummary[0].summary ?? '');
+    }
+    if (myTasksSummary.length > 0 && myTasksSummary[0]) {
+      console.log('[AI Work Summary] 최종 내 업무 요약 첫 건 summary=%s', myTasksSummary[0].summary ?? '');
+    }
+    return { overallSummary, myTasksSummary, provider: summaryProvider };
   } catch (err) {
     console.error('[AI Work Summary] Qwen error:', err);
     return null;
   }
 }
 
-async function callQwen(userPrompt: string): Promise<Record<string, unknown> | null> {
+/** lang=zh일 때: 한국어 요약 결과의 summary, delayedNote 만 중국어로 번역 */
+async function translateSummaryToChinese(result: AiWorkSummaryResult): Promise<AiWorkSummaryResult | null> {
+  const payload = JSON.stringify(result);
+  const prompt = `Translate the following JSON to Simplified Chinese (简体中文). Translate ONLY the "summary" and "delayedNote" string values. Do not change productId, productName, priority, status, or any other field. Keep the exact same JSON structure. Output valid JSON only, no markdown or explanation.
+
+Input:
+${payload}`;
+  const systemMsg = 'You are a translator. Output only valid JSON. Translate only the summary and delayedNote text values to Simplified Chinese. Keep all other fields unchanged.';
+  const res = await callChatForSummary(prompt, systemMsg);
+  const data = res?.data;
+  if (!data || !Array.isArray(data.overallSummary) || !Array.isArray(data.myTasksSummary)) {
+    return null;
+  }
+  const translated: AiWorkSummaryResult = {
+    overallSummary: data.overallSummary as OverallSummaryProduct[],
+    myTasksSummary: data.myTasksSummary as MyTaskSummaryItem[],
+  };
+  for (let i = 0; i < result.overallSummary.length && i < translated.overallSummary.length; i++) {
+    translated.overallSummary[i].status = result.overallSummary[i].status;
+    translated.overallSummary[i].priority = result.overallSummary[i].priority;
+  }
+  return translated;
+}
+
+type CallChatResult = { data: Record<string, unknown>; provider: SummaryProvider };
+
+/** OpenAI 1순위, 실패 시 Qwen 2순위. 사용된 AI(provider) 함께 반환 */
+async function callChatForSummary(userPrompt: string, systemMessage?: string): Promise<CallChatResult | null> {
+  let result = await callOpenAI(userPrompt, systemMessage);
+  if (result != null) return { data: result, provider: 'openai' };
+  result = await callQwen(userPrompt, systemMessage);
+  if (result != null) return { data: result, provider: 'qwen' };
+  return null;
+}
+
+async function callOpenAI(userPrompt: string, systemMessage?: string): Promise<Record<string, unknown> | null> {
+  if (!OPENAI_API_KEY) return null;
+  const url = `${OPENAI_BASE_URL.replace(/\/$/, '')}/chat/completions`;
+  const messages: Array<{ role: 'user' | 'system'; content: string }> = systemMessage
+    ? [{ role: 'system', content: systemMessage }, { role: 'user', content: userPrompt }]
+    : [{ role: 'user', content: userPrompt }];
+  const payload = {
+    model: OPENAI_SUMMARY_MODEL,
+    messages,
+    max_tokens: 2048,
+    temperature: 0.3,
+    response_format: { type: 'json_object' as const },
+  };
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SUMMARY_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.warn('[AI Work Summary] OpenAI API error:', res.status, errBody.slice(0, 300));
+      return null;
+    }
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const raw = data.choices?.[0]?.message?.content?.trim();
+    if (!raw) return null;
+    console.log('[AI Work Summary] OpenAI 원문 응답 길이=%d, 앞 400자=%s', raw.length, raw.slice(0, 400));
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      console.warn('[AI Work Summary] Invalid JSON from OpenAI:', raw.slice(0, 200));
+      return null;
+    }
+  } catch (err) {
+    clearTimeout(timeoutId);
+    console.warn('[AI Work Summary] OpenAI request failed, will try Qwen:', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+async function callQwen(userPrompt: string, systemMessage?: string): Promise<Record<string, unknown> | null> {
   if (!DASHSCOPE_API_KEY) return null;
   const url = `${QWEN_BASE_URL.replace(/\/$/, '')}/chat/completions`;
+  const messages: Array<{ role: 'user' | 'system'; content: string }> = systemMessage
+    ? [{ role: 'system', content: systemMessage }, { role: 'user', content: userPrompt }]
+    : [{ role: 'user', content: userPrompt }];
   const payload = {
     model: SUMMARY_MODEL,
-    messages: [{ role: 'user', content: userPrompt }],
+    messages,
     max_tokens: 2048,
     temperature: 0.3,
     response_format: { type: 'json_object' as const },
@@ -351,9 +489,14 @@ async function callQwen(userPrompt: string): Promise<Record<string, unknown> | n
       }
       const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
       const raw = data.choices?.[0]?.message?.content?.trim();
-      if (!raw) return null;
+      if (!raw) {
+        console.log('[AI Work Summary] Qwen 응답 본문 없음');
+        return null;
+      }
+      console.log('[AI Work Summary] Qwen 원문 응답 길이=%d, 앞 400자=%s', raw.length, raw.slice(0, 400));
       try {
-        return JSON.parse(raw) as Record<string, unknown>;
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        return parsed;
       } catch {
         console.error('[AI Work Summary] Invalid JSON from Qwen:', raw.slice(0, 200));
         return null;

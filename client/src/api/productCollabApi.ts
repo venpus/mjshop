@@ -47,19 +47,34 @@ export interface MyTaskSummaryItem {
   summary: string;
 }
 
+export type SummaryProvider = 'openai' | 'qwen';
+
 export interface AiWorkSummaryResult {
   overallSummary: OverallSummaryProduct[];
   myTasksSummary: MyTaskSummaryItem[];
+  /** 요약 생성에 사용된 AI */
+  provider?: SummaryProvider;
 }
 
-export async function postAiWorkSummary(lang: 'ko' | 'zh'): Promise<ApiResponse<AiWorkSummaryResult>> {
+export async function postAiWorkSummary(lang: 'ko' | 'zh'): Promise<ApiResponse<AiWorkSummaryResult & { generatedAt?: string }>> {
   const res = await fetch(`${getApiBaseUrl()}/product-collab/ai-work-summary?lang=${lang}`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
   const json = await res.json();
   if (!res.ok) return { success: false, error: json.error || '요약 생성 실패' };
-  return { success: true, data: json.data };
+  return { success: true, data: { ...json.data, generatedAt: json.generatedAt } };
+}
+
+export async function getAiWorkSummaryLast(lang: 'ko' | 'zh'): Promise<
+  ApiResponse<AiWorkSummaryResult & { generatedAt?: string }>
+> {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/ai-work-summary/last?lang=${lang}`, {
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) return { success: false, error: json.error || '마지막 요약 조회 실패' };
+  return { success: true, data: { ...json.data, generatedAt: json.generatedAt } };
 }
 
 export async function getDashboard(): Promise<ApiResponse<DashboardData>> {

@@ -299,15 +299,39 @@ export class ProductCollabController {
       }
       const lang = (req.query.lang ?? req.body?.lang ?? 'ko') as string;
       const language = lang === 'zh' ? 'zh' : 'ko';
+      console.log('[AI Work Summary] POST lang=%s -> language=%s', lang, language);
       const { getAiWorkSummary } = await import('../services/aiWorkSummaryService.js');
       const result = await getAiWorkSummary(userId, language);
       if (!result) {
-        return res.status(503).json({ success: false, error: 'AI 요약을 생성할 수 없습니다. DASHSCOPE_API_KEY를 확인하세요.' });
+        return res.status(503).json({ success: false, error: 'AI 요약을 생성할 수 없습니다. OPENAI_API_KEY 또는 DASHSCOPE_API_KEY를 확인하세요.' });
       }
-      res.json({ success: true, data: result });
+      const { upsertAiWorkSummaryCache } = await import('../repositories/aiWorkSummaryCacheRepository.js');
+      const generatedAt = new Date().toISOString();
+      await upsertAiWorkSummaryCache(userId, language, result);
+      res.json({ success: true, data: result, generatedAt });
     } catch (error: unknown) {
       console.error('Product collab AI work summary error:', error);
       res.status(500).json({ success: false, error: '업무 요약 중 오류가 발생했습니다.' });
+    }
+  };
+
+  getAiWorkSummaryLast = async (req: Request, res: Response) => {
+    try {
+      const userId = (req as unknown as { user?: { id: string } }).user?.id ?? '';
+      if (!userId) {
+        return res.status(401).json({ success: false, error: '로그인이 필요합니다.' });
+      }
+      const lang = (req.query.lang ?? 'ko') as string;
+      const language = lang === 'zh' ? 'zh' : 'ko';
+      const { getAiWorkSummaryCache } = await import('../repositories/aiWorkSummaryCacheRepository.js');
+      const cached = await getAiWorkSummaryCache(userId, language);
+      if (!cached) {
+        return res.status(404).json({ success: false, error: '저장된 요약이 없습니다.' });
+      }
+      res.json({ success: true, data: cached.result, generatedAt: cached.generatedAt });
+    } catch (error: unknown) {
+      console.error('Product collab AI work summary last error:', error);
+      res.status(500).json({ success: false, error: '마지막 요약 조회 중 오류가 발생했습니다.' });
     }
   };
 

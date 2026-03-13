@@ -1,17 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { postAiWorkSummary } from '../../../api/productCollabApi';
+import { postAiWorkSummary, getAiWorkSummaryLast } from '../../../api/productCollabApi';
 import type { AiWorkSummaryResult } from '../../../api/productCollabApi';
 import { OverallSummaryTable } from './OverallSummaryTable';
 import { MyTasksSummaryTable } from './MyTasksSummaryTable';
+
+function formatSummaryGeneratedAgo(isoString: string): { key: string; n?: number } {
+  const then = new Date(isoString).getTime();
+  const now = Date.now();
+  const diffSec = Math.max(0, Math.floor((now - then) / 1000));
+  if (diffSec < 60) return { key: 'productCollab.summaryGeneratedAgoJustNow' };
+  if (diffSec < 3600) return { key: 'productCollab.summaryGeneratedAgoMinutes', n: Math.floor(diffSec / 60) };
+  if (diffSec < 86400) return { key: 'productCollab.summaryGeneratedAgoHours', n: Math.floor(diffSec / 3600) };
+  return { key: 'productCollab.summaryGeneratedAgoDays', n: Math.floor(diffSec / 86400) };
+}
 
 export function AiWorkSummarySection() {
   const { t, language } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<AiWorkSummaryResult | null>(null);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
 
   const lang = language === 'zh' ? 'zh' : 'ko';
+
+  useEffect(() => {
+    let cancelled = false;
+    getAiWorkSummaryLast(lang).then((res) => {
+      if (cancelled) return;
+      if (res.success && res.data) {
+        setData(res.data);
+        setGeneratedAt(res.data.generatedAt ?? null);
+      } else {
+        setData(null);
+        setGeneratedAt(null);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [lang]);
 
   const handleSummarize = async () => {
     setLoading(true);
@@ -20,17 +46,31 @@ export function AiWorkSummarySection() {
     setLoading(false);
     if (res.success && res.data) {
       setData(res.data);
+      if (res.data.generatedAt) setGeneratedAt(res.data.generatedAt);
     } else {
       setError(res.error ?? t('productCollab.summaryError'));
     }
   };
 
   const showResult = data !== null;
+  const agoText = generatedAt
+    ? (() => {
+        const { key, n } = formatSummaryGeneratedAgo(generatedAt);
+        return n !== undefined ? t(key).replace('{n}', String(n)) : t(key);
+      })()
+    : null;
 
   return (
     <section className="rounded-xl border-2 border-[#E5E7EB] bg-white overflow-hidden mb-6">
       <div className="px-4 py-3 bg-[#F3F4F6] border-b border-[#E5E7EB] flex items-center justify-between gap-2 flex-wrap">
-        <h2 className="text-lg font-semibold text-[#374151]">{t('productCollab.aiWorkAssistant')}</h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h2 className="text-lg font-semibold text-[#374151]">{t('productCollab.aiWorkAssistant')}</h2>
+          {agoText && (
+            <span className="text-sm text-[#6B7280]">
+              ({data?.provider ? `${data.provider === 'openai' ? 'OpenAI' : 'Qwen'} · ${agoText}` : agoText})
+            </span>
+          )}
+        </div>
         <button
           type="button"
           disabled={loading}

@@ -35,7 +35,7 @@ export function MyTasksSummaryTable({ items }: MyTasksSummaryTableProps) {
         >
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
             <Link
-              to={`/admin/product-collab/thread/${row.productId}`}
+              to={`/admin/product-collab/thread/${row.productId}?from=summary`}
               className="text-[#2563EB] hover:underline font-medium shrink-0"
             >
               {row.productName}
