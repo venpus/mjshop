@@ -234,7 +234,7 @@ export async function getAiWorkSummary(userId: string, lang: 'ko' | 'zh'): Promi
     threadTextByProductId.set(pid, formatThreadMessages(msgs, promptLang));
   }
 
-  const langInstruction = 'Respond in Korean only (한국어).';
+  const langInstruction = 'Respond in Korean only (한국어). Use formal polite style (경어체): -합니다, -해요, -입니다, -세요, -십시오. Do not use casual endings (-해, -야, -이다).';
   const noThread = '(쓰레드 없음)';
   const overallText = overallProducts
     .map((p) => {
@@ -254,6 +254,7 @@ export async function getAiWorkSummary(userId: string, lang: 'ko' | 'zh'): Promi
 
   const overallPrompt = `You are an assistant that summarizes work by product.
 ${langInstruction}
+Write all summary and delayedNote text in formal polite Korean (경어체).
 Below is the full thread (all messages and replies in chronological order) for each product. For each product, write a short summary (1-2 sentences) based on the entire conversation. If the product is marked as 지연 (delayed), add a separate "delayedNote" that emphasizes the delay.
 Output ONLY a valid JSON object with this exact structure (no markdown, no extra text):
 {"products":[{"productId":number,"productName":"string","summary":"string","delayedNote":"string or omit if not delayed"}]}
@@ -263,6 +264,7 @@ ${overallText}`;
 
   const myTasksPrompt = `You are an assistant that summarizes my assigned tasks in priority order: 1) issue (문제 제품), 2) delayed (지연), 3) normal.
 ${langInstruction}
+Write all summary text in formal polite Korean (경어체).
 Below is the full thread (all messages and replies in chronological order) for each product in my task list. For each product, write a short summary (1-2 sentences) based on the entire conversation. Include the priority: "issue", "delayed", or "normal".
 Output ONLY a valid JSON object with this exact structure (no markdown, no extra text):
 {"items":[{"productId":number,"productName":"string","priority":"issue"|"delayed"|"normal","summary":"string"}]}
@@ -373,11 +375,11 @@ ${myTasksText}`;
 /** lang=zh일 때: 한국어 요약 결과의 summary, delayedNote 만 중국어로 번역 */
 async function translateSummaryToChinese(result: AiWorkSummaryResult): Promise<AiWorkSummaryResult | null> {
   const payload = JSON.stringify(result);
-  const prompt = `Translate the following JSON to Simplified Chinese (简体中文). Translate ONLY the "summary" and "delayedNote" string values. Do not change productId, productName, priority, status, or any other field. Keep the exact same JSON structure. Output valid JSON only, no markdown or explanation.
+  const prompt = `Translate the following JSON to Simplified Chinese (简体中文). Translate ONLY the "summary" and "delayedNote" string values. Use Chinese polite/formal style (敬语): use 您 where appropriate, 请、可以、能否、敬请; keep tone professional and respectful. Do not change productId, productName, priority, status, or any other field. Keep the exact same JSON structure. Output valid JSON only, no markdown or explanation.
 
 Input:
 ${payload}`;
-  const systemMsg = 'You are a translator. Output only valid JSON. Translate only the summary and delayedNote text values to Simplified Chinese. Keep all other fields unchanged.';
+  const systemMsg = 'You are a translator. Output only valid JSON. Translate only the summary and delayedNote text values to Simplified Chinese. Use formal polite style (敬语): 您, 请, 可以, 能否, 敬请; professional and respectful tone. Keep all other fields unchanged.';
   const res = await callChatForSummary(prompt, systemMsg);
   const data = res?.data;
   if (!data || !Array.isArray(data.overallSummary) || !Array.isArray(data.myTasksSummary)) {
