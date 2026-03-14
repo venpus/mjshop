@@ -1,10 +1,10 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import type { ProductCollabMessage, MessageTag } from '../types';
 import { getProductCollabImageUrl, getProductCollabDownloadUrl } from '../utils/imageUrl';
-import { updateMessage, deleteMessage, createMessage, completeTask, getAuthHeaders, uploadProductImages } from '../../../api/productCollabApi';
+import { updateMessage, deleteMessage, createMessage, completeTask, getAuthHeaders, uploadProductImages, getMentionableUsers, type MentionableUser } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { MessageAttachmentImage } from './MessageAttachmentImage';
-import { ImagePlus, X } from 'lucide-react';
+import { ImagePlus, X, AtSign } from 'lucide-react';
 
 /** 선택한 파일과 미리보기용 object URL (답글 업로드용) */
 interface FileWithPreview {
@@ -423,13 +423,126 @@ function ReplyForm({ productId, parentMessageId, onSent, onReplySent, currentUse
   const [selectedFiles, setSelectedFiles] = useState<FileWithPreview[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mentionableUsers, setMentionableUsers] = useState<MentionableUser[]>([]);
+  const [selectedMentionIds, setSelectedMentionIds] = useState<string[]>([]);
+  const [mentionDropdownOpen, setMentionDropdownOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionHighlightIndex, setMentionHighlightIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mentionListRef = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    getMentionableUsers().then((res) => {
+      if (res.success && res.data) setMentionableUsers(res.data);
+    });
+  }, []);
 
   useEffect(() => {
     return () => {
       selectedFiles.forEach(({ objectUrl }) => objectUrl && URL.revokeObjectURL(objectUrl));
     };
   }, [selectedFiles]);
+
+  /** 본문에 남아 있는 @이름 기준으로 맨션 ID 목록 동기화 (키보드로 삭제 시 칩도 제거) */
+  const syncMentionIdsFromBody = (text: string) => {
+    const ids: string[] = [];
+    for (const u of mentionableUsers) {
+      const needle = `@${u.name}`;
+      let idx = text.indexOf(needle);
+      while (idx !== -1) {
+        const after = text[idx + needle.length];
+        if (after === undefined || /\s/.test(after)) {
+          ids.push(u.id);
+          break;
+        }
+        idx = text.indexOf(needle, idx + 1);
+      }
+    }
+    setSelectedMentionIds((prev) => {
+      const next = [...new Set(ids)];
+      return prev.length === next.length && prev.every((id, i) => next[i] === id) ? prev : next;
+    });
+  };
+
+  const getMentionContext = (value: string, cursor: number): { start: number; query: string } | null => {
+    const before = value.slice(0, cursor);
+    const atIndex = before.lastIndexOf('@');
+    if (atIndex === -1) return null;
+    const afterAt = before.slice(atIndex + 1);
+    if (/\s/.test(afterAt)) return null;
+    return { start: atIndex, query: afterAt };
+  };
+
+  const openMentionDropdownAt = (value: string, cursor: number) => {
+    const ctx = getMentionContext(value, cursor);
+    if (ctx != null) {
+      setMentionQuery(ctx.query);
+      setMentionDropdownOpen(true);
+      setMentionHighlightIndex(0);
+    } else {
+      setMentionQuery(null);
+      setMentionDropdownOpen(false);
+    }
+  };
+
+  const applyMention = (user: MentionableUser) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const value = ta.value;
+    const cursor = ta.selectionStart;
+    const ctx = getMentionContext(value, cursor);
+    if (!ctx) return;
+    const insert = `@${user.name} `;
+    const nextValue = value.slice(0, ctx.start) + insert + value.slice(cursor);
+    setBody(nextValue);
+    setSelectedMentionIds((prev) => (prev.includes(user.id) ? prev : [...prev, user.id]));
+    setMentionQuery(null);
+    setMentionDropdownOpen(false);
+    setTimeout(() => {
+      ta.focus();
+      const newPos = ctx.start + insert.length;
+      ta.setSelectionRange(newPos, newPos);
+    }, 0);
+  };
+
+  const filteredByAt =
+    mentionQuery === null
+      ? mentionableUsers.filter((u) => !selectedMentionIds.includes(u.id))
+      : mentionableUsers.filter(
+          (u) => !selectedMentionIds.includes(u.id) && u.name.toLowerCase().includes(mentionQuery.toLowerCase())
+        );
+  const showAtDropdown = mentionDropdownOpen && (mentionQuery !== null || filteredByAt.length > 0);
+
+  const handleBodyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const v = e.target.value;
+    setBody(v);
+    syncMentionIdsFromBody(v);
+    openMentionDropdownAt(v, e.target.selectionStart);
+  };
+
+  const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!showAtDropdown || filteredByAt.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setMentionHighlightIndex((i) => (i + 1) % filteredByAt.length);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setMentionHighlightIndex((i) => (filteredByAt.length + i - 1) % filteredByAt.length);
+      return;
+    }
+    if (e.key === 'Enter' && filteredByAt[mentionHighlightIndex]) {
+      e.preventDefault();
+      applyMention(filteredByAt[mentionHighlightIndex]);
+      return;
+    }
+    if (e.key === 'Escape') {
+      setMentionQuery(null);
+      setMentionDropdownOpen(false);
+    }
+  };
 
   const removeFile = (index: number) => {
     setSelectedFiles((prev) => {
@@ -453,7 +566,7 @@ function ReplyForm({ productId, parentMessageId, onSent, onReplySent, currentUse
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const hasContent = body.trim() || selectedFiles.length > 0;
+    const hasContent = body.trim() || selectedFiles.length > 0 || selectedMentionIds.length > 0;
     if (!hasContent) return;
     setError(null);
     setSubmitting(true);
@@ -479,10 +592,12 @@ function ReplyForm({ productId, parentMessageId, onSent, onReplySent, currentUse
         body: body.trim() || null,
         parent_id: parentMessageId,
         attachment_urls: attachment_urls.length ? attachment_urls : undefined,
+        mention_user_ids: selectedMentionIds.length > 0 ? selectedMentionIds : undefined,
       });
       if (!res.success) throw new Error(res.error);
       setBody('');
       setSelectedFiles([]);
+      setSelectedMentionIds([]);
       if (onReplySent && res.data) {
         onReplySent(parentMessageId, res.data);
       } else {
@@ -499,13 +614,45 @@ function ReplyForm({ productId, parentMessageId, onSent, onReplySent, currentUse
     <form onSubmit={handleSubmit} className="mt-2 ml-4 pl-3 border-l-2 border-[#E5E7EB]">
       <div className="flex gap-2 items-start">
         <div className="flex-1 min-w-0 space-y-1">
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder={t('productCollab.replyPlaceholder')}
-            rows={2}
-            className="w-full px-2 py-1.5 border border-[#E5E7EB] rounded text-sm resize-none"
-          />
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              value={body}
+              onChange={handleBodyChange}
+              onKeyDown={handleBodyKeyDown}
+              placeholder={t('productCollab.replyPlaceholder')}
+              rows={2}
+              className="w-full px-2 py-1.5 border border-[#E5E7EB] rounded text-sm resize-none"
+            />
+            {showAtDropdown && mentionQuery !== null && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  aria-hidden
+                  onClick={() => {
+                    setMentionQuery(null);
+                    setMentionDropdownOpen(false);
+                  }}
+                />
+                <ul
+                  ref={mentionListRef}
+                  className="absolute left-0 right-0 top-full mt-1 z-20 max-h-40 overflow-auto bg-white border border-[#E5E7EB] rounded shadow py-1"
+                >
+                  {filteredByAt.map((u, i) => (
+                    <li key={u.id}>
+                      <button
+                        type="button"
+                        className={`w-full text-left px-2 py-1.5 text-sm hover:bg-[#F3F4F6] ${i === mentionHighlightIndex ? 'bg-[#EFF6FF]' : ''}`}
+                        onClick={() => applyMention(u)}
+                      >
+                        @{u.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <input
               ref={fileInputRef}
@@ -523,6 +670,42 @@ function ReplyForm({ productId, parentMessageId, onSent, onReplySent, currentUse
               <ImagePlus className="w-3.5 h-3.5" />
               {t('productCollab.uploadImageAndFile')}
             </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMentionDropdownOpen((v) => !v)}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-[#2563EB] hover:bg-[#EFF6FF] rounded border border-[#E5E7EB]"
+              >
+                <AtSign className="w-3.5 h-3.5" />
+                {t('productCollab.addMention')}
+              </button>
+              {mentionDropdownOpen && mentionQuery === null && (
+                <>
+                  <div className="fixed inset-0 z-10" aria-hidden onClick={() => setMentionDropdownOpen(false)} />
+                  <ul className="absolute left-0 top-full mt-1 z-20 min-w-[140px] max-h-40 overflow-auto bg-white border border-[#E5E7EB] rounded shadow py-1">
+                    {mentionableUsers
+                      .filter((u) => !selectedMentionIds.includes(u.id))
+                      .map((u) => (
+                        <li key={u.id}>
+                          <button
+                            type="button"
+                            className="w-full text-left px-2 py-1.5 text-sm hover:bg-[#F3F4F6]"
+                            onClick={() => {
+                              setSelectedMentionIds((prev) => [...prev, u.id]);
+                              setMentionDropdownOpen(false);
+                            }}
+                          >
+                            {u.name}
+                          </button>
+                        </li>
+                      ))}
+                    {mentionableUsers.filter((u) => !selectedMentionIds.includes(u.id)).length === 0 && (
+                      <li className="px-2 py-1.5 text-xs text-[#6B7280]">{t('productCollab.noUsersToAdd')}</li>
+                    )}
+                  </ul>
+                </>
+              )}
+            </div>
             {selectedFiles.length > 0 && (
               <span className="text-xs text-[#6B7280]">
                 {selectedFiles.map((item, i) => (
@@ -536,10 +719,33 @@ function ReplyForm({ productId, parentMessageId, onSent, onReplySent, currentUse
               </span>
             )}
           </div>
+          {selectedMentionIds.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {selectedMentionIds.map((id) => {
+                const u = mentionableUsers.find((x) => x.id === id);
+                return (
+                  <span
+                    key={id}
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs bg-[#EFF6FF] text-[#2563EB] rounded-full"
+                  >
+                    @{u?.name ?? id}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMentionIds((prev) => prev.filter((x) => x !== id))}
+                      className="hover:text-[#1D4ED8]"
+                      aria-label={t('productCollab.remove')}
+                    >
+                      ×
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
         <button
           type="submit"
-          disabled={submitting || (!body.trim() && selectedFiles.length === 0)}
+          disabled={submitting || (!body.trim() && selectedFiles.length === 0 && selectedMentionIds.length === 0)}
           className="shrink-0 px-3 py-1.5 text-sm text-white bg-[#2563EB] rounded hover:bg-[#1D4ED8] disabled:opacity-50"
         >
           {submitting ? t('productCollab.sending') : t('productCollab.reply')}

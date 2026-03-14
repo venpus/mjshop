@@ -37,8 +37,13 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
   const [mentionableUsers, setMentionableUsers] = useState<MentionableUser[]>([]);
   const [selectedMentionIds, setSelectedMentionIds] = useState<string[]>([]);
   const [mentionDropdownOpen, setMentionDropdownOpen] = useState(false);
+  /** @ 입력 시 검색어(커서 앞 문자열). 빈 문자열이면 @ 직후 */
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mentionListRef = useRef<HTMLUListElement>(null);
+  const [mentionHighlightIndex, setMentionHighlightIndex] = useState(0);
 
   useEffect(() => {
     getMentionableUsers().then((res) => {
@@ -60,6 +65,69 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
     });
   };
 
+  /** 본문에 남아 있는 @이름 기준으로 맨션 ID 목록 동기화 (키보드로 삭제 시 칩도 제거) */
+  const syncMentionIdsFromBody = (text: string) => {
+    const ids: string[] = [];
+    for (const u of mentionableUsers) {
+      const needle = `@${u.name}`;
+      let idx = text.indexOf(needle);
+      while (idx !== -1) {
+        const after = text[idx + needle.length];
+        if (after === undefined || /\s/.test(after)) {
+          ids.push(u.id);
+          break;
+        }
+        idx = text.indexOf(needle, idx + 1);
+      }
+    }
+    setSelectedMentionIds((prev) => {
+      const next = [...new Set(ids)];
+      return prev.length === next.length && prev.every((id, i) => next[i] === id) ? prev : next;
+    });
+  };
+
+  /** textarea에서 @ 이후 문자열(커서 앞) 추출. 마지막 @ 위치 반환 */
+  const getMentionContext = (value: string, cursor: number): { start: number; query: string } | null => {
+    const before = value.slice(0, cursor);
+    const atIndex = before.lastIndexOf('@');
+    if (atIndex === -1) return null;
+    const afterAt = before.slice(atIndex + 1);
+    if (/\s/.test(afterAt)) return null;
+    return { start: atIndex, query: afterAt };
+  };
+
+  const openMentionDropdownAt = (value: string, cursor: number) => {
+    const ctx = getMentionContext(value, cursor);
+    if (ctx != null) {
+      setMentionQuery(ctx.query);
+      setMentionDropdownOpen(true);
+      setMentionHighlightIndex(0);
+    } else {
+      setMentionQuery(null);
+      setMentionDropdownOpen(false);
+    }
+  };
+
+  const applyMention = (user: MentionableUser) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const value = ta.value;
+    const cursor = ta.selectionStart;
+    const ctx = getMentionContext(value, cursor);
+    if (!ctx) return;
+    const insert = `@${user.name} `;
+    const nextValue = value.slice(0, ctx.start) + insert + value.slice(cursor);
+    setBody(nextValue);
+    setSelectedMentionIds((prev) => (prev.includes(user.id) ? prev : [...prev, user.id]));
+    setMentionQuery(null);
+    setMentionDropdownOpen(false);
+    setTimeout(() => {
+      ta.focus();
+      const newPos = ctx.start + insert.length;
+      ta.setSelectionRange(newPos, newPos);
+    }, 0);
+  };
+
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length) return;
@@ -74,7 +142,7 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const hasContent = body.trim() || selectedFiles.length > 0;
+    const hasContent = body.trim() || selectedFiles.length > 0 || selectedMentionIds.length > 0;
     if (!hasContent) {
       setError(t('productCollab.enterContentOrImage'));
       return;
@@ -116,16 +184,78 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
     }
   };
 
+  const filteredByAt = mentionQuery === null
+    ? mentionableUsers.filter((u) => !selectedMentionIds.includes(u.id))
+    : mentionableUsers.filter(
+        (u) => !selectedMentionIds.includes(u.id) && u.name.toLowerCase().includes(mentionQuery.toLowerCase())
+      );
+  const showAtDropdown = mentionDropdownOpen && (mentionQuery !== null || filteredByAt.length > 0);
+
+  const handleBodyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const v = e.target.value;
+    setBody(v);
+    syncMentionIdsFromBody(v);
+    openMentionDropdownAt(v, e.target.selectionStart);
+  };
+
+  const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!showAtDropdown || filteredByAt.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setMentionHighlightIndex((i) => (i + 1) % filteredByAt.length);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setMentionHighlightIndex((i) => (filteredByAt.length + i - 1) % filteredByAt.length);
+      return;
+    }
+    if (e.key === 'Enter' && filteredByAt[mentionHighlightIndex]) {
+      e.preventDefault();
+      applyMention(filteredByAt[mentionHighlightIndex]);
+      return;
+    }
+    if (e.key === 'Escape') {
+      setMentionQuery(null);
+      setMentionDropdownOpen(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-[#E5E7EB] p-4">
       <div className="space-y-3">
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder={t('productCollab.placeholderMessage')}
-          rows={3}
-          className="w-full px-3 py-2 border border-[#E5E7EB] rounded-lg text-[#1F2937] text-sm resize-none"
-        />
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={body}
+            onChange={handleBodyChange}
+            onKeyDown={handleBodyKeyDown}
+            placeholder={t('productCollab.placeholderMessage')}
+            rows={3}
+            className="w-full px-3 py-2 border border-[#E5E7EB] rounded-lg text-[#1F2937] text-sm resize-none"
+          />
+          {showAtDropdown && mentionQuery !== null && (
+            <>
+              <div className="fixed inset-0 z-10" aria-hidden onClick={() => { setMentionQuery(null); setMentionDropdownOpen(false); }} />
+              <ul
+                ref={mentionListRef}
+                className="absolute left-0 right-0 top-full mt-1 z-20 max-h-48 overflow-auto bg-white border border-[#E5E7EB] rounded-lg shadow py-1"
+              >
+                {filteredByAt.map((u, i) => (
+                  <li key={u.id}>
+                    <button
+                      type="button"
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-[#F3F4F6] ${i === mentionHighlightIndex ? 'bg-[#EFF6FF]' : ''}`}
+                      onClick={() => applyMention(u)}
+                    >
+                      @{u.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={tag}
@@ -162,7 +292,7 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
               <AtSign className="w-4 h-4" />
               {t('productCollab.addMention')}
             </button>
-            {mentionDropdownOpen && (
+            {mentionDropdownOpen && mentionQuery === null && (
               <>
                 <div
                   className="fixed inset-0 z-10"

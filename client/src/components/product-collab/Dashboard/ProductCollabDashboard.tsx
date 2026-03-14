@@ -70,7 +70,7 @@ export function ProductCollabDashboard() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="p-6 max-w-6xl 2xl:max-w-screen-2xl mx-auto space-y-6">
       <h1 className="text-xl font-bold text-[#1F2937]">
         {t('productCollab.aiWorkAssistant')}
         {counts && (
@@ -78,8 +78,13 @@ export function ProductCollabDashboard() {
         )}
       </h1>
 
-      <AiWorkSummarySection />
-
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+        {/* 왼쪽: AI 업무 요약 (PC에서 고정 너비, 세로 스크롤) */}
+        <div className="lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto lg:sticky lg:top-6 min-w-0">
+          <AiWorkSummarySection />
+        </div>
+        {/* 오른쪽: 제품 현황·내 업무·확인됨·답글·담당자별 업무 */}
+        <div className="min-w-0 space-y-6">
       {/* 제품 현황 - 슬레이트 계열 (맨 위로 이동), 클릭 시 해당 상태 목록으로 이동 */}
       <section className="rounded-xl border-2 border-[#CBD5E1] overflow-hidden bg-[#F8FAFC]">
         <div className="px-4 py-3 bg-[#E2E8F0] border-b border-[#CBD5E1]">
@@ -434,6 +439,8 @@ export function ProductCollabDashboard() {
         )}
         </div>
       </section>
+        </div>
+      </div>
     </div>
   );
 }
