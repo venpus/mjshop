@@ -27,6 +27,8 @@ import {
 } from '../utils/purchaseOrderCalculations';
 import { getShippingCostByPurchaseOrder } from '../api/packingListApi';
 import { useForceMobileLayout } from '../hooks/useForceMobileLayout';
+import { getScrollParent } from '../utils/domUtils';
+import { getApiBaseUrl, getServerOrigin } from '../api/baseUrl';
 
 interface PurchaseOrdersProps {
   onViewDetail: (orderId: string, tab?: 'cost' | 'factory' | 'work' | 'delivery', autoSave?: boolean) => void;
@@ -145,7 +147,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const isSuperAdmin = user?.level === 'A-SuperAdmin';
   const location = useLocation();
   const navigate = useNavigate();
-  
+  const forceMobileLayout = useForceMobileLayout();
+
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [totalItems, setTotalItems] = useState(0); // 전체 발주 개수 (서버에서 받음)
   const [isLoading, setIsLoading] = useState(true);
@@ -195,13 +198,15 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const mobileSentinelRef = useRef<HTMLDivElement>(null);
   /** 모바일 무필터 첫 로드 중복 방지 (검색/필터 변경 시 리셋) */
   const mobileInitialLoadStartedRef = useRef(false);
+  /** 무한 스크롤 콜백을 ref로 보관해 observer/scroll 리스너가 매 렌더마다 재등록되지 않도록 함 */
+  const loadMoreMobileRef = useRef<() => void>(() => {});
 
   // 필터 유지 상태에서 페이징 시 불필요한 API 재호출 방지: searchTerm/filters 변경 시에만 재요청
   const prevSearchTermRef = useRef<string | null>(null);
   const prevFiltersRef = useRef<typeof filters | null>(null);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-  const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+  const API_BASE_URL = getApiBaseUrl();
+  const SERVER_BASE_URL = getServerOrigin();
 
   // 이미지 URL을 전체 URL로 변환하는 헬퍼 함수 (캐시 버스팅 포함)
   const getFullImageUrl = (imageUrl: string | null | undefined): string => {
@@ -298,7 +303,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     params.set('page', String(page));
     params.set('limit', '20');
     if (searchTerm.trim()) params.set('search', searchTerm.trim());
-    const response = await fetch(`${API_BASE_URL}/purchase-orders?${params.toString()}`, {
+    const response = await fetch(`${getApiBaseUrl()}/purchase-orders?${params.toString()}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -518,7 +523,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   }, [mobileOrdersSource]);
 
   const loadMoreMobile = useCallback(() => {
-    if (typeof window !== 'undefined' && window.innerWidth >= 768) return;
+    if (!forceMobileLayout && typeof window !== 'undefined' && window.innerWidth >= 768) return;
     if (isLoadingMoreMobile) return;
     if (hasActiveStatusFilters) {
       setMobileDisplayCount((c) => c + 20);
@@ -535,21 +540,50 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       })
       .catch(() => setHasMoreMobile(false))
       .finally(() => setIsLoadingMoreMobile(false));
-  }, [hasActiveStatusFilters, isLoadingMoreMobile, hasMoreMobile, mobilePage, mobileOrders.length, loadPurchaseOrdersPage]);
+  }, [forceMobileLayout, hasActiveStatusFilters, isLoadingMoreMobile, hasMoreMobile, mobilePage, mobileOrders.length, loadPurchaseOrdersPage]);
 
-  // 모바일 스크롤 감지: sentinel이 뷰포트에 보이면 더 불러오기 (단일 페이지 스크롤)
+  loadMoreMobileRef.current = loadMoreMobile;
+
+  // 모바일 스크롤 감지: IntersectionObserver + 스크롤 이벤트 보강 (스크롤 컨테이너 기준)
   useEffect(() => {
     const sentinel = mobileSentinelRef.current;
     if (!sentinel) return;
+    const scrollRoot = getScrollParent(sentinel);
+
+    const checkAndLoad = () => {
+      loadMoreMobileRef.current?.();
+    };
+
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) loadMoreMobile();
+        if (entries[0]?.isIntersecting) checkAndLoad();
       },
-      { root: null, rootMargin: '200px', threshold: 0 }
+      { root: scrollRoot ?? null, rootMargin: '200px', threshold: 0 }
     );
     observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [loadMoreMobile]);
+
+    const onScroll = () => {
+      if (scrollRoot) {
+        const el = scrollRoot as HTMLElement;
+        const { scrollTop, clientHeight, scrollHeight } = el;
+        if (scrollHeight - (scrollTop + clientHeight) < 250) checkAndLoad();
+      } else {
+        const { scrollTop, clientHeight, scrollHeight } = document.documentElement;
+        if (scrollHeight - (scrollTop + clientHeight) < 250) checkAndLoad();
+      }
+    };
+
+    const scrollTarget = scrollRoot ?? (typeof window !== 'undefined' ? window : null);
+    if (scrollTarget) {
+      (scrollTarget as EventTarget).addEventListener('scroll', onScroll, { passive: true });
+    }
+    return () => {
+      observer.disconnect();
+      if (scrollTarget) {
+        (scrollTarget as EventTarget).removeEventListener('scroll', onScroll);
+      }
+    };
+  }, []);
 
   // 검색 실행 핸들러 (엔터키 또는 검색 버튼 클릭 시)
   const handleSearch = () => {
@@ -792,8 +826,6 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   // 활성 필터 개수
   const activeFilterCount = Object.values(filters).reduce((sum, arr) => sum + arr.length, 0);
 
-  const forceMobileLayout = useForceMobileLayout();
-
   if (isLoading) {
     return (
       <div className="p-8 min-h-[1080px] flex items-center justify-center">
@@ -809,7 +841,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     <div className="p-4 md:p-8 min-h-[1080px]">
       {/* 모바일: 상단 컴팩트·스티키 */}
       {/* 모바일: 상단 컴팩트·스티키 (검색/필터 1줄, 컨펌/생성 1줄) - 앱 WebView에서 배경 투명 방지 */}
-      <div className={`${forceMobileLayout ? 'block' : 'block md:hidden'} sticky top-0 z-10 bg-white border-b border-gray-200 -mx-4 px-4 pt-2 pb-2 mb-2 shadow-sm`}>
+      <div className={`${forceMobileLayout ? 'block' : 'block md:hidden'} sticky top-0 z-20 bg-white border-b border-gray-200 -mx-4 px-4 pt-2 pb-2 mb-2 shadow-sm`}>
         <div className="flex items-center gap-1.5 mb-1.5 min-h-[2.25rem]">
           <div className="flex-1 min-w-0 flex items-stretch">
             <SearchBar
