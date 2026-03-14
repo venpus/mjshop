@@ -5,6 +5,7 @@ export interface AccessLogItem {
   ip: string | null;
   url: string;
   device: 'PC' | 'Mobile';
+  device_model: string | null;
   user_name: string;
 }
 

@@ -9,19 +9,22 @@ interface AccessLogRow extends RowDataPacket {
   ip: string | null;
   url: string;
   device: string;
+  device_model: string | null;
   user_name: string;
 }
 
 export interface AccessLogListFilters {
   userName?: string;
+  /** true면 admin_accounts에 없는 user_id 접속 로그만 조회 */
+  othersOnly?: boolean;
 }
 
 export class AccessLogRepository {
   async create(dto: CreateAccessLogDTO): Promise<number> {
     const [result] = await pool.execute<ResultSetHeader>(
-      `INSERT INTO access_logs (user_id, accessed_at, ip, url, device)
-       VALUES (?, ?, ?, ?, ?)`,
-      [dto.user_id, dto.accessed_at, dto.ip, dto.url, dto.device]
+      `INSERT INTO access_logs (user_id, accessed_at, ip, url, device, device_model)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [dto.user_id, dto.accessed_at, dto.ip, dto.url, dto.device, dto.device_model ?? null]
     );
     return result.insertId;
   }
@@ -33,13 +36,15 @@ export class AccessLogRepository {
   ): Promise<AccessLogWithUserName[]> {
     const conditions: string[] = ['1=1'];
     const params: (string | number)[] = [];
-    if (filters.userName && filters.userName.trim()) {
+    if (filters.othersOnly) {
+      conditions.push('l.user_id NOT IN (SELECT id FROM admin_accounts)');
+    } else if (filters.userName && filters.userName.trim()) {
       conditions.push('a.name LIKE ?');
       params.push(`%${filters.userName.trim()}%`);
     }
     const where = conditions.join(' AND ');
     const [rows] = await pool.execute<AccessLogRow[]>(
-      `SELECT l.id, l.user_id, l.accessed_at, l.ip, l.url, l.device, a.name AS user_name
+      `SELECT l.id, l.user_id, l.accessed_at, l.ip, l.url, l.device, l.device_model, a.name AS user_name
        FROM access_logs l
        LEFT JOIN admin_accounts a ON a.id = l.user_id
        WHERE ${where}
@@ -54,6 +59,7 @@ export class AccessLogRepository {
       ip: r.ip,
       url: r.url,
       device: r.device as 'PC' | 'Mobile',
+      device_model: r.device_model ?? null,
       user_name: r.user_name ?? r.user_id,
     }));
   }
@@ -61,7 +67,9 @@ export class AccessLogRepository {
   async countWithFilter(filters: AccessLogListFilters): Promise<number> {
     const conditions: string[] = ['1=1'];
     const params: string[] = [];
-    if (filters.userName && filters.userName.trim()) {
+    if (filters.othersOnly) {
+      conditions.push('l.user_id NOT IN (SELECT id FROM admin_accounts)');
+    } else if (filters.userName && filters.userName.trim()) {
       conditions.push('a.name LIKE ?');
       params.push(`%${filters.userName.trim()}%`);
     }

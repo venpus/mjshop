@@ -26,10 +26,14 @@ export function AccessLogPage() {
         setFilterOptions([
           { value: '', label: t('accessLog.filterAll') },
           ...list.map((a) => ({ value: a.name, label: a.name })),
+          { value: '__OTHERS__', label: t('accessLog.filterOthers') },
         ]);
       })
       .catch(() => {
-        if (!cancelled) setFilterOptions([{ value: '', label: t('accessLog.filterAll') }]);
+        if (!cancelled) setFilterOptions([
+          { value: '', label: t('accessLog.filterAll') },
+          { value: '__OTHERS__', label: t('accessLog.filterOthers') },
+        ]);
       })
       .finally(() => {
         if (!cancelled) setOptionsLoading(false);
@@ -44,7 +48,8 @@ export function AccessLogPage() {
       const res = await getAccessLogs({
         page,
         limit: PAGE_SIZE,
-        userName: selectedUserName || undefined,
+        userName: selectedUserName && selectedUserName !== '__OTHERS__' ? selectedUserName : undefined,
+        othersOnly: selectedUserName === '__OTHERS__',
       });
       setData({ data: res.data, pagination: res.pagination });
     } catch (e) {

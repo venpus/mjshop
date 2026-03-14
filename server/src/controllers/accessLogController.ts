@@ -24,8 +24,9 @@ export async function list(req: Request, res: Response) {
     const page = req.query.page ? Number(req.query.page) : 1;
     const limit = req.query.limit ? Number(req.query.limit) : 20;
     const userName = typeof req.query.userName === 'string' ? req.query.userName : undefined;
+    const othersOnly = req.query.othersOnly === '1' || req.query.othersOnly === 'true';
 
-    const result = await accessLogService.list({ userName, page, limit });
+    const result = await accessLogService.list({ userName, othersOnly, page, limit });
     return res.json({
       data: result.data,
       pagination: {

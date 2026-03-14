@@ -29,7 +29,8 @@
     "multer": "^2.0.2",
     "mysql2": "^3.9.0",
     "node-fetch": "^3.3.2",
-    "puppeteer": "^24.37.5"
+    "puppeteer": "^24.37.5",
+    "ua-parser-js": "^2.0.9"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",

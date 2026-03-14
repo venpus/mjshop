@@ -15,6 +15,7 @@ import qwenRoutes from './qwen.js';
 import productCollabRoutes from './productCollab.js';
 import manufacturingDocumentRoutes from './manufacturingDocuments.js';
 import accessLogRoutes from './accessLogs.js';
+import normalInvoiceRoutes from './normalInvoices.js';
 
 const router = Router();
 
@@ -38,6 +39,7 @@ router.use('/stock-outbound', stockOutboundRoutes);
 router.use('/qwen', qwenRoutes);
 router.use('/product-collab', productCollabRoutes);
 router.use('/manufacturing-documents', manufacturingDocumentRoutes);
+router.use('/normal-invoices', normalInvoiceRoutes);
 
 router.get('/', (req, res) => {
   res.json({ 

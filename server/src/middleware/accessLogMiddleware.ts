@@ -1,6 +1,7 @@
 import { Request, NextFunction } from 'express';
 import { AccessLogService } from '../services/accessLogService.js';
 import { logger } from '../utils/logger.js';
+import { parseDeviceModel } from '../utils/userAgent.js';
 
 const accessLogService = new AccessLogService();
 
@@ -31,13 +32,16 @@ export function accessLogMiddleware(req: Request, _res: unknown, next: NextFunct
   }
   const ip = getClientIp(req);
   const url = req.originalUrl ?? req.url ?? '';
-  const device = getDevice(req.headers['user-agent']);
+  const ua = req.headers['user-agent'];
+  const device = getDevice(ua);
+  const device_model = parseDeviceModel(ua);
   const dto = {
     user_id: user.id,
     accessed_at: new Date(),
     ip,
     url,
     device,
+    device_model,
   };
   void accessLogService.create(dto).catch((err) => {
     logger.error('접속 로그 기록 실패:', err);

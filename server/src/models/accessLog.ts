@@ -7,6 +7,7 @@ export interface AccessLog {
   ip: string | null;
   url: string;
   device: AccessLogDevice;
+  device_model: string | null;
 }
 
 export interface AccessLogWithUserName extends AccessLog {
@@ -19,4 +20,5 @@ export interface CreateAccessLogDTO {
   ip: string | null;
   url: string;
   device: AccessLogDevice;
+  device_model: string | null;
 }

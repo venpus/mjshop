@@ -510,8 +510,10 @@ export class ProductCollabController {
       if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
         return res.status(404).json({ success: false, error: '파일을 찾을 수 없습니다.' });
       }
-      const safeName = path.basename(name).replace(/[^a-zA-Z0-9._-]/g, '_') || 'download';
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(safeName)}"`);
+      const baseName = path.basename(name) || 'download';
+      const fallback = baseName.replace(/[^\x20-\x7E]/g, '_') || 'download';
+      const encoded = encodeURIComponent(baseName);
+      res.setHeader('Content-Disposition', `attachment; filename="${fallback.replace(/"/g, "'")}"; filename*=UTF-8''${encoded}`);
       res.sendFile(path.resolve(filePath));
     } catch (error: unknown) {
       console.error('Product collab download error:', error);

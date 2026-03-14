@@ -1286,3 +1286,79 @@ export async function getNextProjectInitialImageNumber(projectId: number): Promi
     return 1;
   }
 }
+
+// ==================== Normal Invoice (정상 인보이스) ====================
+
+const normalInvoiceUploadDir = path.join(__dirname, '../../uploads/normal-invoices');
+if (!fs.existsSync(normalInvoiceUploadDir)) {
+  fs.mkdirSync(normalInvoiceUploadDir, { recursive: true });
+}
+
+const normalInvoiceTempDir = path.join(normalInvoiceUploadDir, 'temp');
+if (!fs.existsSync(normalInvoiceTempDir)) {
+  fs.mkdirSync(normalInvoiceTempDir, { recursive: true });
+}
+
+const normalInvoiceStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, normalInvoiceTempDir),
+  filename: (_req, file, cb) => {
+    const uuid = randomUUID();
+    const ext = path.extname(file.originalname).toLowerCase() || path.extname(file.originalname) || '';
+    const safeName = (file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);
+    cb(null, `${uuid}-${safeName}`);
+  },
+});
+
+const normalInvoiceFileFilter: multer.Options['fileFilter'] = (_req, _file, cb) => cb(null, true);
+
+export const normalInvoiceFileUpload = multer({
+  storage: normalInvoiceStorage,
+  fileFilter: normalInvoiceFileFilter,
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
+
+export function getNormalInvoiceEntryDir(entryId: number): string {
+  return path.join(normalInvoiceUploadDir, String(entryId));
+}
+
+/** 임시 파일을 엔트리 폴더로 이동하고 상대 경로 반환 (normal-invoices/{entryId}/invoice.* 또는 photos/{name}) */
+export async function saveNormalInvoiceFile(
+  tempFilePath: string,
+  entryId: number,
+  fileKind: 'invoice' | 'photo',
+  originalName: string
+): Promise<string> {
+  const entryDir = getNormalInvoiceEntryDir(entryId);
+  await fs.promises.mkdir(entryDir, { recursive: true });
+  const ext = path.extname(originalName).toLowerCase() || '';
+  const baseName = path.basename(originalName, path.extname(originalName)).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+  let relativePath: string;
+  if (fileKind === 'invoice') {
+    const filename = `invoice${ext}`;
+    const destPath = path.join(entryDir, filename);
+    if (fs.existsSync(tempFilePath)) {
+      await fs.promises.rename(tempFilePath, destPath);
+    }
+    relativePath = `normal-invoices/${entryId}/${filename}`;
+  } else {
+    const photosDir = path.join(entryDir, 'photos');
+    await fs.promises.mkdir(photosDir, { recursive: true });
+    const files = await fs.promises.readdir(photosDir).catch(() => []);
+    const nextNum = files.length + 1;
+    const filename = `${String(nextNum).padStart(3, '0')}-${baseName}${ext}`;
+    const destPath = path.join(photosDir, filename);
+    if (fs.existsSync(tempFilePath)) {
+      await fs.promises.rename(tempFilePath, destPath);
+    }
+    relativePath = `normal-invoices/${entryId}/photos/${filename}`;
+  }
+  return relativePath.replace(/\\/g, '/');
+}
+
+/** 엔트리 폴더 및 파일 삭제 */
+export async function deleteNormalInvoiceEntryFiles(entryId: number): Promise<void> {
+  const entryDir = getNormalInvoiceEntryDir(entryId);
+  if (fs.existsSync(entryDir)) {
+    await fs.promises.rm(entryDir, { recursive: true }).catch(() => {});
+  }
+}

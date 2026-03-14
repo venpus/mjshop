@@ -12,6 +12,7 @@ export class AccessLogService {
 
   async list(options: {
     userName?: string;
+    othersOnly?: boolean;
     page?: number;
     limit?: number;
   }): Promise<{
@@ -24,7 +25,10 @@ export class AccessLogService {
     const page = Math.max(1, options.page ?? 1);
     const limit = Math.min(100, Math.max(1, options.limit ?? PAGE_SIZE));
     const offset = (page - 1) * limit;
-    const filters = { userName: options.userName?.trim() || undefined };
+    const filters = {
+      userName: options.othersOnly ? undefined : (options.userName?.trim() || undefined),
+      othersOnly: options.othersOnly ?? false,
+    };
 
     const [data, total] = await Promise.all([
       this.repo.findWithFilter(filters, limit, offset),

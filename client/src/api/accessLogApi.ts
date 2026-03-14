@@ -21,6 +21,8 @@ export interface GetAccessLogsParams {
   page: number;
   limit: number;
   userName?: string;
+  /** 등록된 사용자 외 접속 로그만 조회 */
+  othersOnly?: boolean;
 }
 
 export interface AdminAccountOption {
@@ -49,7 +51,9 @@ export async function getAccessLogs(
   const search = new URLSearchParams();
   search.set('page', String(params.page));
   search.set('limit', String(params.limit));
-  if (params.userName?.trim()) {
+  if (params.othersOnly) {
+    search.set('othersOnly', '1');
+  } else if (params.userName?.trim()) {
     search.set('userName', params.userName.trim());
   }
   const res = await fetch(`${API_BASE}/access-logs?${search.toString()}`, {

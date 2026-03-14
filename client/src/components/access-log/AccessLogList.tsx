@@ -38,6 +38,13 @@ export function AccessLogList({ items, loading }: AccessLogListProps) {
       </div>
     );
   }
+  function formatDeviceDisplay(log: AccessLogItem): string {
+    if (log.device_model?.trim()) {
+      return `${log.device_model.trim()} (${log.device})`;
+    }
+    return log.device;
+  }
+
   return (
     <div className="font-mono text-sm text-gray-800 border border-gray-200 rounded-lg bg-gray-50 p-4">
       {items.map((log) => (
@@ -45,7 +52,26 @@ export function AccessLogList({ items, loading }: AccessLogListProps) {
           key={log.id}
           className="py-2 border-b border-gray-200 last:border-b-0"
         >
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0">
+          {/* 모바일: 1행 - 접속 ID, 사용자명 */}
+          <div className="flex flex-wrap items-center gap-x-2 md:hidden">
+            <span className="text-gray-500">{t('accessLog.id')}:</span>
+            <span>{log.user_id}</span>
+            <span className="text-gray-400">·</span>
+            <span className="text-gray-500">{t('accessLog.userName')}:</span>
+            <span>{log.user_name}</span>
+          </div>
+          {/* 모바일: 2행 - 접속시간 */}
+          <div className="mt-1 md:hidden">
+            <span className="text-gray-500">{t('accessLog.accessedAt')}:</span>
+            <span className="ml-1">{formatDateTime(log.accessed_at)}</span>
+          </div>
+          {/* 모바일: 3행 - 접속IP */}
+          <div className="mt-1 md:hidden">
+            <span className="text-gray-500">{t('accessLog.ip')}:</span>
+            <span className="ml-1">{log.ip ?? '-'}</span>
+          </div>
+          {/* PC: 1행 - 접속 ID, 사용자명, 접속시간, 접속IP */}
+          <div className="hidden md:flex flex-wrap items-center gap-x-2 gap-y-0">
             <span className="text-gray-500">{t('accessLog.id')}:</span>
             <span>{log.user_id}</span>
             <span className="text-gray-400">·</span>
@@ -57,11 +83,14 @@ export function AccessLogList({ items, loading }: AccessLogListProps) {
             <span className="text-gray-400">·</span>
             <span className="text-gray-500">{t('accessLog.ip')}:</span>
             <span>{log.ip ?? '-'}</span>
-            <span className="text-gray-400">·</span>
-            <span className="text-gray-500">{t('accessLog.device')}:</span>
-            <span>{log.device}</span>
           </div>
-          <div className="mt-1 pl-0 break-all text-gray-700">
+          {/* 4행(모바일) / 2행(PC) - 기기 */}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0 text-gray-700">
+            <span className="text-gray-500">{t('accessLog.device')}:</span>
+            <span>{formatDeviceDisplay(log)}</span>
+          </div>
+          {/* 5행(모바일) / 3행(PC) - URL */}
+          <div className="mt-1 break-all text-gray-700">
             <span className="text-gray-500">{t('accessLog.url')}:</span> {log.url}
           </div>
         </div>
