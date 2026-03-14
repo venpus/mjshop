@@ -86,8 +86,14 @@ export class ProductCollabService {
         await this.repository.updateMessageTranslation(message.id, dto.product_id, {
           body_translated: result.translated,
           body_lang: result.detectedLang ?? null,
+          body_translation_provider: result.provider ?? null,
         });
-        return { ...message, body_translated: result.translated, body_lang: result.detectedLang ?? null };
+        return {
+          ...message,
+          body_translated: result.translated,
+          body_lang: result.detectedLang ?? null,
+          body_translation_provider: result.provider ?? null,
+        };
       }
     }
     return message;
@@ -111,11 +117,17 @@ export class ProductCollabService {
           await this.repository.updateMessageTranslation(messageId, productId, {
             body_translated: result.translated,
             body_lang: result.detectedLang ?? null,
+            body_translation_provider: result.provider ?? null,
           });
-          return { ...updated, body_translated: result.translated, body_lang: result.detectedLang ?? null };
+          return {
+            ...updated,
+            body_translated: result.translated,
+            body_lang: result.detectedLang ?? null,
+            body_translation_provider: result.provider ?? null,
+          };
         }
       }
-      return { ...updated, body_translated: null, body_lang: null };
+      return { ...updated, body_translated: null, body_lang: null, body_translation_provider: null };
     }
     return updated;
   }

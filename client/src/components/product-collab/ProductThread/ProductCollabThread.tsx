@@ -100,6 +100,21 @@ export function ProductCollabThread() {
     return null;
   }, []);
 
+  /** 스레드 내 메시지·답글 중 가장 최근 번역에 사용된 AI (제품명 옆 표기용) */
+  const latestTranslationProvider = useMemo((): 'openai' | 'qwen' | null => {
+    if (!product?.messages?.length) return null;
+    const all: { created_at: string; body_translation_provider?: 'openai' | 'qwen' | null }[] = [];
+    for (const m of product.messages) {
+      if (m.body_translation_provider) all.push({ created_at: m.created_at, body_translation_provider: m.body_translation_provider });
+      for (const r of m.replies ?? []) {
+        if (r.body_translation_provider) all.push({ created_at: r.created_at, body_translation_provider: r.body_translation_provider });
+      }
+    }
+    if (all.length === 0) return null;
+    all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return all[0].body_translation_provider ?? null;
+  }, [product?.messages]);
+
   if (loading) return <div className="p-6 text-[#1F2937]">{t('productCollab.loading')}</div>;
   if (error || !product) {
     return (
@@ -137,6 +152,11 @@ export function ProductCollabThread() {
           </button>
         )}
         <h1 className="text-lg font-semibold text-[#1F2937]">{product.name}</h1>
+        {latestTranslationProvider && (
+          <span className="text-xs text-[#6B7280] ml-2">
+            {latestTranslationProvider === 'openai' ? t('productCollab.translationByOpenAI') : t('productCollab.translationByQwen')}
+          </span>
+        )}
         <span className="text-xs text-[#6B7280]">{product.status}</span>
         {product.status !== 'PRODUCTION_COMPLETE' && (
           <button

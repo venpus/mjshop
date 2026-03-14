@@ -67,6 +67,8 @@ export interface ProductCollabMessage {
   body: string | null;
   body_translated?: string | null;
   body_lang?: string | null;
+  /** 번역에 사용된 AI: openai / qwen */
+  body_translation_provider?: 'openai' | 'qwen' | null;
   tag: MessageTag | null;
   created_at: Date;
   updated_at: Date;

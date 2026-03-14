@@ -48,6 +48,7 @@ interface MessageRow extends RowDataPacket {
   body: string | null;
   body_translated?: string | null;
   body_lang?: string | null;
+  body_translation_provider?: string | null;
   tag: string | null;
   created_at: Date;
   updated_at: Date;
@@ -79,6 +80,12 @@ function getMessageLang(row: MessageRow | Record<string, unknown>): string | nul
   const r = row as Record<string, unknown>;
   const v = r.body_lang ?? r.BODY_lang ?? r.body_Lang;
   return typeof v === 'string' && v.trim() ? v : null;
+}
+function getMessageTranslationProvider(row: MessageRow | Record<string, unknown>): 'openai' | 'qwen' | null {
+  const r = row as Record<string, unknown>;
+  const v = r.body_translation_provider ?? r.body_Translation_provider;
+  if (v === 'openai' || v === 'qwen') return v;
+  return null;
 }
 
 export class ProductCollabRepository {
@@ -340,6 +347,7 @@ export class ProductCollabRepository {
         body: r.body,
         body_translated: getMessageTranslated(r),
         body_lang: getMessageLang(r),
+        body_translation_provider: getMessageTranslationProvider(r),
         tag: r.tag as ProductCollabMessage['tag'],
         created_at: r.created_at,
         updated_at: r.updated_at,
@@ -370,6 +378,7 @@ export class ProductCollabRepository {
       body: m.body,
       body_translated: getMessageTranslated(m),
       body_lang: getMessageLang(m),
+      body_translation_provider: getMessageTranslationProvider(m),
       tag: m.tag as ProductCollabMessage['tag'],
       created_at: m.created_at,
       updated_at: m.updated_at,
@@ -577,6 +586,7 @@ export class ProductCollabRepository {
       body: m.body,
       body_translated: getMessageTranslated(m),
       body_lang: getMessageLang(m),
+      body_translation_provider: getMessageTranslationProvider(m),
       tag: m.tag as ProductCollabMessage['tag'],
       created_at: m.created_at,
       updated_at: m.updated_at,
@@ -605,7 +615,7 @@ export class ProductCollabRepository {
     if (dto.body !== undefined) {
       fields.push('body = ?');
       values.push(dto.body);
-      fields.push('body_translated = NULL', 'body_lang = NULL');
+      fields.push('body_translated = NULL', 'body_lang = NULL', 'body_translation_provider = NULL');
     }
     if (dto.tag !== undefined) {
       fields.push('tag = ?');
@@ -638,11 +648,11 @@ export class ProductCollabRepository {
   async updateMessageTranslation(
     messageId: number,
     productId: number,
-    data: { body_translated: string; body_lang?: string | null }
+    data: { body_translated: string; body_lang?: string | null; body_translation_provider?: 'openai' | 'qwen' | null }
   ): Promise<void> {
     await pool.execute(
-      'UPDATE product_collab_messages SET body_translated = ?, body_lang = ? WHERE id = ? AND product_id = ?',
-      [data.body_translated, data.body_lang ?? null, messageId, productId]
+      'UPDATE product_collab_messages SET body_translated = ?, body_lang = ?, body_translation_provider = ? WHERE id = ? AND product_id = ?',
+      [data.body_translated, data.body_lang ?? null, data.body_translation_provider ?? null, messageId, productId]
     );
   }
 

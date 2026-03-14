@@ -248,6 +248,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'productCollab.list': '목록',
     'productCollab.prev': '이전',
     'productCollab.next': '다음',
+    'productCollab.translationByOpenAI': '번역: OpenAI',
+    'productCollab.translationByQwen': '번역: Qwen',
 
     'packing.bag': '마대',
     'packing.weightIndividual': '개별 중량',
@@ -570,6 +572,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'productCollab.list': '列表',
     'productCollab.prev': '上一页',
     'productCollab.next': '下一页',
+    'productCollab.translationByOpenAI': '翻译: OpenAI',
+    'productCollab.translationByQwen': '翻译: Qwen',
 
     'packing.bag': '麻袋',
     'packing.box': '箱',
