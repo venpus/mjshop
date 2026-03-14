@@ -140,7 +140,7 @@ function AdminLayout() {
   };
 
   return (
-    <div className="flex h-screen min-h-0 lg:min-h-[1080px] bg-gray-50">
+    <div className="flex h-screen min-h-0 overflow-hidden lg:min-h-[1080px] bg-gray-50">
       {/* Overlay */}
       {isSidebarOpen && (
         <div
@@ -181,7 +181,7 @@ function AdminLayout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-h-0 min-w-0">
+      <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         {/* Header */}
         <div className="shrink-0 bg-white border-b border-gray-200 px-2 py-2 sm:px-4 sm:py-3 lg:px-8 lg:py-4 flex items-center gap-1 sm:gap-2 min-w-0">
           <button
