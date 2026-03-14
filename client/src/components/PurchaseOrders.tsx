@@ -189,9 +189,10 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState<FiltersState>(filtersFromUrl);
 
-  // 모바일 무한 스크롤용 상태
+  // 모바일 무한 스크롤/페이징용 상태
   const [mobileOrders, setMobileOrders] = useState<PurchaseOrder[]>([]);
   const [mobilePage, setMobilePage] = useState(1);
+  const [mobileTotal, setMobileTotal] = useState(0);
   const [hasMoreMobile, setHasMoreMobile] = useState(true);
   const [isLoadingMoreMobile, setIsLoadingMoreMobile] = useState(false);
   const [mobileDisplayCount, setMobileDisplayCount] = useState(20);
@@ -457,6 +458,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
     setMobilePage(1);
     setHasMoreMobile(true);
     setMobileDisplayCount(20);
+    setMobileTotal(0);
   }, [searchTerm, filters]);
 
   // 필터 없을 때 모바일: 첫 데이터는 20개 단위 1페이지 직접 로드 (데스크 15개와 섞이면 16~20번 누락 방지)
@@ -467,6 +469,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       .then(({ orders, total }) => {
         setMobileOrders(orders);
         setMobilePage(2);
+        setMobileTotal(total);
         setHasMoreMobile(total > orders.length);
       })
       .catch(() => setHasMoreMobile(false))
@@ -536,6 +539,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       .then(({ orders, total }) => {
         setMobileOrders((prev) => [...prev, ...orders]);
         setMobilePage((p) => p + 1);
+        setMobileTotal(total);
         setHasMoreMobile(prevLen + orders.length < total);
       })
       .catch(() => setHasMoreMobile(false))
@@ -544,46 +548,67 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
   loadMoreMobileRef.current = loadMoreMobile;
 
-  // 모바일 스크롤 감지: IntersectionObserver + 스크롤 이벤트 보강 (스크롤 컨테이너 기준)
+  // 모바일 스크롤 감지: 모바일일 때만 설정, 스크롤 컨테이너 + window 둘 다 리스너 등록
   useEffect(() => {
-    const sentinel = mobileSentinelRef.current;
-    if (!sentinel) return;
-    const scrollRoot = getScrollParent(sentinel);
+    if (!forceMobileLayout && typeof window !== 'undefined' && window.innerWidth >= 768) return;
 
-    const checkAndLoad = () => {
-      loadMoreMobileRef.current?.();
-    };
+    let teardown: (() => void) | undefined;
+    const frameId = requestAnimationFrame(() => {
+      const sentinel = mobileSentinelRef.current;
+      if (!sentinel) return;
+      const scrollRoot = getScrollParent(sentinel);
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) checkAndLoad();
-      },
-      { root: scrollRoot ?? null, rootMargin: '200px', threshold: 0 }
-    );
-    observer.observe(sentinel);
+      const checkAndLoad = () => {
+        loadMoreMobileRef.current?.();
+      };
 
-    const onScroll = () => {
-      if (scrollRoot) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0]?.isIntersecting) checkAndLoad();
+        },
+        { root: scrollRoot ?? null, rootMargin: '200px', threshold: 0 }
+      );
+      observer.observe(sentinel);
+
+      const thresholdPx = 250;
+
+      const onScrollContainer = () => {
+        if (!scrollRoot) return;
         const el = scrollRoot as HTMLElement;
         const { scrollTop, clientHeight, scrollHeight } = el;
-        if (scrollHeight - (scrollTop + clientHeight) < 250) checkAndLoad();
-      } else {
-        const { scrollTop, clientHeight, scrollHeight } = document.documentElement;
-        if (scrollHeight - (scrollTop + clientHeight) < 250) checkAndLoad();
-      }
-    };
+        if (scrollHeight - (scrollTop + clientHeight) < thresholdPx) checkAndLoad();
+      };
 
-    const scrollTarget = scrollRoot ?? (typeof window !== 'undefined' ? window : null);
-    if (scrollTarget) {
-      (scrollTarget as EventTarget).addEventListener('scroll', onScroll, { passive: true });
-    }
-    return () => {
-      observer.disconnect();
-      if (scrollTarget) {
-        (scrollTarget as EventTarget).removeEventListener('scroll', onScroll);
+      const onScrollWindow = () => {
+        const el = document.documentElement;
+        const body = document.body;
+        const scrollTop = el.scrollTop || body.scrollTop;
+        const clientHeight = el.clientHeight || body.clientHeight;
+        const scrollHeight = Math.max(el.scrollHeight, body.scrollHeight);
+        if (scrollHeight - (scrollTop + clientHeight) < thresholdPx) checkAndLoad();
+      };
+
+      if (scrollRoot) {
+        scrollRoot.addEventListener('scroll', onScrollContainer, { passive: true });
       }
+      if (typeof window !== 'undefined') {
+        window.addEventListener('scroll', onScrollWindow, { passive: true });
+      }
+
+      teardown = () => {
+        observer.disconnect();
+        scrollRoot?.removeEventListener('scroll', onScrollContainer);
+        if (typeof window !== 'undefined') {
+          window.removeEventListener('scroll', onScrollWindow);
+        }
+      };
+    });
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      teardown?.();
     };
-  }, []);
+  }, [forceMobileLayout]);
 
   // 검색 실행 핸들러 (엔터키 또는 검색 버튼 클릭 시)
   const handleSearch = () => {
@@ -1466,6 +1491,38 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             {t('purchaseOrder.card.loadingMore')}
           </div>
         )}
+        {/* 모바일 하단 페이징: 표시 건수 + 다음 20개 버튼 */}
+        <div className="sticky bottom-0 left-0 right-0 py-3 px-2 bg-white border-t border-gray-200 flex flex-col sm:flex-row items-center justify-center gap-2">
+          {hasActiveStatusFilters ? (
+            <>
+              <span className="text-sm text-gray-600">
+                {Math.min(mobileDisplayCount, filteredCount)} / {filteredCount}건
+              </span>
+              <button
+                type="button"
+                disabled={mobileDisplayCount >= filteredCount}
+                onClick={() => setMobileDisplayCount((c) => c + 20)}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                다음 20개
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-sm text-gray-600">
+                {mobileOrders.length} / {mobileTotal || '—'}건
+              </span>
+              <button
+                type="button"
+                disabled={!hasMoreMobile || isLoadingMoreMobile}
+                onClick={() => loadMoreMobileRef.current?.()}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoadingMoreMobile ? t('purchaseOrder.card.loadingMore') : '다음 20개'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Product Image Preview */}
