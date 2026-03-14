@@ -18,6 +18,7 @@ import {
   Plus,
   Trash2,
   Download,
+  Upload,
   X,
   Images,
 } from "lucide-react";
@@ -57,6 +58,13 @@ import {
   calculateDeliveryStatus,
 } from "../utils/purchaseOrderCalculations";
 import { getShippingCostByPurchaseOrder, getShippingSummaryByPurchaseOrder, getPackingListsByPurchaseOrder, type RelatedPackingList } from "../api/packingListApi";
+import {
+  listManufacturingDocuments,
+  uploadManufacturingDocument,
+  downloadManufacturingDocument,
+  deleteManufacturingDocument,
+} from "../api/manufacturingApi";
+import type { ManufacturingDocument } from "../types/manufacturing";
 import { usePurchaseOrderData } from "../hooks/usePurchaseOrderData";
 import { usePurchaseOrderSave } from "../hooks/usePurchaseOrderSave";
 import { useMemoManagement } from "../hooks/useMemoManagement";
@@ -163,7 +171,15 @@ export function PurchaseOrderDetail({
   // 상품 상세 모달 상태
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+
+  // 제조 문서 모달
+  const [isManufacturingModalOpen, setIsManufacturingModalOpen] = useState(false);
   
+  // 제조 문서 (이 발주에 연결된 목록)
+  const [manufacturingDocs, setManufacturingDocs] = useState<ManufacturingDocument[]>([]);
+  const [manufacturingLoading, setManufacturingLoading] = useState(false);
+  const [manufacturingUploading, setManufacturingUploading] = useState(false);
+
   // 사진모아보기 이미지 상태
   const [productGalleryImages, setProductGalleryImages] = useState<Array<{ id?: number; url: string; type?: string }>>([]);
 
@@ -950,6 +966,63 @@ export function PurchaseOrderDetail({
     return fullUrl;
   }, [SERVER_BASE_URL]);
 
+  // 제조 문서 목록 로드
+  const loadManufacturingDocs = useCallback(async () => {
+    if (isNewOrder || !orderId) return;
+    setManufacturingLoading(true);
+    try {
+      const res = await listManufacturingDocuments({ purchaseOrderId: orderId, limit: 50 });
+      setManufacturingDocs(res.data);
+    } catch {
+      setManufacturingDocs([]);
+    } finally {
+      setManufacturingLoading(false);
+    }
+  }, [orderId, isNewOrder]);
+
+  useEffect(() => {
+    loadManufacturingDocs();
+  }, [loadManufacturingDocs]);
+
+  const handleManufacturingUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !orderId) return;
+      setManufacturingUploading(true);
+      try {
+        await uploadManufacturingDocument(file, orderId);
+        await loadManufacturingDocs();
+      } catch (err: any) {
+        alert(err?.message || "업로드에 실패했습니다.");
+      } finally {
+        setManufacturingUploading(false);
+        e.target.value = "";
+      }
+    },
+    [orderId, loadManufacturingDocs]
+  );
+
+  const handleManufacturingDownload = useCallback(async (doc: ManufacturingDocument) => {
+    try {
+      await downloadManufacturingDocument(doc.id, doc.original_file_name || undefined);
+    } catch (err: any) {
+      alert(err?.message || "다운로드에 실패했습니다.");
+    }
+  }, []);
+
+  const handleManufacturingDelete = useCallback(
+    async (doc: ManufacturingDocument) => {
+      if (!confirm("이 제조 문서를 삭제하시겠습니까?")) return;
+      try {
+        await deleteManufacturingDocument(doc.id);
+        await loadManufacturingDocs();
+      } catch (err: any) {
+        alert(err?.message || "삭제에 실패했습니다.");
+      }
+    },
+    [loadManufacturingDocs]
+  );
+
   // 메인 이미지 업로드 핸들러
   const handleMainImageUpload = useCallback(async (file: File) => {
     try {
@@ -1242,22 +1315,23 @@ export function PurchaseOrderDetail({
           onWeightChange={setProductWeight}
           onPackagingSizeChange={setProductPackagingSize}
           userLevel={user?.level}
-          currentFactoryStatus={currentFactoryStatus}
-          totalShippedQuantity={totalShippedQuantity}
-          totalReturnQuantity={totalReturnQuantity}
-          totalReceivedQuantity={totalReceivedQuantity}
-          hasFactoryShipments={factoryShipments.length > 0}
-          hasReturnItems={returnExchangeItems.length > 0}
-          workStatus={workStatus}
-          workItems={safeWorkItems}
-          deliveryStatus="대기중"
-          paymentStatus="미결제"
+          rightColumnContent={
+            <MemoSection
+              memos={memos}
+              newMemoContent={newMemoContent}
+              replyInputs={replyInputs}
+              onSetNewMemoContent={setNewMemoContent}
+              onSetReplyInputs={setReplyInputs}
+              onAddMemo={addMemo}
+              onDeleteMemo={deleteMemo}
+              onAddReply={addReply}
+              onDeleteReply={deleteReply}
+            />
+          }
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4 md:gap-6 mt-4 md:mt-6">
-        {/* Left Column - Main Info */}
+        <div className="grid grid-cols-1 gap-4 md:gap-6 mt-4 md:mt-6">
         <div className="space-y-6">
-
           {/* Cost Breakdown - Editable */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
@@ -1404,22 +1478,6 @@ export function PurchaseOrderDetail({
             )}
           </div>
         </div>
-
-        {/* Right Column - Status & Summary */}
-        <div className="space-y-6">
-          {/* 메모 섹션 */}
-          <MemoSection
-            memos={memos}
-            newMemoContent={newMemoContent}
-            replyInputs={replyInputs}
-            onSetNewMemoContent={setNewMemoContent}
-            onSetReplyInputs={setReplyInputs}
-            onAddMemo={addMemo}
-            onDeleteMemo={deleteMemo}
-            onAddReply={addReply}
-            onDeleteReply={deleteReply}
-          />
-        </div>
       </div>
       </div>
     );
@@ -1469,20 +1527,81 @@ export function PurchaseOrderDetail({
           if (order!.poNumber?.trim()) params.set('poNumber', order!.poNumber.trim());
           window.open(`/admin/shipping-history?${params.toString()}`, '_blank');
         }}
-        currentFactoryStatus={currentFactoryStatus}
-        totalShippedQuantity={totalShippedQuantity}
-        totalReturnQuantity={totalReturnQuantity}
-        totalReceivedQuantity={totalReceivedQuantity}
-        hasFactoryShipments={factoryShipments.length > 0}
-        hasReturnItems={returnExchangeItems.length > 0}
-        workStatus={workStatus}
-        workItems={safeWorkItems}
-        deliveryStatus={calculatedDeliveryStatus}
-        paymentStatus={order!.paymentStatus}
+        rightColumnContent={
+          <>
+            {/* 제조 문서 */}
+            {!isNewOrder && orderId && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <Wrench className="w-4 h-4" />
+                  제조 문서
+                </h3>
+                <p className="text-xs text-gray-500 mb-3">엑셀(.xlsx, .xls) 또는 PDF 업로드</p>
+                <label className="flex items-center justify-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg cursor-pointer hover:bg-amber-100 text-amber-800 text-sm mb-3 disabled:opacity-50">
+                  <Upload className="w-4 h-4" />
+                  {manufacturingUploading ? "업로드 중..." : "파일 선택"}
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.pdf"
+                    onChange={handleManufacturingUpload}
+                    disabled={manufacturingUploading}
+                    className="hidden"
+                  />
+                </label>
+                {manufacturingLoading ? (
+                  <div className="text-xs text-gray-500 py-2">로딩 중...</div>
+                ) : manufacturingDocs.length === 0 ? (
+                  <div className="text-xs text-gray-500 py-2">등록된 제조 문서가 없습니다.</div>
+                ) : (
+                  <ul className="space-y-2">
+                    {manufacturingDocs.map((doc) => (
+                      <li key={doc.id} className="flex items-center justify-between gap-2 py-2 border-b border-gray-100 last:border-0">
+                        <span className="text-sm text-gray-800 truncate flex-1 min-w-0" title={doc.original_file_name || undefined}>
+                          {doc.original_file_name || "제조 문서"}
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {doc.document_file_path && (
+                            <button
+                              type="button"
+                              onClick={() => handleManufacturingDownload(doc)}
+                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"
+                              title="다운로드"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleManufacturingDelete(doc)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                            title="삭제"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            <MemoSection
+              memos={memos}
+              newMemoContent={newMemoContent}
+              replyInputs={replyInputs}
+              onSetNewMemoContent={setNewMemoContent}
+              onSetReplyInputs={setReplyInputs}
+              onAddMemo={addMemo}
+              onDeleteMemo={deleteMemo}
+              onAddReply={addReply}
+              onDeleteReply={deleteReply}
+            />
+          </>
+        }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4 md:gap-6 mt-4 md:mt-6">
-        {/* Left Column - Main Info */}
+      <div className="grid grid-cols-1 gap-4 md:gap-6 mt-4 md:mt-6">
+        {/* Main Content - 발주 진행 관리 */}
         <div className="space-y-6">
           {/* Cost Breakdown - Editable */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
@@ -1591,22 +1710,6 @@ export function PurchaseOrderDetail({
             )}
           </div>
         </div>
-
-        {/* Right Column - Status & Summary */}
-        <div className="space-y-6">
-          {/* 메모 섹션 */}
-          <MemoSection
-            memos={memos}
-            newMemoContent={newMemoContent}
-            replyInputs={replyInputs}
-            onSetNewMemoContent={setNewMemoContent}
-            onSetReplyInputs={setReplyInputs}
-            onAddMemo={addMemo}
-            onDeleteMemo={deleteMemo}
-            onAddReply={addReply}
-            onDeleteReply={deleteReply}
-          />
-        </div>
       </div>
 
       {/* 상품 이미지 모달 */}
@@ -1680,6 +1783,7 @@ export function PurchaseOrderDetail({
           }}
         />
       )}
+
     </div>
   );
 }

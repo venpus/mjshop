@@ -516,6 +516,153 @@ export async function deletePOMainImage(purchaseOrderId: string): Promise<void> 
   }
 }
 
+// ==================== Manufacturing Documents Images ====================
+
+const manufacturingUploadDir = path.join(__dirname, '../../uploads/manufacturing');
+if (!fs.existsSync(manufacturingUploadDir)) {
+  fs.mkdirSync(manufacturingUploadDir, { recursive: true });
+}
+
+const manufacturingStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, manufacturingUploadDir),
+  filename: (_req, file, cb) => {
+    const uuid = randomUUID();
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    cb(null, `temp-${uuid}${ext}`);
+  },
+});
+
+export const manufacturingImageUpload = multer({
+  storage: manufacturingStorage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+export function getManufacturingDocDir(docId: string): string {
+  return path.join(manufacturingUploadDir, docId);
+}
+
+export function getManufacturingFinishedImagePath(docId: string, ext: string): string {
+  return path.join(getManufacturingDocDir(docId), `finished-product${ext}`);
+}
+
+export async function saveManufacturingFinishedImage(tempFilePath: string, docId: string): Promise<string> {
+  const dir = getManufacturingDocDir(docId);
+  if (!fs.existsSync(dir)) {
+    await fs.promises.mkdir(dir, { recursive: true });
+  }
+  const ext = path.extname(tempFilePath).toLowerCase() || '.jpg';
+  const newPath = getManufacturingFinishedImagePath(docId, ext);
+  const possibleExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  for (const e of possibleExts) {
+    const p = getManufacturingFinishedImagePath(docId, e);
+    if (fs.existsSync(p) && p !== newPath) {
+      await fs.promises.unlink(p).catch(() => {});
+    }
+  }
+  if (!fs.existsSync(tempFilePath)) {
+    throw new Error(`임시 파일을 찾을 수 없습니다: ${tempFilePath}`);
+  }
+  await fs.promises.rename(tempFilePath, newPath);
+  return `manufacturing/${docId}/finished-product${ext}`;
+}
+
+export function getManufacturingStepImagesDir(docId: string, stepId: number): string {
+  return path.join(manufacturingUploadDir, docId, 'steps', String(stepId));
+}
+
+export async function getNextManufacturingStepImageNumber(docId: string, stepId: number): Promise<number> {
+  const dir = getManufacturingStepImagesDir(docId, stepId);
+  if (!fs.existsSync(dir)) return 1;
+  const files = await fs.promises.readdir(dir);
+  const imageFiles = files.filter((f) => ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(path.extname(f).toLowerCase()));
+  if (imageFiles.length === 0) return 1;
+  const numbers = imageFiles
+    .map((f) => parseInt(path.basename(f, path.extname(f)), 10))
+    .filter((n) => !isNaN(n) && n > 0);
+  return numbers.length === 0 ? 1 : Math.max(...numbers) + 1;
+}
+
+export async function saveManufacturingStepImage(
+  tempFilePath: string,
+  docId: string,
+  stepId: number,
+  imageNumber: number,
+  originalExt: string
+): Promise<string> {
+  const dir = getManufacturingStepImagesDir(docId, stepId);
+  if (!fs.existsSync(dir)) {
+    await fs.promises.mkdir(dir, { recursive: true });
+  }
+  const newFilename = `${String(imageNumber).padStart(3, '0')}${originalExt}`;
+  const newPath = path.join(dir, newFilename);
+  if (!fs.existsSync(tempFilePath)) {
+    throw new Error(`임시 파일을 찾을 수 없습니다: ${tempFilePath}`);
+  }
+  await fs.promises.rename(tempFilePath, newPath);
+  return `manufacturing/${docId}/steps/${stepId}/${newFilename}`;
+}
+
+// 제조 문서 파일(엑셀/PDF) 업로드
+const manufacturingDocUploadDir = path.join(manufacturingUploadDir, 'docs');
+if (!fs.existsSync(manufacturingDocUploadDir)) {
+  fs.mkdirSync(manufacturingDocUploadDir, { recursive: true });
+}
+
+const manufacturingDocFileFilter: multer.Options['fileFilter'] = (_req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const allowed = ['.xlsx', '.xls', '.pdf'];
+  if (allowed.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error('엑셀(.xlsx, .xls) 또는 PDF 파일만 업로드 가능합니다.'));
+  }
+};
+
+const manufacturingDocStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, manufacturingDocUploadDir),
+  filename: (_req, file, cb) => {
+    const uuid = randomUUID();
+    const ext = path.extname(file.originalname).toLowerCase() || '.xlsx';
+    cb(null, `temp-${uuid}${ext}`);
+  },
+});
+
+export const manufacturingDocumentFileUpload = multer({
+  storage: manufacturingDocStorage,
+  fileFilter: manufacturingDocFileFilter,
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
+
+export function getManufacturingDocumentFilePath(docId: string, fileName: string): string {
+  return path.join(manufacturingDocUploadDir, docId, fileName);
+}
+
+export async function saveManufacturingDocumentFile(
+  tempFilePath: string,
+  docId: string,
+  originalFileName: string
+): Promise<string> {
+  const dir = path.join(manufacturingDocUploadDir, docId);
+  if (!fs.existsSync(dir)) {
+    await fs.promises.mkdir(dir, { recursive: true });
+  }
+  const ext = path.extname(originalFileName).toLowerCase();
+  const base = path.basename(originalFileName, ext);
+  const safeName = `${base.replace(/[^a-zA-Z0-9가-힣_-]/g, '_')}${ext}`;
+  const newPath = path.join(dir, safeName);
+  if (!fs.existsSync(tempFilePath)) {
+    throw new Error(`임시 파일을 찾을 수 없습니다: ${tempFilePath}`);
+  }
+  await fs.promises.rename(tempFilePath, newPath);
+  return `manufacturing/docs/${docId}/${safeName}`;
+}
+
+const uploadsRoot = path.join(__dirname, '../../uploads');
+export function getManufacturingDocumentAbsolutePath(relativePath: string): string {
+  return path.join(uploadsRoot, relativePath);
+}
+
 // ==================== Material Images ====================
 
 // 부자재 이미지 업로드 디렉토리 경로

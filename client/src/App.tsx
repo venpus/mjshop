@@ -23,6 +23,7 @@ import { ChinaWarehouse } from './components/ChinaWarehouse';
 import { Invoice } from './components/Invoice';
 import { AdminAccount } from './components/AdminAccount';
 import { PermissionManagement } from './components/PermissionManagement';
+import { AccessLogPage } from './components/access-log/AccessLogPage';
 import { Settings } from './components/Settings';
 import { Materials } from './components/Materials';
 import { MaterialDetail } from './components/materials/MaterialDetail';
@@ -93,6 +94,10 @@ function AdminLayout() {
     // product-collab 하위 경로
     if (adminPath.startsWith('product-collab')) {
       return 'product-collab';
+    }
+    // 제조관리
+    if (adminPath.startsWith('manufacturing')) {
+      return 'manufacturing';
     }
     
     // 루트 경로는 product-collab(제품 개발 협업 첫 탭)
@@ -201,16 +206,19 @@ function AdminLayout() {
                 <span className="text-[10px] sm:text-xs text-gray-500 truncate shrink-0" title={user.id}>({user.id})</span>
               </div>
             )}
-            <button
-              type="button"
-              onClick={() => navigate('/admin/product-collab')}
-              className="flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 text-white rounded-lg shrink-0 shadow-sm border border-[#2563EB]/30 animate-sparkle bg-[#2563EB] hover:bg-[#1D4ED8] hover:animate-none"
-              title={t('productCollab.aiWorkAssistant')}
-            >
-              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="text-xs sm:text-sm font-medium whitespace-nowrap sm:hidden">{t('productCollab.aiWorkAssistantShort')}</span>
-              <span className="text-xs sm:text-sm font-medium whitespace-nowrap hidden sm:inline">{t('productCollab.aiWorkAssistant')}</span>
-            </button>
+            {/* AI 업무 비서: A레벨 관리자만 표시 */}
+            {user?.level === 'A-SuperAdmin' && (
+              <button
+                type="button"
+                onClick={() => navigate('/admin/product-collab')}
+                className="flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 text-white rounded-lg shrink-0 shadow-sm border border-[#2563EB]/30 animate-sparkle bg-[#2563EB] hover:bg-[#1D4ED8] hover:animate-none"
+                title={t('productCollab.aiWorkAssistant')}
+              >
+                <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm font-medium whitespace-nowrap sm:hidden">{t('productCollab.aiWorkAssistantShort')}</span>
+                <span className="text-xs sm:text-sm font-medium whitespace-nowrap hidden sm:inline">{t('productCollab.aiWorkAssistant')}</span>
+              </button>
+            )}
             <button
               onClick={logout}
               className="flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
@@ -281,7 +289,13 @@ function AdminLayout() {
                   <AiSearch />
                 </PermissionCheckWrapper>
               } />
-              <Route path="/product-collab/*" element={<ProductCollabRoutes />} />
+              <Route path="/product-collab/*" element={
+                user?.level === 'A-SuperAdmin' ? (
+                  <ProductCollabRoutes />
+                ) : (
+                  <Navigate to="/admin/shipping-history" replace />
+                )
+              } />
               <Route path="/products" element={
                 (user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin') ? (
                   <Products onNavigateToPurchaseOrder={handleViewOrderDetail} />
@@ -376,7 +390,20 @@ function AdminLayout() {
                   <Navigate to="/admin/product-collab" replace />
                 )
               } />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/access-log" element={
+                (user?.level === 'A-SuperAdmin') ? (
+                  <AccessLogPage />
+                ) : (
+                  <Navigate to="/admin/product-collab" replace />
+                )
+              } />
+              <Route path="/settings" element={
+                user?.level === 'A-SuperAdmin' ? (
+                  <Settings />
+                ) : (
+                  <Navigate to="/admin/product-collab" replace />
+                )
+              } />
             </>
           )}
           </Routes>

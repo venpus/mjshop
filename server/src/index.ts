@@ -158,6 +158,20 @@ async function startServer() {
       logger.info(`🚀 서버가 포트 ${PORT}에서 실행 중입니다.`);
       logger.info(`📍 Health check: http://localhost:${PORT}/api/health`);
       logger.debug(`📸 이미지 예시 URL: http://localhost:${PORT}/uploads/products/P001/001.png`);
+      // 접속 로그 2주 초과분 자동 삭제 (24시간마다)
+      const RUN_CLEANUP_MS = 24 * 60 * 60 * 1000;
+      const runAccessLogCleanup = async () => {
+        try {
+          const { AccessLogService } = await import('./services/accessLogService.js');
+          const service = new AccessLogService();
+          const { deleted } = await service.deleteOlderThanRetention(14);
+          if (deleted > 0) logger.info(`접속 로그 정리: 2주 초과 ${deleted}건 삭제`);
+        } catch (err) {
+          logger.error('접속 로그 자동 정리 실패:', err);
+        }
+      };
+      runAccessLogCleanup(); // 기동 시 1회 실행
+      setInterval(runAccessLogCleanup, RUN_CLEANUP_MS);
     });
   } catch (error) {
     logger.error('서버 시작 실패:', error);

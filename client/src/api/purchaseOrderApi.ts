@@ -285,6 +285,8 @@ export interface CostAnalysisResult {
   totalOrderAmount: number;
   totalCommissionAmount: number;
   totalAdminCost: number;
+  adminCostFromPo: number;
+  adminCostFromPackingList: number;
   orderCount: number;
   totalQuantity: number;
   items: Array<{

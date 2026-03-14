@@ -2819,3 +2819,9 @@ input[type="number"] {
   syntax: "*";
   inherits: false
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

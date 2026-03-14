@@ -38,6 +38,10 @@ export function detectSourceLanguage(text: string): 'ko' | 'zh' | 'unknown' {
 
 const PERSONA = 'You are a translator specialized in toys, general merchandise, manufacturing, sales, and research (완구·잡화·제작·판매·조사 분야 전문가). ';
 
+/** 제조 문서 번역용 페르소나: 완구, 봉제, 잡화 전문 + 한국어·중국어 능통 */
+const MANUFACTURING_PERSONA =
+  'You are an expert in toys, plush (봉제), and general merchandise (잡화), with strong proficiency in Korean and Chinese. You translate product and manufacturing-related text accurately and naturally for both languages. ';
+
 /** 원문 언어에 따라 번역 방향 명시 (중국어→한국어, 한국어→중국어만) + 양쪽 모두 경어체 사용 */
 function getSystemPrompt(sourceLang: 'ko' | 'zh' | 'unknown'): string {
   if (sourceLang === 'zh') {
@@ -58,6 +62,15 @@ function getSystemPrompt(sourceLang: 'ko' | 'zh' | 'unknown'): string {
 - If the message is mainly Korean, output Simplified Chinese only. Use Chinese polite style (敬语): 您, 请, formal expressions.
 - If the message is mainly Chinese, output Korean only. Use Korean honorific form (경어체): -합니다, -해요, -입니다, -세요.
 - Output ONLY the translated text. No explanations, no prefixes, no quotes.`;
+}
+
+/** 제조 문서용: 한국어 → 중국어(간체)만. 완구·봉제·잡화 전문 페르소나 */
+function getManufacturingKoToZhPrompt(): string {
+  return `${MANUFACTURING_PERSONA}The user's message is in Korean. Translate it into Simplified Chinese only.
+- Input: Korean. Output: Simplified Chinese only (简体中文).
+- Use Chinese polite/formal style (敬语): use 您 instead of 你 when referring to the reader; use formal expressions (e.g. 请、可以、能否); keep the tone professional.
+- Preserve product names, model numbers, and technical terms when appropriate; translate only natural language.
+- Output ONLY the Chinese translation. No explanations, no "Translation:", no quotes. Never use English or Korean in the output.`;
 }
 
 export type TranslationProvider = 'openai' | 'qwen';
@@ -202,4 +215,111 @@ export async function translateKoreanChinese(text: string): Promise<TranslateRes
 
   console.error('[Translation] All providers failed:', lastErr);
   return null;
+}
+
+/**
+ * 제조 문서용 한국어 → 중국어 번역 (OpenAI 1순위, Qwen 2순위, 완구·봉제·잡화 전문 페르소나)
+ */
+export async function translateManufacturingKoToZh(text: string): Promise<TranslateResult | null> {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return null;
+
+  const useOpenAI = !!OPENAI_API_KEY;
+  const useQwen = !!DASHSCOPE_API_KEY;
+  if (!useOpenAI && !useQwen) {
+    console.warn('[Translation] Neither OPENAI_API_KEY nor DASHSCOPE_API_KEY is set. Skipping manufacturing translation.');
+    return null;
+  }
+
+  const systemPrompt = getManufacturingKoToZhPrompt();
+  const providers: { name: string; key: TranslationProvider; fn: () => Promise<string | null> }[] = [];
+  if (useOpenAI) {
+    providers.push({
+      name: 'OpenAI',
+      key: 'openai',
+      fn: () =>
+        callChatCompletions(
+          'https://api.openai.com/v1',
+          OPENAI_API_KEY!,
+          OPENAI_MODEL,
+          systemPrompt,
+          trimmed,
+          'OpenAI'
+        ),
+    });
+  }
+  if (useQwen) {
+    providers.push({
+      name: 'QWEN',
+      key: 'qwen',
+      fn: () => callChatCompletions(QWEN_BASE_URL, DASHSCOPE_API_KEY!, QWEN_MODEL, systemPrompt, trimmed, 'QWEN'),
+    });
+  }
+
+  let lastErr: unknown;
+  for (const provider of providers) {
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const content = await provider.fn();
+        if (content) {
+          return { translated: content, detectedLang: 'ko', provider: provider.key };
+        }
+        break;
+      } catch (err) {
+        lastErr = err;
+        if (attempt < MAX_RETRIES && isRetryableError(err)) {
+          await delay(RETRY_DELAY_MS);
+        }
+      }
+    }
+  }
+  console.error('[Translation] Manufacturing translate failed:', lastErr);
+  return null;
+}
+
+export interface ManufacturingTranslateInput {
+  product_name: string;
+  steps: { process_name: string; work_method: string | null }[];
+}
+
+export interface ManufacturingTranslateResult {
+  product_name_zh: string | null;
+  steps: { process_name_zh: string | null; work_method_zh: string | null }[];
+  provider?: TranslationProvider;
+}
+
+/**
+ * 제조 문서 전체 번역: 제품명 + 공정명·작업방법을 한꺼번에 한국어→중국어로 번역
+ */
+export async function translateManufacturingDocument(input: ManufacturingTranslateInput): Promise<ManufacturingTranslateResult> {
+  const result: ManufacturingTranslateResult = {
+    product_name_zh: null,
+    steps: input.steps.map(() => ({ process_name_zh: null, work_method_zh: null })),
+  };
+  let provider: TranslationProvider | undefined;
+
+  const productResult = await translateManufacturingKoToZh(input.product_name);
+  if (productResult) {
+    result.product_name_zh = productResult.translated;
+    provider = productResult.provider;
+  }
+
+  for (let i = 0; i < input.steps.length; i++) {
+    const step = input.steps[i];
+    const nameResult = await translateManufacturingKoToZh(step.process_name);
+    if (nameResult) {
+      result.steps[i].process_name_zh = nameResult.translated;
+      provider = provider ?? nameResult.provider;
+    }
+    const method = (step.work_method || '').trim();
+    if (method) {
+      const methodResult = await translateManufacturingKoToZh(method);
+      if (methodResult) {
+        result.steps[i].work_method_zh = methodResult.translated;
+        provider = provider ?? methodResult.provider;
+      }
+    }
+  }
+  result.provider = provider;
+  return result;
 }

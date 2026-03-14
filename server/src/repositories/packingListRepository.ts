@@ -358,6 +358,45 @@ export class PackingListRepository {
   }
 
   /**
+   * 기간 내 발주일(order_date)에 해당하는 발주에 연결된 패킹리스트의 A레벨 비용(배송비 차이) 합계
+   * 배송비 차이 = 비율 중량 배송비 - 실중량 배송비 (결제내역과 동일 계산)
+   * 정상해운 제외. 패킹리스트는 2026-02-22 이후(발송일 또는 생성일 기준)만 포함.
+   */
+  async getAdminCostSumByOrderDateRange(startDate: string, endDate: string): Promise<number> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT 
+        pl.id,
+        pl.shipping_cost,
+        pl.calculated_weight,
+        pl.actual_weight
+       FROM packing_lists pl
+       INNER JOIN (
+         SELECT DISTINCT pli.packing_list_id
+         FROM packing_list_items pli
+         INNER JOIN purchase_orders po ON pli.purchase_order_id = po.id
+         WHERE po.order_date BETWEEN ? AND ?
+           AND (po.order_status IS NULL OR po.order_status != '취소됨')
+       ) sub ON pl.id = sub.packing_list_id
+       WHERE (pl.logistics_company IS NULL OR pl.logistics_company != '정상해운')
+         AND (COALESCE(pl.shipment_date, pl.created_at) >= '2026-02-22')`,
+      [startDate, endDate]
+    );
+
+    let total = 0;
+    for (const row of rows) {
+      const shippingCost = Number(row.shipping_cost) || 0;
+      const calculatedWeight = Number(row.calculated_weight) || 0;
+      const actualWeight = row.actual_weight != null ? Number(row.actual_weight) : null;
+      if (calculatedWeight > 0 && actualWeight != null && shippingCost > 0) {
+        const unitCost = shippingCost / calculatedWeight;
+        const actualWeightShippingCost = actualWeight * unitCost;
+        total += shippingCost - actualWeightShippingCost;
+      }
+    }
+    return total;
+  }
+
+  /**
    * 코드와 날짜로 패킹리스트 조회 (중복 체크용)
    */
   async findByCodeAndDate(code: string, shipmentDate: string): Promise<PackingList | null> {

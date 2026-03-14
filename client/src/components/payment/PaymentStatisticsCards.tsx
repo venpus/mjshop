@@ -38,6 +38,15 @@ interface PaymentStatisticsCardsProps {
   userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
 }
 
+/** A레벨 비용 집계 기준일: 이 날짜(포함) 이후만 결제내역 A레벨 비용에 포함 */
+const ADMIN_COST_FROM_DATE = '2026-02-22';
+
+function isOnOrAfterAdminCostFromDate(dateStr: string | null | undefined): boolean {
+  if (!dateStr) return false;
+  const d = String(dateStr).slice(0, 10);
+  return d >= ADMIN_COST_FROM_DATE;
+}
+
 /**
  * 결제 통계 카드 컴포넌트
  */
@@ -192,13 +201,13 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
           }
         });
 
-      // 4. A레벨 관리자 추가 비용 총계 계산
+      // 4. A레벨 관리자 추가 비용 총계 계산 (2026-02-22 이후만 포함)
       let adminCostTotal = 0;
       const adminCostDetail: AdminCostDetail = { backMargin: 0, adminCostItems: 0, shippingDifference: 0 };
 
-      // 발주관리: admin_total_cost 또는 (back_margin * quantity) + admin_cost_items 합계
+      // 발주관리: admin_total_cost 또는 (back_margin * quantity) + admin_cost_items 합계 (발주일 2026-02-22 이후만)
       allHistory
-        .filter((item) => item.source_type === 'purchase_order')
+        .filter((item) => item.source_type === 'purchase_order' && isOnOrAfterAdminCostFromDate(item.order_date))
         .forEach((item) => {
           let adminCost = 0;
           
@@ -235,24 +244,24 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
           adminCostDetail.adminCostItems += adminCostItemsTotal;
         });
 
-      // 패킹리스트: shipping_cost_difference
+      // 패킹리스트: shipping_cost_difference (발송일 또는 생성일 2026-02-22 이후만)
       allHistory
-        .filter((item) => item.source_type === 'packing_list')
+        .filter((item) => item.source_type === 'packing_list' && isOnOrAfterAdminCostFromDate(item.shipment_date || item.pl_created_at))
         .forEach((item) => {
           const shippingDiff = item.shipping_cost_difference || 0;
           adminCostTotal += shippingDiff;
           adminCostDetail.shippingDifference += shippingDiff;
         });
 
-      // 5. A레벨 관리자 지급예정/지급완료 비용 계산 (상세 포함)
+      // 5. A레벨 관리자 지급예정/지급완료 비용 계산 (상세 포함, 2026-02-22 이후만)
       let adminCostPending = 0; // 지급예정
       let adminCostPaid = 0; // 지급완료
       const adminCostPendingDetail: AdminCostDetail = { backMargin: 0, adminCostItems: 0, shippingDifference: 0 };
       const adminCostPaidDetail: AdminCostDetail = { backMargin: 0, adminCostItems: 0, shippingDifference: 0 };
 
-      // 발주관리 항목만 대상 (패킹리스트는 제외)
+      // 발주관리 항목만 대상 (발주일 2026-02-22 이후만)
       allHistory
-        .filter((item) => item.source_type === 'purchase_order')
+        .filter((item) => item.source_type === 'purchase_order' && isOnOrAfterAdminCostFromDate(item.order_date))
         .forEach((item) => {
           let adminCost = 0;
           
@@ -299,9 +308,9 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
           }
         });
 
-      // 패킹리스트의 shipping_cost_difference는 admin_cost_paid 상태에 따라 지급예정/지급완료로 구분
+      // 패킹리스트의 shipping_cost_difference는 admin_cost_paid 상태에 따라 지급예정/지급완료로 구분 (발송일 또는 생성일 2026-02-22 이후만)
       allHistory
-        .filter((item) => item.source_type === 'packing_list')
+        .filter((item) => item.source_type === 'packing_list' && isOnOrAfterAdminCostFromDate(item.shipment_date || item.pl_created_at))
         .forEach((item) => {
           const shippingDiff = item.shipping_cost_difference || 0;
           if (item.admin_cost_paid) {

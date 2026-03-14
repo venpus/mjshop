@@ -30,6 +30,8 @@ import {
   Sparkles,
   Package,
   Settings as SettingsIcon,
+  Wrench,
+  Activity,
 } from "lucide-react";
 import { SidebarExternalLink } from "./sidebar/SidebarExternalLink";
 
@@ -51,6 +53,7 @@ type PageType =
   | "china-warehouse"
   | "invoice"
   | "admin-account"
+  | "access-log"
   | "materials"
   | "packaging-work"
   | "projects"
@@ -140,19 +143,21 @@ export function Sidebar({
             </button>
             )}
 
-            {/* 제품 개발 협업 */}
-            <button
-              onClick={() => onPageChange("product-collab")}
-              className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
-                currentPage === "product-collab"
-                  ? "bg-purple-50 text-purple-600"
-                  : "text-gray-700 hover:bg-gray-50"
-              }`}
-              title={isCollapsed ? t('menu.productCollab') : undefined}
-            >
-              <Package className="w-5 h-5 flex-shrink-0" />
-              {!isCollapsed && <span>{t('menu.productCollab')}</span>}
-            </button>
+            {/* 제품 협업 개발: A레벨 관리자만 표시 */}
+            {isLevelA && (
+              <button
+                onClick={() => onPageChange("product-collab")}
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
+                  currentPage === "product-collab"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
+                title={isCollapsed ? t('menu.productCollab') : undefined}
+              >
+                <Package className="w-5 h-5 flex-shrink-0" />
+                {!isCollapsed && <span>{t('menu.productCollab')}</span>}
+              </button>
+            )}
 
             {/* 악세서리 AI (외부 링크) - 숨김 */}
             {false && (
@@ -496,24 +501,38 @@ export function Sidebar({
                   <Shield className="w-4 h-4 flex-shrink-0" />
                   <span>{t('menu.permissions')}</span>
                 </button>
+                <button
+                  onClick={() => onPageChange("access-log")}
+                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+                    currentPage === "access-log"
+                      ? "bg-purple-50 text-purple-600"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                  title={t('menu.accessLog')}
+                >
+                  <Activity className="w-4 h-4 flex-shrink-0" />
+                  <span>{t('menu.accessLog')}</span>
+                </button>
               </div>
             )}
           </div>
         )}
 
-        {/* 설정 (모든 로그인 사용자) */}
-        <button
-          onClick={() => onPageChange("settings")}
-          className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
-            currentPage === "settings"
-              ? "bg-purple-50 text-purple-600"
-              : "text-gray-700 hover:bg-gray-50"
-          }`}
-          title={isCollapsed ? t('menu.settings') : undefined}
-        >
-          <SettingsIcon className="w-5 h-5 flex-shrink-0" />
-          {!isCollapsed && <span>{t('menu.settings')}</span>}
-        </button>
+        {/* 설정 (A 레벨 관리자만) */}
+        {isLevelA && (
+          <button
+            onClick={() => onPageChange("settings")}
+            className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
+              currentPage === "settings"
+                ? "bg-purple-50 text-purple-600"
+                : "text-gray-700 hover:bg-gray-50"
+            }`}
+            title={isCollapsed ? t('menu.settings') : undefined}
+          >
+            <SettingsIcon className="w-5 h-5 flex-shrink-0" />
+            {!isCollapsed && <span>{t('menu.settings')}</span>}
+          </button>
+        )}
           </>
         )}
       </nav>

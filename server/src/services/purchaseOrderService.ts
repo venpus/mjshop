@@ -1,5 +1,6 @@
 import { pool } from '../config/database.js';
 import { PurchaseOrderRepository } from '../repositories/purchaseOrderRepository.js';
+import { PackingListRepository } from '../repositories/packingListRepository.js';
 import {
   PurchaseOrder,
   PurchaseOrderPublic,
@@ -12,9 +13,11 @@ import { getKSTDateString, formatDateToKSTString, isNewCommissionCalculationDate
 
 export class PurchaseOrderService {
   private repository: PurchaseOrderRepository;
+  private packingListRepository: PackingListRepository;
 
   constructor() {
     this.repository = new PurchaseOrderRepository();
+    this.packingListRepository = new PackingListRepository();
   }
 
   /**
@@ -954,6 +957,8 @@ export class PurchaseOrderService {
     totalOrderAmount: number;
     totalCommissionAmount: number;
     totalAdminCost: number;
+    adminCostFromPo: number;
+    adminCostFromPackingList: number;
     orderCount: number;
     totalQuantity: number;
     items: Array<{
@@ -971,7 +976,7 @@ export class PurchaseOrderService {
 
     let totalOrderAmount = 0;
     let totalCommissionAmount = 0;
-    let totalAdminCost = 0;
+    let adminCostFromPo = 0;
     let totalQuantity = 0;
     const items: Array<{
       id: string;
@@ -1018,9 +1023,8 @@ export class PurchaseOrderService {
 
       totalOrderAmount += finalPaymentAmount;
       totalCommissionAmount += commissionAmount;
-      // 결제내역과 동일: A레벨 비용 = 발주 주가비(back_margin×수량) + A레벨 전용 비용 항목
       const adminCostPerPo = (po.back_margin ?? 0) * po.quantity + po.admin_only_cost;
-      totalAdminCost += adminCostPerPo;
+      adminCostFromPo += adminCostPerPo;
       totalQuantity += po.quantity;
 
       items.push({
@@ -1035,10 +1039,15 @@ export class PurchaseOrderService {
       });
     }
 
+    const adminCostFromPackingList = await this.packingListRepository.getAdminCostSumByOrderDateRange(startDate, endDate);
+    const totalAdminCost = adminCostFromPo + adminCostFromPackingList;
+
     return {
       totalOrderAmount,
       totalCommissionAmount,
       totalAdminCost,
+      adminCostFromPo,
+      adminCostFromPackingList,
       orderCount: rows.length,
       totalQuantity,
       items,

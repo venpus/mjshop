@@ -1,8 +1,7 @@
+import { type ReactNode } from "react";
 import { DetailHeader } from "../DetailHeader";
 import { ProductInfoSection } from "../ProductInfoSection";
-import { ProgressStatusSection } from "../ProgressStatusSection";
 import { SaveStatusBar } from "./SaveStatusBar";
-import { type WorkItem } from "../tabs/ProcessingPackagingTab";
 
 interface HeaderSectionProps {
   // Header 관련
@@ -30,12 +29,12 @@ interface HeaderSectionProps {
   onDeliveryDateChange: (value: string) => void;
   onOrderConfirmedChange: (value: boolean) => void;
   onCancelOrder: () => void;
-  onProductClick?: () => void; // 제품명 링크 기능 제거로 optional로 변경
+  onProductClick?: () => void;
   onPhotoGalleryClick: () => void;
   onImageClick: () => void;
-  onViewPackingListClick?: () => void; // 패킹리스트 페이지에서 이 발주만 보기 (새 탭)
-  
-  // 편집 모드 (새 발주일 때 true)
+  onViewPackingListClick?: () => void;
+  onManufacturingClick?: () => void;
+
   isEditable?: boolean;
   onProductNameChange?: (value: string) => void;
   onSizeChange?: (value: string) => void;
@@ -44,17 +43,8 @@ interface HeaderSectionProps {
   onMainImageUpload?: (file: File) => Promise<void>;
   userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
 
-  // ProgressStatusSection props
-  currentFactoryStatus: string;
-  totalShippedQuantity: number;
-  totalReturnQuantity: number;
-  totalReceivedQuantity: number;
-  hasFactoryShipments: boolean;
-  hasReturnItems: boolean;
-  workStatus: string;
-  workItems: WorkItem[];
-  deliveryStatus: string;
-  paymentStatus: string;
+  /** 진행상태 대신 표시할 영역 (제조문서 + 메모 등) */
+  rightColumnContent?: ReactNode;
 }
 
 export function HeaderSection({
@@ -84,16 +74,8 @@ export function HeaderSection({
   onPhotoGalleryClick,
   onImageClick,
   onViewPackingListClick,
-  currentFactoryStatus,
-  totalShippedQuantity,
-  totalReturnQuantity,
-  totalReceivedQuantity,
-  hasFactoryShipments,
-  hasReturnItems,
-  workStatus,
-  workItems,
-  deliveryStatus,
-  paymentStatus,
+  onManufacturingClick,
+  rightColumnContent,
   isEditable,
   onProductNameChange,
   onSizeChange,
@@ -117,10 +99,9 @@ export function HeaderSection({
         lastSavedAt={lastSavedAt}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4 md:gap-6">
-        {/* Left Column - Main Info */}
+      <div className={`grid gap-4 md:gap-6 ${rightColumnContent ? "grid-cols-1 md:grid-cols-[2fr_1fr]" : "grid-cols-1"}`}>
+        {/* Left Column - Product Info */}
         <div className="space-y-6">
-          {/* Product Information */}
           <ProductInfoSection
             productName={productName}
             poNumber={poNumber}
@@ -143,6 +124,7 @@ export function HeaderSection({
             onPhotoGalleryClick={onPhotoGalleryClick}
             onImageClick={onImageClick}
             onViewPackingListClick={onViewPackingListClick}
+            onManufacturingClick={onManufacturingClick}
             onMainImageUpload={onMainImageUpload}
             isEditable={isEditable}
             onProductNameChange={onProductNameChange}
@@ -153,22 +135,10 @@ export function HeaderSection({
           />
         </div>
 
-        {/* Right Column - Status (모바일에서는 숨김) */}
-        <div className="hidden md:block space-y-6">
-          {/* Status Information */}
-          <ProgressStatusSection
-            currentFactoryStatus={currentFactoryStatus}
-            totalShippedQuantity={totalShippedQuantity}
-            totalReturnQuantity={totalReturnQuantity}
-            totalReceivedQuantity={totalReceivedQuantity}
-            hasFactoryShipments={hasFactoryShipments}
-            hasReturnItems={hasReturnItems}
-            workStatus={workStatus}
-            workItems={workItems}
-            deliveryStatus={deliveryStatus}
-            paymentStatus={paymentStatus}
-          />
-        </div>
+        {/* Right Column - 제조문서 / 메모 (진행상태 대체) */}
+        {rightColumnContent ? (
+          <div className="hidden md:block space-y-6">{rightColumnContent}</div>
+        ) : null}
       </div>
     </>
   );

@@ -25,6 +25,8 @@ interface PaymentHistoryRowProps {
   onStatisticsRefresh?: () => void; // 통계 카드만 업데이트
   onViewOrderDetail?: (orderId: string) => void; // 발주 상세 보기 핸들러
   userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
+  /** 패킹리스트 탭에서 실중량·비율 열 표시 여부 (A-SuperAdmin만 true) */
+  showActualWeightAndRatio?: boolean;
 }
 
 /**
@@ -41,6 +43,7 @@ export function PaymentHistoryRow({
   onStatisticsRefresh,
   onViewOrderDetail,
   userLevel,
+  showActualWeightAndRatio,
 }: PaymentHistoryRowProps) {
   const isLevelC = userLevel === 'C0: 한국Admin';
   // A레벨 관리자 비용 지불 완료 상태 (로컬 상태)
@@ -801,12 +804,16 @@ export function PaymentHistoryRow({
             <span className="text-gray-400">-</span>
           )}
         </td>
-        <td className="px-4 py-3 text-sm text-gray-900 text-right">
-          {item.actual_weight ? `${item.actual_weight.toLocaleString()}kg` : '-'}
-        </td>
-        <td className="px-4 py-3 text-sm text-gray-900 text-right">
-          {item.weight_ratio ? `${item.weight_ratio.toFixed(2)}%` : '-'}
-        </td>
+        {showActualWeightAndRatio && (
+          <>
+            <td className="px-4 py-3 text-sm text-gray-900 text-right">
+              {item.actual_weight ? `${item.actual_weight.toLocaleString()}kg` : '-'}
+            </td>
+            <td className="px-4 py-3 text-sm text-gray-900 text-right">
+              {item.weight_ratio ? `${item.weight_ratio.toFixed(2)}%` : '-'}
+            </td>
+          </>
+        )}
         <td className="px-4 py-3 text-sm text-gray-900 text-right">
           {item.calculated_weight ? `${item.calculated_weight.toLocaleString()}kg` : '-'}
         </td>

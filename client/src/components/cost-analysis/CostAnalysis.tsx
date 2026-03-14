@@ -31,6 +31,8 @@ export function CostAnalysis() {
     totalOrderAmount: number;
     totalCommissionAmount: number;
     totalAdminCost: number;
+    adminCostFromPo: number;
+    adminCostFromPackingList: number;
     orderCount: number;
     totalQuantity: number;
     items: Array<{
@@ -136,12 +138,22 @@ export function CostAnalysis() {
             />
           </div>
 
+          {/* A레벨 비용 구분 안내 */}
+          <div className="rounded-lg border border-purple-200 bg-purple-50/50 p-4">
+            <p className="text-sm font-medium text-gray-800 mb-2">A레벨 비용 산출 기준</p>
+            <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
+              <li><strong>발주 기준:</strong> 해당 기간 발주의 발주 주가비(추가단가×수량) + A레벨 전용 비용 항목 합계 → <span className="font-semibold tabular-nums">{formatCurrency(data.adminCostFromPo)}</span></li>
+              <li><strong>패킹리스트 기준:</strong> 해당 기간 발주에 연결된 패킹리스트의 배송비 차이(비율 중량 배송비 − 실중량 배송비, 정상해운 제외). <span className="text-gray-600">2026-02-22 이후 발송·생성된 패킹리스트만 집계.</span> → <span className="font-semibold tabular-nums">{formatCurrency(data.adminCostFromPackingList)}</span></li>
+              <li><strong>합계:</strong> 발주 기준 + 패킹리스트 기준 = <span className="font-semibold tabular-nums">{formatCurrency(data.totalAdminCost)}</span></li>
+            </ul>
+          </div>
+
           <section className="mt-8 rounded-xl border border-gray-200 bg-gray-50/50 p-5">
             <h2 className="text-base font-semibold text-gray-900 mb-3">분석근거</h2>
             <p className="text-sm text-gray-600 mb-4">
               <strong>발주 총 금액</strong> = 해당 기간 발주의 최종 결제 금액 합계(기본비용+수수료+배송비+옵션·인건비).{' '}
-              <strong>수수료 금액</strong> = 각 발주의 수수료 합계. <strong>A레벨 비용</strong> = 각 발주의 발주 주가비(추가단가×수량) + A레벨 전용 비용 항목 합계. (결제내역의 A레벨 관리자 추가 비용과 동일한 계산식, 패킹리스트 배송비 차이는 발주일 기준 비용분석에 미포함) <strong>발주 총 수량</strong> = 해당 기간 발주 수량 합계.
-              아래 표는 조회 기간 내 발주일 기준 포함된 발주 목록이며, 각 행의 합계가 위 카드와 일치합니다.
+              <strong>수수료 금액</strong> = 각 발주의 수수료 합계. <strong>A레벨 비용</strong> = 발주 기준(발주 주가비 + A레벨 전용 항목) + 패킹리스트 기준(해당 기간 발주에 연결된 패킹리스트의 배송비 차이). <strong>발주 총 수량</strong> = 해당 기간 발주 수량 합계.
+              아래 표는 조회 기간 내 발주일 기준 포함된 발주 목록이며, 표의 「A레벨 비용」합계는 발주 기준만 포함됩니다(패킹리스트 기준은 위 A레벨 비용 구분에 별도 표기).
             </p>
             <p className="text-xs text-gray-500 mb-4">
               2025-01-06 이전 발주는 수수료가 기본비용에 포함되어 계산되며, 이후 발주는 수수료를 별도 합산합니다.
@@ -178,11 +190,11 @@ export function CostAnalysis() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-gray-300 bg-white/80 font-medium">
-                      <td className="py-2 px-2" colSpan={3}>합계</td>
+                      <td className="py-2 px-2" colSpan={3}>합계 (발주 기준만)</td>
                       <td className="py-2 px-2 text-right tabular-nums">{new Intl.NumberFormat('ko-KR').format(data.totalQuantity)}</td>
                       <td className="py-2 px-2 text-right tabular-nums">{formatCurrency(data.totalOrderAmount)}</td>
                       <td className="py-2 px-2 text-right tabular-nums">{formatCurrency(data.totalCommissionAmount)}</td>
-                      <td className="py-2 px-2 text-right tabular-nums">{formatCurrency(data.totalAdminCost)}</td>
+                      <td className="py-2 px-2 text-right tabular-nums">{formatCurrency(data.adminCostFromPo)}</td>
                     </tr>
                   </tfoot>
                 </table>

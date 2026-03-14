@@ -52,6 +52,8 @@ export function PaymentHistoryTable({ type, onStatisticsRefresh, userLevel }: Pa
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   const isAdminLevelA = user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin' || user?.level === 'B0: 중국Admin';
+  /** 패킹리스트 탭에서 실중량·비율 열 표시 여부 (A-SuperAdmin만 표시) */
+  const showActualWeightAndRatio = user?.level === 'A-SuperAdmin';
 
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -612,12 +614,16 @@ export function PaymentHistoryTable({ type, onStatisticsRefresh, userLevel }: Pa
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       한국 도착일
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      실중량 (kg)
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      비율
-                    </th>
+                    {showActualWeightAndRatio && (
+                      <>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          실중량 (kg)
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          비율
+                        </th>
+                      </>
+                    )}
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       중량 (kg)
                     </th>
@@ -729,6 +735,7 @@ export function PaymentHistoryTable({ type, onStatisticsRefresh, userLevel }: Pa
                     onStatisticsRefresh={onStatisticsRefresh}
                     onViewOrderDetail={(orderId) => setSelectedOrderId(orderId)}
                     userLevel={userLevel}
+                    showActualWeightAndRatio={type === 'packing-lists' ? showActualWeightAndRatio : undefined}
                   />
                 ))
               )}

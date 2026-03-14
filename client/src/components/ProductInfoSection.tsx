@@ -9,6 +9,7 @@ import {
   DollarSign,
   Upload,
   Search,
+  Wrench,
 } from "lucide-react";
 import { useRef, useState, useEffect, useMemo } from "react";
 import { handleNumberInput } from "../utils/numberInputUtils";
@@ -46,6 +47,7 @@ interface ProductInfoSectionProps {
   onPhotoGalleryClick: () => void;
   onImageClick: () => void;
   onViewPackingListClick?: () => void; // 패킹리스트 페이지에서 이 발주만 보기 (새 탭)
+  onManufacturingClick?: () => void; // 제조 문서 모달 열기
   onMainImageUpload?: (file: File) => Promise<void>; // 메인 이미지 업로드 핸들러
   
   // 편집 모드 (새 발주일 때 true)
@@ -84,6 +86,7 @@ export function ProductInfoSection({
   onPhotoGalleryClick,
   onImageClick,
   onViewPackingListClick,
+  onManufacturingClick,
   onMainImageUpload,
   isEditable = false,
   onProductNameChange,
@@ -259,6 +262,18 @@ export function ProductInfoSection({
           >
             <Search className="w-3.5 h-3.5 md:w-5 md:h-5 shrink-0" />
             <span className="font-semibold whitespace-nowrap">패킹리스트</span>
+          </button>
+        )}
+        {/* 제조 문서 */}
+        {onManufacturingClick && (
+          <button
+            type="button"
+            onClick={onManufacturingClick}
+            className="flex items-center gap-1 md:gap-2 px-2 py-1.5 md:px-4 md:py-3 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg border border-amber-200 transition-colors text-xs md:text-base shrink-0"
+            title="제조 문서"
+          >
+            <Wrench className="w-3.5 h-3.5 md:w-5 md:h-5 shrink-0" />
+            <span className="font-semibold whitespace-nowrap">제조</span>
           </button>
         )}
 
