@@ -1,7 +1,9 @@
+import { useLanguage } from "../../contexts/LanguageContext";
+
 interface TabNavigationProps {
   activeTab: "cost" | "factory" | "work" | "delivery";
   onTabChange: (tab: "cost" | "factory" | "work" | "delivery") => void;
-  userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
+  userLevel?: "A-SuperAdmin" | "S: Admin" | "B0: 중국Admin" | "C0: 한국Admin" | "D0: 비전 담당자";
 }
 
 export function TabNavigation({
@@ -9,7 +11,8 @@ export function TabNavigation({
   onTabChange,
   userLevel,
 }: TabNavigationProps) {
-  const isLevelC = userLevel === 'C0: 한국Admin';
+  const { t } = useLanguage();
+  const isLevelC = userLevel === "C0: 한국Admin";
   return (
     <div className="flex gap-1 md:gap-2 mb-4 md:mb-6 overflow-x-auto pb-1 -mx-1 md:mx-0 md:pb-0">
       <button
@@ -20,7 +23,7 @@ export function TabNavigation({
             : "bg-purple-50 text-purple-700 border-transparent hover:bg-purple-100"
         }`}
       >
-        비용/결제
+        {t("purchaseOrder.detail.tabCost")}
       </button>
       {!isLevelC && (
         <button
@@ -31,7 +34,7 @@ export function TabNavigation({
               : "bg-blue-50 text-blue-700 border-transparent hover:bg-blue-100"
           }`}
         >
-          업체 출고
+          {t("purchaseOrder.detail.tabFactory")}
         </button>
       )}
       {!isLevelC && (
@@ -43,7 +46,7 @@ export function TabNavigation({
               : "bg-green-50 text-green-700 border-transparent hover:bg-green-100"
           }`}
         >
-          가공/포장
+          {t("purchaseOrder.detail.tabWork")}
         </button>
       )}
       <button
@@ -54,7 +57,7 @@ export function TabNavigation({
             : "bg-orange-50 text-orange-700 border-transparent hover:bg-orange-100"
         }`}
       >
-        연관 패킹리스트
+        {t("purchaseOrder.detail.tabDelivery")}
       </button>
     </div>
   );

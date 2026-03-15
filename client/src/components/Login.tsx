@@ -3,12 +3,17 @@ import { LogIn, Lock, User, AlertCircle, UserPlus, CheckCircle } from 'lucide-re
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { Checkbox } from './ui/checkbox';
 import { PasswordForgotDialog } from './PasswordForgotDialog';
 import { AdminSignupModal } from './AdminSignupModal';
 import { useLanguage } from '../contexts/LanguageContext';
 
+export interface LoginOptions {
+  autoLogin?: boolean;
+}
+
 interface LoginProps {
-  onLogin: (id: string, password: string) => Promise<void>;
+  onLogin: (id: string, password: string, options?: LoginOptions) => Promise<void>;
   isLoading?: boolean;
   error?: string | null;
 }
@@ -17,6 +22,7 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
   const { t } = useLanguage();
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
+  const [autoLogin, setAutoLogin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
@@ -38,7 +44,7 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
     }
 
     try {
-      await onLogin(id.trim(), password);
+      await onLogin(id.trim(), password, { autoLogin });
     } catch (err: any) {
       setError(err.message || t('login.failed'));
     }
@@ -118,6 +124,23 @@ export function Login({ onLogin, isLoading = false, error: externalError }: Logi
                   autoComplete="current-password"
                 />
               </div>
+            </div>
+
+            {/* 자동 로그인 체크박스 */}
+            <div className="flex items-center gap-3 py-1">
+              <Checkbox
+                id="auto-login"
+                checked={autoLogin}
+                onCheckedChange={(checked) => setAutoLogin(checked === true)}
+                disabled={isLoading}
+                className="size-5 rounded border-gray-300 data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600"
+              />
+              <Label
+                htmlFor="auto-login"
+                className="text-gray-700 font-medium cursor-pointer select-none"
+              >
+                {t('login.autoLogin')}
+              </Label>
             </div>
 
             {/* Forgot Password Link */}

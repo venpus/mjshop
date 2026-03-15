@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import type { MessageTag } from '../types';
 import { createMessage, uploadProductImages, getMentionableUsers, type MentionableUser } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -43,7 +43,11 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mentionListRef = useRef<HTMLUListElement>(null);
+  const mentionButtonRef = useRef<HTMLButtonElement>(null);
   const [mentionHighlightIndex, setMentionHighlightIndex] = useState(0);
+  const DROPDOWN_MAX_H = 192;
+  const [atDropdownPos, setAtDropdownPos] = useState<{ top: number; left: number; width: number; openUp: boolean } | null>(null);
+  const [addMentionDropdownPos, setAddMentionDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     getMentionableUsers().then((res) => {
@@ -56,6 +60,40 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
       selectedFiles.forEach(({ objectUrl }) => URL.revokeObjectURL(objectUrl));
     };
   }, [selectedFiles]);
+
+  useLayoutEffect(() => {
+    if (!showAtDropdown || mentionQuery === null) {
+      setAtDropdownPos(null);
+      return;
+    }
+    const el = textareaRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const spaceBelow = typeof window !== 'undefined' ? window.innerHeight - rect.bottom - 8 : 300;
+    const openUp = spaceBelow < DROPDOWN_MAX_H;
+    setAtDropdownPos({
+      left: rect.left,
+      width: rect.width,
+      top: openUp ? rect.top - DROPDOWN_MAX_H - 4 : rect.bottom + 4,
+      openUp,
+    });
+  }, [showAtDropdown, mentionQuery]);
+
+  useLayoutEffect(() => {
+    if (!mentionDropdownOpen || mentionQuery !== null) {
+      setAddMentionDropdownPos(null);
+      return;
+    }
+    const el = mentionButtonRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const spaceBelow = typeof window !== 'undefined' ? window.innerHeight - rect.bottom - 8 : 300;
+    const openUp = spaceBelow < DROPDOWN_MAX_H;
+    setAddMentionDropdownPos({
+      left: rect.left,
+      top: openUp ? rect.top - DROPDOWN_MAX_H - 4 : rect.bottom + 4,
+    });
+  }, [mentionDropdownOpen, mentionQuery]);
 
   const removeFile = (index: number) => {
     setSelectedFiles((prev) => {
@@ -237,22 +275,31 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
           {showAtDropdown && mentionQuery !== null && (
             <>
               <div className="fixed inset-0 z-10" aria-hidden onClick={() => { setMentionQuery(null); setMentionDropdownOpen(false); }} />
-              <ul
-                ref={mentionListRef}
-                className="absolute left-0 right-0 top-full mt-1 z-20 max-h-48 overflow-auto bg-white border border-[#E5E7EB] rounded-lg shadow py-1"
-              >
-                {filteredByAt.map((u, i) => (
-                  <li key={u.id}>
-                    <button
-                      type="button"
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-[#F3F4F6] ${i === mentionHighlightIndex ? 'bg-[#EFF6FF]' : ''}`}
-                      onClick={() => applyMention(u)}
-                    >
-                      @{u.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {atDropdownPos && (
+                <ul
+                  ref={mentionListRef}
+                  className="z-20 overflow-auto bg-white border border-[#E5E7EB] rounded-lg shadow py-1"
+                  style={{
+                    position: 'fixed',
+                    top: atDropdownPos.top,
+                    left: atDropdownPos.left,
+                    width: atDropdownPos.width,
+                    maxHeight: DROPDOWN_MAX_H,
+                  }}
+                >
+                  {filteredByAt.map((u, i) => (
+                    <li key={u.id}>
+                      <button
+                        type="button"
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-[#F3F4F6] ${i === mentionHighlightIndex ? 'bg-[#EFF6FF]' : ''}`}
+                        onClick={() => applyMention(u)}
+                      >
+                        @{u.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </>
           )}
         </div>
@@ -285,6 +332,7 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
           </button>
           <div className="relative">
             <button
+              ref={mentionButtonRef}
               type="button"
               onClick={() => setMentionDropdownOpen((v) => !v)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#2563EB] hover:bg-[#EFF6FF] rounded-lg border border-[#E5E7EB]"
@@ -299,27 +347,37 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
                   aria-hidden
                   onClick={() => setMentionDropdownOpen(false)}
                 />
-                <ul className="absolute left-0 top-full mt-1 z-20 min-w-[160px] max-h-48 overflow-auto bg-white border border-[#E5E7EB] rounded-lg shadow py-1">
-                  {mentionableUsers
-                    .filter((u) => !selectedMentionIds.includes(u.id))
-                    .map((u) => (
-                      <li key={u.id}>
-                        <button
-                          type="button"
-                          className="w-full text-left px-3 py-2 text-sm text-[#1F2937] hover:bg-[#F3F4F6]"
-                          onClick={() => {
-                            setSelectedMentionIds((prev) => [...prev, u.id]);
-                            setMentionDropdownOpen(false);
-                          }}
-                        >
-                          {u.name}
-                        </button>
-                      </li>
-                    ))}
-                  {mentionableUsers.filter((u) => !selectedMentionIds.includes(u.id)).length === 0 && (
-                    <li className="px-3 py-2 text-sm text-[#6B7280]">{t('productCollab.noUsersToAdd')}</li>
-                  )}
-                </ul>
+                {addMentionDropdownPos && (
+                  <ul
+                    className="z-20 min-w-[160px] overflow-auto bg-white border border-[#E5E7EB] rounded-lg shadow py-1"
+                    style={{
+                      position: 'fixed',
+                      top: addMentionDropdownPos.top,
+                      left: addMentionDropdownPos.left,
+                      maxHeight: DROPDOWN_MAX_H,
+                    }}
+                  >
+                    {mentionableUsers
+                      .filter((u) => !selectedMentionIds.includes(u.id))
+                      .map((u) => (
+                        <li key={u.id}>
+                          <button
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-sm text-[#1F2937] hover:bg-[#F3F4F6]"
+                            onClick={() => {
+                              setSelectedMentionIds((prev) => [...prev, u.id]);
+                              setMentionDropdownOpen(false);
+                            }}
+                          >
+                            {u.name}
+                          </button>
+                        </li>
+                      ))}
+                    {mentionableUsers.filter((u) => !selectedMentionIds.includes(u.id)).length === 0 && (
+                      <li className="px-3 py-2 text-sm text-[#6B7280]">{t('productCollab.noUsersToAdd')}</li>
+                    )}
+                  </ul>
+                )}
               </>
             )}
           </div>

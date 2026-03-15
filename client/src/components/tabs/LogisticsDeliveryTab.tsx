@@ -3,6 +3,7 @@ import { useLogisticsOptions } from "../../hooks/useLogisticsOptions";
 import { RelatedPackingList } from "../../api/packingListApi";
 import { formatDateForInput } from "../../utils/dateUtils";
 import { handleNumberInput } from "../../utils/numberInputUtils";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 export interface PackageInfo {
   id: string;
@@ -86,7 +87,8 @@ export function LogisticsDeliveryTab({
     isLoadingPackingLists,
     deliverySets: deliverySets?.length || 0 
   });
-  
+
+  const { t } = useLanguage();
   const { inlandCompanies, warehouses, isLoading: optionsLoading } = useLogisticsOptions();
   
   console.log('[LogisticsDeliveryTab] useLogisticsOptions 완료:', {
@@ -114,26 +116,26 @@ export function LogisticsDeliveryTab({
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
         <div className="flex items-center gap-2 mb-4">
           <Package className="w-5 h-5 text-orange-600 shrink-0" />
-          <h3 className="text-base md:text-lg font-bold text-gray-900">연관 패킹리스트</h3>
+          <h3 className="text-base md:text-lg font-bold text-gray-900">{t("purchaseOrder.detail.relatedPackingLists")}</h3>
         </div>
 
         {isLoadingPackingLists ? (
           <div className="text-center py-8">
-            <p className="text-gray-500">로딩 중...</p>
+            <p className="text-gray-500">{t("common.loading")}</p>
           </div>
         ) : relatedPackingLists && relatedPackingLists.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">패킹리스트 코드</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">발송일</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">물류회사</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">물류창고 도착일</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">출고 수량</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">배송 상태</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">한국도착일</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">배송비</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{t("purchaseOrder.detail.packingListCode")}</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{t("purchaseOrder.detail.shipDate")}</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{t("purchaseOrder.detail.logisticsCompany")}</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{t("purchaseOrder.detail.warehouseArrivalDate")}</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">{t("purchaseOrder.detail.shippedQuantity")}</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">{t("purchaseOrder.detail.deliveryStatus")}</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{t("purchaseOrder.detail.koreaArrivalDate")}</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">{t("purchaseOrder.detail.shippingCostLabel")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -193,7 +195,7 @@ export function LogisticsDeliveryTab({
         ) : (
           <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
             <Package className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-            <p className="text-gray-500">연관된 패킹리스트가 없습니다.</p>
+            <p className="text-gray-500">{t("purchaseOrder.detail.noRelatedPackingLists")}</p>
           </div>
         )}
       </div>
@@ -209,7 +211,7 @@ export function LogisticsDeliveryTab({
               type="text"
               value={newPackingCode}
               onChange={(e) => onSetNewPackingCode(e.target.value)}
-              placeholder="포장 코드를 입력하세요"
+              placeholder={t("purchaseOrder.detail.packingCodePlaceholder")}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
@@ -244,13 +246,13 @@ export function LogisticsDeliveryTab({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 pb-3 border-b border-orange-200">
               <div className="flex flex-wrap items-center gap-3 md:gap-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-600">포장 코드:</span>
+                  <span className="text-sm font-medium text-gray-600">{t("purchaseOrder.detail.packingCode")}:</span>
                   <span className="px-3 py-1 bg-orange-100 text-orange-800 rounded font-semibold">
                     {set.packingCode}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-600">날짜:</span>
+                  <span className="text-sm font-medium text-gray-600">{t("purchaseOrder.detail.date")}:</span>
                   <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded">
                     {set.date}
                   </span>
@@ -267,13 +269,13 @@ export function LogisticsDeliveryTab({
             {/* 포장 정보 영역 */}
             <div className="mb-5">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold text-gray-800">포장 정보</h4>
+                <h4 className="font-semibold text-gray-800">{t("purchaseOrder.detail.packingInfo")}</h4>
                 <button
                   onClick={() => onAddPackageInfo(set.id)}
                   className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors text-xs"
                 >
                   <Plus className="w-3 h-3" />
-                  추가
+                  {t("purchaseOrder.detail.add")}
                 </button>
               </div>
               
@@ -281,15 +283,15 @@ export function LogisticsDeliveryTab({
               <table className="w-full border-collapse border border-gray-300 text-xs min-w-[600px]">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left">종</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left">{t("purchaseOrder.detail.kind")}</th>
                     <th className="border border-gray-300 px-2 py-1.5 text-center">×</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left">개</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left">{t("purchaseOrder.detail.count")}</th>
                     <th className="border border-gray-300 px-2 py-1.5 text-center">×</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left">세트</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left">{t("purchaseOrder.detail.set")}</th>
                     <th className="border border-gray-300 px-2 py-1.5 text-center">=</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left">합계</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left">포장방식</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left">중량(kg)</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left">{t("purchaseOrder.detail.total")}</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left">{t("purchaseOrder.detail.packingMethod")}</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left">{t("purchaseOrder.detail.weightKg")}</th>
                     <th className="border border-gray-300 px-2 py-1.5 w-8"></th>
                   </tr>
                 </thead>
@@ -337,8 +339,8 @@ export function LogisticsDeliveryTab({
                           onChange={(e) => onUpdatePackageInfo(set.id, pkg.id, "method", e.target.value as "박스" | "마대")}
                           className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-orange-500"
                         >
-                          <option value="박스">박스</option>
-                          <option value="마대">마대</option>
+                          <option value="박스">{t("purchaseOrder.detail.box")}</option>
+                          <option value="마대">{t("purchaseOrder.detail.bag")}</option>
                         </select>
                       </td>
                       <td className="border border-gray-300 p-0">
@@ -387,13 +389,13 @@ export function LogisticsDeliveryTab({
             {/* 물류 정보 영역 */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold text-gray-800">물류 정보</h4>
+                <h4 className="font-semibold text-gray-800">{t("purchaseOrder.detail.logisticsInfo")}</h4>
                 <button
                   onClick={() => onAddLogisticsInfo(set.id)}
                   className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors text-xs"
                 >
                   <Plus className="w-3 h-3" />
-                  추가
+                  {t("purchaseOrder.detail.add")}
                 </button>
               </div>
               
@@ -401,10 +403,10 @@ export function LogisticsDeliveryTab({
               <table className="w-full border-collapse border border-gray-300 text-xs min-w-[500px]">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left">송장번호</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left">내륙운송회사</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left">도착 창고</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left">사진</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left">{t("purchaseOrder.detail.trackingNumber")}</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left">{t("purchaseOrder.detail.inlandCarrier")}</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left">{t("purchaseOrder.detail.destinationWarehouse")}</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left">{t("purchaseOrder.detail.photo")}</th>
                     <th className="border border-gray-300 px-2 py-1.5 w-8"></th>
                   </tr>
                 </thead>
@@ -416,7 +418,7 @@ export function LogisticsDeliveryTab({
                           type="text"
                           value={logistics.trackingNumber}
                           onChange={(e) => onUpdateLogisticsInfo(set.id, logistics.id, "trackingNumber", e.target.value)}
-                          placeholder="송장번호를 입력하세요"
+                          placeholder={t("purchaseOrder.detail.trackingNumberPlaceholder")}
                           className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-orange-500"
                         />
                       </td>
@@ -427,7 +429,7 @@ export function LogisticsDeliveryTab({
                           className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white"
                           disabled={optionsLoading}
                         >
-                          <option value="">선택하세요</option>
+                          <option value="">{t("purchaseOrder.detail.selectOption")}</option>
                           {inlandCompanies.map((company) => (
                             <option key={company.id} value={company.id}>
                               {company.name}
@@ -442,7 +444,7 @@ export function LogisticsDeliveryTab({
                           className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white"
                           disabled={optionsLoading}
                         >
-                          <option value="">선택하세요</option>
+                          <option value="">{t("purchaseOrder.detail.selectOption")}</option>
                           {warehouses.map((warehouse) => (
                             <option key={warehouse.id} value={warehouse.id}>
                               {warehouse.name}

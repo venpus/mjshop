@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { getProductById, updateProduct, uploadProductImages, deleteProduct } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { getAdminUser } from '../../../utils/authStorage';
 import { useProductCollabCounts } from '../ProductCollabCountsContext';
 import type { ProductCollabProductDetail, ProductCollabMessage } from '../types';
 import { getProductCollabImageUrl } from '../utils/imageUrl';
@@ -87,18 +88,7 @@ export function ProductCollabThread() {
     !!product &&
     !!(product.price?.trim() || product.moq?.trim() || product.lead_time?.trim());
 
-  const currentUserId = useMemo(() => {
-    try {
-      const saved = localStorage.getItem('admin_user');
-      if (saved) {
-        const u = JSON.parse(saved);
-        return (u?.id as string) ?? null;
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  }, []);
+  const currentUserId = useMemo(() => getAdminUser()?.id ?? null, []);
 
   /** 스레드 내 메시지·답글 중 가장 최근 번역에 사용된 AI (제품명 옆 표기용) */
   const latestTranslationProvider = useMemo((): 'openai' | 'qwen' | null => {

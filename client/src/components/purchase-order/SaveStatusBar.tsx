@@ -1,4 +1,5 @@
 import { Save, Loader2 } from "lucide-react";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 interface SaveStatusBarProps {
   onSave?: () => void;
@@ -13,14 +14,15 @@ export function SaveStatusBar({
   isSaving = false,
   lastSavedAt,
 }: SaveStatusBarProps) {
+  const { t } = useLanguage();
   const formatDateTime = (date: Date | null) => {
-    if (!date) return '';
+    if (!date) return "";
     const now = new Date(date);
     const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
     return `${year}-${month}-${day} ${hours}:${minutes}`;
   };
 
@@ -29,7 +31,7 @@ export function SaveStatusBar({
       <div className="flex-1 min-w-0">
         {lastSavedAt && (
           <p className="text-xs md:text-sm text-gray-500 truncate">
-            마지막 저장: {formatDateTime(lastSavedAt)}
+            {t("purchaseOrder.detail.lastSaved")}: {formatDateTime(lastSavedAt)}
           </p>
         )}
       </div>
@@ -40,19 +42,19 @@ export function SaveStatusBar({
             disabled={!isDirty || isSaving}
             className={`flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-lg transition-colors text-sm ${
               isDirty && !isSaving
-                ? 'bg-purple-600 text-white hover:bg-purple-700'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                ? "bg-purple-600 text-white hover:bg-purple-700"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }`}
           >
             {isSaving ? (
               <>
                 <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
-                <span>저장 중...</span>
+                <span>{t("purchaseOrder.detail.saving")}</span>
               </>
             ) : (
               <>
                 <Save className="w-4 h-4 md:w-5 md:h-5" />
-                <span>저장</span>
+                <span>{t("common.save")}</span>
               </>
             )}
           </button>

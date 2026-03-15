@@ -1,5 +1,7 @@
 // 프로젝트 관련 API 함수
 
+import { getAdminUser } from '../utils/authStorage';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
@@ -8,17 +10,8 @@ const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:300
  */
 function getAuthHeaders(): HeadersInit {
   const headers: HeadersInit = {};
-  const savedUser = localStorage.getItem('admin_user');
-  if (savedUser) {
-    try {
-      const userData = JSON.parse(savedUser);
-      if (userData.id) {
-        headers['X-User-Id'] = userData.id;
-      }
-    } catch (error) {
-      console.error('Failed to parse saved user data:', error);
-    }
-  }
+  const userData = getAdminUser();
+  if (userData?.id) headers['X-User-Id'] = userData.id;
   return headers;
 }
 
@@ -384,17 +377,8 @@ export async function uploadEntryImages(
 
   // FormData 사용 시 Content-Type은 브라우저가 자동 설정하므로 사용자 ID만 헤더에 포함
   const headers: HeadersInit = {};
-  const savedUser = localStorage.getItem('admin_user');
-  if (savedUser) {
-    try {
-      const userData = JSON.parse(savedUser);
-      if (userData.id) {
-        headers['X-User-Id'] = userData.id;
-      }
-    } catch (error) {
-      console.error('Failed to parse saved user data:', error);
-    }
-  }
+  const userData = getAdminUser();
+  if (userData?.id) headers['X-User-Id'] = userData.id;
 
   console.log('📤 [이미지 업로드] 요청 정보:');
   console.log('  - projectId:', projectId);

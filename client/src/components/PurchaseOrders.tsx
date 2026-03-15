@@ -29,6 +29,25 @@ import { getShippingCostByPurchaseOrder } from '../api/packingListApi';
 import { useForceMobileLayout } from '../hooks/useForceMobileLayout';
 import { getScrollParent } from '../utils/domUtils';
 import { getApiBaseUrl, getServerOrigin } from '../api/baseUrl';
+import { getOrderStatusKey, getPaymentStatusKey } from '../utils/purchaseOrderStatusKeys';
+
+/** 필터 옵션: API/상태값(한국어) + 표시용 i18n 키 */
+const ORDER_STATUS_FILTER_OPTIONS = [
+  { value: '발주 대기', key: 'purchaseOrder.orderStatus.pending' },
+  { value: '발주확인', key: 'purchaseOrder.orderStatus.confirmed' },
+  { value: '취소됨', key: 'purchaseOrder.orderStatus.cancelled' },
+] as const;
+const DELIVERY_STATUS_FILTER_OPTIONS = [
+  { value: '대기중', key: 'purchaseOrder.deliveryStatus.waiting' },
+  { value: '내륙운송중', key: 'purchaseOrder.deliveryStatus.inland' },
+  { value: '배송중', key: 'purchaseOrder.deliveryStatus.shipping' },
+  { value: '한국도착', key: 'purchaseOrder.deliveryStatus.arrived' },
+] as const;
+const PAYMENT_STATUS_FILTER_OPTIONS = [
+  { value: '미결제', key: 'purchaseOrder.paymentStatus.unpaid' },
+  { value: '선금결제', key: 'purchaseOrder.paymentStatus.advance' },
+  { value: '완료', key: 'purchaseOrder.paymentStatus.complete' },
+] as const;
 
 interface PurchaseOrdersProps {
   onViewDetail: (orderId: string, tab?: 'cost' | 'factory' | 'work' | 'delivery', autoSave?: boolean) => void;
@@ -260,7 +279,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || '발주 목록을 불러오는데 실패했습니다.');
+        throw new Error(errorData.error || t('purchaseOrder.loadListErrorShort'));
       }
 
       const data = await response.json();
@@ -292,7 +311,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       }
     } catch (err: any) {
       console.error('발주 로드 오류:', err);
-      alert(err.message || '발주 목록을 불러오는 중 오류가 발생했습니다.');
+      alert(err.message || t('purchaseOrder.loadListError'));
     } finally {
       setIsLoading(false);
     }
@@ -734,7 +753,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       return;
     }
 
-    if (!confirm(`발주번호 ${order.poNumber}를 취소하시겠습니까?`)) {
+    if (!confirm(t('purchaseOrder.cancelConfirm').replace('{{poNumber}}', order.poNumber))) {
       return;
     }
 
@@ -760,13 +779,12 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
         throw new Error(data.error || '발주 취소에 실패했습니다.');
       }
 
-      // 성공 메시지 표시
-      alert('발주가 성공적으로 취소되었습니다.');
+      alert(t('purchaseOrder.cancelSuccess'));
 
       // 목록 새로고침
       await loadPurchaseOrders();
     } catch (err: any) {
-      alert(err.message || '발주 취소 중 오류가 발생했습니다.');
+      alert(err.message || t('purchaseOrder.cancelError'));
       console.error('발주 취소 오류:', err);
     }
   };
@@ -812,8 +830,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
         throw new Error(`일부 발주 컨펌에 실패했습니다:\n${errors.join('\n')}`);
       }
 
-      // 성공 메시지
-      alert(`${selectedOrderIds.length}개의 발주가 성공적으로 컨펌되었습니다.`);
+      alert(t('purchaseOrder.confirmSuccess').replace('{{count}}', String(selectedOrderIds.length)));
 
       // 목록 새로고침하여 최신 상태 반영
       await loadPurchaseOrders();
@@ -822,7 +839,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       setSelectedOrders(new Set());
     } catch (err: any) {
       console.error('발주 컨펌 오류:', err);
-      alert(err.message || '발주 컨펌 중 오류가 발생했습니다.');
+      alert(err.message || t('purchaseOrder.confirmError'));
     }
   };
 
@@ -856,7 +873,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       <div className="p-8 min-h-[1080px] flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">발주 목록을 불러오는 중...</p>
+          <p className="text-gray-600">{t('purchaseOrder.list.loading')}</p>
         </div>
       </div>
     );
@@ -873,7 +890,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
               value={inputSearchTerm}
               onChange={handleSearchInputChange}
               onKeyDown={handleSearchKeyDown}
-              placeholder="검색..."
+              placeholder={t('purchaseOrder.list.searchPlaceholder')}
               className="[&_input]:py-1.5 [&_input]:text-sm [&_input]:h-9 w-full min-w-0"
             />
           </div>
@@ -881,7 +898,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             onClick={handleSearch}
             className="px-2.5 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm shrink-0 flex-shrink-0"
           >
-            검색
+            {t('common.search')}
           </button>
           <div className="relative shrink-0 flex-shrink-0">
             <button
@@ -893,17 +910,17 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
               }`}
             >
               <Filter className="w-4 h-4" />
-              <span>{activeFilterCount > 0 ? activeFilterCount : '필터'}</span>
+              <span>{activeFilterCount > 0 ? activeFilterCount : t('purchaseOrder.list.filter')}</span>
             </button>
             {isFilterOpen && (
               <div className="absolute top-full left-0 mt-2 right-0 max-w-[calc(100vw-2rem)] w-[320px] bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-y-auto">
                 <div className="p-3">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-gray-900 text-sm">필터 옵션</h3>
+                    <h3 className="text-gray-900 text-sm">{t('purchaseOrder.list.filterOptions')}</h3>
                     <div className="flex items-center gap-2">
                       {activeFilterCount > 0 && (
                         <button onClick={clearAllFilters} className="text-xs text-purple-600 hover:text-purple-700">
-                          전체 초기화
+                          {t('purchaseOrder.list.clearFilters')}
                         </button>
                       )}
                       <button onClick={() => setIsFilterOpen(false)} className="p-1 hover:bg-gray-100 rounded">
@@ -913,49 +930,49 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                   </div>
                   <div className="space-y-3">
                     <div className="bg-indigo-50 rounded-lg p-2.5 border border-indigo-200">
-                      <h4 className="text-xs text-indigo-900 mb-2 pb-1.5 border-b border-indigo-300">발주 상태</h4>
+                      <h4 className="text-xs text-indigo-900 mb-2 pb-1.5 border-b border-indigo-300">{t('purchaseOrder.list.orderStatusLabel')}</h4>
                       <div className="space-y-1.5">
-                        {['발주 대기', '발주확인', '취소됨'].map((status) => (
-                          <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-indigo-100 p-1 rounded">
+                        {ORDER_STATUS_FILTER_OPTIONS.map(({ value, key }) => (
+                          <label key={value} className="flex items-center gap-1.5 cursor-pointer hover:bg-indigo-100 p-1 rounded">
                             <input
                               type="checkbox"
-                              checked={filters.orderStatus.includes(status)}
-                              onChange={() => toggleFilter('orderStatus', status)}
+                              checked={filters.orderStatus.includes(value)}
+                              onChange={() => toggleFilter('orderStatus', value)}
                               className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer"
                             />
-                            <span className="text-xs text-gray-700">{status}</span>
+                            <span className="text-xs text-gray-700">{t(key)}</span>
                           </label>
                         ))}
                       </div>
                     </div>
                     <div className="bg-purple-50 rounded-lg p-2.5 border border-purple-200">
-                      <h4 className="text-xs text-purple-900 mb-2 pb-1.5 border-b border-purple-300">배송 상태</h4>
+                      <h4 className="text-xs text-purple-900 mb-2 pb-1.5 border-b border-purple-300">{t('purchaseOrder.list.deliveryStatusLabel')}</h4>
                       <div className="space-y-1.5">
-                        {['대기중', '내륙운송중', '배송중', '한국도착'].map((status) => (
-                          <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-purple-100 p-1 rounded">
+                        {DELIVERY_STATUS_FILTER_OPTIONS.map(({ value, key }) => (
+                          <label key={value} className="flex items-center gap-1.5 cursor-pointer hover:bg-purple-100 p-1 rounded">
                             <input
                               type="checkbox"
-                              checked={filters.deliveryStatus.includes(status)}
-                              onChange={() => toggleFilter('deliveryStatus', status)}
+                              checked={filters.deliveryStatus.includes(value)}
+                              onChange={() => toggleFilter('deliveryStatus', value)}
                               className="w-3.5 h-3.5 accent-purple-600 cursor-pointer"
                             />
-                            <span className="text-xs text-gray-700">{status}</span>
+                            <span className="text-xs text-gray-700">{t(key)}</span>
                           </label>
                         ))}
                       </div>
                     </div>
                     <div className="bg-amber-50 rounded-lg p-2.5 border border-amber-200">
-                      <h4 className="text-xs text-amber-900 mb-2 pb-1.5 border-b border-amber-300">결제 상태</h4>
+                      <h4 className="text-xs text-amber-900 mb-2 pb-1.5 border-b border-amber-300">{t('purchaseOrder.list.paymentStatusLabel')}</h4>
                       <div className="space-y-1.5">
-                        {['미결제', '선금결제', '완료'].map((status) => (
-                          <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 p-1 rounded">
+                        {PAYMENT_STATUS_FILTER_OPTIONS.map(({ value, key }) => (
+                          <label key={value} className="flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 p-1 rounded">
                             <input
                               type="checkbox"
-                              checked={filters.paymentStatus.includes(status)}
-                              onChange={() => toggleFilter('paymentStatus', status)}
+                              checked={filters.paymentStatus.includes(value)}
+                              onChange={() => toggleFilter('paymentStatus', value)}
                               className="w-3.5 h-3.5 accent-amber-600 cursor-pointer"
                             />
-                            <span className="text-xs text-gray-700">{status}</span>
+                            <span className="text-xs text-gray-700">{t(key)}</span>
                           </label>
                         ))}
                       </div>
@@ -975,7 +992,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             }`}
           >
             <CheckSquare className="w-4 h-4 shrink-0" />
-            <span className="whitespace-nowrap">발주 컨펌{selectedOrders.size > 0 ? ` ${selectedOrders.size}` : ''}</span>
+            <span className="whitespace-nowrap">{t('purchaseOrder.list.confirmOrders')}{selectedOrders.size > 0 ? ` ${selectedOrders.size}` : ''}</span>
           </button>
           <CreatePurchaseOrderButton className="!px-2.5 !py-1.5 !text-sm shrink-0" />
         </div>
@@ -984,8 +1001,8 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
       {/* 데스크톱: 제목 + 설명 + 생성 버튼 */}
       <div className={`${forceMobileLayout ? 'hidden' : 'hidden md:flex'} mb-8 items-start justify-between`}>
         <div>
-          <h2 className="text-gray-900 mb-2">발주 관리</h2>
-          <p className="text-gray-600">중국 제조사에 발주한 상품을 확인하고 제조 상태를 관리할 수 있습니다</p>
+          <h2 className="text-gray-900 mb-2">{t('purchaseOrder.list.title')}</h2>
+          <p className="text-gray-600">{t('purchaseOrder.list.description')}</p>
         </div>
         <CreatePurchaseOrderButton />
       </div>
@@ -997,13 +1014,13 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             value={inputSearchTerm}
             onChange={handleSearchInputChange}
             onKeyDown={handleSearchKeyDown}
-            placeholder="발주번호, 공급업체명, 상품명으로 검색..."
+            placeholder={t('purchaseOrder.list.searchPlaceholderDesktop')}
           />
           <button
             onClick={handleSearch}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium whitespace-nowrap"
           >
-            검색
+            {t('common.search')}
           </button>
         </div>
         <div className="flex gap-2">
@@ -1017,7 +1034,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
               }`}
             >
               <Filter className="w-5 h-5" />
-              <span>필터{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</span>
+              <span>{t('purchaseOrder.list.filter')}{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</span>
             </button>
 
             {/* Filter Dropdown Panel */}
@@ -1025,14 +1042,14 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
               <div className="absolute top-full left-0 mt-2 w-[1050px] bg-white rounded-lg shadow-xl border border-gray-200 z-50">
                 <div className="p-3">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-gray-900 text-sm">필터 옵션</h3>
+                    <h3 className="text-gray-900 text-sm">{t('purchaseOrder.list.filterOptions')}</h3>
                     <div className="flex items-center gap-2">
                       {activeFilterCount > 0 && (
                         <button
                           onClick={clearAllFilters}
                           className="text-xs text-purple-600 hover:text-purple-700"
                         >
-                          전체 초기화
+                          {t('purchaseOrder.list.clearFilters')}
                         </button>
                       )}
                       <button
@@ -1046,55 +1063,50 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
 
                   {/* Filter Groups - Grid Layout */}
                   <div className="grid grid-cols-5 gap-3">
-                    {/* 발주 상태 */}
                     <div className="bg-indigo-50 rounded-lg p-2.5 border border-indigo-200">
-                      <h4 className="text-xs text-indigo-900 mb-2 pb-1.5 border-b border-indigo-300">발주 상태</h4>
+                      <h4 className="text-xs text-indigo-900 mb-2 pb-1.5 border-b border-indigo-300">{t('purchaseOrder.list.orderStatusLabel')}</h4>
                       <div className="space-y-1.5">
-                        {['발주 대기', '발주확인', '취소됨'].map(status => (
-                          <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-indigo-100 p-1 rounded">
+                        {ORDER_STATUS_FILTER_OPTIONS.map(({ value, key }) => (
+                          <label key={value} className="flex items-center gap-1.5 cursor-pointer hover:bg-indigo-100 p-1 rounded">
                             <input
                               type="checkbox"
-                              checked={filters.orderStatus.includes(status)}
-                              onChange={() => toggleFilter('orderStatus', status)}
+                              checked={filters.orderStatus.includes(value)}
+                              onChange={() => toggleFilter('orderStatus', value)}
                               className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer"
                             />
-                            <span className="text-xs text-gray-700">{status}</span>
+                            <span className="text-xs text-gray-700">{t(key)}</span>
                           </label>
                         ))}
                       </div>
                     </div>
-
-                    {/* 배송 상태 */}
                     <div className="bg-purple-50 rounded-lg p-2.5 border border-purple-200">
-                      <h4 className="text-xs text-purple-900 mb-2 pb-1.5 border-b border-purple-300">배송 상태</h4>
+                      <h4 className="text-xs text-purple-900 mb-2 pb-1.5 border-b border-purple-300">{t('purchaseOrder.list.deliveryStatusLabel')}</h4>
                       <div className="space-y-1.5">
-                        {['대기중', '내륙운송중', '배송중', '한국도착'].map(status => (
-                          <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-purple-100 p-1 rounded">
+                        {DELIVERY_STATUS_FILTER_OPTIONS.map(({ value, key }) => (
+                          <label key={value} className="flex items-center gap-1.5 cursor-pointer hover:bg-purple-100 p-1 rounded">
                             <input
                               type="checkbox"
-                              checked={filters.deliveryStatus.includes(status)}
-                              onChange={() => toggleFilter('deliveryStatus', status)}
+                              checked={filters.deliveryStatus.includes(value)}
+                              onChange={() => toggleFilter('deliveryStatus', value)}
                               className="w-3.5 h-3.5 accent-purple-600 cursor-pointer"
                             />
-                            <span className="text-xs text-gray-700">{status}</span>
+                            <span className="text-xs text-gray-700">{t(key)}</span>
                           </label>
                         ))}
                       </div>
                     </div>
-
-                    {/* 결제 상태 */}
                     <div className="bg-amber-50 rounded-lg p-2.5 border border-amber-200">
-                      <h4 className="text-xs text-amber-900 mb-2 pb-1.5 border-b border-amber-300">결제 상태</h4>
+                      <h4 className="text-xs text-amber-900 mb-2 pb-1.5 border-b border-amber-300">{t('purchaseOrder.list.paymentStatusLabel')}</h4>
                       <div className="space-y-1.5">
-                        {['미결제', '선금결제', '완료'].map(status => (
-                          <label key={status} className="flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 p-1 rounded">
+                        {PAYMENT_STATUS_FILTER_OPTIONS.map(({ value, key }) => (
+                          <label key={value} className="flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 p-1 rounded">
                             <input
                               type="checkbox"
-                              checked={filters.paymentStatus.includes(status)}
-                              onChange={() => toggleFilter('paymentStatus', status)}
+                              checked={filters.paymentStatus.includes(value)}
+                              onChange={() => toggleFilter('paymentStatus', value)}
                               className="w-3.5 h-3.5 accent-amber-600 cursor-pointer"
                             />
-                            <span className="text-xs text-gray-700">{status}</span>
+                            <span className="text-xs text-gray-700">{t(key)}</span>
                           </label>
                         ))}
                       </div>
@@ -1114,11 +1126,11 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
             }`}
           >
             <CheckSquare className="w-5 h-5" />
-            <span>발주 컨펌{selectedOrders.size > 0 ? ` (${selectedOrders.size})` : ''}</span>
+            <span>{t('purchaseOrder.list.confirmOrders')}{selectedOrders.size > 0 ? ` (${selectedOrders.size})` : ''}</span>
           </button>
           <button className={`${forceMobileLayout ? 'hidden' : 'hidden md:flex'} items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors`}>
             <Download className="w-5 h-5" />
-            <span>내보내기</span>
+            <span>{t('purchaseOrder.list.export')}</span>
           </button>
         </div>
       </div>
@@ -1150,24 +1162,22 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                     className="w-4 h-4 cursor-pointer accent-purple-600"
                   />
                 </th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">발주정보</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">상품정보</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">발주 상태</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">단가</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">수량</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">발주금액</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap bg-yellow-100">예상최종단가</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">사이즈</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">무게</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">소포장 방식</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">미입고 수량</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">미발송 수량</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">배송중 수량</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">한국도착 수량</th>
-                {/* 출고상태 열 (주석 처리 - 추후 사용 예정) */}
-                {/* <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">출고상태</th> */}
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">결제</th>
-                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">관리</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.orderInfo')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.productInfo')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.orderStatus')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.unitPrice')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.quantity')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.amount')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap bg-yellow-100">{t('purchaseOrder.list.expectedFinalUnitPrice')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.size')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.weight')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.packaging')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.unreceivedQty')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.unshippedQty')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.shippingQty')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.koreaArrivedQty')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.payment')}</th>
+                <th className="px-4 py-2 text-center text-gray-600 whitespace-nowrap">{t('purchaseOrder.list.management')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -1261,18 +1271,23 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                               window.open(`/admin/shipping-history?${params.toString()}`, '_blank');
                             }}
                             className="p-1.5 rounded text-gray-500 hover:bg-purple-100 hover:text-purple-600 transition-colors"
-                            title="패킹리스트에서 이 발주 관련 목록 보기"
+                            title={t('purchaseOrder.list.packingListSearch')}
                           >
                             <Search className="w-4 h-4" />
                           </button>
                         </div>
-                        <span className="text-gray-600 text-center font-bold">{po.product?.name || '-'}</span>
+                        <span className="text-gray-600 text-center font-bold">
+                          {language === 'zh' && po.product?.name_chinese
+                            ? (po.product.name_chinese as string)
+                            : (po.product?.name || '-')}
+                        </span>
                       </div>
                     </td>
                     <td className="px-4 py-2 text-center">
                       <StatusBadge 
-                        status={po.orderStatus} 
+                        status={t(`purchaseOrder.orderStatus.${getOrderStatusKey(po.orderStatus)}`)} 
                         type="order" 
+                        orderStatusKey={getOrderStatusKey(po.orderStatus)}
                         size="sm"
                       />
                     </td>
@@ -1286,11 +1301,10 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                         <span>¥{finalUnitPrice.toFixed(2)}</span>
                         {/* 패킹리스트 출고 수량이 0이면 표시 */}
                         {((po.shippingQuantity || 0) + (po.koreaArrivedQuantity || 0)) === 0 ? (
-                          <span className="text-xs text-red-500">(계산 미완성, 출고대기)</span>
+                          <span className="text-xs text-red-500">{t('purchaseOrder.list.calcIncompleteAwaiting')}</span>
                         ) : (
-                          /* 패킹리스트 출고가 있지만 배송비가 없으면 표시 */
                           (po.packingListShippingCost === undefined || po.packingListShippingCost === 0) && (
-                            <span className="text-xs text-red-500">(계산 미완성, 배송비 입력 전)</span>
+                            <span className="text-xs text-red-500">{t('purchaseOrder.list.calcIncompleteShipping')}</span>
                           )
                         )}
                       </div>
@@ -1380,23 +1394,34 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                         
                         // 둘 다 없으면 기존 paymentStatus 표시 (하위 호환성)
                         if (!hasAdvance && !hasBalance) {
-                          return <StatusBadge status={po.paymentStatus} type="payment" size="sm" />;
+                          return (
+                            <StatusBadge
+                              status={t(`purchaseOrder.paymentStatus.${getPaymentStatusKey(po.paymentStatus)}`)}
+                              type="payment"
+                              paymentStatusKey={getPaymentStatusKey(po.paymentStatus)}
+                              size="sm"
+                            />
+                          );
                         }
                         
                         // 선금/잔금 각각 표시 (결제내역과 동일한 방식)
+                        const paidLabel = t('purchaseOrder.list.paymentPaid');
+                        const waitingLabel = t('purchaseOrder.list.paymentWaiting');
                         return (
                           <div className="flex flex-col gap-1 items-center">
                             {hasAdvance && (
                               <StatusBadge 
-                                status={po.advancePaymentDate ? `지급완료 (${formatDateKST(po.advancePaymentDate)})` : '지급대기'} 
+                                status={po.advancePaymentDate ? `${paidLabel} (${formatDateKST(po.advancePaymentDate)})` : waitingLabel} 
                                 type="payment" 
+                                paymentStatusKey={po.advancePaymentDate ? 'complete' : 'advance'}
                                 size="xs" 
                               />
                             )}
                             {hasBalance && (
                               <StatusBadge 
-                                status={po.balancePaymentDate ? `지급완료 (${formatDateKST(po.balancePaymentDate)})` : '지급대기'} 
+                                status={po.balancePaymentDate ? `${paidLabel} (${formatDateKST(po.balancePaymentDate)})` : waitingLabel} 
                                 type="payment" 
+                                paymentStatusKey={po.balancePaymentDate ? 'complete' : 'advance'}
                                 size="xs" 
                               />
                             )}
@@ -1412,7 +1437,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                             openReorder(po);
                           }}
                           className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                          title="재주문"
+                          title={t('purchaseOrder.list.reorder')}
                         >
                           <RotateCw className="w-4 h-4" />
                         </button>
@@ -1423,7 +1448,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                               openDelete(po);
                             }}
                             className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="삭제"
+                            title={t('purchaseOrder.list.delete')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1439,7 +1464,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                               ? 'text-gray-400 cursor-not-allowed'
                               : 'text-red-600 hover:bg-red-50'
                           }`}
-                          title={po.orderStatus === '취소됨' ? '이미 취소된 발주' : '취소'}
+                          title={po.orderStatus === '취소됨' ? t('purchaseOrder.list.cancelDisabled') : t('purchaseOrder.list.cancel')}
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -1496,7 +1521,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
           {hasActiveStatusFilters ? (
             <>
               <span className="text-sm text-gray-600">
-                {Math.min(mobileDisplayCount, filteredCount)} / {filteredCount}건
+                {t('purchaseOrder.list.itemsCount').replace('{{current}}', String(Math.min(mobileDisplayCount, filteredCount))).replace('{{total}}', String(filteredCount))}
               </span>
               <button
                 type="button"
@@ -1504,13 +1529,13 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                 onClick={() => setMobileDisplayCount((c) => c + 20)}
                 className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                다음 20개
+                {t('purchaseOrder.list.next20')}
               </button>
             </>
           ) : (
             <>
               <span className="text-sm text-gray-600">
-                {mobileOrders.length} / {mobileTotal || '—'}건
+                {t('purchaseOrder.list.itemsCount').replace('{{current}}', String(mobileOrders.length)).replace('{{total}}', String(mobileTotal || '—'))}
               </span>
               <button
                 type="button"
@@ -1518,7 +1543,7 @@ export function PurchaseOrders({ onViewDetail }: PurchaseOrdersProps) {
                 onClick={() => loadMoreMobileRef.current?.()}
                 className="px-4 py-2 text-sm font-medium rounded-lg border border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoadingMoreMobile ? t('purchaseOrder.card.loadingMore') : '다음 20개'}
+                {isLoadingMoreMobile ? t('purchaseOrder.card.loadingMore') : t('purchaseOrder.list.next20')}
               </button>
             </>
           )}

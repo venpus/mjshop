@@ -1,4 +1,5 @@
 import { Wrench, Plus, Trash2, Image } from "lucide-react";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 export interface WorkItem {
   id: string; // DB ID (number를 string으로 변환) 또는 임시 ID (Date.now())
@@ -36,9 +37,9 @@ export function ProcessingPackagingTab({
   onUpdateWorkItemDescription,
   onSetSelectedFactoryImage,
 }: ProcessingPackagingTabProps) {
+  const { t } = useLanguage();
   return (
     <div className="space-y-4">
-      {/* Work Status & Add Button */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 md:p-4 border border-purple-200">
         <div className="flex flex-wrap items-center gap-2 md:gap-3 min-w-0">
           <div className="flex items-center gap-2">
@@ -46,12 +47,11 @@ export function ProcessingPackagingTab({
               <Wrench className="w-4 h-4 md:w-5 md:h-5 text-white" />
             </div>
             <h3 className="text-base md:text-xl font-bold text-gray-900">
-              가공/포장 작업
+              {t("purchaseOrder.detail.workTitle")}
             </h3>
-            {/* 작업 항목 개수 배지 */}
             {workItems.length > 0 && (
               <span className="inline-flex items-center justify-center px-2 py-0.5 md:px-3 md:py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full text-xs md:text-sm font-bold shadow-md">
-                {workItems.length}개
+                {workItems.length}{t("purchaseOrder.list.quantityUnit")}
               </span>
             )}
           </div>
@@ -74,7 +74,7 @@ export function ProcessingPackagingTab({
             {/* 작업시작일 */}
             <div className="flex items-center gap-1">
               <label className="text-gray-600">
-                시작일:
+                {t("purchaseOrder.detail.startDate")}:
               </label>
               <input
                 type="date"
@@ -89,7 +89,7 @@ export function ProcessingPackagingTab({
             {/* 작업완료일 */}
             <div className="flex items-center gap-1">
               <label className="text-gray-600">
-                완료일:
+                {t("purchaseOrder.detail.endDate")}:
               </label>
               <input
                 type="date"
@@ -107,7 +107,7 @@ export function ProcessingPackagingTab({
         {/* 사진 추가 버튼 */}
         <label className="flex items-center justify-center gap-1.5 md:gap-2 px-3 py-2 md:px-4 md:py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer transition-colors text-sm shrink-0">
           <Plus className="w-4 h-4" />
-          <span>작업 항목 추가</span>
+          <span>{t("purchaseOrder.detail.addWorkItem")}</span>
           <input
             type="file"
             multiple
@@ -166,7 +166,7 @@ export function ProcessingPackagingTab({
                   className="flex items-center gap-1 px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-xs"
                 >
                   <Trash2 className="w-3 h-3" />
-                  <span>삭제</span>
+                  <span>{t("common.delete")}</span>
                 </button>
               </div>
 
@@ -216,7 +216,7 @@ export function ProcessingPackagingTab({
                           e.target.value,
                         )
                       }
-                      placeholder="작업 설명을 입력하세요..."
+                      placeholder={t("purchaseOrder.detail.workDescriptionPlaceholder")}
                       rows={2}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                     />

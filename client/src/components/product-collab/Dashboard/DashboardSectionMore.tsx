@@ -4,6 +4,7 @@ import { getDashboardSection, completeTask } from '../../../api/productCollabApi
 import type { DashboardSectionKey } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { getDashboardShowBothLanguages } from '../../../constants/settings';
+import { getAdminUser } from '../../../utils/authStorage';
 import type {
   DashboardMyTask,
   DashboardConfirmation,
@@ -27,18 +28,7 @@ export function DashboardSectionMore() {
   const sectionKey = section as DashboardSectionKey | undefined;
   const isValidSection = sectionKey && SECTION_KEYS.includes(sectionKey);
 
-  const currentUserId = useMemo(() => {
-    try {
-      const saved = localStorage.getItem('admin_user');
-      if (saved) {
-        const u = JSON.parse(saved);
-        return (u?.id as string) ?? null;
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  }, []);
+  const currentUserId = useMemo(() => getAdminUser()?.id ?? null, []);
 
   const showBothLanguages = getDashboardShowBothLanguages();
   const bodyForLanguage = (item: { body?: string | null; body_translated?: string | null; body_lang?: string | null }) => {

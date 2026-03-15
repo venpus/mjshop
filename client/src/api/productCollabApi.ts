@@ -1,18 +1,10 @@
 import { getApiBaseUrl } from './baseUrl';
+import { getAdminUser } from '../utils/authStorage';
 
 export function getAuthHeaders(): HeadersInit {
   const headers: HeadersInit = {};
-  const savedUser = localStorage.getItem('admin_user');
-  if (savedUser) {
-    try {
-      const userData = JSON.parse(savedUser);
-      if (userData.id) {
-        headers['X-User-Id'] = userData.id;
-      }
-    } catch {
-      // ignore
-    }
-  }
+  const userData = getAdminUser();
+  if (userData?.id) headers['X-User-Id'] = userData.id;
   return headers;
 }
 
@@ -49,9 +41,22 @@ export interface MyTaskSummaryItem {
 
 export type SummaryProvider = 'openai' | 'qwen';
 
+/** 상태 카테고리별 한 덩어리 요약 */
+export interface StatusCategorySummary {
+  status: string;
+  summary: string;
+  productCount: number;
+  /** 관련 제품 목록 (링크용) */
+  products?: { productId: number; productName: string }[];
+}
+
 export interface AiWorkSummaryResult {
   overallSummary: OverallSummaryProduct[];
   myTasksSummary: MyTaskSummaryItem[];
+  /** 내 업무 전체 한 문장 요약(지연·문제 우선 강조) */
+  myTasksOverallSummary?: string;
+  /** 상태 카테고리별 요약 */
+  statusCategorySummaries?: StatusCategorySummary[];
   /** 요약 생성에 사용된 AI */
   provider?: SummaryProvider;
 }

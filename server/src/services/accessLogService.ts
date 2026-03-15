@@ -13,6 +13,8 @@ export class AccessLogService {
   async list(options: {
     userName?: string;
     othersOnly?: boolean;
+    /** true면 로그인 기록만 조회 (기본값 true) */
+    loginOnly?: boolean;
     page?: number;
     limit?: number;
   }): Promise<{
@@ -28,6 +30,7 @@ export class AccessLogService {
     const filters = {
       userName: options.othersOnly ? undefined : (options.userName?.trim() || undefined),
       othersOnly: options.othersOnly ?? false,
+      loginOnly: options.loginOnly !== false,
     };
 
     const [data, total] = await Promise.all([

@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 import { getDaysPast } from '../../utils/dateUtils';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export interface UnreceivedQuantityCellProps {
   /** 미입고 수량 (발주 수량 - 업체 출고 수량) */
@@ -22,7 +23,9 @@ export function UnreceivedQuantityCell({
   isOverdueWithUnreceived,
   hasNoDeliveryDate = false,
 }: UnreceivedQuantityCellProps) {
-  const qtyText = unreceivedQuantity !== undefined ? `${unreceivedQuantity}개` : '-';
+  const { t } = useLanguage();
+  const unit = t('purchaseOrder.list.quantityUnit');
+  const qtyText = unreceivedQuantity !== undefined ? `${unreceivedQuantity}${unit}` : '-';
   const daysPast = isOverdueWithUnreceived && estimatedDelivery ? getDaysPast(estimatedDelivery) : 0;
 
   return (
@@ -54,18 +57,18 @@ export function UnreceivedQuantityCell({
       </div>
       {hasNoDeliveryDate ? (
         <span className="text-xs text-red-700 font-bold">
-          납기일 미지정
+          {t('purchaseOrder.badge.noDeliveryDate')}
         </span>
       ) : (
         <>
           {estimatedDelivery && (
             <span className={`text-xs ${isOverdueWithUnreceived ? 'text-red-700 font-bold' : 'text-gray-500'}`}>
-              납기: {estimatedDelivery}
+              {t('purchaseOrder.list.dueDateLabel')}: {estimatedDelivery}
             </span>
           )}
           {isOverdueWithUnreceived && daysPast > 0 && (
             <span className="text-xs text-red-700 font-bold">
-              {daysPast}일 경과
+              {t('purchaseOrder.list.daysOverdue').replace('{{days}}', String(daysPast))}
             </span>
           )}
         </>

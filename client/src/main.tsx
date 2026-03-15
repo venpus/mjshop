@@ -4,12 +4,15 @@ import App from "./App.tsx";
 import "./index.css";
 import { AuthProvider } from "./contexts/AuthContext.tsx";
 import { PermissionProvider } from "./contexts/PermissionContext.tsx";
+import { LanguageProvider } from "./contexts/LanguageContext.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
     <AuthProvider>
       <PermissionProvider>
-        <App />
+        <LanguageProvider>
+          <App />
+        </LanguageProvider>
       </PermissionProvider>
     </AuthProvider>
   </BrowserRouter>

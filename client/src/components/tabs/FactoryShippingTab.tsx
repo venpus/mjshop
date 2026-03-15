@@ -1,5 +1,6 @@
 import { Factory, Plus, Trash2, X, Truck } from "lucide-react";
 import { handleNumberInput } from "../../utils/numberInputUtils";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 export interface FactoryShipment {
   id: string;
@@ -56,20 +57,20 @@ export function FactoryShippingTab({
   onRemoveReturnImage,
   onFactoryToWarehouse,
 }: FactoryShippingTabProps) {
+  const { t } = useLanguage();
   return (
     <div className="space-y-6">
-      {/* Factory Status */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
             <Factory className="w-5 h-5 md:w-6 md:h-6 text-gray-700 shrink-0" />
             <h3 className="text-lg md:text-xl font-bold text-gray-900">
-              업체 출고 상태
+              {t("purchaseOrder.detail.factoryStatusTitle")}
             </h3>
             {(factoryShipments.length > 0 ||
               returnExchangeItems.length > 0) && (
               <span className="text-sm md:text-lg text-gray-600">
-                (총 입고수량:{" "}
+                ({t("purchaseOrder.detail.totalReceivedQty")}:{" "}
                 <span className="font-semibold text-blue-600">
                   {(
                     factoryShipments.reduce(
@@ -84,7 +85,7 @@ export function FactoryShippingTab({
                     )
                   ).toLocaleString()}
                 </span>
-                개)
+                {t("purchaseOrder.list.quantityUnit")})
               </span>
             )}
           </div>
@@ -109,7 +110,7 @@ export function FactoryShippingTab({
               className="flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
             >
               <Truck className="w-3.5 h-3.5 md:w-4 md:h-4" />
-              <span>공장→물류</span>
+              <span>{t("purchaseOrder.detail.factoryToWarehouse")}</span>
             </button>
           )}
           <button
@@ -117,14 +118,14 @@ export function FactoryShippingTab({
             className="flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
           >
             <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span>출고 추가</span>
+            <span>{t("purchaseOrder.detail.addShipment")}</span>
           </button>
           <button
             onClick={onAddReturnExchangeItem}
             className="flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
           >
             <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span>반품/교환</span>
+            <span>{t("purchaseOrder.detail.returnExchange")}</span>
           </button>
         </div>
       </div>
@@ -159,7 +160,7 @@ export function FactoryShippingTab({
                     className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
                   >
                     <Trash2 className="w-3 h-3" />
-                    <span>삭제</span>
+                    <span>{t("common.delete")}</span>
                   </button>
                 </div>
 
@@ -226,7 +227,7 @@ export function FactoryShippingTab({
                           e.target.value,
                         )
                       }
-                      placeholder="송장번호 입력"
+                      placeholder={t("purchaseOrder.detail.trackingPlaceholder")}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -257,7 +258,7 @@ export function FactoryShippingTab({
                     </label>
                     <label className="flex items-center justify-center gap-2 px-3 py-2 bg-white border-2 border-dashed border-blue-300 rounded-lg text-sm text-blue-700 hover:bg-blue-50 cursor-pointer transition-colors h-[38px]">
                       <Plus className="w-4 h-4" />
-                      <span>추가</span>
+                      <span>{t("purchaseOrder.detail.add")}</span>
                       <input
                         type="file"
                         multiple
@@ -360,7 +361,7 @@ export function FactoryShippingTab({
           <div className="bg-orange-50 rounded-lg p-8 text-center">
             <p className="text-gray-600">
               반품/교환 항목이 없습니다. 위의
-              "반품/교환 추가" 버튼을 눌러
+              {t("purchaseOrder.detail.returnExchangeHint")}
               추가해주세요.
             </p>
           </div>
@@ -386,7 +387,7 @@ export function FactoryShippingTab({
                       className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
                     >
                       <Trash2 className="w-3 h-3" />
-                      <span>삭제</span>
+                      <span>{t("common.delete")}</span>
                     </button>
                   </div>
 
@@ -453,7 +454,7 @@ export function FactoryShippingTab({
                             e.target.value,
                           )
                         }
-                        placeholder="송장번호 입력"
+                        placeholder={t("purchaseOrder.detail.trackingPlaceholder")}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
                     </div>
@@ -484,7 +485,7 @@ export function FactoryShippingTab({
                       </label>
                       <label className="flex items-center justify-center gap-2 px-3 py-2 bg-white border-2 border-dashed border-orange-300 rounded-lg text-sm text-orange-700 hover:bg-orange-50 cursor-pointer transition-colors h-[38px]">
                         <Plus className="w-4 h-4" />
-                        <span>추가</span>
+                        <span>{t("purchaseOrder.detail.add")}</span>
                         <input
                           type="file"
                           multiple

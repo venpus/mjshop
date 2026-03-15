@@ -1,18 +1,12 @@
 import { getApiBaseUrl } from './baseUrl';
+import { getAdminUser } from '../utils/authStorage';
 
 const API_BASE = getApiBaseUrl();
 
 function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
-  try {
-    const saved = localStorage.getItem('admin_user');
-    if (saved) {
-      const user = JSON.parse(saved);
-      if (user?.id) headers['X-User-Id'] = user.id;
-    }
-  } catch {
-    // ignore
-  }
+  const user = getAdminUser();
+  if (user?.id) headers['X-User-Id'] = user.id;
   return headers;
 }
 

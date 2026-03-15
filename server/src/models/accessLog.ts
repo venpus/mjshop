@@ -1,5 +1,7 @@
 export type AccessLogDevice = 'PC' | 'Mobile';
 
+export type AccessLogEventType = 'login' | 'access';
+
 export interface AccessLog {
   id: number;
   user_id: string;
@@ -8,6 +10,7 @@ export interface AccessLog {
   url: string;
   device: AccessLogDevice;
   device_model: string | null;
+  event_type: AccessLogEventType;
 }
 
 export interface AccessLogWithUserName extends AccessLog {
@@ -21,4 +24,5 @@ export interface CreateAccessLogDTO {
   url: string;
   device: AccessLogDevice;
   device_model: string | null;
+  event_type: AccessLogEventType;
 }

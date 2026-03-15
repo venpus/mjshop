@@ -1,16 +1,21 @@
 import { Request, Response } from 'express';
 import { AdminAccountService } from '../services/adminAccountService.js';
+import { AccessLogService } from '../services/accessLogService.js';
 import {
   CreateAdminAccountDTO,
   UpdateAdminAccountDTO,
 } from '../models/adminAccount.js';
 import { logger } from '../utils/logger.js';
+import { getClientIp, getDevice } from '../utils/accessLogRequest.js';
+import { parseDeviceModel } from '../utils/userAgent.js';
 
 export class AdminAccountController {
   private service: AdminAccountService;
+  private accessLogService: AccessLogService;
 
   constructor() {
     this.service = new AdminAccountService();
+    this.accessLogService = new AccessLogService();
   }
 
   /**
@@ -273,6 +278,20 @@ export class AdminAccountController {
       logger.debug('로그인 시도:', { id });
       const account = await this.service.login(id, password);
       logger.info('로그인 성공:', { id: account.id });
+
+      // 접속 로그에 로그인 기록 (비동기, 응답 블로킹 안 함)
+      const ua = req.headers['user-agent'];
+      void this.accessLogService
+        .create({
+          user_id: account.id,
+          accessed_at: new Date(),
+          ip: getClientIp(req),
+          url: req.originalUrl ?? req.url ?? '/api/admin-accounts/login',
+          device: getDevice(req),
+          device_model: parseDeviceModel(ua),
+          event_type: 'login',
+        })
+        .catch((err) => logger.error('로그인 접속 로그 기록 실패:', err));
 
       res.json({
         success: true,

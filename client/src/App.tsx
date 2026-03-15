@@ -2,6 +2,7 @@ import { useState, useEffect, ReactNode } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Menu, X, Globe, LogOut, User, Sparkles } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
+import { AdminSidebarHost } from './components/AdminSidebarHost';
 import { Dashboard } from './components/Dashboard';
 import { Products } from './components/Products';
 import { Orders } from './components/Orders';
@@ -35,7 +36,7 @@ import { ProductCollabRoutes } from './components/product-collab/routes';
 import { Login } from './components/Login';
 import { useAuth } from './contexts/AuthContext';
 import { usePermission } from './contexts/PermissionContext';
-import { LanguageProvider, useLanguage, Language } from './contexts/LanguageContext';
+import { useLanguage, Language } from './contexts/LanguageContext';
 import { PackingListUnsavedProvider, usePackingListUnsaved } from './contexts/PackingListUnsavedContext';
 import { useForceMobileLayout } from './hooks/useForceMobileLayout';
 
@@ -67,13 +68,15 @@ function AdminLayout() {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
-  
-  // 사이드바를 접힌 상태로 표시할 페이지 확인 (패킹리스트, 발주관리, 발주상세)
-  const isCollapsedPage = location.pathname.includes('/admin/shipping-history') || 
+  /** PC 웹 전용: 호버 시 펼침, 기본값 접힘 */
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+
+  // 사이드바를 접힌 상태로 표시할 페이지 확인 (패킹리스트, 발주관리, 발주상세) — 모바일용
+  const isCollapsedPage = location.pathname.includes('/admin/shipping-history') ||
                           location.pathname === '/admin/purchase-orders' ||
                           location.pathname.startsWith('/admin/purchase-orders/');
-  
-  // 사이드바 접힘 상태 (패킹리스트와 발주관리는 기본 접힘, 나머지는 기본 펼침)
+
+  // 사이드바 접힘 상태 (모바일: 페이지별 기본값, PC: 호버로만 펼침)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(isCollapsedPage);
 
   const languages: Record<Language, { name: string; flag: string }> = {
@@ -149,36 +152,36 @@ function AdminLayout() {
         />
       )}
 
-      {/* Sidebar - 앱/모바일일 때는 닫혀 있으면 화면 밖으로 밀어서 완전히 숨김 */}
-      <div
-        className={`fixed inset-y-0 left-0 z-30 transform transition-transform duration-300 ${
-          useMobileLayout ? '' : 'lg:static lg:translate-x-0'
-        } ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
-        style={
-          useMobileLayout && !isSidebarOpen
-            ? { transform: 'translateX(-100%)' }
-            : undefined
-        }
+      {/* Sidebar - PC: 기본 접힘, 호버 시 펼침, 메뉴 클릭 시 접힘 / 모바일: 기존 동작 */}
+      <AdminSidebarHost
+        isMobileLayout={useMobileLayout}
+        isSidebarOpen={isSidebarOpen}
+        onHoverChange={setIsSidebarHovered}
       >
-        <Sidebar 
-          currentPage={currentPage as any} 
-          isCollapsed={isSidebarOpen ? false : isSidebarCollapsed}
-          onToggleCollapse={isSidebarOpen ? undefined : () => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        <Sidebar
+          currentPage={currentPage as any}
+          isCollapsed={
+            useMobileLayout
+              ? (isSidebarOpen ? false : isSidebarCollapsed)
+              : !isSidebarHovered
+          }
+          onToggleCollapse={
+            useMobileLayout
+              ? () => setIsSidebarCollapsed(!isSidebarCollapsed)
+              : undefined
+          }
           onPageChange={(page) => {
-            if (page === 'purchase-order-detail') {
-              // purchase-order-detail은 직접 이동할 수 없음
-              return;
-            }
-            // 패킹리스트에서 저장하지 않은 변경이 있으면 확인 후 이동
+            if (page === 'purchase-order-detail') return;
             if (location.pathname.includes('shipping-history') && packingListHasUnsaved) {
               const confirmed = window.confirm(t('app.unsavedConfirm'));
               if (!confirmed) return;
             }
             navigate(`/admin/${page}`);
             setIsSidebarOpen(false);
-          }} 
+            if (!useMobileLayout) setIsSidebarHovered(false);
+          }}
         />
-      </div>
+      </AdminSidebarHost>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
@@ -532,11 +535,15 @@ function AppContent() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const location = useLocation();
 
-  const handleLogin = async (id: string, password: string) => {
+  const handleLogin = async (
+    id: string,
+    password: string,
+    options?: { autoLogin?: boolean }
+  ) => {
     setIsLoggingIn(true);
     setLoginError(null);
     try {
-      await login(id, password);
+      await login(id, password, options);
     } catch (error: any) {
       setLoginError(error.message || t('app.loginFailed'));
       throw error;
@@ -593,9 +600,5 @@ function AppContent() {
 }
 
 export default function App() {
-  return (
-    <LanguageProvider>
-      <AppContent />
-    </LanguageProvider>
-  );
+  return <AppContent />;
 }

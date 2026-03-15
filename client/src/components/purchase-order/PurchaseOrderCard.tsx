@@ -111,7 +111,7 @@ export function PurchaseOrderCard({
                 onToggleSelect(e);
               }}
               className="h-4 w-4 cursor-pointer accent-purple-600"
-              aria-label="선택"
+              aria-label={t('purchaseOrder.list.select')}
             />
           </div>
         )}

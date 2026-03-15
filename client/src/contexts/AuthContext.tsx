@@ -1,18 +1,14 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getApiBaseUrl } from '../api/baseUrl';
+import { getAdminUser, setAdminUser, removeAdminUser, type AdminUser } from '../utils/authStorage';
 
-interface AdminUser {
-  id: string;
-  name: string;
-  email: string;
-  level: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
-}
+export type { AdminUser };
 
 interface AuthContextType {
   user: AdminUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (id: string, password: string) => Promise<void>;
+  login: (id: string, password: string, options?: { autoLogin?: boolean }) => Promise<void>;
   logout: () => void;
 }
 
@@ -26,22 +22,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 초기 로딩 시 저장된 세션 확인
+  // 초기 로딩 시 저장된 세션 확인 (자동 로그인 여부에 따라 storage에서 복원)
   useEffect(() => {
-    const savedUser = localStorage.getItem('admin_user');
-    if (savedUser) {
-      try {
-        const userData = JSON.parse(savedUser);
-        setUser(userData);
-      } catch (error) {
-        console.error('Failed to parse saved user data:', error);
-        localStorage.removeItem('admin_user');
-      }
-    }
+    const savedUser = getAdminUser();
+    if (savedUser) setUser(savedUser);
     setIsLoading(false);
   }, []);
 
-  const login = async (id: string, password: string) => {
+  const login = async (id: string, password: string, options?: { autoLogin?: boolean }) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000); // 15초 타임아웃
 
@@ -74,7 +62,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         };
 
         setUser(userData);
-        localStorage.setItem('admin_user', JSON.stringify(userData));
+        setAdminUser(userData, options?.autoLogin ?? false);
       } else {
         throw new Error('로그인에 실패했습니다.');
       }
@@ -93,7 +81,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('admin_user');
+    removeAdminUser();
   };
 
   return (

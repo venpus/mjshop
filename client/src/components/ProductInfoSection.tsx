@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useRef, useState, useEffect, useMemo } from "react";
 import { handleNumberInput } from "../utils/numberInputUtils";
+import { useLanguage } from "../contexts/LanguageContext";
 
 interface ProductInfoSectionProps {
   // 상품 기본 정보
@@ -96,6 +97,7 @@ export function ProductInfoSection({
   packagingSize,
   userLevel,
 }: ProductInfoSectionProps) {
+  const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 포장 박스 사이즈를 3개의 필드로 관리
@@ -175,8 +177,8 @@ export function ProductInfoSection({
     if (!file) return;
 
     // 이미지 파일 검증
-    if (!file.type.startsWith('image/')) {
-      alert('이미지 파일만 업로드할 수 있습니다.');
+    if (!file.type.startsWith("image/")) {
+      alert(t("purchaseOrder.detail.imageUploadError"));
       return;
     }
 
@@ -184,7 +186,7 @@ export function ProductInfoSection({
       try {
         await onMainImageUpload(file);
       } catch (error: any) {
-        alert(error.message || '이미지 업로드에 실패했습니다.');
+        alert(error.message || t("purchaseOrder.detail.imageUploadFailed"));
       }
     }
 
@@ -206,12 +208,12 @@ export function ProductInfoSection({
               type="text"
               value={productName}
               onChange={(e) => onProductNameChange?.(e.target.value)}
-              placeholder="상품명을 입력하세요"
+              placeholder={t("purchaseOrder.detail.productNamePlaceholder")}
               className="flex-1 min-w-0 text-sm font-bold text-blue-600 px-2 py-1.5 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             />
           ) : (
             <span className="flex-1 min-w-0 text-sm font-bold text-gray-900 overflow-x-auto whitespace-nowrap block">
-              {productName || '(상품명 없음)'} ({poNumber})
+              {productName || t("purchaseOrder.detail.noProductName")} ({poNumber})
             </span>
           )}
           {isEditable && <span className="text-sm font-bold text-gray-600 shrink-0">({poNumber})</span>}
@@ -231,14 +233,14 @@ export function ProductInfoSection({
                 type="text"
                 value={productName}
                 onChange={(e) => onProductNameChange?.(e.target.value)}
-                placeholder="상품명을 입력하세요"
+                placeholder={t("purchaseOrder.detail.productNamePlaceholder")}
                 className="text-xl font-bold text-blue-600 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[200px]"
               />
               <span className="text-xl font-bold text-gray-600 shrink-0">({poNumber})</span>
             </div>
           ) : (
             <span className="text-xl font-bold text-gray-900 truncate">
-              {productName || '(상품명 없음)'} ({poNumber})
+              {productName || t("purchaseOrder.detail.noProductName")} ({poNumber})
             </span>
           )}
         </div>
@@ -247,33 +249,31 @@ export function ProductInfoSection({
         <button
           onClick={onPhotoGalleryClick}
           className="flex items-center gap-1 md:gap-2 px-2 py-1.5 md:px-4 md:py-3 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg border border-purple-200 transition-colors text-xs md:text-base shrink-0"
-          title="사진첩"
+          title={t("purchaseOrder.detail.photoGallery")}
         >
           <Images className="w-3.5 h-3.5 md:w-5 md:h-5 shrink-0" />
-          <span className="font-semibold whitespace-nowrap">사진첩</span>
+          <span className="font-semibold whitespace-nowrap">{t("purchaseOrder.detail.photoGallery")}</span>
         </button>
-        {/* 패킹 리스트 검색 */}
         {onViewPackingListClick && (
           <button
             type="button"
             onClick={onViewPackingListClick}
             className="flex items-center gap-1 md:gap-2 px-2 py-1.5 md:px-4 md:py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 transition-colors text-xs md:text-base shrink-0"
-            title="패킹리스트에서 이 발주 관련 목록 보기"
+            title={t("purchaseOrder.list.packingListSearch")}
           >
             <Search className="w-3.5 h-3.5 md:w-5 md:h-5 shrink-0" />
-            <span className="font-semibold whitespace-nowrap">패킹리스트</span>
+            <span className="font-semibold whitespace-nowrap">{t("purchaseOrder.detail.packingList")}</span>
           </button>
         )}
-        {/* 제조 문서 */}
         {onManufacturingClick && (
           <button
             type="button"
             onClick={onManufacturingClick}
             className="flex items-center gap-1 md:gap-2 px-2 py-1.5 md:px-4 md:py-3 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg border border-amber-200 transition-colors text-xs md:text-base shrink-0"
-            title="제조 문서"
+            title={t("purchaseOrder.detail.manufacturing")}
           >
             <Wrench className="w-3.5 h-3.5 md:w-5 md:h-5 shrink-0" />
-            <span className="font-semibold whitespace-nowrap">제조</span>
+            <span className="font-semibold whitespace-nowrap">{t("purchaseOrder.detail.manufacturing")}</span>
           </button>
         )}
 
@@ -298,18 +298,16 @@ export function ProductInfoSection({
                 isOrderConfirmed ? "text-green-800" : "text-orange-800"
               }`}
             >
-              {isOrderConfirmed ? "발주 컨펌" : "컨펌 대기"}
+              {isOrderConfirmed ? t("purchaseOrder.detail.orderConfirm") : t("purchaseOrder.detail.confirmWaiting")}
             </span>
           </label>
         )}
-        
-        {/* 취소 버튼 (C0 레벨에서는 숨김, 모바일에서는 숨김) */}
-        {userLevel !== 'C0: 한국Admin' && orderStatus !== '취소됨' && (
+        {userLevel !== "C0: 한국Admin" && orderStatus !== "취소됨" && (
           <button
             onClick={onCancelOrder}
             className="hidden md:inline-flex px-3 py-1.5 md:px-4 md:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm shrink-0"
           >
-            취소
+            {t("purchaseOrder.list.cancel")}
           </button>
         )}
       </div>
@@ -332,7 +330,7 @@ export function ProductInfoSection({
                 <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none"></div>
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <span className="text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity bg-black bg-opacity-50 px-2 py-1 rounded">
-                    크게 보기
+                    {t("purchaseOrder.detail.viewLarge")}
                   </span>
                 </div>
               </>
@@ -343,7 +341,7 @@ export function ProductInfoSection({
                   <>
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                       <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                      <span className="text-xs text-gray-500">이미지 업로드</span>
+                      <span className="text-xs text-gray-500">{t("purchaseOrder.detail.imageUpload")}</span>
                     </div>
                     <input
                       ref={fileInputRef}
@@ -370,13 +368,13 @@ export function ProductInfoSection({
                     <Ruler className="w-5 h-5 text-purple-600" />
                   </div>
                   <div>
-                    <span className="text-gray-600 text-sm">사이즈</span>
+                    <span className="text-gray-600 text-sm">{t("purchaseOrder.detail.size")}</span>
                     {onSizeChange ? (
                       <input
                         type="text"
                         value={size}
                         onChange={(e) => onSizeChange(e.target.value)}
-                        placeholder="예: 30x20x15"
+                        placeholder={t("purchaseOrder.detail.sizePlaceholder")}
                         className="mt-1 w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
                     ) : (
@@ -389,13 +387,13 @@ export function ProductInfoSection({
                     <Weight className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <span className="text-gray-600 text-sm">무게</span>
+                    <span className="text-gray-600 text-sm">{t("purchaseOrder.detail.weight")}</span>
                     {onWeightChange ? (
                       <input
                         type="text"
                         value={weight}
                         onChange={(e) => onWeightChange(e.target.value)}
-                        placeholder="예: 500"
+                        placeholder={t("purchaseOrder.detail.weightPlaceholder")}
                         className="mt-1 w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
                     ) : (
@@ -412,7 +410,7 @@ export function ProductInfoSection({
                     <Box className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <span className="text-gray-600 text-sm">소포장</span>
+                    <span className="text-gray-600 text-sm">{t("purchaseOrder.detail.packaging")}</span>
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
@@ -426,7 +424,7 @@ export function ProductInfoSection({
                         }}
                         className="w-16 px-2 py-1 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
-                      <span className="text-gray-500 text-xs">개</span>
+                      <span className="text-gray-500 text-xs">{t("purchaseOrder.list.quantityUnit")}</span>
                     </div>
                   </div>
                 </div>
@@ -435,14 +433,14 @@ export function ProductInfoSection({
                     <Box className="w-5 h-5 text-orange-600" />
                   </div>
                   <div className="flex-1">
-                    <span className="text-gray-600 text-sm">포장 박스 사이즈</span>
+                    <span className="text-gray-600 text-sm">{t("purchaseOrder.detail.packagingBoxSize")}</span>
                     {onPackagingSizeChange ? (
                       <div className="mt-1 flex items-center gap-1">
                         <input
                           type="number"
                           value={packagingWidth}
                           onChange={(e) => handlePackagingSizeChange(e.target.value, packagingHeight, packagingDepth)}
-                          placeholder="가로"
+                          placeholder={t("purchaseOrder.detail.width")}
                           className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
                         />
                         <span className="text-gray-500 text-sm">×</span>
@@ -450,7 +448,7 @@ export function ProductInfoSection({
                           type="number"
                           value={packagingHeight}
                           onChange={(e) => handlePackagingSizeChange(packagingWidth, e.target.value, packagingDepth)}
-                          placeholder="세로"
+                          placeholder={t("purchaseOrder.detail.height")}
                           className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
                         />
                         <span className="text-gray-500 text-sm">×</span>
@@ -458,7 +456,7 @@ export function ProductInfoSection({
                           type="number"
                           value={packagingDepth}
                           onChange={(e) => handlePackagingSizeChange(packagingWidth, packagingHeight, e.target.value)}
-                          placeholder="높이"
+                          placeholder={t("purchaseOrder.detail.depth")}
                           className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
                         />
                         <span className="text-gray-500 text-xs">cm</span>
@@ -479,7 +477,7 @@ export function ProductInfoSection({
                     <DollarSign className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <span className="text-gray-700 text-sm font-semibold block mb-2">최종 예상 단가</span>
+                    <span className="text-gray-700 text-sm font-semibold block mb-2">{t("purchaseOrder.detail.finalUnitPrice")}</span>
                     <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg px-5 py-4 shadow-lg ring-2 ring-purple-300 ring-offset-2 ring-offset-white w-fit">
                       <div className="flex flex-col gap-1">
                         <span className="text-3xl font-extrabold text-white drop-shadow-sm">
@@ -490,11 +488,10 @@ export function ProductInfoSection({
                         </span>
                         {/* 패킹리스트 출고 수량이 0이면 표시 */}
                         {((shippingQuantity || 0) + (koreaArrivedQuantity || 0)) === 0 ? (
-                          <span className="text-xs text-white/90">(계산 미완성, 출고대기)</span>
+                          <span className="text-xs text-white/90">{t("purchaseOrder.list.calcIncompleteAwaiting")}</span>
                         ) : (
-                          /* 패킹리스트 출고가 있지만 배송비가 없으면 표시 */
                           (packingListShippingCost === undefined || packingListShippingCost === 0) && (
-                            <span className="text-xs text-white/90">(계산 미완성, 배송비 입력 전)</span>
+                            <span className="text-xs text-white/90">{t("purchaseOrder.list.calcIncompleteShipping")}</span>
                           )
                         )}
                       </div>
@@ -529,7 +526,7 @@ export function ProductInfoSection({
                 className="text-gray-600 text-sm flex items-center gap-2 w-28 flex-shrink-0"
               >
                 <Calendar className="w-4 h-4" />
-                예정 납기일
+                {t("purchaseOrder.detail.expectedDeliveryDate")}
               </label>
               <input
                 id="deliveryDate"

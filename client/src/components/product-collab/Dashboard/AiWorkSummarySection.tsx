@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { postAiWorkSummary, getAiWorkSummaryLast } from '../../../api/productCollabApi';
 import type { AiWorkSummaryResult } from '../../../api/productCollabApi';
-import { OverallSummaryTable } from './OverallSummaryTable';
 import { MyTasksSummaryTable } from './MyTasksSummaryTable';
+import { StatusCategorySummaryList } from './StatusCategorySummaryList';
 
 function formatSummaryGeneratedAgo(isoString: string): { key: string; n?: number } {
   const then = new Date(isoString).getTime();
@@ -93,24 +94,54 @@ export function AiWorkSummarySection() {
           <div className="space-y-6">
             <div>
               <h3 className="text-base font-semibold text-[#374151] mb-2">
-                {t('productCollab.overallSummaryTitle')}
-              </h3>
-              {data.overallSummary.length > 0 ? (
-                <OverallSummaryTable products={data.overallSummary} />
-              ) : (
-                <p className="text-[#6B7280] text-sm">{t('productCollab.summaryEmpty')}</p>
-              )}
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-[#374151] mb-2">
                 {t('productCollab.myTasksSummaryTitle')}
               </h3>
               {data.myTasksSummary.length > 0 ? (
-                <MyTasksSummaryTable items={data.myTasksSummary} />
+                <>
+                  <div className="rounded-lg border border-[#E5E7EB] overflow-hidden mb-3">
+                    {data.myTasksOverallSummary && (
+                      <p className="p-3 text-sm text-[#374151] bg-white border-b border-[#E5E7EB]">
+                        {data.myTasksOverallSummary}
+                      </p>
+                    )}
+                    <p
+                      className={
+                        data.myTasksOverallSummary
+                          ? 'p-3 pt-0 text-xs text-[#6B7280] bg-white'
+                          : 'p-3 text-xs text-[#6B7280] bg-white'
+                      }
+                    >
+                      <span className="mr-1.5">{t('productCollab.relatedProducts')}:</span>
+                      {data.myTasksSummary.map((row, idx) => (
+                        <span key={row.productId}>
+                          {idx > 0 && <span className="text-[#9CA3AF] mx-1">·</span>}
+                          <Link
+                            to={`/admin/product-collab/thread/${row.productId}?from=summary`}
+                            className="text-[#2563EB] hover:underline"
+                          >
+                            {row.productName}
+                          </Link>
+                        </span>
+                      ))}
+                    </p>
+                  </div>
+                  <MyTasksSummaryTable items={data.myTasksSummary} />
+                </>
               ) : (
                 <p className="text-[#6B7280] text-sm">{t('productCollab.summaryEmpty')}</p>
               )}
             </div>
+            {data.statusCategorySummaries && data.statusCategorySummaries.length > 0 && (
+              <div>
+                <h3 className="text-base font-semibold text-[#374151] mb-2">
+                  {t('productCollab.statusCategorySummaryTitle')}
+                </h3>
+                <StatusCategorySummaryList
+                  items={data.statusCategorySummaries}
+                  overallSummary={data.overallSummary}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

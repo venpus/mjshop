@@ -90,11 +90,101 @@ export interface MyTaskSummaryItem {
 
 export type SummaryProvider = 'openai' | 'qwen';
 
+/** 상태 카테고리별 한 덩어리 요약 (제품별 요약을 상태로 묶어 요약) */
+export interface StatusCategorySummary {
+  status: string;
+  summary: string;
+  productCount: number;
+  /** 관련 제품 목록 (클라이언트에서 링크용) */
+  products?: { productId: number; productName: string }[];
+}
+
 export interface AiWorkSummaryResult {
   overallSummary: OverallSummaryProduct[];
   myTasksSummary: MyTaskSummaryItem[];
+  /** 내 업무 전체를 한 문장으로 요약(지연·문제 우선 강조) */
+  myTasksOverallSummary?: string;
+  /** 상태 카테고리별 요약 (전체 요약 제품을 상태로 그룹한 뒤 그룹당 1문단) */
+  statusCategorySummaries?: StatusCategorySummary[];
   /** 요약 생성에 사용된 AI (OpenAI 1순위, 실패 시 Qwen) */
   provider?: SummaryProvider;
+}
+
+/** 전체 요약에 등장하는 상태의 표시 순서: 문제발생→발주대기→샘플테스트→구성확정→조사중→입고중→생산중→생산완료 */
+const STATUS_ORDER_FOR_SUMMARY = [
+  'ISSUE_OCCURRED',   // 1 문제발생
+  'ORDER_PENDING',    // 2 발주대기
+  'SAMPLE_TEST',      // 3 샘플테스트
+  'CONFIG_CONFIRM',   // 4 구성확정중
+  'RESEARCH',         // 5 조사중
+  'INCOMING',         // 6 입고중
+  'IN_PRODUCTION',    // 7 생산중
+  'PRODUCTION_COMPLETE', // 8 생산완료
+] as const;
+
+/**
+ * 제품별 요약을 상태로 그룹한 뒤, 각 상태 그룹당 1~2문장 요약 생성
+ */
+async function buildStatusCategorySummaries(
+  overallSummary: OverallSummaryProduct[]
+): Promise<StatusCategorySummary[]> {
+  const byStatus = new Map<string, OverallSummaryProduct[]>();
+  for (const p of overallSummary) {
+    const s = p.status ?? 'UNKNOWN';
+    if (!byStatus.has(s)) byStatus.set(s, []);
+    byStatus.get(s)!.push(p);
+  }
+  const orderedStatuses = STATUS_ORDER_FOR_SUMMARY.filter((s) => byStatus.has(s));
+  const otherStatuses = [...byStatus.keys()].filter((s) => !STATUS_ORDER_FOR_SUMMARY.includes(s as (typeof STATUS_ORDER_FOR_SUMMARY)[number]));
+  const statuses = [...orderedStatuses, ...otherStatuses];
+  if (statuses.length === 0) return [];
+
+  const langInstruction =
+    'Respond in Korean only (한국어). Use formal polite style (경어체): -합니다, -해요, -입니다. Do not use casual endings.';
+  const lines = statuses.map((status) => {
+    const products = byStatus.get(status) ?? [];
+    const productLines = products.map((p) => `- ${p.productName}: ${p.summary}${p.delayedNote ? ` (지연: ${p.delayedNote})` : ''}`);
+    return `[상태: ${status}]\n${productLines.join('\n')}`;
+  });
+  const prompt = `You are an assistant that summarizes work by status category.
+${langInstruction}
+Below are products grouped by status. Each group has a status label and the per-product summaries. For each status group, write ONE short summary (1-2 sentences) that captures the overall situation of that group. Output ONLY a valid JSON object with this exact structure (no markdown, no extra text):
+{"statusSummaries":[{"status":"string","summary":"string"}]}
+
+Input (status groups in order):
+${lines.join('\n\n')}`;
+
+  const res = await callChatForSummary(prompt);
+  const raw = res?.data?.statusSummaries;
+  const toProducts = (list: OverallSummaryProduct[]): { productId: number; productName: string }[] =>
+    list.map((p) => ({ productId: p.productId, productName: p.productName }));
+
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return statuses.map((status) => {
+      const list = byStatus.get(status) ?? [];
+      return {
+        status,
+        summary: `해당 상태 제품 ${list.length}건입니다.`,
+        productCount: list.length,
+        products: toProducts(list),
+      };
+    });
+  }
+  const byStatusResult = new Map<string, { summary: string }>();
+  for (const item of raw) {
+    if (item && typeof item.status === 'string' && typeof item.summary === 'string') {
+      byStatusResult.set(item.status, { summary: item.summary });
+    }
+  }
+  return statuses.map((status) => {
+    const list = byStatus.get(status) ?? [];
+    return {
+      status,
+      summary: byStatusResult.get(status)?.summary ?? `해당 상태 제품 ${list.length}건입니다.`,
+      productCount: list.length,
+      products: toProducts(list),
+    };
+  });
 }
 
 function snippet(s: string | null): string {
@@ -265,9 +355,11 @@ ${overallText}`;
   const myTasksPrompt = `You are an assistant that summarizes my assigned tasks in priority order: 1) issue (문제 제품), 2) delayed (지연), 3) normal.
 ${langInstruction}
 Write all summary text in formal polite Korean (경어체).
-Below is the full thread (all messages and replies in chronological order) for each product in my task list. For each product, write a short summary (1-2 sentences) based on the entire conversation. Include the priority: "issue", "delayed", or "normal".
+Below is the full thread (all messages and replies in chronological order) for each product in my task list.
+1) For each product, write a short summary (1-2 sentences) in "items".
+2) Also write ONE "overallSummary" sentence (1-2 sentences) that summarizes ALL my tasks above. In this sentence, emphasize delayed and issue items FIRST and clearly (e.g. "지연·문제 업무를 우선 ...").
 Output ONLY a valid JSON object with this exact structure (no markdown, no extra text):
-{"items":[{"productId":number,"productName":"string","priority":"issue"|"delayed"|"normal","summary":"string"}]}
+{"items":[{"productId":number,"productName":"string","priority":"issue"|"delayed"|"normal","summary":"string"}],"overallSummary":"string"}
 
 Input:
 ${myTasksText}`;
@@ -277,6 +369,8 @@ ${myTasksText}`;
   try {
     let overallSummary: OverallSummaryProduct[] = [];
     let myTasksSummary: MyTaskSummaryItem[] = [];
+    let myTasksOverallSummary: string | undefined;
+    let statusCategorySummaries: StatusCategorySummary[] = [];
 
     let summaryProvider: SummaryProvider | undefined;
     if (overallProducts.length > 0) {
@@ -321,6 +415,9 @@ ${myTasksText}`;
         const order: Record<string, number> = { issue: 0, delayed: 1, normal: 2 };
         return (order[a.priority ?? 'normal'] ?? 2) - (order[b.priority ?? 'normal'] ?? 2);
       });
+
+      // 상태 카테고리별 요약 생성 (제품별 요약을 상태로 묶어 그룹당 1문단)
+      statusCategorySummaries = await buildStatusCategorySummaries(overallSummary);
     }
 
     if (myTaskProducts.length > 0) {
@@ -345,6 +442,9 @@ ${myTasksText}`;
           summary: '-',
         }));
       }
+      const rawOverall = myRes?.data?.overallSummary;
+      myTasksOverallSummary =
+        typeof rawOverall === 'string' && rawOverall.trim() ? rawOverall.trim() : undefined;
     }
 
     if (lang === 'zh' && (overallSummary.length > 0 || myTasksSummary.length > 0)) {
@@ -365,21 +465,28 @@ ${myTasksText}`;
     if (myTasksSummary.length > 0 && myTasksSummary[0]) {
       console.log('[AI Work Summary] 최종 내 업무 요약 첫 건 summary=%s', myTasksSummary[0].summary ?? '');
     }
-    return { overallSummary, myTasksSummary, provider: summaryProvider };
+    return {
+      overallSummary,
+      myTasksSummary,
+      ...(myTasksOverallSummary != null && myTasksOverallSummary !== '' && { myTasksOverallSummary }),
+      ...(statusCategorySummaries.length > 0 && { statusCategorySummaries }),
+      provider: summaryProvider,
+    };
   } catch (err) {
     console.error('[AI Work Summary] Qwen error:', err);
     return null;
   }
 }
 
-/** lang=zh일 때: 한국어 요약 결과의 summary, delayedNote 만 중국어로 번역 */
+/** lang=zh일 때: 한국어 요약 결과의 summary, delayedNote, myTasksOverallSummary, statusCategorySummaries[].summary 만 중국어로 번역 */
 async function translateSummaryToChinese(result: AiWorkSummaryResult): Promise<AiWorkSummaryResult | null> {
   const payload = JSON.stringify(result);
-  const prompt = `Translate the following JSON to Simplified Chinese (简体中文). Translate ONLY the "summary" and "delayedNote" string values. Use Chinese polite/formal style (敬语): use 您 where appropriate, 请、可以、能否、敬请; keep tone professional and respectful. Do not change productId, productName, priority, status, or any other field. Keep the exact same JSON structure. Output valid JSON only, no markdown or explanation.
+  const prompt = `Translate the following JSON to Simplified Chinese (简体中文). Translate ONLY these string values: "summary", "delayedNote", "myTasksOverallSummary", and inside "statusCategorySummaries" the "summary" of each item. Use Chinese polite/formal style (敬语): use 您 where appropriate, 请、可以、能否、敬请; keep tone professional and respectful. Do not change productId, productName, priority, status, productCount, or any other field. Keep the exact same JSON structure. Output valid JSON only, no markdown or explanation.
 
 Input:
 ${payload}`;
-  const systemMsg = 'You are a translator. Output only valid JSON. Translate only the summary and delayedNote text values to Simplified Chinese. Use formal polite style (敬语): 您, 请, 可以, 能否, 敬请; professional and respectful tone. Keep all other fields unchanged.';
+  const systemMsg =
+    'You are a translator. Output only valid JSON. Translate summary, delayedNote, myTasksOverallSummary, and statusCategorySummaries[].summary to Simplified Chinese. Use formal polite style (敬语). Keep all other fields unchanged.';
   const res = await callChatForSummary(prompt, systemMsg);
   const data = res?.data;
   if (!data || !Array.isArray(data.overallSummary) || !Array.isArray(data.myTasksSummary)) {
@@ -388,10 +495,25 @@ ${payload}`;
   const translated: AiWorkSummaryResult = {
     overallSummary: data.overallSummary as OverallSummaryProduct[],
     myTasksSummary: data.myTasksSummary as MyTaskSummaryItem[],
+    myTasksOverallSummary:
+      typeof data.myTasksOverallSummary === 'string' ? data.myTasksOverallSummary : result.myTasksOverallSummary,
   };
   for (let i = 0; i < result.overallSummary.length && i < translated.overallSummary.length; i++) {
     translated.overallSummary[i].status = result.overallSummary[i].status;
     translated.overallSummary[i].priority = result.overallSummary[i].priority;
+  }
+  if (Array.isArray(result.statusCategorySummaries) && result.statusCategorySummaries.length > 0) {
+    const translatedStatus = data.statusCategorySummaries as StatusCategorySummary[] | undefined;
+    if (Array.isArray(translatedStatus) && translatedStatus.length === result.statusCategorySummaries.length) {
+      translated.statusCategorySummaries = translatedStatus.map((item, i) => ({
+        ...item,
+        status: result.statusCategorySummaries![i].status,
+        productCount: result.statusCategorySummaries![i].productCount,
+        products: result.statusCategorySummaries![i].products,
+      }));
+    } else {
+      translated.statusCategorySummaries = result.statusCategorySummaries;
+    }
   }
   return translated;
 }

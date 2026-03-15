@@ -7,8 +7,7 @@ dist/
 build/
 */dist/
 */build/
-APP/
-APP_WEBAPP/
+Mobile_APP/
 
 # Environment variables
 .env

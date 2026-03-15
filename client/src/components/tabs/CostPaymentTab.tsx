@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from "lucide-react";
 import { DecimalInput } from "../ui/DecimalInput";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 export interface LaborCostItem {
   id: string;
@@ -113,10 +114,10 @@ export function CostPaymentTab({
   onSetAdvancePaymentDate,
   onSetBalancePaymentDate,
 }: CostPaymentTabProps) {
-  // 레벨별 권한 확인
-  const isLevelA = isSuperAdmin; // A-SuperAdmin
-  const isLevelSorB = userLevel === 'S: Admin' || userLevel === 'B0: 중국Admin'; // S 또는 B 레벨
-  const isLevelC = userLevel === 'C0: 한국Admin'; // C 레벨
+  const { t } = useLanguage();
+  const isLevelA = isSuperAdmin;
+  const isLevelSorB = userLevel === "S: Admin" || userLevel === "B0: 중국Admin";
+  const isLevelC = userLevel === "C0: 한국Admin";
   
   // 항목을 일반 항목과 A레벨 전용 항목으로 분리
   const normalOptionItems = optionItems.filter(item => !item.isAdminOnly);
@@ -208,7 +209,7 @@ export function CostPaymentTab({
                   disabled={!canEditCostFields}
                   className={`flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 ${!canWrite ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 />
-                <span className="text-gray-500 text-xs min-w-[16px]">개</span>
+                <span className="text-gray-500 text-xs min-w-[16px]">{t("purchaseOrder.list.quantityUnit")}</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -249,7 +250,7 @@ export function CostPaymentTab({
         {/* 운송비 */}
         <div className="space-y-3 border-l border-gray-200 pl-5 w-fit">
           <h4 className="text-sm text-gray-700 mb-3 pb-2 border-b border-gray-200 flex flex-col gap-1">
-            <span>운송비</span>
+            <span>{t("purchaseOrder.detail.shippingCost")}</span>
             <span className="text-lg font-semibold text-blue-700 bg-blue-100 px-3 py-1 rounded self-start">
               ¥{shippingCostTotal.toFixed(2)}
             </span>
@@ -311,7 +312,7 @@ export function CostPaymentTab({
           <div className="space-y-4">
             {/* 일반 항목 */}
             <div className="space-y-2">
-              {!isLevelC && <div className="text-xs font-semibold text-gray-600 mb-2">일반 항목</div>}
+              {!isLevelC && <div className="text-xs font-semibold text-gray-600 mb-2">{t("purchaseOrder.detail.generalItems")}</div>}
               {normalOptionItems.map((item) => {
                   const calculatedCost = item.unit_price * item.quantity;
                   const isEditable = canAddItems;
@@ -334,7 +335,7 @@ export function CostPaymentTab({
                               type="text"
                               value={item.name || ''}
                               onChange={(e) => onUpdateOptionItemName(item.id, e.target.value)}
-                              placeholder="항목명"
+                              placeholder={t("purchaseOrder.detail.itemNamePlaceholder")}
                               className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                             />
                           ) : (
@@ -386,7 +387,7 @@ export function CostPaymentTab({
                             type="text"
                             value={item.name || ''}
                             onChange={(e) => onUpdateOptionItemName(item.id, e.target.value)}
-                            placeholder="항목명"
+                            placeholder={t("purchaseOrder.detail.itemNamePlaceholder")}
                             className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                           />
                         ) : (
@@ -473,7 +474,7 @@ export function CostPaymentTab({
                               type="text"
                               value={item.name || ''}
                               onChange={(e) => onUpdateOptionItemName(item.id, e.target.value)}
-                              placeholder="항목명"
+                              placeholder={t("purchaseOrder.detail.itemNamePlaceholder")}
                               className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                             />
                           ) : (
@@ -528,7 +529,7 @@ export function CostPaymentTab({
                             type="text"
                             value={item.name || ''}
                             onChange={(e) => onUpdateOptionItemName(item.id, e.target.value)}
-                            placeholder="항목명"
+                            placeholder={t("purchaseOrder.detail.itemNamePlaceholder")}
                             className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
                           />
                         ) : (
@@ -587,7 +588,7 @@ export function CostPaymentTab({
         {/* 인건비 */}
         <div className="space-y-3 border-l border-gray-200 pl-5">
           <h4 className="text-sm text-gray-700 mb-3 pb-2 border-b border-gray-200 flex justify-between items-center">
-            <span>인건비</span>
+            <span>{t("purchaseOrder.detail.laborCost")}</span>
             <span className="text-lg font-semibold text-orange-700 bg-orange-100 px-3 py-1 rounded">
               ¥{totalLaborCost.toFixed(2)}
             </span>
@@ -595,7 +596,7 @@ export function CostPaymentTab({
           <div className="space-y-4">
             {/* 일반 항목 */}
             <div className="space-y-2">
-              {!isLevelC && <div className="text-xs font-semibold text-gray-600 mb-2">일반 항목</div>}
+              {!isLevelC && <div className="text-xs font-semibold text-gray-600 mb-2">{t("purchaseOrder.detail.generalItems")}</div>}
               {normalLaborCostItems.map((item) => {
                 const calculatedCost = item.unit_price * item.quantity;
                 const isEditable = canAddItems;
@@ -618,7 +619,7 @@ export function CostPaymentTab({
                             type="text"
                             value={item.name || ''}
                             onChange={(e) => onUpdateLaborCostItemName(item.id, e.target.value)}
-                            placeholder="항목명"
+                            placeholder={t("purchaseOrder.detail.itemNamePlaceholder")}
                             className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                           />
                         ) : (
@@ -670,7 +671,7 @@ export function CostPaymentTab({
                           type="text"
                           value={item.name || ''}
                           onChange={(e) => onUpdateLaborCostItemName(item.id, e.target.value)}
-                          placeholder="항목명"
+                          placeholder={t("purchaseOrder.detail.itemNamePlaceholder")}
                           className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                         />
                       ) : (
@@ -757,7 +758,7 @@ export function CostPaymentTab({
                                 type="text"
                                 value={item.name || ''}
                                 onChange={(e) => onUpdateLaborCostItemName(item.id, e.target.value)}
-                                placeholder="항목명"
+                                placeholder={t("purchaseOrder.detail.itemNamePlaceholder")}
                                 className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                               />
                             ) : (
@@ -812,7 +813,7 @@ export function CostPaymentTab({
                               type="text"
                               value={item.name || ''}
                               onChange={(e) => onUpdateLaborCostItemName(item.id, e.target.value)}
-                              placeholder="항목명"
+                              placeholder={t("purchaseOrder.detail.itemNamePlaceholder")}
                               className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"
                             />
                           ) : (
@@ -921,7 +922,7 @@ export function CostPaymentTab({
               {/* 잔금 */}
               <div className="space-y-3 border-t border-gray-300 pt-6 md:border-t-0 md:pt-0 md:border-l md:pl-8">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="text-gray-900 font-semibold">잔금</span>
+                  <span className="text-gray-900 font-semibold">{t("purchaseOrder.detail.balancePayment")}</span>
                   <span className="text-lg font-semibold text-orange-700 bg-orange-100 px-4 py-1.5 rounded">
                     ¥
                     {balancePaymentAmount.toLocaleString(undefined, {

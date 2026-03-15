@@ -4,6 +4,7 @@ import { getDashboard, completeTask } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useProductCollabCounts } from '../ProductCollabCountsContext';
 import { getDashboardShowBothLanguages } from '../../../constants/settings';
+import { getAdminUser } from '../../../utils/authStorage';
 import { useIsMobile } from '../../ui/use-mobile';
 import type { DashboardData } from '../types';
 import { PRODUCT_COLLAB_STATUS_LABEL_KEYS, PRODUCT_COLLAB_STATUS_BADGE_CLASS } from '../types';
@@ -18,18 +19,7 @@ export function ProductCollabDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
 
-  const currentUserId = useMemo(() => {
-    try {
-      const saved = localStorage.getItem('admin_user');
-      if (saved) {
-        const u = JSON.parse(saved);
-        return (u?.id as string) ?? null;
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  }, []);
+  const currentUserId = useMemo(() => getAdminUser()?.id ?? null, []);
 
   const loadDashboard = () => {
     getDashboard().then((res) => {

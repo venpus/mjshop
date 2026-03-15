@@ -305,9 +305,9 @@ export class ProductCollabController {
       if (!result) {
         return res.status(503).json({ success: false, error: 'AI 요약을 생성할 수 없습니다. OPENAI_API_KEY 또는 DASHSCOPE_API_KEY를 확인하세요.' });
       }
-      const { upsertAiWorkSummaryCache } = await import('../repositories/aiWorkSummaryCacheRepository.js');
+      const { insertAiWorkSummaryCache } = await import('../repositories/aiWorkSummaryCacheRepository.js');
       const generatedAt = new Date().toISOString();
-      await upsertAiWorkSummaryCache(userId, language, result);
+      await insertAiWorkSummaryCache(userId, language, result);
       res.json({ success: true, data: result, generatedAt });
     } catch (error: unknown) {
       console.error('Product collab AI work summary error:', error);

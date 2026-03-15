@@ -1,20 +1,13 @@
 // QWEN 대화형 검색 API
 
+import { getAdminUser } from '../utils/authStorage';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 function getAuthHeaders(): HeadersInit {
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
-  const savedUser = localStorage.getItem('admin_user');
-  if (savedUser) {
-    try {
-      const userData = JSON.parse(savedUser);
-      if (userData.id) {
-        (headers as Record<string, string>)['X-User-Id'] = userData.id;
-      }
-    } catch {
-      // ignore
-    }
-  }
+  const userData = getAdminUser();
+  if (userData?.id) (headers as Record<string, string>)['X-User-Id'] = userData.id;
   return headers;
 }
 

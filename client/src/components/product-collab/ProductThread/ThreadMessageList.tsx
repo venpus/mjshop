@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
 import type { ProductCollabMessage, MessageTag } from '../types';
 import { getProductCollabImageUrl, getProductCollabDownloadUrl } from '../utils/imageUrl';
 import { updateMessage, deleteMessage, createMessage, completeTask, getAuthHeaders, uploadProductImages, getMentionableUsers, type MentionableUser } from '../../../api/productCollabApi';
@@ -431,6 +431,10 @@ function ReplyForm({ productId, parentMessageId, onSent, onReplySent, currentUse
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mentionListRef = useRef<HTMLUListElement>(null);
+  const mentionButtonRef = useRef<HTMLButtonElement>(null);
+  const DROPDOWN_MAX_H = 160;
+  const [atDropdownPos, setAtDropdownPos] = useState<{ top: number; left: number; width: number; openUp: boolean } | null>(null);
+  const [addMentionDropdownPos, setAddMentionDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     getMentionableUsers().then((res) => {
@@ -443,6 +447,40 @@ function ReplyForm({ productId, parentMessageId, onSent, onReplySent, currentUse
       selectedFiles.forEach(({ objectUrl }) => objectUrl && URL.revokeObjectURL(objectUrl));
     };
   }, [selectedFiles]);
+
+  useLayoutEffect(() => {
+    if (!showAtDropdown || mentionQuery === null) {
+      setAtDropdownPos(null);
+      return;
+    }
+    const el = textareaRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const spaceBelow = typeof window !== 'undefined' ? window.innerHeight - rect.bottom - 8 : 300;
+    const openUp = spaceBelow < DROPDOWN_MAX_H;
+    setAtDropdownPos({
+      left: rect.left,
+      width: rect.width,
+      top: openUp ? rect.top - DROPDOWN_MAX_H - 4 : rect.bottom + 4,
+      openUp,
+    });
+  }, [showAtDropdown, mentionQuery]);
+
+  useLayoutEffect(() => {
+    if (!mentionDropdownOpen || mentionQuery !== null) {
+      setAddMentionDropdownPos(null);
+      return;
+    }
+    const el = mentionButtonRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const spaceBelow = typeof window !== 'undefined' ? window.innerHeight - rect.bottom - 8 : 300;
+    const openUp = spaceBelow < DROPDOWN_MAX_H;
+    setAddMentionDropdownPos({
+      left: rect.left,
+      top: openUp ? rect.top - DROPDOWN_MAX_H - 4 : rect.bottom + 4,
+    });
+  }, [mentionDropdownOpen, mentionQuery]);
 
   /** 본문에 남아 있는 @이름 기준으로 맨션 ID 목록 동기화 (키보드로 삭제 시 칩도 제거) */
   const syncMentionIdsFromBody = (text: string) => {
@@ -634,22 +672,31 @@ function ReplyForm({ productId, parentMessageId, onSent, onReplySent, currentUse
                     setMentionDropdownOpen(false);
                   }}
                 />
-                <ul
-                  ref={mentionListRef}
-                  className="absolute left-0 right-0 top-full mt-1 z-20 max-h-40 overflow-auto bg-white border border-[#E5E7EB] rounded shadow py-1"
-                >
-                  {filteredByAt.map((u, i) => (
-                    <li key={u.id}>
-                      <button
-                        type="button"
-                        className={`w-full text-left px-2 py-1.5 text-sm hover:bg-[#F3F4F6] ${i === mentionHighlightIndex ? 'bg-[#EFF6FF]' : ''}`}
-                        onClick={() => applyMention(u)}
-                      >
-                        @{u.name}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                {atDropdownPos && (
+                  <ul
+                    ref={mentionListRef}
+                    className="z-20 overflow-auto bg-white border border-[#E5E7EB] rounded shadow py-1"
+                    style={{
+                      position: 'fixed',
+                      top: atDropdownPos.top,
+                      left: atDropdownPos.left,
+                      width: atDropdownPos.width,
+                      maxHeight: DROPDOWN_MAX_H,
+                    }}
+                  >
+                    {filteredByAt.map((u, i) => (
+                      <li key={u.id}>
+                        <button
+                          type="button"
+                          className={`w-full text-left px-2 py-1.5 text-sm hover:bg-[#F3F4F6] ${i === mentionHighlightIndex ? 'bg-[#EFF6FF]' : ''}`}
+                          onClick={() => applyMention(u)}
+                        >
+                          @{u.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </>
             )}
           </div>
@@ -672,6 +719,7 @@ function ReplyForm({ productId, parentMessageId, onSent, onReplySent, currentUse
             </button>
             <div className="relative">
               <button
+                ref={mentionButtonRef}
                 type="button"
                 onClick={() => setMentionDropdownOpen((v) => !v)}
                 className="flex items-center gap-1 px-2 py-1 text-xs text-[#2563EB] hover:bg-[#EFF6FF] rounded border border-[#E5E7EB]"
@@ -682,27 +730,37 @@ function ReplyForm({ productId, parentMessageId, onSent, onReplySent, currentUse
               {mentionDropdownOpen && mentionQuery === null && (
                 <>
                   <div className="fixed inset-0 z-10" aria-hidden onClick={() => setMentionDropdownOpen(false)} />
-                  <ul className="absolute left-0 top-full mt-1 z-20 min-w-[140px] max-h-40 overflow-auto bg-white border border-[#E5E7EB] rounded shadow py-1">
-                    {mentionableUsers
-                      .filter((u) => !selectedMentionIds.includes(u.id))
-                      .map((u) => (
-                        <li key={u.id}>
-                          <button
-                            type="button"
-                            className="w-full text-left px-2 py-1.5 text-sm hover:bg-[#F3F4F6]"
-                            onClick={() => {
-                              setSelectedMentionIds((prev) => [...prev, u.id]);
-                              setMentionDropdownOpen(false);
-                            }}
-                          >
-                            {u.name}
-                          </button>
-                        </li>
-                      ))}
-                    {mentionableUsers.filter((u) => !selectedMentionIds.includes(u.id)).length === 0 && (
-                      <li className="px-2 py-1.5 text-xs text-[#6B7280]">{t('productCollab.noUsersToAdd')}</li>
-                    )}
-                  </ul>
+                  {addMentionDropdownPos && (
+                    <ul
+                      className="z-20 min-w-[140px] overflow-auto bg-white border border-[#E5E7EB] rounded shadow py-1"
+                      style={{
+                        position: 'fixed',
+                        top: addMentionDropdownPos.top,
+                        left: addMentionDropdownPos.left,
+                        maxHeight: DROPDOWN_MAX_H,
+                      }}
+                    >
+                      {mentionableUsers
+                        .filter((u) => !selectedMentionIds.includes(u.id))
+                        .map((u) => (
+                          <li key={u.id}>
+                            <button
+                              type="button"
+                              className="w-full text-left px-2 py-1.5 text-sm hover:bg-[#F3F4F6]"
+                              onClick={() => {
+                                setSelectedMentionIds((prev) => [...prev, u.id]);
+                                setMentionDropdownOpen(false);
+                              }}
+                            >
+                              {u.name}
+                            </button>
+                          </li>
+                        ))}
+                      {mentionableUsers.filter((u) => !selectedMentionIds.includes(u.id)).length === 0 && (
+                        <li className="px-2 py-1.5 text-xs text-[#6B7280]">{t('productCollab.noUsersToAdd')}</li>
+                      )}
+                    </ul>
+                  )}
                 </>
               )}
             </div>
