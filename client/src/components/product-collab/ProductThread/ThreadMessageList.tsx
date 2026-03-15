@@ -449,7 +449,7 @@ function ReplyForm({ productId, parentMessageId, onSent, onReplySent, currentUse
   }, [selectedFiles]);
 
   useLayoutEffect(() => {
-    if (!showAtDropdown || mentionQuery === null) {
+    if (mentionQuery === null || !mentionDropdownOpen) {
       setAtDropdownPos(null);
       return;
     }
@@ -464,7 +464,7 @@ function ReplyForm({ productId, parentMessageId, onSent, onReplySent, currentUse
       top: openUp ? rect.top - DROPDOWN_MAX_H - 4 : rect.bottom + 4,
       openUp,
     });
-  }, [showAtDropdown, mentionQuery]);
+  }, [mentionQuery, mentionDropdownOpen]);
 
   useLayoutEffect(() => {
     if (!mentionDropdownOpen || mentionQuery !== null) {

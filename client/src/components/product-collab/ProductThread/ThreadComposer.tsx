@@ -62,7 +62,7 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
   }, [selectedFiles]);
 
   useLayoutEffect(() => {
-    if (!showAtDropdown || mentionQuery === null) {
+    if (mentionQuery === null || !mentionDropdownOpen) {
       setAtDropdownPos(null);
       return;
     }
@@ -77,7 +77,7 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
       top: openUp ? rect.top - DROPDOWN_MAX_H - 4 : rect.bottom + 4,
       openUp,
     });
-  }, [showAtDropdown, mentionQuery]);
+  }, [mentionQuery, mentionDropdownOpen]);
 
   useLayoutEffect(() => {
     if (!mentionDropdownOpen || mentionQuery !== null) {
