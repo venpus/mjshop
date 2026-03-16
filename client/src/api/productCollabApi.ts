@@ -61,14 +61,61 @@ export interface AiWorkSummaryResult {
   provider?: SummaryProvider;
 }
 
-export async function postAiWorkSummary(lang: 'ko' | 'zh'): Promise<ApiResponse<AiWorkSummaryResult & { generatedAt?: string }>> {
-  const res = await fetch(`${getApiBaseUrl()}/product-collab/ai-work-summary?lang=${lang}`, {
+export interface PostAiWorkSummaryResponse {
+  success: boolean;
+  data?: AiWorkSummaryResult & { generatedAt?: string };
+  error?: string;
+  /** 백그라운드로 요약 생성이 시작됨(즉시 응답) */
+  started?: boolean;
+  /** 이미 요약 생성 중이라 중복 요청 무시됨 */
+  alreadyGenerating?: boolean;
+  /** started/alreadyGenerating 시 서버 메시지(클라이언트는 i18n 사용 권장) */
+  message?: string;
+}
+
+/** 요약하기: 방식 B - 사이트 설정 언어(lang)에 따라 해당 언어로 직접 요약 생성. lang 미전달 시 ko 사용 */
+export async function postAiWorkSummary(lang?: 'ko' | 'zh'): Promise<PostAiWorkSummaryResponse> {
+  const langParam = lang === 'zh' ? 'zh' : 'ko';
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/ai-work-summary?lang=${langParam}`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
   const json = await res.json();
   if (!res.ok) return { success: false, error: json.error || '요약 생성 실패' };
-  return { success: true, data: { ...json.data, generatedAt: json.generatedAt } };
+  if (json.started === true || json.alreadyGenerating === true) {
+    return {
+      success: true,
+      started: json.started === true,
+      alreadyGenerating: json.alreadyGenerating === true,
+      message: json.message,
+    };
+  }
+  return {
+    success: true,
+    data: json.data ? { ...json.data, generatedAt: json.generatedAt } : undefined,
+  };
+}
+
+/** 번역하기: 한국어 요약을 중국어로 번역 */
+export async function postAiWorkSummaryTranslate(): Promise<PostAiWorkSummaryResponse> {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/ai-work-summary/translate?lang=zh`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) return { success: false, error: json.error || '번역 실패' };
+  if (json.started === true || json.alreadyGenerating === true) {
+    return {
+      success: true,
+      started: json.started === true,
+      alreadyGenerating: json.alreadyGenerating === true,
+      message: json.message,
+    };
+  }
+  return {
+    success: true,
+    data: json.data ? { ...json.data, generatedAt: json.generatedAt } : undefined,
+  };
 }
 
 export async function getAiWorkSummaryLast(lang: 'ko' | 'zh'): Promise<
@@ -76,10 +123,33 @@ export async function getAiWorkSummaryLast(lang: 'ko' | 'zh'): Promise<
 > {
   const res = await fetch(`${getApiBaseUrl()}/product-collab/ai-work-summary/last?lang=${lang}`, {
     headers: getAuthHeaders(),
+    cache: 'no-store',
   });
   const json = await res.json();
   if (!res.ok) return { success: false, error: json.error || '마지막 요약 조회 실패' };
   return { success: true, data: { ...json.data, generatedAt: json.generatedAt } };
+}
+
+export type AiWorkSummaryPhase = 'summarizing' | 'translating';
+
+export interface AiWorkSummaryStatusResponse {
+  success: boolean;
+  generating: boolean;
+  phase?: AiWorkSummaryPhase | null;
+  error?: string;
+}
+
+export async function getAiWorkSummaryStatus(lang: 'ko' | 'zh'): Promise<AiWorkSummaryStatusResponse> {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/ai-work-summary/status?lang=${lang}`, {
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) return { success: false, generating: false, error: json.error || '진행 상태 조회 실패' };
+  return {
+    success: true,
+    generating: json.generating === true,
+    phase: json.phase ?? null,
+  };
 }
 
 export async function getDashboard(): Promise<ApiResponse<DashboardData>> {

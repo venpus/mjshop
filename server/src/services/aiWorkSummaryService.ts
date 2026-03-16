@@ -1,5 +1,6 @@
 import { ProductCollabRepository } from '../repositories/productCollabRepository.js';
 import { getDelayInfo } from '../utils/delayRules.js';
+import { setPhase } from '../state/aiWorkSummaryState.js';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
@@ -50,6 +51,21 @@ function isRetryableNetworkError(err: unknown): boolean {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** AI 응답에서 마크다운 코드블록 제거 후 JSON 파싱. 실패 시 null */
+function parseJSONFromRaw(raw: string): Record<string, unknown> | null {
+  let s = raw.trim();
+  const codeBlockMatch = s.match(/^```(?:json)?\s*([\s\S]*?)```\s*$/);
+  if (codeBlockMatch) s = codeBlockMatch[1].trim();
+  const first = s.indexOf('{');
+  const last = s.lastIndexOf('}');
+  if (first !== -1 && last !== -1 && last > first) s = s.slice(first, last + 1);
+  try {
+    return JSON.parse(s) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
 
 export interface ProductSummaryInput {
@@ -122,11 +138,41 @@ const STATUS_ORDER_FOR_SUMMARY = [
   'PRODUCTION_COMPLETE', // 8 생산완료
 ] as const;
 
+/** 방식 B: 출력 언어별 프롬프트 문구. 사이트 설정 언어와 동일한 언어로 결과를 내도록 강하게 명시 */
+const LANG_PROMPT = {
+  ko: {
+    outputLanguageBanner: 'OUTPUT LANGUAGE (REQUIRED): The site language is Korean (한국어). You MUST write ALL summary, delayedNote, and overallSummary text in Korean only. Use formal polite style (경어체): -합니다, -해요, -입니다. Do not use casual endings (-해, -야, -이다).',
+    langInstruction: 'Respond in Korean only (한국어). Use formal polite style (경어체): -합니다, -해요, -입니다, -세요, -십시오. Do not use casual endings (-해, -야, -이다).',
+    summaryStyle: 'Write all summary and delayedNote text in formal polite Korean (경어체). Every user-visible string in the JSON MUST be in Korean.',
+    myTasksStyle: 'Write all summary text in formal polite Korean (경어체). Every user-visible string in the JSON MUST be in Korean.',
+    noThread: '(쓰레드 없음)',
+    statusLangInstruction: 'OUTPUT LANGUAGE (REQUIRED): Korean (한국어). The site language is Korean. You MUST write every status summary in Korean only. Use formal polite style (경어체).',
+    statusFallbackSummary: (n: number) => `해당 상태 제품 ${n}건입니다.`,
+    delayedLabel: '지연',
+    fallbackDelayedNote: (days: number) => `${days}일 지연`,
+  },
+  zh: {
+    outputLanguageBanner: 'OUTPUT LANGUAGE (REQUIRED): The site language is Simplified Chinese (简体中文). You MUST write ALL summary, delayedNote, and overallSummary text in 简体中文 only. If the input is in Korean or another language, translate your summary into Simplified Chinese before outputting. Do NOT output Korean in the result. Use formal polite style (敬语). Every user-visible string in the JSON MUST be in 简体中文.',
+    langInstruction: 'Respond in Simplified Chinese only (简体中文). The site is set to Chinese; output must be in Chinese. Use formal polite style (敬语). Do not use Korean or casual expressions.',
+    summaryStyle: 'Write all summary and delayedNote text in Simplified Chinese (简体中文) only. Translate any content into Chinese so the result matches the site language. Use formal polite style (敬语). Every user-visible string MUST be in 简体中文.',
+    myTasksStyle: 'Write all summary text in Simplified Chinese (简体中文) only. Translate into Chinese so the result matches the site language. Use formal polite style (敬语). Every user-visible string MUST be in 简体中文.',
+    noThread: '(无线程)',
+    statusLangInstruction: 'OUTPUT LANGUAGE (REQUIRED): Simplified Chinese (简体中文). The site language is Chinese. You MUST write every status summary in 简体中文 only. Translate into Chinese if needed. Use formal polite style (敬语). Do not output Korean.',
+    statusFallbackSummary: (n: number) => `该状态产品 ${n} 件。`,
+    delayedLabel: '延迟',
+    fallbackDelayedNote: (days: number) => `${days}天延迟`,
+    /** 시스템 메시지: 모델이 출력 언어를 준수하도록 강제 (Qwen 등 일부 모델 대응) */
+    systemMessageForSummary: 'You are a helpful assistant. CRITICAL RULE: The user interface language is Simplified Chinese (简体中文). You MUST write ALL text in the "summary", "delayedNote", "overallSummary" fields in 简体中文 ONLY. If the input is in Korean, translate it into Chinese. Never output Korean in these fields. Use formal polite style (敬语).',
+    systemMessageForStatus: 'You are a helpful assistant. CRITICAL RULE: The user interface language is Simplified Chinese (简体中文). You MUST write every "summary" in statusSummaries in 简体中文 ONLY. Never output Korean. Use formal polite style (敬语).',
+  },
+} as const;
+
 /**
  * 제품별 요약을 상태로 그룹한 뒤, 각 상태 그룹당 1~2문장 요약 생성
  */
 async function buildStatusCategorySummaries(
-  overallSummary: OverallSummaryProduct[]
+  overallSummary: OverallSummaryProduct[],
+  lang: 'ko' | 'zh'
 ): Promise<StatusCategorySummary[]> {
   const byStatus = new Map<string, OverallSummaryProduct[]>();
   for (const p of overallSummary) {
@@ -139,22 +185,23 @@ async function buildStatusCategorySummaries(
   const statuses = [...orderedStatuses, ...otherStatuses];
   if (statuses.length === 0) return [];
 
-  const langInstruction =
-    'Respond in Korean only (한국어). Use formal polite style (경어체): -합니다, -해요, -입니다. Do not use casual endings.';
+  const { statusLangInstruction, statusFallbackSummary, delayedLabel } = LANG_PROMPT[lang];
   const lines = statuses.map((status) => {
     const products = byStatus.get(status) ?? [];
-    const productLines = products.map((p) => `- ${p.productName}: ${p.summary}${p.delayedNote ? ` (지연: ${p.delayedNote})` : ''}`);
+    const productLines = products.map((p) => `- ${p.productName}: ${p.summary}${p.delayedNote ? ` (${delayedLabel}: ${p.delayedNote})` : ''}`);
     return `[상태: ${status}]\n${productLines.join('\n')}`;
   });
-  const prompt = `You are an assistant that summarizes work by status category.
-${langInstruction}
+  const prompt = `당신은 완구, 봉제 인형, 잡화 분야의 전문 소싱, 제작, 판매 전문 관리자 입니다. You are an assistant that summarizes work by status category.
+${statusLangInstruction}
 Below are products grouped by status. Each group has a status label and the per-product summaries. For each status group, write ONE short summary (1-2 sentences) that captures the overall situation of that group. Output ONLY a valid JSON object with this exact structure (no markdown, no extra text):
 {"statusSummaries":[{"status":"string","summary":"string"}]}
 
 Input (status groups in order):
 ${lines.join('\n\n')}`;
 
-  const res = await callChatForSummary(prompt);
+  console.log('[AI Work Summary] AI 전달 프롬프트 (상태 카테고리 요약, lang=%s):\n%s', lang, prompt);
+  const statusSystemMsg = lang === 'zh' ? LANG_PROMPT.zh.systemMessageForStatus : undefined;
+  const res = await callChatForSummary(prompt, statusSystemMsg);
   const raw = res?.data?.statusSummaries;
   const toProducts = (list: OverallSummaryProduct[]): { productId: number; productName: string }[] =>
     list.map((p) => ({ productId: p.productId, productName: p.productName }));
@@ -164,7 +211,7 @@ ${lines.join('\n\n')}`;
       const list = byStatus.get(status) ?? [];
       return {
         status,
-        summary: `해당 상태 제품 ${list.length}건입니다.`,
+        summary: statusFallbackSummary(list.length),
         productCount: list.length,
         products: toProducts(list),
       };
@@ -180,7 +227,7 @@ ${lines.join('\n\n')}`;
     const list = byStatus.get(status) ?? [];
     return {
       status,
-      summary: byStatusResult.get(status)?.summary ?? `해당 상태 제품 ${list.length}건입니다.`,
+      summary: byStatusResult.get(status)?.summary ?? statusFallbackSummary(list.length),
       productCount: list.length,
       products: toProducts(list),
     };
@@ -195,6 +242,7 @@ function snippet(s: string | null): string {
 
 export async function getAiWorkSummary(userId: string, lang: 'ko' | 'zh'): Promise<AiWorkSummaryResult | null> {
   console.log('[AI Work Summary] getAiWorkSummary 시작 lang=%s', lang);
+  setPhase(userId, lang, 'summarizing');
   if (!OPENAI_API_KEY && !DASHSCOPE_API_KEY) {
     console.warn('[AI Work Summary] OPENAI_API_KEY와 DASHSCOPE_API_KEY 중 하나 이상 필요합니다.');
     return null;
@@ -317,15 +365,14 @@ export async function getAiWorkSummary(userId: string, lang: 'ko' | 'zh'): Promi
     if (!threadByProduct.has(row.product_id)) threadByProduct.set(row.product_id, []);
     threadByProduct.get(row.product_id)!.push(row);
   }
-  // lang=zh일 때는 모델이 한국어로 잘 나오므로, 한국어로 요약한 뒤 번역 단계로 중국어 변환
-  const promptLang: 'ko' | 'zh' = lang === 'zh' ? 'ko' : lang;
+  // 방식 B: 요청 lang에 따라 프롬프트 출력 언어 지정 (한 번에 해당 언어로 요약, 별도 번역 없음)
+  const promptLang: 'ko' | 'zh' = lang;
+  const { outputLanguageBanner, langInstruction, summaryStyle, myTasksStyle, noThread, fallbackDelayedNote } = LANG_PROMPT[lang];
   const threadTextByProductId = new Map<number, string>();
   for (const [pid, msgs] of threadByProduct) {
     threadTextByProductId.set(pid, formatThreadMessages(msgs, promptLang));
   }
 
-  const langInstruction = 'Respond in Korean only (한국어). Use formal polite style (경어체): -합니다, -해요, -입니다, -세요, -십시오. Do not use casual endings (-해, -야, -이다).';
-  const noThread = '(쓰레드 없음)';
   const overallText = overallProducts
     .map((p) => {
       const header = `[제품 ${p.productName} (id:${p.productId})] 상태:${p.status} ${p.isDelayed ? `지연(${p.daysOverdue ?? 0}일 초과)` : ''}`;
@@ -342,9 +389,10 @@ export async function getAiWorkSummary(userId: string, lang: 'ko' | 'zh'): Promi
     })
     .join('\n\n');
 
-  const overallPrompt = `You are an assistant that summarizes work by product.
+  const overallPrompt = `당신은 완구, 봉제 인형, 잡화 분야의 전문 소싱, 제작, 판매 전문 관리자 입니다. You are an assistant that summarizes work by product.
+${outputLanguageBanner}
 ${langInstruction}
-Write all summary and delayedNote text in formal polite Korean (경어체).
+${summaryStyle}
 Below is the full thread (all messages and replies in chronological order) for each product. For each product, write a short summary (1-2 sentences) based on the entire conversation. If the product is marked as 지연 (delayed), add a separate "delayedNote" that emphasizes the delay.
 Output ONLY a valid JSON object with this exact structure (no markdown, no extra text):
 {"products":[{"productId":number,"productName":"string","summary":"string","delayedNote":"string or omit if not delayed"}]}
@@ -352,9 +400,10 @@ Output ONLY a valid JSON object with this exact structure (no markdown, no extra
 Input:
 ${overallText}`;
 
-  const myTasksPrompt = `You are an assistant that summarizes my assigned tasks in priority order: 1) issue (문제 제품), 2) delayed (지연), 3) normal.
+  const myTasksPrompt = `당신은 완구, 봉제 인형, 잡화 분야의 전문 소싱, 제작, 판매 전문 관리자 입니다. You are an assistant that summarizes my assigned tasks in priority order: 1) issue (문제 제품), 2) delayed (지연), 3) normal.
+${outputLanguageBanner}
 ${langInstruction}
-Write all summary text in formal polite Korean (경어체).
+${myTasksStyle}
 Below is the full thread (all messages and replies in chronological order) for each product in my task list.
 1) For each product, write a short summary (1-2 sentences) in "items".
 2) Also write ONE "overallSummary" sentence (1-2 sentences) that summarizes ALL my tasks above. In this sentence, emphasize delayed and issue items FIRST and clearly (e.g. "지연·문제 업무를 우선 ...").
@@ -374,8 +423,10 @@ ${myTasksText}`;
 
     let summaryProvider: SummaryProvider | undefined;
     if (overallProducts.length > 0) {
-      console.log('[AI Work Summary] 전체 요약 API 호출 (lang=%s, 한국어 요약 후 zh면 번역)', lang);
-      const overallRes = await callChatForSummary(overallPrompt);
+      console.log('[AI Work Summary] 전체 요약 API 호출 (lang=%s, 방식 B: 해당 언어로 직접 출력)', lang);
+      console.log('[AI Work Summary] AI 전달 프롬프트 (전체 제품 요약):\n%s', overallPrompt);
+      const overallSystemMsg = lang === 'zh' ? LANG_PROMPT.zh.systemMessageForSummary : undefined;
+      const overallRes = await callChatForSummary(overallPrompt, overallSystemMsg);
       if (overallRes?.data && typeof overallRes.data === 'object') {
         summaryProvider = overallRes.provider;
         const products = overallRes.data.products as OverallSummaryProduct[] | undefined;
@@ -392,7 +443,7 @@ ${myTasksText}`;
           productId: p.productId,
           productName: p.productName,
           summary: '-',
-          delayedNote: p.isDelayed ? (lang === 'zh' ? `已延迟 ${p.daysOverdue ?? 0} 天` : `${p.daysOverdue ?? 0}일 지연`) : undefined,
+          delayedNote: p.isDelayed ? fallbackDelayedNote(p.daysOverdue ?? 0) : undefined,
         }));
       }
       const priorityOf = (p: ProductSummaryInput): 'issue' | 'delayed' | 'normal' =>
@@ -417,12 +468,14 @@ ${myTasksText}`;
       });
 
       // 상태 카테고리별 요약 생성 (제품별 요약을 상태로 묶어 그룹당 1문단)
-      statusCategorySummaries = await buildStatusCategorySummaries(overallSummary);
+      statusCategorySummaries = await buildStatusCategorySummaries(overallSummary, lang);
     }
 
     if (myTaskProducts.length > 0) {
       console.log('[AI Work Summary] 내 업무 요약 API 호출 (lang=%s)', lang);
-      const myRes = await callChatForSummary(myTasksPrompt);
+      console.log('[AI Work Summary] AI 전달 프롬프트 (내 업무 요약):\n%s', myTasksPrompt);
+      const myTasksSystemMsg = lang === 'zh' ? LANG_PROMPT.zh.systemMessageForSummary : undefined;
+      const myRes = await callChatForSummary(myTasksPrompt, myTasksSystemMsg);
       if (myRes?.data && typeof myRes.data === 'object') {
         if (summaryProvider === undefined) summaryProvider = myRes.provider;
         const items = myRes.data.items as MyTaskSummaryItem[] | undefined;
@@ -447,27 +500,6 @@ ${myTasksText}`;
         typeof rawOverall === 'string' && rawOverall.trim() ? rawOverall.trim() : undefined;
     }
 
-    if (lang === 'zh' && (overallSummary.length > 0 || myTasksSummary.length > 0 || statusCategorySummaries.length > 0)) {
-      console.log('[AI Work Summary] lang=zh: 한국어 요약을 중국어로 번역 단계 시작');
-      const toTranslate: AiWorkSummaryResult = {
-        overallSummary,
-        myTasksSummary,
-        ...(myTasksOverallSummary != null && myTasksOverallSummary !== '' && { myTasksOverallSummary }),
-        ...(statusCategorySummaries.length > 0 && { statusCategorySummaries }),
-      };
-      const translated = await translateSummaryToChinese(toTranslate);
-      if (translated) {
-        overallSummary = translated.overallSummary;
-        myTasksSummary = translated.myTasksSummary;
-        if (translated.myTasksOverallSummary != null) myTasksOverallSummary = translated.myTasksOverallSummary;
-        if (Array.isArray(translated.statusCategorySummaries) && translated.statusCategorySummaries.length > 0) {
-          statusCategorySummaries = translated.statusCategorySummaries;
-        }
-        console.log('[AI Work Summary] 번역 완료');
-      } else {
-        console.warn('[AI Work Summary] 번역 실패, 한국어 결과 반환');
-      }
-    }
     console.log('[AI Work Summary] 반환: overallSummary %d건, myTasksSummary %d건, provider=%s', overallSummary.length, myTasksSummary.length, summaryProvider ?? '');
     if (overallSummary.length > 0 && overallSummary[0]) {
       console.log('[AI Work Summary] 최종 전체 요약 첫 건 summary=%s', overallSummary[0].summary ?? '');
@@ -475,38 +507,81 @@ ${myTasksText}`;
     if (myTasksSummary.length > 0 && myTasksSummary[0]) {
       console.log('[AI Work Summary] 최종 내 업무 요약 첫 건 summary=%s', myTasksSummary[0].summary ?? '');
     }
-    return {
+
+    const result: AiWorkSummaryResult = {
       overallSummary,
       myTasksSummary,
       ...(myTasksOverallSummary != null && myTasksOverallSummary !== '' && { myTasksOverallSummary }),
       ...(statusCategorySummaries.length > 0 && { statusCategorySummaries }),
       provider: summaryProvider,
     };
+
+    // lang=zh 요청인데 AI가 한국어로 응답한 경우: 기존 번역 API로 중국어 변환 후 반환 (Qwen 등 대응)
+    if (lang === 'zh' && resultContainsKorean(result)) {
+      console.log('[AI Work Summary] 응답에 한글 포함됨 → 중국어로 번역 후 반환');
+      const translated = await translateSummaryToChinese(result);
+      if (translated) {
+        console.log('[AI Work Summary] 번역 완료, 중국어 결과 반환');
+        return translated;
+      }
+      console.warn('[AI Work Summary] 번역 실패, 한글 포함 결과 그대로 반환');
+    }
+
+    return result;
   } catch (err) {
     console.error('[AI Work Summary] Qwen error:', err);
     return null;
   }
 }
 
+/** 결과물에 한글이 포함되어 있는지 검사 (가-힣) */
+function resultContainsKorean(result: AiWorkSummaryResult): boolean {
+  const koreanRegex = /[가-힣]/;
+  for (const p of result.overallSummary) {
+    if (koreanRegex.test(p.summary ?? '') || koreanRegex.test(p.delayedNote ?? '')) return true;
+  }
+  for (const p of result.myTasksSummary) {
+    if (koreanRegex.test(p.summary ?? '')) return true;
+  }
+  if (result.myTasksOverallSummary && koreanRegex.test(result.myTasksOverallSummary)) return true;
+  for (const s of result.statusCategorySummaries ?? []) {
+    if (koreanRegex.test(s.summary ?? '')) return true;
+  }
+  return false;
+}
+
 /** lang=zh일 때: 한국어 요약 결과의 summary, delayedNote, myTasksOverallSummary, statusCategorySummaries[].summary 만 중국어로 번역 */
 async function translateSummaryToChinese(result: AiWorkSummaryResult): Promise<AiWorkSummaryResult | null> {
   const payload = JSON.stringify(result);
-  const prompt = `Translate the following JSON to Simplified Chinese (简体中文). Translate ONLY these string values: "summary", "delayedNote", "myTasksOverallSummary", and inside "statusCategorySummaries" the "summary" of each item. Use Chinese polite/formal style (敬语): use 您 where appropriate, 请、可以、能否、敬请; keep tone professional and respectful. Do not change productId, productName, priority, status, productCount, or any other field. Keep the exact same JSON structure. Output valid JSON only, no markdown or explanation.
+  const prompt = `The input below is a JSON object with text in **Korean (한국어)**. Your task is to translate ONLY the following fields **from Korean into Simplified Chinese (简体中文)**: "summary", "delayedNote", "myTasksOverallSummary", and each "summary" inside "statusCategorySummaries". All other fields (productId, productName, priority, status, productCount, etc.) must remain unchanged. Write the translated text in Chinese only; do not keep Korean in the output. Use Chinese polite/formal style (敬语). Keep the exact same JSON structure: same top-level keys (overallSummary, myTasksSummary, myTasksOverallSummary, statusCategorySummaries), same array lengths and order. Output valid JSON only, no markdown or explanation.
 
-Input:
+Input (Korean):
 ${payload}`;
   const systemMsg =
-    'You are a translator. Output only valid JSON. Translate summary, delayedNote, myTasksOverallSummary, and statusCategorySummaries[].summary to Simplified Chinese. Use formal polite style (敬语). Keep all other fields unchanged.';
-  const res = await callChatForSummary(prompt, systemMsg);
+    '당신은 완구, 봉제 인형, 잡화 분야의 전문 소싱, 제작, 판매 전문 관리자 입니다. You are a translator. The input is in Korean. Output the same JSON with summary, delayedNote, myTasksOverallSummary, and statusCategorySummaries[].summary translated into Simplified Chinese (简体中文) only. Use formal polite style (敬语). Do not output Korean; the translated fields must be in Chinese. Keep all other fields unchanged. Preserve exact structure: same keys and array lengths. Output only valid JSON.';
+  console.log('[AI Work Summary] AI 전달 프롬프트 (한→중 번역, user):\n%s', prompt);
+  console.log('[AI Work Summary] AI 전달 프롬프트 (한→중 번역, system):\n%s', systemMsg);
+  const res = await callChatForSummary(prompt, systemMsg, 4096);
   const data = res?.data;
-  if (!data || !Array.isArray(data.overallSummary) || !Array.isArray(data.myTasksSummary)) {
+  if (!data || typeof data !== 'object') {
+    console.warn('[AI Work Summary] 번역 실패: API 응답 없음 또는 비객체');
+    return null;
+  }
+  if (!Array.isArray(data.overallSummary) || !Array.isArray(data.myTasksSummary)) {
+    console.warn('[AI Work Summary] 번역 실패: 응답 구조 이상 (overallSummary/myTasksSummary 배열 아님)');
+    return null;
+  }
+  const arrOverall = data.overallSummary as OverallSummaryProduct[];
+  const arrMyTasks = data.myTasksSummary as MyTaskSummaryItem[];
+  if (arrOverall.length !== result.overallSummary.length || arrMyTasks.length !== result.myTasksSummary.length) {
+    console.warn('[AI Work Summary] 번역 실패: 배열 길이 불일치');
     return null;
   }
   const translated: AiWorkSummaryResult = {
-    overallSummary: data.overallSummary as OverallSummaryProduct[],
-    myTasksSummary: data.myTasksSummary as MyTaskSummaryItem[],
+    overallSummary: arrOverall,
+    myTasksSummary: arrMyTasks,
     myTasksOverallSummary:
-      typeof data.myTasksOverallSummary === 'string' ? data.myTasksOverallSummary : result.myTasksOverallSummary,
+      typeof data.myTasksOverallSummary === 'string' ? data.myTasksOverallSummary : (result.myTasksOverallSummary ?? undefined),
   };
   for (let i = 0; i < result.overallSummary.length && i < translated.overallSummary.length; i++) {
     translated.overallSummary[i].status = result.overallSummary[i].status;
@@ -522,24 +597,46 @@ ${payload}`;
         products: result.statusCategorySummaries![i].products,
       }));
     } else {
-      translated.statusCategorySummaries = result.statusCategorySummaries;
+      console.warn('[AI Work Summary] 번역 실패: statusCategorySummaries 구조/길이 불일치');
+      return null;
     }
   }
   return translated;
 }
 
+/** 한국어 요약 캐시를 읽어 중국어로 번역한 결과 반환. 캐시 없거나 번역 실패 시 null */
+export async function translateAiWorkSummaryFromCache(userId: string): Promise<AiWorkSummaryResult | null> {
+  const { getAiWorkSummaryCache } = await import('../repositories/aiWorkSummaryCacheRepository.js');
+  const cached = await getAiWorkSummaryCache(userId, 'ko');
+  if (!cached?.result) {
+    console.warn('[AI Work Summary] 번역 불가: 한국어 요약 캐시 없음 userId=%s', userId);
+    return null;
+  }
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const translated = await translateSummaryToChinese(cached.result);
+    if (translated) return translated;
+    if (attempt < maxAttempts) {
+      console.warn('[AI Work Summary] 번역 실패, 재시도 %d/%d', attempt, maxAttempts);
+      await delay(1500);
+    }
+  }
+  console.warn('[AI Work Summary] 번역 실패(%d회 시도)', maxAttempts);
+  return null;
+}
+
 type CallChatResult = { data: Record<string, unknown>; provider: SummaryProvider };
 
-/** OpenAI 1순위, 실패 시 Qwen 2순위. 사용된 AI(provider) 함께 반환 */
-async function callChatForSummary(userPrompt: string, systemMessage?: string): Promise<CallChatResult | null> {
-  let result = await callOpenAI(userPrompt, systemMessage);
+/** OpenAI 1순위, 실패 시 Qwen 2순위. 사용된 AI(provider) 함께 반환. maxTokens 기본 2048, 번역 시 4096 권장 */
+async function callChatForSummary(userPrompt: string, systemMessage?: string, maxTokens = 2048): Promise<CallChatResult | null> {
+  let result = await callOpenAI(userPrompt, systemMessage, maxTokens);
   if (result != null) return { data: result, provider: 'openai' };
-  result = await callQwen(userPrompt, systemMessage);
+  result = await callQwen(userPrompt, systemMessage, maxTokens);
   if (result != null) return { data: result, provider: 'qwen' };
   return null;
 }
 
-async function callOpenAI(userPrompt: string, systemMessage?: string): Promise<Record<string, unknown> | null> {
+async function callOpenAI(userPrompt: string, systemMessage?: string, maxTokens = 2048): Promise<Record<string, unknown> | null> {
   if (!OPENAI_API_KEY) return null;
   const url = `${OPENAI_BASE_URL.replace(/\/$/, '')}/chat/completions`;
   const messages: Array<{ role: 'user' | 'system'; content: string }> = systemMessage
@@ -548,7 +645,7 @@ async function callOpenAI(userPrompt: string, systemMessage?: string): Promise<R
   const payload = {
     model: OPENAI_SUMMARY_MODEL,
     messages,
-    max_tokens: 2048,
+    max_tokens: maxTokens,
     temperature: 0.3,
     response_format: { type: 'json_object' as const },
   };
@@ -574,12 +671,10 @@ async function callOpenAI(userPrompt: string, systemMessage?: string): Promise<R
     const raw = data.choices?.[0]?.message?.content?.trim();
     if (!raw) return null;
     console.log('[AI Work Summary] OpenAI 원문 응답 길이=%d, 앞 400자=%s', raw.length, raw.slice(0, 400));
-    try {
-      return JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      console.warn('[AI Work Summary] Invalid JSON from OpenAI:', raw.slice(0, 200));
-      return null;
-    }
+    const parsed = parseJSONFromRaw(raw);
+    if (parsed) return parsed;
+    console.warn('[AI Work Summary] Invalid JSON from OpenAI:', raw.slice(0, 200));
+    return null;
   } catch (err) {
     clearTimeout(timeoutId);
     console.warn('[AI Work Summary] OpenAI request failed, will try Qwen:', err instanceof Error ? err.message : err);
@@ -587,7 +682,7 @@ async function callOpenAI(userPrompt: string, systemMessage?: string): Promise<R
   }
 }
 
-async function callQwen(userPrompt: string, systemMessage?: string): Promise<Record<string, unknown> | null> {
+async function callQwen(userPrompt: string, systemMessage?: string, maxTokens = 2048): Promise<Record<string, unknown> | null> {
   if (!DASHSCOPE_API_KEY) return null;
   const url = `${QWEN_BASE_URL.replace(/\/$/, '')}/chat/completions`;
   const messages: Array<{ role: 'user' | 'system'; content: string }> = systemMessage
@@ -596,7 +691,7 @@ async function callQwen(userPrompt: string, systemMessage?: string): Promise<Rec
   const payload = {
     model: SUMMARY_MODEL,
     messages,
-    max_tokens: 2048,
+    max_tokens: maxTokens,
     temperature: 0.3,
     response_format: { type: 'json_object' as const },
   };
@@ -628,13 +723,10 @@ async function callQwen(userPrompt: string, systemMessage?: string): Promise<Rec
         return null;
       }
       console.log('[AI Work Summary] Qwen 원문 응답 길이=%d, 앞 400자=%s', raw.length, raw.slice(0, 400));
-      try {
-        const parsed = JSON.parse(raw) as Record<string, unknown>;
-        return parsed;
-      } catch {
-        console.error('[AI Work Summary] Invalid JSON from Qwen:', raw.slice(0, 200));
-        return null;
-      }
+      const parsed = parseJSONFromRaw(raw);
+      if (parsed) return parsed;
+      console.error('[AI Work Summary] Invalid JSON from Qwen:', raw.slice(0, 200));
+      return null;
     } catch (err) {
       clearTimeout(timeoutId);
       lastErr = err;

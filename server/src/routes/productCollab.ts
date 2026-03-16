@@ -9,7 +9,9 @@ const controller = new ProductCollabController();
 router.use(authenticateUser);
 
 router.post('/ai-work-summary', controller.postAiWorkSummary);
+router.post('/ai-work-summary/translate', controller.postAiWorkSummaryTranslate);
 router.get('/ai-work-summary/last', controller.getAiWorkSummaryLast);
+router.get('/ai-work-summary/status', controller.getAiWorkSummaryStatus);
 router.get('/dashboard/section/:section', controller.getDashboardSection);
 router.get('/dashboard', controller.getDashboard);
 router.get('/mentionable-users', controller.getMentionableUsers);

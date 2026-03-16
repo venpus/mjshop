@@ -9,6 +9,7 @@ import type {
   CreateMessageDTO,
 } from '../models/productCollab.js';
 import { getProductCollabImageUrl, getProductCollabFilePathFromUrl } from '../utils/upload.js';
+import { setGenerating, getGenerating, getStatus, setPhase } from '../state/aiWorkSummaryState.js';
 
 export class ProductCollabController {
   private service: ProductCollabService;
@@ -291,6 +292,7 @@ export class ProductCollabController {
     }
   };
 
+  /** 요약하기: 방식 B - 요청 lang(ko/zh)에 따라 해당 언어로 직접 요약 생성 후 캐시 */
   postAiWorkSummary = async (req: Request, res: Response) => {
     try {
       const userId = (req as unknown as { user?: { id: string } }).user?.id ?? '';
@@ -299,19 +301,101 @@ export class ProductCollabController {
       }
       const lang = (req.query.lang ?? req.body?.lang ?? 'ko') as string;
       const language = lang === 'zh' ? 'zh' : 'ko';
-      console.log('[AI Work Summary] POST lang=%s -> language=%s', lang, language);
-      const { getAiWorkSummary } = await import('../services/aiWorkSummaryService.js');
-      const result = await getAiWorkSummary(userId, language);
-      if (!result) {
-        return res.status(503).json({ success: false, error: 'AI 요약을 생성할 수 없습니다. OPENAI_API_KEY 또는 DASHSCOPE_API_KEY를 확인하세요.' });
+      console.log('[AI Work Summary] 요약하기 요청 수신 userId=%s 요청 lang=%s → language=%s', userId, lang, language);
+      if (getGenerating(userId, language)) {
+        return res.status(200).json({
+          success: true,
+          started: false,
+          alreadyGenerating: true,
+          message: '이미 요약 생성 중입니다. 완료 후 새로고침하거나 다시 들어오면 반영됩니다.',
+        });
       }
-      const { insertAiWorkSummaryCache } = await import('../repositories/aiWorkSummaryCacheRepository.js');
-      const generatedAt = new Date().toISOString();
-      await insertAiWorkSummaryCache(userId, language, result);
-      res.json({ success: true, data: result, generatedAt });
+      setGenerating(userId, language, true);
+      try {
+        res.status(200).json({
+          success: true,
+          started: true,
+          message: '요약 생성이 시작되었습니다. 완료 후 새로고침하거나 다시 들어오면 반영됩니다.',
+        });
+        ;(async () => {
+          try {
+            const { getAiWorkSummary } = await import('../services/aiWorkSummaryService.js');
+            const result = await getAiWorkSummary(userId, language);
+            if (result) {
+              const { insertAiWorkSummaryCache } = await import('../repositories/aiWorkSummaryCacheRepository.js');
+              await insertAiWorkSummaryCache(userId, language, result);
+              console.log('[AI Work Summary] 백그라운드 요약 완료 userId=%s lang=%s', userId, language);
+            } else {
+              console.warn('[AI Work Summary] 백그라운드 요약 실패(결과 없음) userId=%s', userId);
+            }
+          } catch (err) {
+            console.error('[AI Work Summary] 백그라운드 요약 오류:', err);
+          } finally {
+            setGenerating(userId, language, false);
+          }
+        })();
+      } catch (sendErr) {
+        setGenerating(userId, language, false);
+        throw sendErr;
+      }
     } catch (error: unknown) {
       console.error('Product collab AI work summary error:', error);
       res.status(500).json({ success: false, error: '업무 요약 중 오류가 발생했습니다.' });
+    }
+  };
+
+  /** 번역하기: 한국어 요약 캐시를 읽어 중국어로 번역 후 lang=zh 로 캐시 */
+  postAiWorkSummaryTranslate = async (req: Request, res: Response) => {
+    try {
+      const userId = (req as unknown as { user?: { id: string } }).user?.id ?? '';
+      if (!userId) {
+        return res.status(401).json({ success: false, error: '로그인이 필요합니다.' });
+      }
+      const lang = (req.query.lang ?? req.body?.lang ?? 'zh') as string;
+      const language = lang === 'zh' ? 'zh' : 'ko';
+      if (language !== 'zh') {
+        return res.status(400).json({ success: false, error: '번역은 중국어(zh)만 지원합니다.' });
+      }
+      if (getGenerating(userId, language)) {
+        return res.status(200).json({
+          success: true,
+          started: false,
+          alreadyGenerating: true,
+          message: '이미 번역 중입니다. 완료 후 새로고침하거나 다시 들어오면 반영됩니다.',
+        });
+      }
+      setGenerating(userId, language, true);
+      setPhase(userId, language, 'translating');
+      try {
+        res.status(200).json({
+          success: true,
+          started: true,
+          message: '번역이 시작되었습니다. 완료 후 새로고침하거나 다시 들어오면 반영됩니다.',
+        });
+        ;(async () => {
+          try {
+            const { translateAiWorkSummaryFromCache } = await import('../services/aiWorkSummaryService.js');
+            const result = await translateAiWorkSummaryFromCache(userId);
+            if (result) {
+              const { insertAiWorkSummaryCache } = await import('../repositories/aiWorkSummaryCacheRepository.js');
+              await insertAiWorkSummaryCache(userId, 'zh', result);
+              console.log('[AI Work Summary] 백그라운드 번역 완료 userId=%s lang=zh', userId);
+            } else {
+              console.warn('[AI Work Summary] 백그라운드 번역 실패 userId=%s (한국어 캐시 없음 또는 번역 API 실패)', userId);
+            }
+          } catch (err) {
+            console.error('[AI Work Summary] 백그라운드 번역 오류:', err);
+          } finally {
+            setGenerating(userId, language, false);
+          }
+        })();
+      } catch (sendErr) {
+        setGenerating(userId, language, false);
+        throw sendErr;
+      }
+    } catch (error: unknown) {
+      console.error('Product collab AI work summary translate error:', error);
+      res.status(500).json({ success: false, error: '번역 중 오류가 발생했습니다.' });
     }
   };
 
@@ -328,10 +412,27 @@ export class ProductCollabController {
       if (!cached) {
         return res.status(404).json({ success: false, error: '저장된 요약이 없습니다.' });
       }
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
       res.json({ success: true, data: cached.result, generatedAt: cached.generatedAt });
     } catch (error: unknown) {
       console.error('Product collab AI work summary last error:', error);
       res.status(500).json({ success: false, error: '마지막 요약 조회 중 오류가 발생했습니다.' });
+    }
+  };
+
+  getAiWorkSummaryStatus = async (req: Request, res: Response) => {
+    try {
+      const userId = (req as unknown as { user?: { id: string } }).user?.id ?? '';
+      if (!userId) {
+        return res.status(401).json({ success: false, error: '로그인이 필요합니다.' });
+      }
+      const lang = (req.query.lang ?? 'ko') as string;
+      const language = lang === 'zh' ? 'zh' : 'ko';
+      const status = getStatus(userId, language);
+      res.json({ success: true, generating: status.generating, phase: status.phase });
+    } catch (error: unknown) {
+      console.error('Product collab AI work summary status error:', error);
+      res.status(500).json({ success: false, error: '진행 상태 조회 중 오류가 발생했습니다.' });
     }
   };
 
