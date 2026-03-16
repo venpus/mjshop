@@ -378,14 +378,10 @@ export class ProductCollabController {
 
   getMentionableUsers = async (req: Request, res: Response) => {
     try {
-      const currentUserId = (req as unknown as { user?: { id: string } }).user?.id;
       const accounts = await this.adminAccountService.getAllAccounts();
-      let list = accounts
+      const list = accounts
         .filter((a) => a.is_active)
         .map((a) => ({ id: a.id, name: a.name }));
-      if (currentUserId) {
-        list = list.filter((a) => a.id !== currentUserId);
-      }
       res.json({ success: true, data: list });
     } catch (error: unknown) {
       console.error('Product collab mentionable users error:', error);

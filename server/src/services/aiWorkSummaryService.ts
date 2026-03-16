@@ -447,12 +447,22 @@ ${myTasksText}`;
         typeof rawOverall === 'string' && rawOverall.trim() ? rawOverall.trim() : undefined;
     }
 
-    if (lang === 'zh' && (overallSummary.length > 0 || myTasksSummary.length > 0)) {
+    if (lang === 'zh' && (overallSummary.length > 0 || myTasksSummary.length > 0 || statusCategorySummaries.length > 0)) {
       console.log('[AI Work Summary] lang=zh: 한국어 요약을 중국어로 번역 단계 시작');
-      const translated = await translateSummaryToChinese({ overallSummary, myTasksSummary });
+      const toTranslate: AiWorkSummaryResult = {
+        overallSummary,
+        myTasksSummary,
+        ...(myTasksOverallSummary != null && myTasksOverallSummary !== '' && { myTasksOverallSummary }),
+        ...(statusCategorySummaries.length > 0 && { statusCategorySummaries }),
+      };
+      const translated = await translateSummaryToChinese(toTranslate);
       if (translated) {
         overallSummary = translated.overallSummary;
         myTasksSummary = translated.myTasksSummary;
+        if (translated.myTasksOverallSummary != null) myTasksOverallSummary = translated.myTasksOverallSummary;
+        if (Array.isArray(translated.statusCategorySummaries) && translated.statusCategorySummaries.length > 0) {
+          statusCategorySummaries = translated.statusCategorySummaries;
+        }
         console.log('[AI Work Summary] 번역 완료');
       } else {
         console.warn('[AI Work Summary] 번역 실패, 한국어 결과 반환');
