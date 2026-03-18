@@ -1362,3 +1362,39 @@ export async function deleteNormalInvoiceEntryFiles(entryId: number): Promise<vo
     await fs.promises.rm(entryDir, { recursive: true }).catch(() => {});
   }
 }
+
+/** 별도처리 금액 첨부파일 */
+const paymentMiscRoot = path.join(__dirname, '../../uploads/payment-misc');
+const paymentMiscAllowed = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip',
+  'application/x-zip-compressed',
+]);
+
+export const paymentMiscUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, _file, cb) => {
+      const id = (req.params as { id?: string }).id || '0';
+      const dir = path.join(paymentMiscRoot, String(id));
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || '';
+      cb(null, `${randomUUID()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (paymentMiscAllowed.has(file.mimetype)) cb(null, true);
+    else cb(new Error('허용되지 않는 파일 형식입니다. (PDF, 이미지, Word, Excel, ZIP)'));
+  },
+});

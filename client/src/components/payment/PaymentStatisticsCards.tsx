@@ -3,42 +3,51 @@ import {
   getPaymentHistory,
   PaymentHistoryItem,
 } from '../../api/paymentHistoryApi';
-import { getAllPaymentRequests, PaymentRequest } from '../../api/paymentRequestApi';
+import { getAllPaymentRequests } from '../../api/paymentRequestApi';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { AdminCostStatCard } from './AdminCostStatCard';
+import {
+  aggregateAdminCostByPaymentBucket,
+  collectAdminCostConfirmedItems,
+  emptyAdminCostDetail,
+  type AdminCostDetail,
+  type AdminCostConfirmedRow,
+} from '../../utils/adminCostStatistics';
+import { AdminCostConfirmedModal } from './AdminCostConfirmedModal';
+import { FactoryCostRequestCard } from './FactoryCostRequestCard';
 
 interface PaymentDetail {
-  advance: number; // 선금
-  balance: number; // 잔금
-  shipping: number; // 배송비
-}
-
-interface AdminCostDetail {
-  backMargin: number; // 발주 주가비
-  adminCostItems: number; // A레벨 관리자 입력 비용
-  shippingDifference: number; // 배송비 추가비
+  advance: number;
+  balance: number;
+  shipping: number;
 }
 
 interface PaymentStatistics {
-  paidAmount: number; // 지급된 금액 총계
-  pendingAmount: number; // 지급 예정 총계
-  requestedAmount: number; // 금일까지 지급요청 총계
-  paidDetail: PaymentDetail; // 지급된 금액 상세
-  pendingDetail: PaymentDetail; // 지급 예정 금액 상세
-  requestedDetail: PaymentDetail; // 지급요청 금액 상세
-  adminCostTotal: number; // A레벨 관리자 추가 비용 총계
-  adminCostDetail: AdminCostDetail; // A레벨 관리자 추가 비용 상세
-  adminCostPending: number; // A레벨 관리자 지급예정 비용
-  adminCostPendingDetail: AdminCostDetail; // A레벨 관리자 지급예정 비용 상세
-  adminCostPaid: number; // A레벨 관리자 지급완료 비용
-  adminCostPaidDetail: AdminCostDetail; // A레벨 관리자 지급완료 비용 상세
+  paidAmount: number;
+  pendingAmount: number;
+  requestedAmount: number;
+  paidDetail: PaymentDetail;
+  pendingDetail: PaymentDetail;
+  requestedDetail: PaymentDetail;
+  adminCostTotal: number;
+  adminCostDetail: AdminCostDetail;
+  adminCostPending: number;
+  adminCostPendingDetail: AdminCostDetail;
+  adminCostConfirmed: number;
+  adminCostConfirmedDetail: AdminCostDetail;
+  adminCostPaid: number;
+  adminCostPaidDetail: AdminCostDetail;
 }
 
 interface PaymentStatisticsCardsProps {
-  refreshTrigger?: number; // 새로고침 트리거
+  refreshTrigger?: number;
   userLevel?: 'A-SuperAdmin' | 'S: Admin' | 'B0: 중국Admin' | 'C0: 한국Admin' | 'D0: 비전 담당자';
+  /** 비-A0 한국Admin 전용: 금일 지급요청 카드 오른쪽 공장 비용 카드 */
+  factoryCostRequestTotalCny?: number;
+  factoryCostRequestLoading?: boolean;
+  onFactoryCostRequestCardClick?: () => void;
 }
 
-/** A레벨 비용 집계 기준일: 이 날짜(포함) 이후만 결제내역 A레벨 비용에 포함 */
 const ADMIN_COST_FROM_DATE = '2026-02-22';
 
 function isOnOrAfterAdminCostFromDate(dateStr: string | null | undefined): boolean {
@@ -47,10 +56,13 @@ function isOnOrAfterAdminCostFromDate(dateStr: string | null | undefined): boole
   return d >= ADMIN_COST_FROM_DATE;
 }
 
-/**
- * 결제 통계 카드 컴포넌트
- */
-export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentStatisticsCardsProps) {
+export function PaymentStatisticsCards({
+  refreshTrigger,
+  userLevel,
+  factoryCostRequestTotalCny = 0,
+  factoryCostRequestLoading = false,
+  onFactoryCostRequestCardClick,
+}: PaymentStatisticsCardsProps) {
   const { t } = useLanguage();
   const isLevelC = userLevel === 'C0: 한국Admin';
   const [statistics, setStatistics] = useState<PaymentStatistics>({
@@ -61,13 +73,18 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
     pendingDetail: { advance: 0, balance: 0, shipping: 0 },
     requestedDetail: { advance: 0, balance: 0, shipping: 0 },
     adminCostTotal: 0,
-    adminCostDetail: { backMargin: 0, adminCostItems: 0, shippingDifference: 0 },
+    adminCostDetail: emptyAdminCostDetail(),
     adminCostPending: 0,
-    adminCostPendingDetail: { backMargin: 0, adminCostItems: 0, shippingDifference: 0 },
+    adminCostPendingDetail: emptyAdminCostDetail(),
+    adminCostConfirmed: 0,
+    adminCostConfirmedDetail: emptyAdminCostDetail(),
     adminCostPaid: 0,
-    adminCostPaidDetail: { backMargin: 0, adminCostItems: 0, shippingDifference: 0 },
+    adminCostPaidDetail: emptyAdminCostDetail(),
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [confirmedModalOpen, setConfirmedModalOpen] = useState(false);
+  const [confirmedPoRows, setConfirmedPoRows] = useState<AdminCostConfirmedRow[]>([]);
+  const [confirmedPlRows, setConfirmedPlRows] = useState<AdminCostConfirmedRow[]>([]);
 
   useEffect(() => {
     loadStatistics();
@@ -76,7 +93,6 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
   const loadStatistics = async () => {
     setIsLoading(true);
     try {
-      // 발주관리와 패킹리스트 결제 내역 조회 (필터 없이 전체 조회)
       const [poHistory, plHistory, allRequests] = await Promise.all([
         getPaymentHistory({ type: 'purchase-orders' }),
         getPaymentHistory({ type: 'packing-lists' }),
@@ -85,13 +101,9 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
 
       const allHistory: PaymentHistoryItem[] = [...poHistory, ...plHistory];
 
-      // 1. 지급된 금액 총계 계산 (상세 포함)
-      // 주의: 지급요청이 완료되면 원본 데이터의 payment_date가 업데이트되므로,
-      // payment_date 기준으로만 계산하면 중복 없이 정확한 지급액을 구할 수 있습니다.
       let paidAmount = 0;
       const paidDetail: PaymentDetail = { advance: 0, balance: 0, shipping: 0 };
 
-      // 발주관리: 선금/잔금 지급일이 있는 경우
       allHistory
         .filter((item) => item.source_type === 'purchase_order')
         .forEach((item) => {
@@ -105,7 +117,6 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
           }
         });
 
-      // 패킹리스트: 배송비 지급일이 있는 경우
       allHistory
         .filter((item) => item.source_type === 'packing_list')
         .forEach((item) => {
@@ -115,12 +126,9 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
           }
         });
 
-      // 2. 지급 예정 총계 계산 (상세 포함)
-      // 요청중이거나 지급대기 상태인 항목 모두 포함
       let pendingAmount = 0;
       const pendingDetail: PaymentDetail = { advance: 0, balance: 0, shipping: 0 };
 
-      // 지급요청: 상태가 '요청중'인 경우
       allRequests
         .filter((req) => req.status === '요청중')
         .forEach((req) => {
@@ -134,11 +142,9 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
           }
         });
 
-      // 발주관리: 지급대기 상태이고 지급일이 없는 경우 (지급요청이 없는 항목)
       allHistory
         .filter((item) => item.source_type === 'purchase_order')
         .forEach((item) => {
-          // 선금: 지급대기이고 지급일이 없고 지급요청이 없는 경우
           if (
             item.advance_status === 'pending' &&
             !item.advance_payment_date &&
@@ -148,7 +154,6 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
             pendingAmount += item.advance_payment_amount;
             pendingDetail.advance += item.advance_payment_amount;
           }
-          // 잔금: 지급대기이고 지급일이 없고 지급요청이 없는 경우
           if (
             item.balance_status === 'pending' &&
             !item.balance_payment_date &&
@@ -160,7 +165,6 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
           }
         });
 
-      // 패킹리스트: 지급대기 상태이고 지급일이 없는 경우 (지급요청이 없는 항목)
       allHistory
         .filter((item) => item.source_type === 'packing_list')
         .forEach((item) => {
@@ -175,16 +179,14 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
           }
         });
 
-      // 3. 금일까지 지급요청 총계 계산 (상세 포함)
-      // 상태가 '요청중'인 항목만 포함 (완료된 과거 데이터 제외)
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // 오늘 00:00:00
+      today.setHours(0, 0, 0, 0);
 
       let requestedAmount = 0;
       const requestedDetail: PaymentDetail = { advance: 0, balance: 0, shipping: 0 };
-      
+
       allRequests
-        .filter((req) => req.status === '요청중') // 요청중인 항목만
+        .filter((req) => req.status === '요청중')
         .forEach((req) => {
           const requestDate = new Date(req.request_date);
           requestDate.setHours(0, 0, 0, 0);
@@ -201,128 +203,10 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
           }
         });
 
-      // 4. A레벨 관리자 추가 비용 총계 계산 (2026-02-22 이후만 포함)
-      let adminCostTotal = 0;
-      const adminCostDetail: AdminCostDetail = { backMargin: 0, adminCostItems: 0, shippingDifference: 0 };
-
-      // 발주관리: admin_total_cost 또는 (back_margin * quantity) + admin_cost_items 합계 (발주일 2026-02-22 이후만)
-      allHistory
-        .filter((item) => item.source_type === 'purchase_order' && isOnOrAfterAdminCostFromDate(item.order_date))
-        .forEach((item) => {
-          let adminCost = 0;
-          
-          // admin_total_cost가 있으면 우선 사용
-          if (item.admin_total_cost !== undefined && item.admin_total_cost !== null) {
-            adminCost = item.admin_total_cost;
-          } else {
-            // 없으면 (back_margin * quantity) + admin_cost_items 합계로 계산
-            const backMargin = item.back_margin || 0;
-            const quantity = item.quantity || 0;
-            const backMarginTotal = backMargin * quantity; // 추가단가 * 수량
-            // is_admin_only === true인 항목만 포함 (서버 로직과 동일)
-            const adminCostItemsTotal = item.admin_cost_items
-              ? item.admin_cost_items
-                  .filter((costItem) => costItem.is_admin_only === true)
-                  .reduce((sum, costItem) => sum + (costItem.cost || 0), 0)
-              : 0;
-            adminCost = backMarginTotal + adminCostItemsTotal;
-          }
-          
-          adminCostTotal += adminCost;
-          
-          // 발주 주가비 (back_margin * quantity)
-          const backMargin = item.back_margin || 0;
-          const quantity = item.quantity || 0;
-          adminCostDetail.backMargin += backMargin * quantity;
-          
-          // A레벨 관리자 입력 비용 (is_admin_only === true인 항목만 포함, 서버 로직과 동일)
-          const adminCostItemsTotal = item.admin_cost_items
-            ? item.admin_cost_items
-                .filter((costItem) => costItem.is_admin_only === true)
-                .reduce((sum, costItem) => sum + (costItem.cost || 0), 0)
-            : 0;
-          adminCostDetail.adminCostItems += adminCostItemsTotal;
-        });
-
-      // 패킹리스트: shipping_cost_difference (발송일 또는 생성일 2026-02-22 이후만)
-      allHistory
-        .filter((item) => item.source_type === 'packing_list' && isOnOrAfterAdminCostFromDate(item.shipment_date || item.pl_created_at))
-        .forEach((item) => {
-          const shippingDiff = item.shipping_cost_difference || 0;
-          adminCostTotal += shippingDiff;
-          adminCostDetail.shippingDifference += shippingDiff;
-        });
-
-      // 5. A레벨 관리자 지급예정/지급완료 비용 계산 (상세 포함, 2026-02-22 이후만)
-      let adminCostPending = 0; // 지급예정
-      let adminCostPaid = 0; // 지급완료
-      const adminCostPendingDetail: AdminCostDetail = { backMargin: 0, adminCostItems: 0, shippingDifference: 0 };
-      const adminCostPaidDetail: AdminCostDetail = { backMargin: 0, adminCostItems: 0, shippingDifference: 0 };
-
-      // 발주관리 항목만 대상 (발주일 2026-02-22 이후만)
-      allHistory
-        .filter((item) => item.source_type === 'purchase_order' && isOnOrAfterAdminCostFromDate(item.order_date))
-        .forEach((item) => {
-          let adminCost = 0;
-          
-          // admin_total_cost가 있으면 우선 사용
-          if (item.admin_total_cost !== undefined && item.admin_total_cost !== null) {
-            adminCost = item.admin_total_cost;
-          } else {
-            // 없으면 (back_margin * quantity) + admin_cost_items 합계로 계산
-            const backMargin = item.back_margin || 0;
-            const quantity = item.quantity || 0;
-            const backMarginTotal = backMargin * quantity;
-            // is_admin_only === true인 항목만 포함 (서버 로직과 동일)
-            const adminCostItemsTotal = item.admin_cost_items
-              ? item.admin_cost_items
-                  .filter((costItem) => costItem.is_admin_only === true)
-                  .reduce((sum, costItem) => sum + (costItem.cost || 0), 0)
-              : 0;
-            adminCost = backMarginTotal + adminCostItemsTotal;
-          }
-
-          // 발주 주가비 계산
-          const backMargin = item.back_margin || 0;
-          const quantity = item.quantity || 0;
-          const backMarginTotal = backMargin * quantity;
-          
-          // A레벨 관리자 입력 비용 (is_admin_only === true인 항목만 포함, 서버 로직과 동일)
-          const adminCostItemsTotal = item.admin_cost_items
-            ? item.admin_cost_items
-                .filter((costItem) => costItem.is_admin_only === true)
-                .reduce((sum, costItem) => sum + (costItem.cost || 0), 0)
-            : 0;
-
-          // admin_cost_paid가 true이면 지급완료, false이거나 undefined이면 지급예정
-          if (item.admin_cost_paid === true) {
-            adminCostPaid += adminCost;
-            adminCostPaidDetail.backMargin += backMarginTotal;
-            adminCostPaidDetail.adminCostItems += adminCostItemsTotal;
-            // shippingDifference는 발주관리 항목에는 없으므로 0으로 유지
-          } else {
-            adminCostPending += adminCost;
-            adminCostPendingDetail.backMargin += backMarginTotal;
-            adminCostPendingDetail.adminCostItems += adminCostItemsTotal;
-            // shippingDifference는 발주관리 항목에는 없으므로 0으로 유지
-          }
-        });
-
-      // 패킹리스트의 shipping_cost_difference는 admin_cost_paid 상태에 따라 지급예정/지급완료로 구분 (발송일 또는 생성일 2026-02-22 이후만)
-      allHistory
-        .filter((item) => item.source_type === 'packing_list' && isOnOrAfterAdminCostFromDate(item.shipment_date || item.pl_created_at))
-        .forEach((item) => {
-          const shippingDiff = item.shipping_cost_difference || 0;
-          if (item.admin_cost_paid) {
-            // 지급완료
-            adminCostPaid += shippingDiff;
-            adminCostPaidDetail.shippingDifference += shippingDiff;
-          } else {
-            // 지급예정
-            adminCostPending += shippingDiff;
-            adminCostPendingDetail.shippingDifference += shippingDiff;
-          }
-        });
+      const adminBuckets = aggregateAdminCostByPaymentBucket(allHistory, isOnOrAfterAdminCostFromDate);
+      const confirmedLists = collectAdminCostConfirmedItems(allHistory, isOnOrAfterAdminCostFromDate);
+      setConfirmedPoRows(confirmedLists.purchaseOrders);
+      setConfirmedPlRows(confirmedLists.packingLists);
 
       setStatistics({
         paidAmount,
@@ -331,79 +215,55 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
         paidDetail,
         pendingDetail,
         requestedDetail,
-        adminCostTotal,
-        adminCostDetail,
-        adminCostPending,
-        adminCostPendingDetail,
-        adminCostPaid,
-        adminCostPaidDetail,
+        adminCostTotal: adminBuckets.totalSum,
+        adminCostDetail: adminBuckets.totalDetail,
+        adminCostPending: adminBuckets.pendingSum,
+        adminCostPendingDetail: adminBuckets.pendingDetail,
+        adminCostConfirmed: adminBuckets.confirmedSum,
+        adminCostConfirmedDetail: adminBuckets.confirmedDetail,
+        adminCostPaid: adminBuckets.paidSum,
+        adminCostPaidDetail: adminBuckets.paidDetail,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('통계 조회 오류:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const formatCurrency = (amount: number): string => {
-    return `¥${amount.toLocaleString('ko-KR')}`;
-  };
-
   const renderDetail = (total: number, detail: PaymentDetail, highlightColor: string) => (
     <div className="flex flex-col gap-3">
-      {/* 총계 부분 */}
       <div className="flex items-center justify-center px-4 py-3 rounded-lg bg-gradient-to-r from-gray-50 to-gray-100 border-2 border-gray-300 shadow-sm">
-        <span className={`text-3xl font-bold ${highlightColor}`}>{formatCurrency(total)}</span>
+        <span className={`text-3xl font-bold ${highlightColor}`}>
+          ¥{total.toLocaleString('ko-KR')}
+        </span>
       </div>
-      
-      {/* 상세 내역 그룹 */}
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-blue-50 border border-blue-300 shadow-sm">
           <span className="text-xs text-blue-600 font-semibold mb-1">{t('payment.advance')}</span>
-          <span className="text-base font-bold text-blue-700">{formatCurrency(detail.advance)}</span>
+          <span className="text-base font-bold text-blue-700">¥{detail.advance.toLocaleString('ko-KR')}</span>
         </div>
         <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-orange-50 border border-orange-300 shadow-sm">
           <span className="text-xs text-orange-600 font-semibold mb-1">{t('payment.balance')}</span>
-          <span className="text-base font-bold text-orange-700">{formatCurrency(detail.balance)}</span>
+          <span className="text-base font-bold text-orange-700">¥{detail.balance.toLocaleString('ko-KR')}</span>
         </div>
         <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-indigo-50 border border-indigo-300 shadow-sm">
           <span className="text-xs text-indigo-600 font-semibold mb-1">{t('payment.shippingCost')}</span>
-          <span className="text-base font-bold text-indigo-700">{formatCurrency(detail.shipping)}</span>
+          <span className="text-base font-bold text-indigo-700">¥{detail.shipping.toLocaleString('ko-KR')}</span>
         </div>
       </div>
     </div>
   );
 
-  const renderAdminCostDetail = (total: number, detail: AdminCostDetail, highlightColor: string) => (
-    <div className="flex flex-col gap-3">
-      {/* 총계 부분 */}
-      <div className="flex items-center justify-center px-4 py-3 rounded-lg bg-gradient-to-r from-gray-50 to-gray-100 border-2 border-gray-300 shadow-sm">
-        <span className={`text-3xl font-bold ${highlightColor}`}>{formatCurrency(total)}</span>
-      </div>
-      
-      {/* 상세 내역 그룹 */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-teal-50 border border-teal-300 shadow-sm">
-          <span className="text-xs text-teal-600 font-semibold mb-1">{t('payment.orderCost')}</span>
-          <span className="text-base font-bold text-teal-700">{formatCurrency(detail.backMargin)}</span>
-        </div>
-        <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-purple-50 border border-purple-300 shadow-sm">
-          <span className="text-xs text-purple-600 font-semibold mb-1">{t('payment.adminInput')}</span>
-          <span className="text-base font-bold text-purple-700">{formatCurrency(detail.adminCostItems)}</span>
-        </div>
-        <div className="flex flex-col items-center justify-center px-3 py-2.5 rounded-lg bg-cyan-50 border border-cyan-300 shadow-sm">
-          <span className="text-xs text-cyan-600 font-semibold mb-1">{t('payment.shippingExtra')}</span>
-          <span className="text-base font-bold text-cyan-700">{formatCurrency(detail.shippingDifference)}</span>
-        </div>
-      </div>
-    </div>
-  );
+  const showFactoryCostCard = !isLevelC && typeof onFactoryCostRequestCardClick === 'function';
 
   return (
     <div className="space-y-6 mb-8">
-      {/* 첫 번째 줄: 지급 관련 카드들 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* 지급된 금액 총계 */}
+      <div
+        className={`grid grid-cols-1 gap-6 ${
+          showFactoryCostCard ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-3'
+        }`}
+      >
         <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
           <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">{t('payment.paidTotal')}</h3>
           {isLoading ? (
@@ -415,7 +275,6 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
           )}
         </div>
 
-        {/* 지급 예정 총계 */}
         <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
           <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">{t('payment.scheduledTotal')}</h3>
           {isLoading ? (
@@ -427,7 +286,6 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
           )}
         </div>
 
-        {/* 금일까지 지급요청 총계 */}
         <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
           <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">{t('payment.requestTotal')}</h3>
           {isLoading ? (
@@ -438,49 +296,60 @@ export function PaymentStatisticsCards({ refreshTrigger, userLevel }: PaymentSta
             renderDetail(statistics.requestedAmount, statistics.requestedDetail, 'text-purple-600')
           )}
         </div>
+
+        {showFactoryCostCard && (
+          <FactoryCostRequestCard
+            title={t('payment.factoryCostRequestCardTitle')}
+            hint={t('payment.factoryCostRequestCardHint')}
+            totalCny={factoryCostRequestTotalCny}
+            loading={factoryCostRequestLoading}
+            onClick={onFactoryCostRequestCardClick!}
+          />
+        )}
       </div>
 
-      {/* 두 번째 줄: A레벨 관리자 비용 관련 카드들 (C0 레벨은 숨김) */}
       {!isLevelC && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* A레벨 관리자 추가 비용 총계 */}
-          <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
-            <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">A레벨 관리자 추가 비용 총계</h3>
-            {isLoading ? (
-              <div className="flex items-center justify-center h-32">
-                <p className="text-2xl font-bold text-gray-400">-</p>
-              </div>
-            ) : (
-              renderAdminCostDetail(statistics.adminCostTotal, statistics.adminCostDetail, 'text-indigo-600')
-            )}
-          </div>
-
-          {/* A레벨 관리자 지급예정 비용 */}
-          <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
-            <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">A레벨 관리자 지급예정 비용</h3>
-            {isLoading ? (
-              <div className="flex items-center justify-center h-32">
-                <p className="text-2xl font-bold text-gray-400">-</p>
-              </div>
-            ) : (
-              renderAdminCostDetail(statistics.adminCostPending, statistics.adminCostPendingDetail, 'text-yellow-600')
-            )}
-          </div>
-
-          {/* A레벨 관리자 지급완료 비용 */}
-          <div className="bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md hover:shadow-lg transition-shadow">
-            <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">A레벨 관리자 지급완료 비용</h3>
-            {isLoading ? (
-              <div className="flex items-center justify-center h-32">
-                <p className="text-2xl font-bold text-gray-400">-</p>
-              </div>
-            ) : (
-              renderAdminCostDetail(statistics.adminCostPaid, statistics.adminCostPaidDetail, 'text-green-600')
-            )}
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+          <AdminCostStatCard
+            title={t('payment.adminCostTotalTitle')}
+            isLoading={isLoading}
+            total={statistics.adminCostTotal}
+            detail={statistics.adminCostDetail}
+            highlightClassName="text-indigo-600"
+          />
+          <AdminCostStatCard
+            title={t('payment.adminCostPendingTitle')}
+            isLoading={isLoading}
+            total={statistics.adminCostPending}
+            detail={statistics.adminCostPendingDetail}
+            highlightClassName="text-yellow-600"
+          />
+          <AdminCostStatCard
+            title={t('payment.adminCostConfirmedTitle')}
+            isLoading={isLoading}
+            total={statistics.adminCostConfirmed}
+            detail={statistics.adminCostConfirmedDetail}
+            highlightClassName="text-amber-700"
+            onCardClick={() => setConfirmedModalOpen(true)}
+          />
+          <AdminCostStatCard
+            title={t('payment.adminCostPaidTitle')}
+            isLoading={isLoading}
+            total={statistics.adminCostPaid}
+            detail={statistics.adminCostPaidDetail}
+            highlightClassName="text-green-600"
+          />
         </div>
+      )}
+
+      {!isLevelC && (
+        <AdminCostConfirmedModal
+          isOpen={confirmedModalOpen}
+          onClose={() => setConfirmedModalOpen(false)}
+          purchaseOrders={confirmedPoRows}
+          packingLists={confirmedPlRows}
+        />
       )}
     </div>
   );
 }
-

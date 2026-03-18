@@ -309,10 +309,11 @@ export function CostPaymentTab({
               ¥{totalOptionCost.toFixed(2)}
             </span>
           </h4>
+          {!isLevelC && (
           <div className="space-y-4">
             {/* 일반 항목 */}
             <div className="space-y-2">
-              {!isLevelC && <div className="text-xs font-semibold text-gray-600 mb-2">{t("purchaseOrder.detail.generalItems")}</div>}
+              <div className="text-xs font-semibold text-gray-600 mb-2">{t("purchaseOrder.detail.generalItems")}</div>
               {normalOptionItems.map((item) => {
                   const calculatedCost = item.unit_price * item.quantity;
                   const isEditable = canAddItems;
@@ -583,6 +584,7 @@ export function CostPaymentTab({
               </div>
             )}
           </div>
+          )}
         </div>
 
         {/* 인건비 */}
@@ -593,10 +595,11 @@ export function CostPaymentTab({
               ¥{totalLaborCost.toFixed(2)}
             </span>
           </h4>
+          {!isLevelC && (
           <div className="space-y-4">
             {/* 일반 항목 */}
             <div className="space-y-2">
-              {!isLevelC && <div className="text-xs font-semibold text-gray-600 mb-2">{t("purchaseOrder.detail.generalItems")}</div>}
+              <div className="text-xs font-semibold text-gray-600 mb-2">{t("purchaseOrder.detail.generalItems")}</div>
               {normalLaborCostItems.map((item) => {
                 const calculatedCost = item.unit_price * item.quantity;
                 const isEditable = canAddItems;
@@ -867,6 +870,7 @@ export function CostPaymentTab({
                 </div>
               )}
           </div>
+          )}
         </div>
       </div>
 

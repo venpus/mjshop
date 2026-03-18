@@ -1,26 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { FileText, Package, BookOpen } from 'lucide-react';
+import { FileText, Package, BookOpen, Coins } from 'lucide-react';
+import { PaymentMiscAmountTab } from './PaymentMiscAmountTab';
 import { PaymentRequestLedger } from './PaymentRequestLedger';
 import { PaymentHistoryTable } from './PaymentHistoryTable';
 import { PaymentStatisticsCards } from './PaymentStatisticsCards';
 import { useAuth } from '../../contexts/AuthContext';
+import { fetchPaymentMiscTotalCny } from '../../api/paymentMiscEntriesApi';
 
 // type TabType = 'all' | 'purchase-orders' | 'packing-lists' | 'requests';
-type TabType = 'purchase-orders' | 'packing-lists' | 'request-ledger';
+type TabType = 'purchase-orders' | 'packing-lists' | 'request-ledger' | 'misc-amounts';
 
 /**
  * 결제내역 메인 컴포넌트
  */
 export function PaymentHistory() {
   const { user } = useAuth();
+  const isLevelC = user?.level === 'C0: 한국Admin';
   const location = useLocation();
   const navigate = useNavigate();
   
   // URL 쿼리 파라미터에서 탭 정보 읽기
   const searchParams = new URLSearchParams(location.search);
   const tabFromUrl = searchParams.get('tab') as TabType | null;
-  const validTabs: TabType[] = ['purchase-orders', 'packing-lists', 'request-ledger'];
+  const validTabs: TabType[] = ['purchase-orders', 'packing-lists', 'request-ledger', 'misc-amounts'];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'purchase-orders';
   
   // 기존 'requests' 탭을 'request-ledger'로 리다이렉트
@@ -34,6 +37,25 @@ export function PaymentHistory() {
   
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [statisticsRefreshTrigger, setStatisticsRefreshTrigger] = useState(0);
+  const [factoryCostTotalCny, setFactoryCostTotalCny] = useState(0);
+  const [factoryCostTotalLoading, setFactoryCostTotalLoading] = useState(false);
+
+  const refreshFactoryCostTotal = useCallback(async () => {
+    if (isLevelC) return;
+    setFactoryCostTotalLoading(true);
+    try {
+      const total = await fetchPaymentMiscTotalCny();
+      setFactoryCostTotalCny(total);
+    } catch {
+      setFactoryCostTotalCny(0);
+    } finally {
+      setFactoryCostTotalLoading(false);
+    }
+  }, [isLevelC]);
+
+  useEffect(() => {
+    refreshFactoryCostTotal();
+  }, [refreshFactoryCostTotal, activeTab]);
 
   // 초기 마운트 시 URL에서 탭 정보 읽기
   useEffect(() => {
@@ -67,6 +89,15 @@ export function PaymentHistory() {
     setStatisticsRefreshTrigger((prev) => prev + 1);
   };
 
+  useEffect(() => {
+    if (isLevelC && activeTab === 'misc-amounts') {
+      setActiveTab('purchase-orders');
+      const params = new URLSearchParams(location.search);
+      params.set('tab', 'purchase-orders');
+      navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+    }
+  }, [isLevelC, activeTab, location.pathname, location.search, navigate]);
+
   return (
     <div className="p-8">
       <div className="mb-6">
@@ -74,8 +105,18 @@ export function PaymentHistory() {
         <p className="text-gray-600">발주관리와 패킹리스트의 결제 내역을 확인하고 지급요청을 관리할 수 있습니다</p>
       </div>
 
-      {/* 통계 카드 */}
-      <PaymentStatisticsCards refreshTrigger={statisticsRefreshTrigger} userLevel={user?.level} />
+      {/* 통계 카드 (공장 비용 카드 = 금일 지급요청 오른쪽) */}
+      <PaymentStatisticsCards
+        refreshTrigger={statisticsRefreshTrigger}
+        userLevel={user?.level}
+        {...(!isLevelC
+          ? {
+              factoryCostRequestTotalCny: factoryCostTotalCny,
+              factoryCostRequestLoading: factoryCostTotalLoading,
+              onFactoryCostRequestCardClick: () => handleTabChange('misc-amounts'),
+            }
+          : {})}
+      />
 
       {/* 탭 */}
       <div className="border-b border-gray-200 mb-6">
@@ -124,12 +165,27 @@ export function PaymentHistory() {
             <BookOpen className="w-4 h-4" />
             지급요청 장부
           </button>
+          {!isLevelC && (
+            <button
+              onClick={() => handleTabChange('misc-amounts')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                activeTab === 'misc-amounts'
+                  ? 'border-purple-500 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Coins className="w-4 h-4" />
+              별도처리 금액
+            </button>
+          )}
         </nav>
       </div>
 
       {/* 컨텐츠 */}
       <div>
-        {activeTab === 'request-ledger' ? (
+        {activeTab === 'misc-amounts' ? (
+          <PaymentMiscAmountTab onEntriesChanged={refreshFactoryCostTotal} />
+        ) : activeTab === 'request-ledger' ? (
           <PaymentRequestLedger onRefresh={handleStatisticsRefresh} />
         ) : (
           <PaymentHistoryTable

@@ -16,6 +16,7 @@ import productCollabRoutes from './productCollab.js';
 import manufacturingDocumentRoutes from './manufacturingDocuments.js';
 import accessLogRoutes from './accessLogs.js';
 import normalInvoiceRoutes from './normalInvoices.js';
+import paymentMiscEntryRoutes from './paymentMiscEntries.js';
 
 const router = Router();
 
@@ -40,6 +41,7 @@ router.use('/qwen', qwenRoutes);
 router.use('/product-collab', productCollabRoutes);
 router.use('/manufacturing-documents', manufacturingDocumentRoutes);
 router.use('/normal-invoices', normalInvoiceRoutes);
+router.use('/payment-misc-entries', paymentMiscEntryRoutes);
 
 router.get('/', (req, res) => {
   res.json({ 

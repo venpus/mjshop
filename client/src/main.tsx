@@ -4,7 +4,7 @@ import App from "./App.tsx";
 import "./index.css";
 import { AuthProvider } from "./contexts/AuthContext.tsx";
 import { PermissionProvider } from "./contexts/PermissionContext.tsx";
-import { LanguageProvider } from "./contexts/LanguageContext.tsx";
+import { LanguageProvider } from "./contexts/LanguageContext";
 
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
