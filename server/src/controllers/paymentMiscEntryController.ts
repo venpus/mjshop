@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PaymentMiscEntryService } from '../services/paymentMiscEntryService.js';
+import { resolveUploadedDisplayName } from '../utils/filenameEncoding.js';
 
 export class PaymentMiscEntryController {
   private service = new PaymentMiscEntryService();
@@ -65,7 +66,8 @@ export class PaymentMiscEntryController {
         res.status(400).json({ success: false, error: '파일이 없습니다.' });
         return;
       }
-      const row = await this.service.attachFile(id, file.path, file.originalname);
+      const displayName = resolveUploadedDisplayName(file.originalname, req.body as Record<string, unknown>);
+      const row = await this.service.attachFile(id, file.path, displayName);
       if (!row) {
         res.status(404).json({ success: false, error: '항목을 찾을 수 없습니다.' });
         return;

@@ -73,6 +73,7 @@ export async function deletePaymentMiscEntry(id: number): Promise<void> {
 
 export async function uploadPaymentMiscFile(id: number, file: File): Promise<PaymentMiscEntry> {
   const fd = new FormData();
+  fd.append('original_filename', file.name);
   fd.append('file', file);
   const res = await fetch(`${base()}/${id}/file`, {
     method: 'POST',
