@@ -303,13 +303,13 @@ export class PurchaseOrderRepository {
    * @param searchTerm 검색어 (선택사항)
    * @param limit 페이지당 항목 수 (선택사항, 없으면 전체 조회)
    * @param offset 건너뛸 항목 수 (선택사항)
-   * @param _scheduleShipmentPicker 예약: 일정 피커 호출 구분용(조건은 미출고만 사용)
+   * @param scheduleShipmentPicker 일정 피커(출고예정): 미입고 수량 0 초과 조건 사용
    */
   async findAllWithUnshipped(
     searchTerm?: string,
     limit?: number,
     offset?: number,
-    _scheduleShipmentPicker?: boolean,
+    scheduleShipmentPicker?: boolean,
   ): Promise<Array<PurchaseOrder & { unshipped_quantity: number }>> {
     let query = `SELECT 
         po.id, po.po_number, po.product_id, po.unit_price, po.back_margin,
@@ -328,6 +328,13 @@ export class PurchaseOrderRepository {
        FROM purchase_orders po
        LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
        WHERE COALESCE(summary.unshipped_quantity, 0) > 0`;
+
+    if (scheduleShipmentPicker) {
+      query = query.replace(
+        "WHERE COALESCE(summary.unshipped_quantity, 0) > 0",
+        "WHERE COALESCE(summary.unreceived_quantity, 0) > 0",
+      );
+    }
 
     const params: any[] = [];
     
@@ -368,13 +375,20 @@ export class PurchaseOrderRepository {
   /**
    * 미출고 수량이 있는 발주 총 개수 조회
    * @param searchTerm 검색어 (선택사항)
-   * @param _scheduleShipmentPicker 예약: 일정 피커 호출 구분용(조건은 미출고만 사용)
+   * @param scheduleShipmentPicker 일정 피커(출고예정): 미입고 수량 0 초과 조건 사용
    */
-  async countUnshipped(searchTerm?: string, _scheduleShipmentPicker?: boolean): Promise<number> {
+  async countUnshipped(searchTerm?: string, scheduleShipmentPicker?: boolean): Promise<number> {
     let query = `SELECT COUNT(*) as total
        FROM purchase_orders po
        LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
        WHERE COALESCE(summary.unshipped_quantity, 0) > 0`;
+
+    if (scheduleShipmentPicker) {
+      query = query.replace(
+        "WHERE COALESCE(summary.unshipped_quantity, 0) > 0",
+        "WHERE COALESCE(summary.unreceived_quantity, 0) > 0",
+      );
+    }
 
     const params: any[] = [];
     

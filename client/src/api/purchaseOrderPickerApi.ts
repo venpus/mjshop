@@ -49,7 +49,7 @@ async function requestPurchaseOrders(
 
 /**
  * 생산중: 발주 컨펌·미입고 수량 0 초과 (일정 피커 전용)
- * 출고예정: 미출고 수량 있는 발주만 (발주관리 미출고 목록과 동일 기준)
+ * 출고예정: 미입고 수량 0 초과 발주만 (일정 피커 전용)
  */
 export async function searchPurchaseOrdersForSchedulePicker(
   mode: "production" | "shipment",
@@ -67,30 +67,7 @@ export async function searchPurchaseOrdersForSchedulePicker(
     return requestPurchaseOrders(`${base}/purchase-orders`, params);
   }
 
-  // 구버전 서버 호환: schedule_shipment_picker 처리 오류가 나면 플래그 없이 재시도
+  // 출고예정 일정 피커: 미입고 수량 0 초과 조건은 서버 플래그로 강제
   params.set("schedule_shipment_picker", "1");
-  try {
-    const rows = await requestPurchaseOrders(`${base}/purchase-orders/unshipped`, params);
-    if (rows.length > 0) return rows;
-    // 일부 서버는 플래그를 받지만 과하게 필터링해 빈 목록을 줄 수 있어, 빈 결과도 재시도
-    console.warn("[SchedulePicker] empty rows with schedule_shipment_picker=1, retrying without flag", {
-      search: search.trim(),
-    });
-    params.delete("schedule_shipment_picker");
-    return await requestPurchaseOrders(`${base}/purchase-orders/unshipped`, params);
-  } catch (firstError) {
-    console.warn("[SchedulePicker] shipment picker request failed, retrying without flag", {
-      error: firstError instanceof Error ? firstError.message : String(firstError),
-      search: search.trim(),
-    });
-    params.delete("schedule_shipment_picker");
-    try {
-      return await requestPurchaseOrders(`${base}/purchase-orders/unshipped`, params);
-    } catch {
-      console.error("[SchedulePicker] shipment picker fallback also failed", {
-        search: search.trim(),
-      });
-      throw firstError;
-    }
-  }
+  return requestPurchaseOrders(`${base}/purchase-orders/unshipped`, params);
 }
