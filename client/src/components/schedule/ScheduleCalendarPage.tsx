@@ -215,7 +215,7 @@ export function ScheduleCalendarPage() {
         className={
           isMobileLayout
             ? "w-full shrink-0 rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
-            : "hidden w-full max-w-[24.2rem] shrink-0 rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:block"
+            : "hidden w-full max-w-[29.04rem] shrink-0 rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:block"
         }
       >
         <ScheduleDayContent
