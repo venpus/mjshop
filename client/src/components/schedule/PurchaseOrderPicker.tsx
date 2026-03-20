@@ -37,6 +37,7 @@ export function PurchaseOrderPicker({ mode, value, onChange }: Props) {
   const [debounced, setDebounced] = useState("");
   const [items, setItems] = useState<PurchaseOrderPickerRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const tmr = setTimeout(() => setDebounced(search), 320);
@@ -47,6 +48,7 @@ export function PurchaseOrderPicker({ mode, value, onChange }: Props) {
     if (open) {
       setSearch("");
       setDebounced("");
+      setErrorMessage(null);
     }
   }, [open]);
 
@@ -55,11 +57,15 @@ export function PurchaseOrderPicker({ mode, value, onChange }: Props) {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setErrorMessage(null);
       try {
         const rows = await searchPurchaseOrdersForSchedulePicker(mode, debounced);
         if (!cancelled) setItems(rows);
-      } catch {
-        if (!cancelled) setItems([]);
+      } catch (e) {
+        if (!cancelled) {
+          setItems([]);
+          setErrorMessage(e instanceof Error ? e.message : t("common.error"));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -137,6 +143,11 @@ export function PurchaseOrderPicker({ mode, value, onChange }: Props) {
                 <div className="py-6 text-center text-sm text-muted-foreground">{t("common.loading")}</div>
               ) : (
                 <>
+                  {errorMessage && (
+                    <div className="px-3 py-2 text-xs text-red-600">
+                      {errorMessage}
+                    </div>
+                  )}
                   <CommandEmpty>{t("schedule.purchaseOrderEmpty")}</CommandEmpty>
                   <CommandGroup>
                     {items.map((po) => (

@@ -1,6 +1,6 @@
 {
   "name": "server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "쇼핑몰 관리자 백엔드 서버",
   "main": "dist/index.js",
   "type": "module",
