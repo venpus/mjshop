@@ -33,6 +33,7 @@ import { Projects } from './components/Projects';
 import { ProjectDetail } from './components/ProjectDetail';
 import { AiSearch } from './components/AiSearch';
 import { ProductCollabRoutes } from './components/product-collab/routes';
+import { ScheduleCalendarPage } from './components/schedule/ScheduleCalendarPage';
 import { Login } from './components/Login';
 import { useAuth } from './contexts/AuthContext';
 import { usePermission } from './contexts/PermissionContext';
@@ -403,6 +404,13 @@ function AdminLayout() {
               <Route path="/settings" element={
                 user?.level === 'A-SuperAdmin' ? (
                   <Settings />
+                ) : (
+                  <Navigate to="/admin/product-collab" replace />
+                )
+              } />
+              <Route path="/schedule" element={
+                user?.level === 'A-SuperAdmin' ? (
+                  <ScheduleCalendarPage />
                 ) : (
                   <Navigate to="/admin/product-collab" replace />
                 )

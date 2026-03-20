@@ -17,6 +17,7 @@ import manufacturingDocumentRoutes from './manufacturingDocuments.js';
 import accessLogRoutes from './accessLogs.js';
 import normalInvoiceRoutes from './normalInvoices.js';
 import paymentMiscEntryRoutes from './paymentMiscEntries.js';
+import scheduleEventRoutes from './scheduleEvents.js';
 
 const router = Router();
 
@@ -42,6 +43,7 @@ router.use('/product-collab', productCollabRoutes);
 router.use('/manufacturing-documents', manufacturingDocumentRoutes);
 router.use('/normal-invoices', normalInvoiceRoutes);
 router.use('/payment-misc-entries', paymentMiscEntryRoutes);
+router.use('/schedule-events', scheduleEventRoutes);
 
 router.get('/', (req, res) => {
   res.json({ 

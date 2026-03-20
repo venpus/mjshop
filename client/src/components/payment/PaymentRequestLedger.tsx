@@ -347,6 +347,7 @@ interface PaymentRequestLedgerItemProps {
 }
 
 function PaymentRequestLedgerItem({ request }: PaymentRequestLedgerItemProps) {
+  const { t } = useLanguage();
   const getPaymentTypeLabel = (type: string): string => {
     switch (type) {
       case 'advance':

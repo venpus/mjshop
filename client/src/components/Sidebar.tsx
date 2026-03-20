@@ -32,6 +32,7 @@ import {
   Settings as SettingsIcon,
   Wrench,
   Activity,
+  Calendar,
 } from "lucide-react";
 import { SidebarExternalLink } from "./sidebar/SidebarExternalLink";
 
@@ -60,6 +61,7 @@ type PageType =
   | "permissions"
   | "ai-search"
   | "product-collab"
+  | "schedule"
   | "settings";
 
 interface SidebarProps {
@@ -156,6 +158,21 @@ export function Sidebar({
               >
                 <Package className="w-5 h-5 flex-shrink-0" />
                 {!isCollapsed && <span>{t('menu.productCollab')}</span>}
+              </button>
+            )}
+
+            {isLevelA && (
+              <button
+                onClick={() => onPageChange("schedule")}
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
+                  currentPage === "schedule"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
+                title={isCollapsed ? t('menu.schedule') : undefined}
+              >
+                <Calendar className="w-5 h-5 flex-shrink-0" />
+                {!isCollapsed && <span>{t('menu.schedule')}</span>}
               </button>
             )}
 

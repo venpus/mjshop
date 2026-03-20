@@ -45,7 +45,15 @@ export class PurchaseOrderController {
         });
       }
 
-      const result = await this.service.getAllPurchaseOrders(searchTerm, page, limit);
+      const scheduleProductionPicker =
+        req.query.schedule_production_picker === '1' ||
+        req.query.schedule_production_picker === 'true';
+      const result = await this.service.getAllPurchaseOrders(
+        searchTerm,
+        page,
+        limit,
+        scheduleProductionPicker,
+      );
       res.json({
         success: true,
         data: result.data,
@@ -67,13 +75,16 @@ export class PurchaseOrderController {
 
   /**
    * 미출고 수량이 있는 발주 목록 조회
-   * GET /api/purchase-orders/unshipped?page=1&limit=20&search=검색어
+   * GET /api/purchase-orders/unshipped?page=1&limit=20&search=검색어&schedule_shipment_picker=1
    */
   getPurchaseOrdersWithUnshipped = async (req: Request, res: Response) => {
     try {
       const searchTerm = req.query.search as string | undefined;
       const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+      const scheduleShipmentPicker =
+        req.query.schedule_shipment_picker === '1' ||
+        req.query.schedule_shipment_picker === 'true';
 
       // 유효성 검사
       if (page !== undefined && (isNaN(page) || page < 1)) {
@@ -89,7 +100,12 @@ export class PurchaseOrderController {
         });
       }
 
-      const result = await this.service.getPurchaseOrdersWithUnshipped(searchTerm, page, limit);
+      const result = await this.service.getPurchaseOrdersWithUnshipped(
+        searchTerm,
+        page,
+        limit,
+        scheduleShipmentPicker,
+      );
       res.json({
         success: true,
         data: result.data,

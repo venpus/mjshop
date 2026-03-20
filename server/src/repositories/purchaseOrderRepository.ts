@@ -189,12 +189,128 @@ export class PurchaseOrderRepository {
   }
 
   /**
+   * 일정 피커(생산중): 발주 컨펌 + 미입고 수량 0 초과인 발주만 (shipping summary 기준)
+   */
+  async findForScheduleProductionPicker(
+    searchTerm?: string,
+    limit?: number,
+    offset?: number,
+  ): Promise<Array<PurchaseOrder & {
+    factory_shipped_quantity: number;
+    unshipped_quantity: number;
+    shipped_quantity: number;
+    shipping_quantity: number;
+    arrived_quantity: number;
+    unreceived_quantity: number;
+    warehouse_arrival_date?: Date | null;
+    has_korea_arrival: number;
+  }>> {
+    let query = `SELECT 
+        po.id, po.po_number, po.product_id, po.unit_price, po.back_margin,
+        po.order_unit_price, po.expected_final_unit_price, po.quantity, po.size, po.weight, po.packaging,
+        po.product_name, po.product_name_chinese, po.product_category, po.product_main_image,
+        po.product_size, po.product_weight, po.product_packaging_size,
+        po.product_set_count, po.product_small_pack_count, po.product_box_count,
+        po.delivery_status, po.payment_status, po.is_confirmed, po.order_status,
+        po.order_date, po.estimated_delivery, po.estimated_shipment_date,
+        po.work_start_date, po.work_end_date,
+        po.shipping_cost, po.warehouse_shipping_cost, po.commission_rate, po.commission_type,
+        po.advance_payment_rate, po.advance_payment_amount, po.advance_payment_date,
+        po.balance_payment_amount, po.balance_payment_date,
+        po.admin_cost_paid, po.admin_cost_paid_date,
+        po.created_at, po.updated_at, po.created_by, po.updated_by,
+        COALESCE(summary.factory_shipped_quantity, 0) AS factory_shipped_quantity,
+        COALESCE(summary.unshipped_quantity, 0) AS unshipped_quantity,
+        COALESCE(summary.shipped_quantity, 0) AS shipped_quantity,
+        COALESCE(summary.shipping_quantity, 0) AS shipping_quantity,
+        COALESCE(summary.arrived_quantity, 0) AS arrived_quantity,
+        COALESCE(summary.unreceived_quantity, 0) AS unreceived_quantity,
+        MAX(pl.warehouse_arrival_date) AS warehouse_arrival_date,
+        CASE WHEN MAX(korea.id) IS NOT NULL THEN 1 ELSE 0 END AS has_korea_arrival
+       FROM purchase_orders po
+       LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
+       LEFT JOIN packing_list_items pli ON po.id = pli.purchase_order_id
+       LEFT JOIN packing_lists pl ON pli.packing_list_id = pl.id
+       LEFT JOIN packing_list_korea_arrivals korea ON pli.id = korea.packing_list_item_id
+       WHERE po.is_confirmed = TRUE
+       AND COALESCE(summary.unreceived_quantity, 0) > 0`;
+
+    const params: any[] = [];
+
+    if (searchTerm && searchTerm.trim()) {
+      const searchPattern = `%${searchTerm.trim()}%`;
+      query += ` AND (
+        po.po_number LIKE ? OR
+        po.product_name LIKE ? OR
+        po.product_name_chinese LIKE ?
+      )`;
+      params.push(searchPattern, searchPattern, searchPattern);
+    }
+
+    query += ` GROUP BY po.id
+       ORDER BY po.order_date DESC, po.created_at DESC`;
+
+    const mapRow = (row: any) => ({
+      ...this.mapRowToPurchaseOrder(row),
+      factory_shipped_quantity: Number(row.factory_shipped_quantity) || 0,
+      unshipped_quantity: Number(row.unshipped_quantity) || 0,
+      shipped_quantity: Number(row.shipped_quantity) || 0,
+      shipping_quantity: Number(row.shipping_quantity) || 0,
+      arrived_quantity: Number(row.arrived_quantity) || 0,
+      unreceived_quantity: Number(row.unreceived_quantity) || 0,
+      warehouse_arrival_date: row.warehouse_arrival_date || null,
+      has_korea_arrival: Number(row.has_korea_arrival) || 0,
+    });
+
+    if (limit !== undefined) {
+      query += ` LIMIT ?`;
+      params.push(limit);
+      if (offset !== undefined) {
+        query += ` OFFSET ?`;
+        params.push(offset);
+      }
+    }
+
+    const [rows] = await pool.execute<any[]>(query, params);
+    return rows.map(mapRow);
+  }
+
+  async countForScheduleProductionPicker(searchTerm?: string): Promise<number> {
+    let query = `SELECT COUNT(*) as total
+       FROM purchase_orders po
+       LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
+       WHERE po.is_confirmed = TRUE
+       AND COALESCE(summary.unreceived_quantity, 0) > 0`;
+
+    const params: any[] = [];
+
+    if (searchTerm && searchTerm.trim()) {
+      const searchPattern = `%${searchTerm.trim()}%`;
+      query += ` AND (
+        po.po_number LIKE ? OR
+        po.product_name LIKE ? OR
+        po.product_name_chinese LIKE ?
+      )`;
+      params.push(searchPattern, searchPattern, searchPattern);
+    }
+
+    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
+    return rows[0].total;
+  }
+
+  /**
    * 미출고 수량이 있는 발주만 조회 (VIEW JOIN)
    * @param searchTerm 검색어 (선택사항)
    * @param limit 페이지당 항목 수 (선택사항, 없으면 전체 조회)
    * @param offset 건너뛸 항목 수 (선택사항)
+   * @param _scheduleShipmentPicker 예약: 일정 피커 호출 구분용(조건은 미출고만 사용)
    */
-  async findAllWithUnshipped(searchTerm?: string, limit?: number, offset?: number): Promise<Array<PurchaseOrder & { unshipped_quantity: number }>> {
+  async findAllWithUnshipped(
+    searchTerm?: string,
+    limit?: number,
+    offset?: number,
+    _scheduleShipmentPicker?: boolean,
+  ): Promise<Array<PurchaseOrder & { unshipped_quantity: number }>> {
     let query = `SELECT 
         po.id, po.po_number, po.product_id, po.unit_price, po.back_margin,
         po.order_unit_price, po.expected_final_unit_price, po.quantity, po.size, po.weight, po.packaging,
@@ -212,7 +328,7 @@ export class PurchaseOrderRepository {
        FROM purchase_orders po
        LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
        WHERE COALESCE(summary.unshipped_quantity, 0) > 0`;
-    
+
     const params: any[] = [];
     
     // 검색어가 있으면 WHERE 조건 추가
@@ -252,13 +368,14 @@ export class PurchaseOrderRepository {
   /**
    * 미출고 수량이 있는 발주 총 개수 조회
    * @param searchTerm 검색어 (선택사항)
+   * @param _scheduleShipmentPicker 예약: 일정 피커 호출 구분용(조건은 미출고만 사용)
    */
-  async countUnshipped(searchTerm?: string): Promise<number> {
+  async countUnshipped(searchTerm?: string, _scheduleShipmentPicker?: boolean): Promise<number> {
     let query = `SELECT COUNT(*) as total
        FROM purchase_orders po
        LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
        WHERE COALESCE(summary.unshipped_quantity, 0) > 0`;
-    
+
     const params: any[] = [];
     
     // 검색어가 있으면 WHERE 조건 추가

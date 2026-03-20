@@ -26,7 +26,12 @@ export class PurchaseOrderService {
    * @param page 페이지 번호 (1부터 시작)
    * @param limit 페이지당 항목 수
    */
-  async getAllPurchaseOrders(searchTerm?: string, page?: number, limit?: number): Promise<{
+  async getAllPurchaseOrders(
+    searchTerm?: string,
+    page?: number,
+    limit?: number,
+    scheduleProductionPicker?: boolean,
+  ): Promise<{
     data: PurchaseOrderPublic[];
     total: number;
     page: number;
@@ -38,11 +43,21 @@ export class PurchaseOrderService {
 
     if (page !== undefined && limit !== undefined) {
       const offset = (page - 1) * limit;
-      purchaseOrders = await this.repository.findAll(searchTerm, limit, offset);
-      total = await this.repository.count(searchTerm);
+      if (scheduleProductionPicker) {
+        purchaseOrders = await this.repository.findForScheduleProductionPicker(searchTerm, limit, offset);
+        total = await this.repository.countForScheduleProductionPicker(searchTerm);
+      } else {
+        purchaseOrders = await this.repository.findAll(searchTerm, limit, offset);
+        total = await this.repository.count(searchTerm);
+      }
     } else {
-      purchaseOrders = await this.repository.findAll(searchTerm);
-      total = purchaseOrders.length;
+      if (scheduleProductionPicker) {
+        purchaseOrders = await this.repository.findForScheduleProductionPicker(searchTerm);
+        total = purchaseOrders.length;
+      } else {
+        purchaseOrders = await this.repository.findAll(searchTerm);
+        total = purchaseOrders.length;
+      }
     }
 
     const enrichedOrders = await Promise.all(purchaseOrders.map(async (po) => {
@@ -79,7 +94,12 @@ export class PurchaseOrderService {
    * @param page 페이지 번호 (1부터 시작)
    * @param limit 페이지당 항목 수
    */
-  async getPurchaseOrdersWithUnshipped(searchTerm?: string, page?: number, limit?: number): Promise<{
+  async getPurchaseOrdersWithUnshipped(
+    searchTerm?: string,
+    page?: number,
+    limit?: number,
+    scheduleShipmentPicker?: boolean,
+  ): Promise<{
     data: Array<PurchaseOrderPublic & { unshipped_quantity: number }>;
     total: number;
     page: number;
@@ -91,10 +111,20 @@ export class PurchaseOrderService {
 
     if (page !== undefined && limit !== undefined) {
       const offset = (page - 1) * limit;
-      purchaseOrders = await this.repository.findAllWithUnshipped(searchTerm, limit, offset);
-      total = await this.repository.countUnshipped(searchTerm);
+      purchaseOrders = await this.repository.findAllWithUnshipped(
+        searchTerm,
+        limit,
+        offset,
+        scheduleShipmentPicker,
+      );
+      total = await this.repository.countUnshipped(searchTerm, scheduleShipmentPicker);
     } else {
-      purchaseOrders = await this.repository.findAllWithUnshipped(searchTerm);
+      purchaseOrders = await this.repository.findAllWithUnshipped(
+        searchTerm,
+        undefined,
+        undefined,
+        scheduleShipmentPicker,
+      );
       total = purchaseOrders.length;
     }
 
