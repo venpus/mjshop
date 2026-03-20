@@ -24,14 +24,14 @@ export function MonthGridCalendar({ month, selectedDate, onSelectDate, events, f
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-2 shadow-sm md:p-2">
-      <div className="grid grid-cols-7 gap-0.5 text-center text-[11px] text-gray-500 md:text-xs">
+      <div className="grid grid-cols-7 gap-0 border border-gray-200 text-center text-[11px] text-gray-500 md:text-xs">
         {weekdays.map((w) => (
           <div key={w} className="py-1 font-medium">
             {w}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-0.5">
+      <div className="grid grid-cols-7 gap-0 border-x border-b border-gray-200">
         {cells.map(({ date, inMonth }) => {
           const key = toDateKey(date);
           const dayEvents = eventsForDateKey(visible, key);
@@ -45,11 +45,11 @@ export function MonthGridCalendar({ month, selectedDate, onSelectDate, events, f
               type="button"
               onClick={() => onSelectDate(date)}
               className={cn(
-                "flex min-h-[72px] flex-col items-center rounded-lg border px-0.5 py-1 text-[13px] transition-colors md:min-h-[88px] md:px-1",
+                "flex min-h-[72px] flex-col items-center border border-gray-200 px-0.5 py-1 text-[13px] transition-colors md:min-h-[88px] md:px-1",
                 !inMonth && "text-gray-300",
                 inMonth && "text-gray-900",
                 isToday && "border-purple-300 bg-purple-50/50",
-                !isToday && "border-transparent hover:bg-gray-50",
+                !isToday && "hover:bg-gray-50",
                 isSel && "ring-2 ring-purple-500 ring-offset-1",
               )}
             >
