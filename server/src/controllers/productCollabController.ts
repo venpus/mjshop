@@ -10,6 +10,7 @@ import type {
 } from '../models/productCollab.js';
 import { getProductCollabImageUrl, getProductCollabFilePathFromUrl } from '../utils/upload.js';
 import { setGenerating, getGenerating, getStatus, setPhase } from '../state/aiWorkSummaryState.js';
+import { appendLog, getLogs, clearLogs } from '../state/aiWorkSummaryLogBuffer.js';
 
 export class ProductCollabController {
   private service: ProductCollabService;
@@ -310,6 +311,7 @@ export class ProductCollabController {
           message: '이미 요약 생성 중입니다. 완료 후 새로고침하거나 다시 들어오면 반영됩니다.',
         });
       }
+      clearLogs(userId, language);
       setGenerating(userId, language, true);
       try {
         res.status(200).json({
@@ -317,10 +319,11 @@ export class ProductCollabController {
           started: true,
           message: '요약 생성이 시작되었습니다. 완료 후 새로고침하거나 다시 들어오면 반영됩니다.',
         });
+        const onLog = (msg: string) => appendLog(userId, language, msg);
         ;(async () => {
           try {
             const { getAiWorkSummary } = await import('../services/aiWorkSummaryService.js');
-            const result = await getAiWorkSummary(userId, language);
+            const result = await getAiWorkSummary(userId, language, { onLog });
             if (result) {
               const { insertAiWorkSummaryCache } = await import('../repositories/aiWorkSummaryCacheRepository.js');
               await insertAiWorkSummaryCache(userId, language, result);
@@ -364,6 +367,7 @@ export class ProductCollabController {
           message: '이미 번역 중입니다. 완료 후 새로고침하거나 다시 들어오면 반영됩니다.',
         });
       }
+      clearLogs(userId, language);
       setGenerating(userId, language, true);
       setPhase(userId, language, 'translating');
       try {
@@ -372,10 +376,11 @@ export class ProductCollabController {
           started: true,
           message: '번역이 시작되었습니다. 완료 후 새로고침하거나 다시 들어오면 반영됩니다.',
         });
+        const onLog = (msg: string) => appendLog(userId, language, msg);
         ;(async () => {
           try {
             const { translateAiWorkSummaryFromCache } = await import('../services/aiWorkSummaryService.js');
-            const result = await translateAiWorkSummaryFromCache(userId);
+            const result = await translateAiWorkSummaryFromCache(userId, { onLog });
             if (result) {
               const { insertAiWorkSummaryCache } = await import('../repositories/aiWorkSummaryCacheRepository.js');
               await insertAiWorkSummaryCache(userId, 'zh', result);
@@ -433,6 +438,24 @@ export class ProductCollabController {
     } catch (error: unknown) {
       console.error('Product collab AI work summary status error:', error);
       res.status(500).json({ success: false, error: '진행 상태 조회 중 오류가 발생했습니다.' });
+    }
+  };
+
+  getAiWorkSummaryLogs = async (req: Request, res: Response) => {
+    try {
+      const userId = (req as unknown as { user?: { id: string } }).user?.id ?? '';
+      if (!userId) {
+        return res.status(401).json({ success: false, error: '로그인이 필요합니다.' });
+      }
+      const lang = (req.query.lang ?? 'ko') as string;
+      const language = lang === 'zh' ? 'zh' : 'ko';
+      const status = getStatus(userId, language);
+      const logs = getLogs(userId, language);
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.json({ success: true, logs, generating: status.generating });
+    } catch (error: unknown) {
+      console.error('Product collab AI work summary logs error:', error);
+      res.status(500).json({ success: false, error: '로그 조회 중 오류가 발생했습니다.' });
     }
   };
 

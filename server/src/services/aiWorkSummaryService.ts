@@ -167,12 +167,15 @@ const LANG_PROMPT = {
   },
 } as const;
 
+export type AiWorkSummaryLogger = (msg: string) => void;
+
 /**
  * 제품별 요약을 상태로 그룹한 뒤, 각 상태 그룹당 1~2문장 요약 생성
  */
 async function buildStatusCategorySummaries(
   overallSummary: OverallSummaryProduct[],
-  lang: 'ko' | 'zh'
+  lang: 'ko' | 'zh',
+  onLog?: AiWorkSummaryLogger
 ): Promise<StatusCategorySummary[]> {
   const byStatus = new Map<string, OverallSummaryProduct[]>();
   for (const p of overallSummary) {
@@ -200,8 +203,10 @@ Input (status groups in order):
 ${lines.join('\n\n')}`;
 
   console.log('[AI Work Summary] AI 전달 프롬프트 (상태 카테고리 요약, lang=%s):\n%s', lang, prompt);
+  onLog?.('상태별 요약 생성 중...');
   const statusSystemMsg = lang === 'zh' ? LANG_PROMPT.zh.systemMessageForStatus : undefined;
   const res = await callChatForSummary(prompt, statusSystemMsg);
+  onLog?.('상태별 요약 완료');
   const raw = res?.data?.statusSummaries;
   const toProducts = (list: OverallSummaryProduct[]): { productId: number; productName: string }[] =>
     list.map((p) => ({ productId: p.productId, productName: p.productName }));
@@ -240,20 +245,29 @@ function snippet(s: string | null): string {
   return t.length <= BODY_SNIPPET_LEN ? t : t.slice(0, BODY_SNIPPET_LEN) + '...';
 }
 
-export async function getAiWorkSummary(userId: string, lang: 'ko' | 'zh'): Promise<AiWorkSummaryResult | null> {
+export interface GetAiWorkSummaryOptions {
+  onLog?: AiWorkSummaryLogger;
+}
+
+export async function getAiWorkSummary(userId: string, lang: 'ko' | 'zh', opts?: GetAiWorkSummaryOptions): Promise<AiWorkSummaryResult | null> {
+  const onLog = opts?.onLog;
   console.log('[AI Work Summary] getAiWorkSummary 시작 lang=%s', lang);
+  onLog?.('요약 생성 시작');
   setPhase(userId, lang, 'summarizing');
   if (!OPENAI_API_KEY && !DASHSCOPE_API_KEY) {
+    onLog?.('오류: API 키가 설정되지 않았습니다.');
     console.warn('[AI Work Summary] OPENAI_API_KEY와 DASHSCOPE_API_KEY 중 하나 이상 필요합니다.');
     return null;
   }
 
+  onLog?.('데이터 수집 중...');
   const repo = new ProductCollabRepository();
   const [allProductRows, myRows] = await Promise.all([
     repo.findActiveProductsForSummary(),
     repo.findMyTasksWithProductInfoForSummary(userId),
   ]);
 
+  onLog?.(`제품 ${allProductRows.length}건, 내 업무 ${myRows.length}건 로드 완료`);
   console.log('[AI Work Summary] 1단계: findActiveProductsForSummary() 결과 (조건: 취소·생산완료 제외한 모든 제품)');
   console.log('[AI Work Summary]   - 제품(행) 수: %d', allProductRows.length);
   allProductRows.forEach((r, i) => {
@@ -423,10 +437,12 @@ ${myTasksText}`;
 
     let summaryProvider: SummaryProvider | undefined;
     if (overallProducts.length > 0) {
+      onLog?.('전체 요약 AI 처리 중...');
       console.log('[AI Work Summary] 전체 요약 API 호출 (lang=%s, 방식 B: 해당 언어로 직접 출력)', lang);
       console.log('[AI Work Summary] AI 전달 프롬프트 (전체 제품 요약):\n%s', overallPrompt);
       const overallSystemMsg = lang === 'zh' ? LANG_PROMPT.zh.systemMessageForSummary : undefined;
       const overallRes = await callChatForSummary(overallPrompt, overallSystemMsg);
+      onLog?.('전체 요약 완료');
       if (overallRes?.data && typeof overallRes.data === 'object') {
         summaryProvider = overallRes.provider;
         const products = overallRes.data.products as OverallSummaryProduct[] | undefined;
@@ -468,10 +484,11 @@ ${myTasksText}`;
       });
 
       // 상태 카테고리별 요약 생성 (제품별 요약을 상태로 묶어 그룹당 1문단)
-      statusCategorySummaries = await buildStatusCategorySummaries(overallSummary, lang);
+      statusCategorySummaries = await buildStatusCategorySummaries(overallSummary, lang, onLog);
     }
 
     if (myTaskProducts.length > 0) {
+      onLog?.('내 업무 요약 AI 처리 중...');
       console.log('[AI Work Summary] 내 업무 요약 API 호출 (lang=%s)', lang);
       console.log('[AI Work Summary] AI 전달 프롬프트 (내 업무 요약):\n%s', myTasksPrompt);
       const myTasksSystemMsg = lang === 'zh' ? LANG_PROMPT.zh.systemMessageForSummary : undefined;
@@ -486,6 +503,7 @@ ${myTasksText}`;
       } else {
         console.log('[AI Work Summary] 내 업무 요약 API 응답: null 또는 비정상');
       }
+      onLog?.('내 업무 요약 완료');
       myTasksSummary = (myRes?.data?.items as MyTaskSummaryItem[] | undefined) ?? [];
       if (myTasksSummary.length === 0) {
         myTasksSummary = myTaskProducts.map((p) => ({
@@ -518,17 +536,22 @@ ${myTasksText}`;
 
     // lang=zh 요청인데 AI가 한국어로 응답한 경우: 기존 번역 API로 중국어 변환 후 반환 (Qwen 등 대응)
     if (lang === 'zh' && resultContainsKorean(result)) {
+      onLog?.('중국어 번역 중...');
       console.log('[AI Work Summary] 응답에 한글 포함됨 → 중국어로 번역 후 반환');
-      const translated = await translateSummaryToChinese(result);
+      const translated = await translateSummaryToChinese(result, onLog);
       if (translated) {
+        onLog?.('번역 완료');
         console.log('[AI Work Summary] 번역 완료, 중국어 결과 반환');
         return translated;
       }
+      onLog?.('번역 실패');
       console.warn('[AI Work Summary] 번역 실패, 한글 포함 결과 그대로 반환');
     }
 
+    onLog?.('요약 생성 완료');
     return result;
   } catch (err) {
+    onLog?.('요약 생성 실패');
     console.error('[AI Work Summary] Qwen error:', err);
     return null;
   }
@@ -551,7 +574,7 @@ function resultContainsKorean(result: AiWorkSummaryResult): boolean {
 }
 
 /** lang=zh일 때: 한국어 요약 결과의 summary, delayedNote, myTasksOverallSummary, statusCategorySummaries[].summary 만 중국어로 번역 */
-async function translateSummaryToChinese(result: AiWorkSummaryResult): Promise<AiWorkSummaryResult | null> {
+async function translateSummaryToChinese(result: AiWorkSummaryResult, onLog?: AiWorkSummaryLogger): Promise<AiWorkSummaryResult | null> {
   const payload = JSON.stringify(result);
   const prompt = `The input below is a JSON object with text in **Korean (한국어)**. Your task is to translate ONLY the following fields **from Korean into Simplified Chinese (简体中文)**: "summary", "delayedNote", "myTasksOverallSummary", and each "summary" inside "statusCategorySummaries". All other fields (productId, productName, priority, status, productCount, etc.) must remain unchanged. Write the translated text in Chinese only; do not keep Korean in the output. Use Chinese polite/formal style (敬语). Keep the exact same JSON structure: same top-level keys (overallSummary, myTasksSummary, myTasksOverallSummary, statusCategorySummaries), same array lengths and order. Output valid JSON only, no markdown or explanation.
 
@@ -559,6 +582,7 @@ Input (Korean):
 ${payload}`;
   const systemMsg =
     '당신은 완구, 봉제 인형, 잡화 분야의 전문 소싱, 제작, 판매 전문 관리자 입니다. You are a translator. The input is in Korean. Output the same JSON with summary, delayedNote, myTasksOverallSummary, and statusCategorySummaries[].summary translated into Simplified Chinese (简体中文) only. Use formal polite style (敬语). Do not output Korean; the translated fields must be in Chinese. Keep all other fields unchanged. Preserve exact structure: same keys and array lengths. Output only valid JSON.';
+  onLog?.('번역 AI 호출 중...');
   console.log('[AI Work Summary] AI 전달 프롬프트 (한→중 번역, user):\n%s', prompt);
   console.log('[AI Work Summary] AI 전달 프롬프트 (한→중 번역, system):\n%s', systemMsg);
   const res = await callChatForSummary(prompt, systemMsg, 4096);
@@ -604,23 +628,35 @@ ${payload}`;
   return translated;
 }
 
+export interface TranslateAiWorkSummaryOptions {
+  onLog?: AiWorkSummaryLogger;
+}
+
 /** 한국어 요약 캐시를 읽어 중국어로 번역한 결과 반환. 캐시 없거나 번역 실패 시 null */
-export async function translateAiWorkSummaryFromCache(userId: string): Promise<AiWorkSummaryResult | null> {
+export async function translateAiWorkSummaryFromCache(userId: string, opts?: TranslateAiWorkSummaryOptions): Promise<AiWorkSummaryResult | null> {
+  const onLog = opts?.onLog;
+  onLog?.('번역 시작 (한국어 → 중국어)');
   const { getAiWorkSummaryCache } = await import('../repositories/aiWorkSummaryCacheRepository.js');
   const cached = await getAiWorkSummaryCache(userId, 'ko');
   if (!cached?.result) {
+    onLog?.('오류: 한국어 요약 캐시가 없습니다.');
     console.warn('[AI Work Summary] 번역 불가: 한국어 요약 캐시 없음 userId=%s', userId);
     return null;
   }
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const translated = await translateSummaryToChinese(cached.result);
-    if (translated) return translated;
+    if (attempt > 1) onLog?.(`번역 재시도 (${attempt}/${maxAttempts})`);
+    const translated = await translateSummaryToChinese(cached.result, onLog);
+    if (translated) {
+      onLog?.('번역 완료');
+      return translated;
+    }
     if (attempt < maxAttempts) {
       console.warn('[AI Work Summary] 번역 실패, 재시도 %d/%d', attempt, maxAttempts);
       await delay(1500);
     }
   }
+  onLog?.('번역 실패');
   console.warn('[AI Work Summary] 번역 실패(%d회 시도)', maxAttempts);
   return null;
 }

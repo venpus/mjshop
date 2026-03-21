@@ -7,13 +7,15 @@ import {
   postAiWorkSummaryTranslate,
   getAiWorkSummaryLast,
   getAiWorkSummaryStatus,
+  getAiWorkSummaryLogs,
 } from '../../../api/productCollabApi';
 import type { AiWorkSummaryResult, AiWorkSummaryPhase } from '../../../api/productCollabApi';
 import { MyTasksSummaryTable } from './MyTasksSummaryTable';
 import { StatusCategorySummaryList } from './StatusCategorySummaryList';
+import { TerminalModal } from '../shared/TerminalModal';
 
-const POLL_LAST_MS = 5000;
 const POLL_STATUS_MS = 2000;
+const POLL_LOGS_MS = 1500;
 
 function formatSummaryGeneratedAgo(isoString: string): { key: string; n?: number } {
   const then = new Date(isoString).getTime();
@@ -36,9 +38,7 @@ export function AiWorkSummarySection() {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [generatingPhase, setGeneratingPhase] = useState<AiWorkSummaryPhase | null>(null);
-  const pollKoLastRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollKoStatusRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollZhLastRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollZhStatusRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 업무 요약 표시 언어: 사이트 설정 언어로 결정. 설정이 중국어면 zh, 그 외면 ko
@@ -95,77 +95,63 @@ export function AiWorkSummarySection() {
 
   useEffect(() => {
     if (!isSummarizing) return;
-    const pollLast = () => {
-      getAiWorkSummaryLast(displayLang).then((res) => {
-        if (res.success && res.data) {
-          if (displayLang === 'ko') setHasKoSummary(true);
-          setIsSummarizing(false);
-          setGeneratingPhase(null);
-          setData(res.data);
-          setGeneratedAt(res.data.generatedAt ?? null);
-          refetchDisplay();
-          if (pollKoLastRef.current) clearInterval(pollKoLastRef.current);
+    const pollStatus = () => {
+      getAiWorkSummaryStatus(displayLang).then((res) => {
+        if (res.success && res.generating) {
+          setGeneratingPhase(res.phase ?? 'summarizing');
+        } else if (res.success && !res.generating) {
+          getAiWorkSummaryLast(displayLang).then((lastRes) => {
+            if (lastRes.success && lastRes.data) {
+              if (displayLang === 'ko') setHasKoSummary(true);
+              setIsSummarizing(false);
+              setGeneratingPhase(null);
+              setLogModalOpen(false);
+              setData(lastRes.data);
+              setGeneratedAt(lastRes.data.generatedAt ?? null);
+              refetchDisplay();
+            }
+          });
           if (pollKoStatusRef.current) clearInterval(pollKoStatusRef.current);
-          pollKoLastRef.current = null;
           pollKoStatusRef.current = null;
         }
       });
     };
-    const pollStatus = () => {
-      getAiWorkSummaryStatus(displayLang).then((res) => {
-        if (res.success && res.generating) setGeneratingPhase(res.phase ?? 'summarizing');
-        else if (res.success && !res.generating) {
-          pollLast();
-        }
-      });
-    };
-    pollKoLastRef.current = setInterval(pollLast, POLL_LAST_MS);
     pollKoStatusRef.current = setInterval(pollStatus, POLL_STATUS_MS);
-    pollLast();
     pollStatus();
     return () => {
-      if (pollKoLastRef.current) clearInterval(pollKoLastRef.current);
       if (pollKoStatusRef.current) clearInterval(pollKoStatusRef.current);
-      pollKoLastRef.current = null;
       pollKoStatusRef.current = null;
     };
   }, [isSummarizing, displayLang, refetchDisplay]);
 
   useEffect(() => {
     if (!isTranslating) return;
-    const pollLast = () => {
-      getAiWorkSummaryLast('zh').then((res) => {
-        if (res.success && res.data) {
-          setIsTranslating(false);
-          setGeneratingPhase(null);
-          if (displayLang === 'zh') {
-            setData(res.data);
-            setGeneratedAt(res.data.generatedAt ?? null);
-          }
-          refetchDisplay();
-          if (pollZhLastRef.current) clearInterval(pollZhLastRef.current);
+    const pollStatus = () => {
+      getAiWorkSummaryStatus('zh').then((res) => {
+        if (res.success && res.generating) {
+          setGeneratingPhase(res.phase ?? 'translating');
+        } else if (res.success && !res.generating) {
+          getAiWorkSummaryLast('zh').then((lastRes) => {
+            if (lastRes.success && lastRes.data) {
+              setIsTranslating(false);
+              setGeneratingPhase(null);
+              setLogModalOpen(false);
+              if (displayLang === 'zh') {
+                setData(lastRes.data);
+                setGeneratedAt(lastRes.data.generatedAt ?? null);
+              }
+              refetchDisplay();
+            }
+          });
           if (pollZhStatusRef.current) clearInterval(pollZhStatusRef.current);
-          pollZhLastRef.current = null;
           pollZhStatusRef.current = null;
         }
       });
     };
-    const pollStatus = () => {
-      getAiWorkSummaryStatus('zh').then((res) => {
-        if (res.success && res.generating) setGeneratingPhase(res.phase ?? 'translating');
-        else if (res.success && !res.generating) {
-          pollLast();
-        }
-      });
-    };
-    pollZhLastRef.current = setInterval(pollLast, POLL_LAST_MS);
     pollZhStatusRef.current = setInterval(pollStatus, POLL_STATUS_MS);
-    pollLast();
     pollStatus();
     return () => {
-      if (pollZhLastRef.current) clearInterval(pollZhLastRef.current);
       if (pollZhStatusRef.current) clearInterval(pollZhStatusRef.current);
-      pollZhLastRef.current = null;
       pollZhStatusRef.current = null;
     };
   }, [isTranslating, displayLang, refetchDisplay]);
@@ -192,47 +178,59 @@ export function AiWorkSummarySection() {
 
   const handleSummarize = async () => {
     setError(null);
-    setIsSummarizing(true);
-    setGeneratingPhase('summarizing');
+    setLogModalOpen(true);
+    setLogModalTitle(t('productCollab.summarize'));
+    setLogs([]);
     setLoadingSummarize(true);
     const res = await postAiWorkSummary(displayLang);
     setLoadingSummarize(false);
     if (res.success && res.started) {
-      // polling will update
+      setIsSummarizing(true);
+      setGeneratingPhase('summarizing');
     } else if (res.success && res.alreadyGenerating) {
+      setIsSummarizing(true);
+      setLogModalOpen(true);
       getAiWorkSummaryStatus(displayLang).then((s) => s.success && s.generating && setGeneratingPhase(s.phase ?? 'summarizing'));
     } else if (res.success && res.data) {
       setIsSummarizing(false);
       setGeneratingPhase(null);
+      setLogModalOpen(false);
       setHasKoSummary(true);
       setData(res.data);
       if (res.data.generatedAt) setGeneratedAt(res.data.generatedAt);
     } else {
       setIsSummarizing(false);
       setGeneratingPhase(null);
+      setLogModalOpen(false);
       setError(res.error ?? t('productCollab.summaryError'));
     }
   };
 
   const handleTranslate = async () => {
     setError(null);
-    setIsTranslating(true);
-    setGeneratingPhase('translating');
+    setLogModalOpen(true);
+    setLogModalTitle(t('productCollab.translate'));
+    setLogs([]);
     setLoadingTranslate(true);
     const res = await postAiWorkSummaryTranslate();
     setLoadingTranslate(false);
     if (res.success && res.started) {
-      // polling will update
+      setIsTranslating(true);
+      setGeneratingPhase('translating');
     } else if (res.success && res.alreadyGenerating) {
+      setIsTranslating(true);
+      setLogModalOpen(true);
       getAiWorkSummaryStatus('zh').then((s) => s.success && s.generating && setGeneratingPhase(s.phase ?? 'translating'));
     } else if (res.success && res.data) {
       setIsTranslating(false);
       setGeneratingPhase(null);
+      setLogModalOpen(false);
       setData(res.data);
       if (res.data.generatedAt) setGeneratedAt(res.data.generatedAt);
     } else {
       setIsTranslating(false);
       setGeneratingPhase(null);
+      setLogModalOpen(false);
       setError(res.error ?? t('productCollab.summaryError'));
     }
   };
@@ -248,6 +246,38 @@ export function AiWorkSummarySection() {
   const statusMessage = isSummarizing ? t('productCollab.summarizing') : isTranslating ? t('productCollab.translating') : null;
   /** 내 업무 요약 하단 상세 내역(제품별 요약 테이블) 접기/펼치기. 기본 접힘 */
   const [myTasksDetailExpanded, setMyTasksDetailExpanded] = useState(false);
+  const [logModalOpen, setLogModalOpen] = useState(false);
+  const [logModalTitle, setLogModalTitle] = useState('');
+  const [logs, setLogs] = useState<string[]>([]);
+  const pollLogsRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!logModalOpen) return;
+    const waiting =
+      loadingSummarize || loadingTranslate || isSummarizing || isTranslating;
+    if (!waiting) return;
+    const lang = isTranslating || loadingTranslate ? 'zh' : displayLang;
+    const poll = () => {
+      getAiWorkSummaryLogs(lang).then((res) => {
+        if (res.success && res.logs.length > 0) setLogs(res.logs);
+      });
+    };
+    poll();
+    pollLogsRef.current = setInterval(poll, POLL_LOGS_MS);
+    return () => {
+      if (pollLogsRef.current) {
+        clearInterval(pollLogsRef.current);
+        pollLogsRef.current = null;
+      }
+    };
+  }, [
+    logModalOpen,
+    loadingSummarize,
+    loadingTranslate,
+    isSummarizing,
+    isTranslating,
+    displayLang,
+  ]);
 
   return (
     <section className="rounded-none sm:rounded-xl border-2 border-[#E5E7EB] bg-white overflow-hidden mb-6 -mx-6 sm:mx-0">
@@ -356,6 +386,13 @@ export function AiWorkSummarySection() {
           </div>
         )}
       </div>
+      <TerminalModal
+        isOpen={logModalOpen}
+        onClose={() => setLogModalOpen(false)}
+        title={logModalTitle}
+        logs={logs}
+        isRunning={loadingSummarize || loadingTranslate || isSummarizing || isTranslating}
+      />
     </section>
   );
 }

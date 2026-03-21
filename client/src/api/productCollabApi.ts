@@ -152,6 +152,27 @@ export async function getAiWorkSummaryStatus(lang: 'ko' | 'zh'): Promise<AiWorkS
   };
 }
 
+export interface AiWorkSummaryLogsResponse {
+  success: boolean;
+  logs: string[];
+  generating: boolean;
+  error?: string;
+}
+
+export async function getAiWorkSummaryLogs(lang: 'ko' | 'zh'): Promise<AiWorkSummaryLogsResponse> {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/ai-work-summary/logs?lang=${lang}`, {
+    headers: getAuthHeaders(),
+    cache: 'no-store',
+  });
+  const json = await res.json();
+  if (!res.ok) return { success: false, logs: [], generating: false, error: json.error || '로그 조회 실패' };
+  return {
+    success: true,
+    logs: Array.isArray(json.logs) ? json.logs : [],
+    generating: json.generating === true,
+  };
+}
+
 export async function getDashboard(): Promise<ApiResponse<DashboardData>> {
   const res = await fetch(`${getApiBaseUrl()}/product-collab/dashboard`, {
     headers: getAuthHeaders(),
