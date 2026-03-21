@@ -59,7 +59,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'schedule.noEvents': '이 날짜에 표시할 일정이 없습니다.',
     'schedule.kindProduction': '생산중',
     'schedule.kindShipment': '출고예정',
-    'schedule.kindLogisticsDispatch': '물류발송',
+    'schedule.kindLogisticsDispatch': '한국출발',
     'schedule.kindKoreaArrivalExpected': '한국도착 예정',
     'schedule.kindOther': '기타',
     'schedule.filterAll': '전체',
@@ -78,6 +78,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'schedule.retryLoad': '다시 시도',
     'schedule.linkedPurchaseOrder': '발주 연결',
     'schedule.searchPurchaseOrder': '발주번호·제품명 검색…',
+    'schedule.searchPurchaseOrderLogistics': '패킹리스트 코드·제품명 검색…',
     'schedule.purchaseOrderPlaceholder': '발주를 검색해 선택',
     'schedule.purchaseOrderEmpty': '검색 결과가 없습니다.',
     'schedule.purchaseOrderHintProduction': '발주관리 전체 목록에서 검색합니다.',
@@ -91,7 +92,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'schedule.titleDerivedFromPo':
       '생산중·출고예정은 달력 제목이 선택한 발주번호와 제품명으로 자동 설정됩니다. 발주를 선택하세요.',
     'schedule.titleDerivedFromPoLogistics':
-      '물류발송도 발주번호·제품명으로 제목이 정해집니다. 패킹리스트에 올라간 발주를 선택하세요.',
+      '한국출발은 선택한 패킹리스트 코드와 행 제품명으로 제목이 정해집니다. 목록에서 항목을 선택하세요.',
     'schedule.fieldTransitDays': '배송 소요일 (일)',
     'schedule.fieldTransitDaysHint': '종료일 기준으로 달력일을 더해 한국도착 예정일이 자동 계산됩니다.',
     'schedule.transitDaysInvalid': '배송 소요일은 0~3650 사이의 정수여야 합니다.',
@@ -675,7 +676,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'schedule.noEvents': '该日期暂无日程。',
     'schedule.kindProduction': '生产中',
     'schedule.kindShipment': '出货预定',
-    'schedule.kindLogisticsDispatch': '物流发货',
+    'schedule.kindLogisticsDispatch': '韩国出发',
     'schedule.kindKoreaArrivalExpected': '预计到达韩国',
     'schedule.kindOther': '其他',
     'schedule.filterAll': '全部',
@@ -698,7 +699,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'schedule.purchaseOrderEmpty': '无结果',
     'schedule.purchaseOrderHintProduction': '从全部订单中搜索。',
     'schedule.purchaseOrderHintShipment': '仅显示未入库数量大于 0 的订单。',
-    'schedule.purchaseOrderHintLogistics': '仅显示已加入装箱单的订单。',
+    'schedule.purchaseOrderHintLogistics': '按装箱单行显示。可用代码、行产品名、订单号搜索。',
     'schedule.clearPurchaseOrder': '清除关联',
     'schedule.linkedPoLine': '订单',
     'schedule.fieldTitleOther': '标题',
@@ -707,7 +708,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'schedule.titleDerivedFromPo':
       '生产中与出货预定的标题将自动使用所选订单号与产品名。请选择订单。',
     'schedule.titleDerivedFromPoLogistics':
-      '物流发货同样按订单号与产品名生成标题。请选择已加入装箱单的订单。',
+      '“韩国出发”将使用所选装箱单代码与行产品名作为标题。请从列表中选择一项。',
     'schedule.fieldTransitDays': '运输天数（日）',
     'schedule.fieldTransitDaysHint': '在结束日期上按日历日累加，自动生成预计到达韩国日期。',
     'schedule.transitDaysInvalid': '运输天数须为 0~3650 的整数。',

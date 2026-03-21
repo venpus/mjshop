@@ -97,7 +97,7 @@ async function resolvePurchaseOrderForSchedule(
   }
   if (kind === 'logistics_dispatch') {
     if (!raw) {
-      return { purchaseOrderId: null, error: '물류발송 일정에는 발주를 선택해야 합니다.' };
+      return { purchaseOrderId: null, error: '한국출발 일정에는 발주를 선택해야 합니다.' };
     }
     const po = await purchaseOrderRepository.findById(raw);
     if (!po) {
@@ -307,12 +307,12 @@ export async function update(req: Request, res: Response) {
     if (existing.kind === 'korea_arrival_expected') {
       return res
         .status(400)
-        .json({ error: '한국도착 예정 일정은 물류발송 일정에서만 수정할 수 있습니다.' });
+        .json({ error: '한국도착 예정 일정은 한국출발 일정에서만 수정할 수 있습니다.' });
     }
 
     if (existing.kind === 'logistics_dispatch') {
       if (kind !== 'logistics_dispatch') {
-        return res.status(400).json({ error: '물류발송 일정의 유형은 변경할 수 없습니다.' });
+        return res.status(400).json({ error: '한국출발 일정의 유형은 변경할 수 없습니다.' });
       }
       const { days: transitDays, error: tdErr } = parseTransitDaysFromBody(body);
       if (tdErr) {

@@ -150,20 +150,34 @@ export class PurchaseOrderService {
   }
 
   /**
-   * 패킹리스트에 등록된 발주 목록 (일정 물류발송 피커)
+   * 패킹리스트 항목 목록 (일정 한국출발 피커)
    */
   async getPurchaseOrdersOnPackingLists(
     searchTerm?: string,
     page?: number,
     limit?: number,
   ): Promise<{
-    data: Array<{ id: string; po_number: string; product_name: string }>;
+    data: Array<{
+      id: string;
+      po_number: string;
+      product_name: string;
+      packing_list_item_id: string;
+      packing_list_code: string;
+      packing_line_product_name: string;
+    }>;
     total: number;
     page: number;
     limit: number;
     totalPages: number;
   }> {
-    let rows: Array<{ id: string; po_number: string; product_name: string }>;
+    let rows: Array<{
+      id: string;
+      po_number: string;
+      product_name: string;
+      packing_list_item_id: string;
+      packing_list_code: string;
+      packing_line_product_name: string;
+    }>;
     let total: number;
 
     if (page !== undefined && limit !== undefined) {

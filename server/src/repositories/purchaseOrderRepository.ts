@@ -417,28 +417,43 @@ export class PurchaseOrderRepository {
   }
 
   /**
-   * 패킹리스트에 등록된 발주만 (일정 물류발송 피커)
+   * 패킹리스트 항목 단위 (일정 한국출발 피커): 코드·행 제품명 기준, 연결 발주 id는 그대로 반환
    */
   async findPurchaseOrdersOnPackingLists(
     searchTerm?: string,
     limit?: number,
     offset?: number,
-  ): Promise<Array<{ id: string; po_number: string; product_name: string }>> {
-    let query = `SELECT DISTINCT po.id, po.po_number, po.product_name
-       FROM purchase_orders po
-       INNER JOIN packing_list_items pli ON pli.purchase_order_id = po.id
+  ): Promise<
+    Array<{
+      id: string;
+      po_number: string;
+      product_name: string;
+      packing_list_item_id: string;
+      packing_list_code: string;
+      packing_line_product_name: string;
+    }>
+  > {
+    let query = `SELECT pli.id AS packing_list_item_id,
+       po.id, po.po_number, po.product_name,
+       pl.code AS packing_list_code,
+       pli.product_name AS packing_line_product_name
+       FROM packing_list_items pli
+       INNER JOIN packing_lists pl ON pli.packing_list_id = pl.id
+       INNER JOIN purchase_orders po ON pli.purchase_order_id = po.id
        WHERE 1=1`;
     const params: any[] = [];
     if (searchTerm && searchTerm.trim()) {
       const searchPattern = `%${searchTerm.trim()}%`;
       query += ` AND (
+        pl.code LIKE ? OR
+        pli.product_name LIKE ? OR
         po.po_number LIKE ? OR
         po.product_name LIKE ? OR
         po.product_name_chinese LIKE ?
       )`;
-      params.push(searchPattern, searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
     }
-    query += ` ORDER BY po.order_date DESC, po.created_at DESC`;
+    query += ` ORDER BY pl.shipment_date DESC, pl.created_at DESC, pli.id`;
     if (limit !== undefined) {
       query += ` LIMIT ?`;
       params.push(limit);
@@ -452,23 +467,29 @@ export class PurchaseOrderRepository {
       id: row.id,
       po_number: row.po_number,
       product_name: row.product_name,
+      packing_list_item_id: String(row.packing_list_item_id),
+      packing_list_code: row.packing_list_code ?? '',
+      packing_line_product_name: row.packing_line_product_name ?? '',
     }));
   }
 
   async countPurchaseOrdersOnPackingLists(searchTerm?: string): Promise<number> {
-    let query = `SELECT COUNT(DISTINCT po.id) AS total
-       FROM purchase_orders po
-       INNER JOIN packing_list_items pli ON pli.purchase_order_id = po.id
+    let query = `SELECT COUNT(*) AS total
+       FROM packing_list_items pli
+       INNER JOIN packing_lists pl ON pli.packing_list_id = pl.id
+       INNER JOIN purchase_orders po ON pli.purchase_order_id = po.id
        WHERE 1=1`;
     const params: any[] = [];
     if (searchTerm && searchTerm.trim()) {
       const searchPattern = `%${searchTerm.trim()}%`;
       query += ` AND (
+        pl.code LIKE ? OR
+        pli.product_name LIKE ? OR
         po.po_number LIKE ? OR
         po.product_name LIKE ? OR
         po.product_name_chinese LIKE ?
       )`;
-      params.push(searchPattern, searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
     }
     const [rows] = await pool.execute<RowDataPacket[]>(query, params);
     return Number(rows[0]?.total) || 0;

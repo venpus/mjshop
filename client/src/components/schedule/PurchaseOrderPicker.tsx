@@ -19,17 +19,46 @@ import { useLanguage } from "../../contexts/LanguageContext";
 
 export type { PurchaseOrderPickerRow };
 
+type PickerMode = "production" | "shipment" | "logistics";
+
+function pickerRowLabel(row: PurchaseOrderPickerRow, mode: PickerMode): string {
+  if (mode === "logistics" && row.packing_list_code?.trim()) {
+    const lineName = (row.packing_line_product_name ?? row.product_name).trim();
+    if (lineName) return `${row.packing_list_code.trim()} · ${lineName}`;
+    return row.packing_list_code.trim();
+  }
+  const po = row.po_number.trim();
+  const pn = row.product_name.trim();
+  if (po && pn) return `${po} · ${pn}`;
+  return po || pn || row.id;
+}
+
+function isSamePickerRow(
+  selected: PurchaseOrderPickerRow | null,
+  row: PurchaseOrderPickerRow,
+  mode: PickerMode,
+): boolean {
+  if (!selected || selected.id !== row.id) return false;
+  if (mode !== "logistics") return true;
+  if (selected.packing_list_item_id && row.packing_list_item_id) {
+    return selected.packing_list_item_id === row.packing_list_item_id;
+  }
+  return true;
+}
+
 type Props = {
-  mode: "production" | "shipment" | "logistics";
+  mode: PickerMode;
   value: PurchaseOrderPickerRow | null;
   onChange: (next: PurchaseOrderPickerRow | null) => void;
+  /** 발주 검색 콤보박스(트리거)에만 적용 */
+  comboboxClassName?: string;
 };
 
 /**
  * Dialog 안에서 Radix Popover(포털)를 쓰면 포커스 트랩과 충돌해 열림이 불안정해질 수 있어,
  * 동일 모달 DOM 안에 absolute 패널로 검색 목록을 띄웁니다.
  */
-export function PurchaseOrderPicker({ mode, value, onChange }: Props) {
+export function PurchaseOrderPicker({ mode, value, onChange, comboboxClassName }: Props) {
   const { t } = useLanguage();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -100,8 +129,8 @@ export function PurchaseOrderPicker({ mode, value, onChange }: Props) {
         : t("schedule.purchaseOrderHintProduction");
 
   const display =
-    value && (value.po_number || value.product_name)
-      ? `${value.po_number}${value.product_name ? ` · ${value.product_name}` : ""}`
+    value && (value.po_number || value.product_name || value.packing_list_code)
+      ? pickerRowLabel(value, mode)
       : t("schedule.purchaseOrderPlaceholder");
 
   return (
@@ -124,7 +153,7 @@ export function PurchaseOrderPicker({ mode, value, onChange }: Props) {
         variant="outline"
         role="combobox"
         aria-expanded={open}
-        className="w-full justify-between font-normal"
+        className={cn("w-full justify-between font-normal", comboboxClassName)}
         onClick={() => setOpen((o) => !o)}
       >
         <span className="truncate text-left">{display}</span>
@@ -138,7 +167,11 @@ export function PurchaseOrderPicker({ mode, value, onChange }: Props) {
         >
           <Command shouldFilter={false} className="flex max-h-[min(320px,50vh)] flex-col overflow-hidden">
             <CommandInput
-              placeholder={t("schedule.searchPurchaseOrder")}
+              placeholder={
+                mode === "logistics"
+                  ? t("schedule.searchPurchaseOrderLogistics")
+                  : t("schedule.searchPurchaseOrder")
+              }
               value={search}
               onValueChange={setSearch}
             />
@@ -156,20 +189,20 @@ export function PurchaseOrderPicker({ mode, value, onChange }: Props) {
                   <CommandGroup>
                     {items.map((po) => (
                       <CommandItem
-                        key={po.id}
-                        value={po.id}
+                        key={po.packing_list_item_id ?? po.id}
+                        value={po.packing_list_item_id ?? po.id}
                         onSelect={() => {
                           onChange(po);
                           setOpen(false);
                         }}
                       >
                         <Check
-                          className={cn("mr-2 size-4 shrink-0", value?.id === po.id ? "opacity-100" : "opacity-0")}
+                          className={cn(
+                            "mr-2 size-4 shrink-0",
+                            isSamePickerRow(value, po, mode) ? "opacity-100" : "opacity-0",
+                          )}
                         />
-                        <span className="truncate">
-                          {po.po_number}
-                          {po.product_name ? ` · ${po.product_name}` : ""}
-                        </span>
+                        <span className="truncate">{pickerRowLabel(po, mode)}</span>
                       </CommandItem>
                     ))}
                   </CommandGroup>

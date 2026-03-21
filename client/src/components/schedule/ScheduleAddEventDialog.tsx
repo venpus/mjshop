@@ -21,7 +21,12 @@ import { useLanguage } from "../../contexts/LanguageContext";
 import type { ScheduleEvent, ScheduleEventKind } from "./types";
 import { PurchaseOrderPicker, type PurchaseOrderPickerRow } from "./PurchaseOrderPicker";
 
-function titleFromPurchaseOrder(po: PurchaseOrderPickerRow): string {
+function titleFromPicker(po: PurchaseOrderPickerRow, kind: ScheduleEventKind): string {
+  if (kind === "logistics_dispatch" && po.packing_list_code?.trim()) {
+    const name = (po.packing_line_product_name ?? po.product_name).trim();
+    if (name) return `[${po.packing_list_code.trim()}] ${name}`.slice(0, 500);
+    return `[${po.packing_list_code.trim()}]`.slice(0, 500);
+  }
   const label = `[${po.po_number}] ${po.product_name}`.trim();
   return (label || po.id).slice(0, 500);
 }
@@ -51,6 +56,10 @@ function pickerModeForKind(kind: ScheduleEventKind): "production" | "shipment" |
   if (kind === "logistics_dispatch") return "logistics";
   return "production";
 }
+
+/** 다이얼로그 안에서 입력 칸 테두리가 또렷하게 보이도록 */
+const scheduleDialogFieldClass =
+  "border-gray-400 bg-white shadow-sm dark:border-gray-500 dark:bg-background";
 
 export function ScheduleAddEventDialog({
   open,
@@ -127,7 +136,7 @@ export function ScheduleAddEventDialog({
       resolvedTitle = trimmed;
     } else if (kind === "logistics_dispatch") {
       if (linkedPo) {
-        resolvedTitle = titleFromPurchaseOrder(linkedPo);
+        resolvedTitle = titleFromPicker(linkedPo, kind);
         purchaseOrderId = linkedPo.id;
       } else if (editingEvent) {
         resolvedTitle = editingEvent.title;
@@ -143,7 +152,7 @@ export function ScheduleAddEventDialog({
       transitDays = td;
     } else {
       if (linkedPo) {
-        resolvedTitle = titleFromPurchaseOrder(linkedPo);
+        resolvedTitle = titleFromPicker(linkedPo, kind);
         purchaseOrderId = linkedPo.id;
       } else if (editingEvent) {
         resolvedTitle = editingEvent.title;
@@ -210,6 +219,7 @@ export function ScheduleAddEventDialog({
               <Input
                 id="sched-start"
                 type="date"
+                className={scheduleDialogFieldClass}
                 value={startDateKey}
                 onChange={(e) => setStartDateKey(e.target.value)}
               />
@@ -219,6 +229,7 @@ export function ScheduleAddEventDialog({
               <Input
                 id="sched-end"
                 type="date"
+                className={scheduleDialogFieldClass}
                 value={endDateKey}
                 onChange={(e) => setEndDateKey(e.target.value)}
               />
@@ -231,7 +242,7 @@ export function ScheduleAddEventDialog({
               onValueChange={(v) => setKind(v as ScheduleEventKind)}
               disabled={Boolean(editingEvent)}
             >
-              <SelectTrigger>
+              <SelectTrigger className={scheduleDialogFieldClass}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -261,6 +272,7 @@ export function ScheduleAddEventDialog({
                 mode={pickerModeForKind(kind)}
                 value={linkedPo}
                 onChange={setLinkedPo}
+                comboboxClassName={scheduleDialogFieldClass}
               />
             </>
           )}
@@ -283,6 +295,7 @@ export function ScheduleAddEventDialog({
             <Label htmlFor="sched-note">{t("schedule.fieldNote")}</Label>
             <Input
               id="sched-note"
+              className={scheduleDialogFieldClass}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={t("schedule.fieldNotePlaceholder")}
