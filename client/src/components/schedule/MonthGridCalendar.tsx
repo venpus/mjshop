@@ -110,7 +110,7 @@ export function MonthGridCalendar({
                 </div>
               )}
               <div className="mt-auto min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
-                <ScheduleDayKindCounts counts={kindCounts} className="mt-0.5" size="month" />
+                <ScheduleDayKindCounts counts={kindCounts} className="mt-0.5" size="month" columns={2} />
               </div>
             </button>
           );
