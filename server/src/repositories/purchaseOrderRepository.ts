@@ -407,6 +407,73 @@ export class PurchaseOrderRepository {
     return rows[0].total;
   }
 
+  /** 발주가 패킹리스트 항목으로 한 번이라도 등록되어 있는지 */
+  async isPurchaseOrderOnPackingList(purchaseOrderId: string): Promise<boolean> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT 1 AS ok FROM packing_list_items WHERE purchase_order_id = ? LIMIT 1`,
+      [purchaseOrderId],
+    );
+    return rows.length > 0;
+  }
+
+  /**
+   * 패킹리스트에 등록된 발주만 (일정 물류발송 피커)
+   */
+  async findPurchaseOrdersOnPackingLists(
+    searchTerm?: string,
+    limit?: number,
+    offset?: number,
+  ): Promise<Array<{ id: string; po_number: string; product_name: string }>> {
+    let query = `SELECT DISTINCT po.id, po.po_number, po.product_name
+       FROM purchase_orders po
+       INNER JOIN packing_list_items pli ON pli.purchase_order_id = po.id
+       WHERE 1=1`;
+    const params: any[] = [];
+    if (searchTerm && searchTerm.trim()) {
+      const searchPattern = `%${searchTerm.trim()}%`;
+      query += ` AND (
+        po.po_number LIKE ? OR
+        po.product_name LIKE ? OR
+        po.product_name_chinese LIKE ?
+      )`;
+      params.push(searchPattern, searchPattern, searchPattern);
+    }
+    query += ` ORDER BY po.order_date DESC, po.created_at DESC`;
+    if (limit !== undefined) {
+      query += ` LIMIT ?`;
+      params.push(limit);
+      if (offset !== undefined) {
+        query += ` OFFSET ?`;
+        params.push(offset);
+      }
+    }
+    const [rows] = await pool.execute<any[]>(query, params);
+    return rows.map((row) => ({
+      id: row.id,
+      po_number: row.po_number,
+      product_name: row.product_name,
+    }));
+  }
+
+  async countPurchaseOrdersOnPackingLists(searchTerm?: string): Promise<number> {
+    let query = `SELECT COUNT(DISTINCT po.id) AS total
+       FROM purchase_orders po
+       INNER JOIN packing_list_items pli ON pli.purchase_order_id = po.id
+       WHERE 1=1`;
+    const params: any[] = [];
+    if (searchTerm && searchTerm.trim()) {
+      const searchPattern = `%${searchTerm.trim()}%`;
+      query += ` AND (
+        po.po_number LIKE ? OR
+        po.product_name LIKE ? OR
+        po.product_name_chinese LIKE ?
+      )`;
+      params.push(searchPattern, searchPattern, searchPattern);
+    }
+    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
+    return Number(rows[0]?.total) || 0;
+  }
+
   /**
    * ID로 발주 조회
    */

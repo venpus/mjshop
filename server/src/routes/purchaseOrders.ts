@@ -11,6 +11,9 @@ router.get('/', purchaseOrderController.getAllPurchaseOrders);
 // 미출고 수량이 있는 발주 목록 조회
 router.get('/unshipped', purchaseOrderController.getPurchaseOrdersWithUnshipped);
 
+// 패킹리스트에 등록된 발주만 (일정 물류발송 피커)
+router.get('/on-packing-lists', purchaseOrderController.getPurchaseOrdersOnPackingLists);
+
 // 한국에 도착하지 않은 물품 분석 조회
 router.get('/analysis/not-arrived', purchaseOrderController.getNotArrivedAnalysis);
 

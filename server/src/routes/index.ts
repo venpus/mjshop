@@ -18,6 +18,7 @@ import accessLogRoutes from './accessLogs.js';
 import normalInvoiceRoutes from './normalInvoices.js';
 import paymentMiscEntryRoutes from './paymentMiscEntries.js';
 import scheduleEventRoutes from './scheduleEvents.js';
+import calendarHolidayRoutes from './calendarHolidays.js';
 
 const router = Router();
 
@@ -44,6 +45,7 @@ router.use('/manufacturing-documents', manufacturingDocumentRoutes);
 router.use('/normal-invoices', normalInvoiceRoutes);
 router.use('/payment-misc-entries', paymentMiscEntryRoutes);
 router.use('/schedule-events', scheduleEventRoutes);
+router.use('/calendar-holidays', calendarHolidayRoutes);
 
 router.get('/', (req, res) => {
   res.json({ 

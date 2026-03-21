@@ -126,6 +126,49 @@ export class PurchaseOrderController {
   };
 
   /**
+   * 패킹리스트에 등록된 발주 목록
+   * GET /api/purchase-orders/on-packing-lists?page=1&limit=20&search=
+   */
+  getPurchaseOrdersOnPackingLists = async (req: Request, res: Response) => {
+    try {
+      const searchTerm = req.query.search as string | undefined;
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+
+      if (page !== undefined && (isNaN(page) || page < 1)) {
+        return res.status(400).json({
+          success: false,
+          error: 'page는 1 이상의 정수여야 합니다.',
+        });
+      }
+      if (limit !== undefined && (isNaN(limit) || limit < 1)) {
+        return res.status(400).json({
+          success: false,
+          error: 'limit는 1 이상의 정수여야 합니다.',
+        });
+      }
+
+      const result = await this.service.getPurchaseOrdersOnPackingLists(searchTerm, page, limit);
+      res.json({
+        success: true,
+        data: result.data,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: result.totalPages,
+        },
+      });
+    } catch (error: any) {
+      console.error('패킹리스트 등록 발주 목록 조회 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '발주 목록을 불러오는데 실패했습니다.',
+      });
+    }
+  };
+
+  /**
    * ID로 발주 조회
    * GET /api/purchase-orders/:id
    */

@@ -50,9 +50,10 @@ async function requestPurchaseOrders(
 /**
  * 생산중: 발주 컨펌·미입고 수량 0 초과 (일정 피커 전용)
  * 출고예정: 미입고 수량 0 초과 발주만 (일정 피커 전용)
+ * 물류발송: 패킹리스트에 한 번이라도 등록된 발주만
  */
 export async function searchPurchaseOrdersForSchedulePicker(
-  mode: "production" | "shipment",
+  mode: "production" | "shipment" | "logistics",
   search: string,
   limit = 30,
 ): Promise<PurchaseOrderPickerRow[]> {
@@ -60,11 +61,15 @@ export async function searchPurchaseOrdersForSchedulePicker(
   const params = new URLSearchParams();
   if (search.trim()) params.set("search", search.trim());
   params.set("page", "1");
-  const effectiveLimit = mode === "production" ? SCHEDULE_PICKER_ROW_LIMIT : SCHEDULE_PICKER_ROW_LIMIT;
+  const effectiveLimit = SCHEDULE_PICKER_ROW_LIMIT;
   params.set("limit", String(effectiveLimit));
   if (mode === "production") {
     params.set("schedule_production_picker", "1");
     return requestPurchaseOrders(`${base}/purchase-orders`, params);
+  }
+
+  if (mode === "logistics") {
+    return requestPurchaseOrders(`${base}/purchase-orders/on-packing-lists`, params);
   }
 
   // 출고예정 일정 피커: 미입고 수량 0 초과 조건은 서버 플래그로 강제

@@ -33,6 +33,7 @@ export type ScheduleAddPayload = {
   startDateKey: string;
   endDateKey: string;
   purchaseOrderId?: string | null;
+  transitDays?: number;
 };
 
 type Props = {
@@ -44,6 +45,12 @@ type Props = {
   onCreate: (payload: ScheduleAddPayload) => void | Promise<void>;
   onUpdate?: (id: string, payload: ScheduleAddPayload) => void | Promise<void>;
 };
+
+function pickerModeForKind(kind: ScheduleEventKind): "production" | "shipment" | "logistics" {
+  if (kind === "shipment") return "shipment";
+  if (kind === "logistics_dispatch") return "logistics";
+  return "production";
+}
 
 export function ScheduleAddEventDialog({
   open,
@@ -60,6 +67,7 @@ export function ScheduleAddEventDialog({
   const [startDateKey, setStartDateKey] = useState(defaultDateKey);
   const [endDateKey, setEndDateKey] = useState(defaultDateKey);
   const [linkedPo, setLinkedPo] = useState<PurchaseOrderPickerRow | null>(null);
+  const [transitDaysInput, setTransitDaysInput] = useState("7");
 
   useEffect(() => {
     if (!open) return;
@@ -83,6 +91,11 @@ export function ScheduleAddEventDialog({
             : null,
         );
       }
+      if (editingEvent.kind === "logistics_dispatch") {
+        setTransitDaysInput(String(editingEvent.transitDays ?? 0));
+      } else {
+        setTransitDaysInput("7");
+      }
     } else {
       setTitle("");
       setKind("production");
@@ -90,6 +103,7 @@ export function ScheduleAddEventDialog({
       setStartDateKey(defaultDateKey);
       setEndDateKey(defaultDateKey);
       setLinkedPo(null);
+      setTransitDaysInput("7");
     }
   }, [open, defaultDateKey, editingEvent]);
 
@@ -105,11 +119,28 @@ export function ScheduleAddEventDialog({
   const handleSave = async () => {
     let resolvedTitle: string;
     let purchaseOrderId: string | null = null;
+    let transitDays: number | undefined;
 
     if (kind === "other") {
       const trimmed = title.trim();
       if (!trimmed) return;
       resolvedTitle = trimmed;
+    } else if (kind === "logistics_dispatch") {
+      if (linkedPo) {
+        resolvedTitle = titleFromPurchaseOrder(linkedPo);
+        purchaseOrderId = linkedPo.id;
+      } else if (editingEvent) {
+        resolvedTitle = editingEvent.title;
+        purchaseOrderId = editingEvent.purchaseOrderId ?? null;
+      } else {
+        return;
+      }
+      const td = parseInt(transitDaysInput.trim(), 10);
+      if (!Number.isInteger(td) || td < 0 || td > 3650) {
+        window.alert(t("schedule.transitDaysInvalid"));
+        return;
+      }
+      transitDays = td;
     } else {
       if (linkedPo) {
         resolvedTitle = titleFromPurchaseOrder(linkedPo);
@@ -136,6 +167,7 @@ export function ScheduleAddEventDialog({
       startDateKey: start,
       endDateKey: end,
       purchaseOrderId,
+      transitDays,
     };
     try {
       if (editingEvent) {
@@ -149,10 +181,20 @@ export function ScheduleAddEventDialog({
     }
   };
 
+  const transitDaysOk = (() => {
+    const td = parseInt(transitDaysInput.trim(), 10);
+    return Number.isInteger(td) && td >= 0 && td <= 3650;
+  })();
+
   const canSave =
     kind === "other"
       ? Boolean(title.trim())
-      : Boolean(linkedPo) || Boolean(editingEvent);
+      : kind === "logistics_dispatch"
+        ? (Boolean(linkedPo) || Boolean(editingEvent)) && transitDaysOk
+        : Boolean(linkedPo) || Boolean(editingEvent);
+
+  const titleHintKey =
+    kind === "logistics_dispatch" ? "schedule.titleDerivedFromPoLogistics" : "schedule.titleDerivedFromPo";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -195,6 +237,7 @@ export function ScheduleAddEventDialog({
               <SelectContent>
                 <SelectItem value="production">{t("schedule.kindProduction")}</SelectItem>
                 <SelectItem value="shipment">{t("schedule.kindShipment")}</SelectItem>
+                <SelectItem value="logistics_dispatch">{t("schedule.kindLogisticsDispatch")}</SelectItem>
                 <SelectItem value="other">{t("schedule.kindOther")}</SelectItem>
               </SelectContent>
             </Select>
@@ -213,13 +256,28 @@ export function ScheduleAddEventDialog({
             </div>
           ) : (
             <>
-              <p className="text-sm text-gray-600">{t("schedule.titleDerivedFromPo")}</p>
+              <p className="text-sm text-gray-600">{t(titleHintKey)}</p>
               <PurchaseOrderPicker
-                mode={kind === "shipment" ? "shipment" : "production"}
+                mode={pickerModeForKind(kind)}
                 value={linkedPo}
                 onChange={setLinkedPo}
               />
             </>
+          )}
+          {kind === "logistics_dispatch" && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="sched-transit">{t("schedule.fieldTransitDays")}</Label>
+              <Input
+                id="sched-transit"
+                type="number"
+                min={0}
+                max={3650}
+                step={1}
+                value={transitDaysInput}
+                onChange={(e) => setTransitDaysInput(e.target.value)}
+              />
+              <p className="text-xs text-gray-500">{t("schedule.fieldTransitDaysHint")}</p>
+            </div>
           )}
           <div className="grid gap-1.5">
             <Label htmlFor="sched-note">{t("schedule.fieldNote")}</Label>

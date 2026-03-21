@@ -20,7 +20,7 @@ import { useLanguage } from "../../contexts/LanguageContext";
 export type { PurchaseOrderPickerRow };
 
 type Props = {
-  mode: "production" | "shipment";
+  mode: "production" | "shipment" | "logistics";
   value: PurchaseOrderPickerRow | null;
   onChange: (next: PurchaseOrderPickerRow | null) => void;
 };
@@ -93,7 +93,11 @@ export function PurchaseOrderPicker({ mode, value, onChange }: Props) {
   }, [open]);
 
   const hint =
-    mode === "shipment" ? t("schedule.purchaseOrderHintShipment") : t("schedule.purchaseOrderHintProduction");
+    mode === "shipment"
+      ? t("schedule.purchaseOrderHintShipment")
+      : mode === "logistics"
+        ? t("schedule.purchaseOrderHintLogistics")
+        : t("schedule.purchaseOrderHintProduction");
 
   const display =
     value && (value.po_number || value.product_name)

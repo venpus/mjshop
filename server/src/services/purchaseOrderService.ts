@@ -150,6 +150,45 @@ export class PurchaseOrderService {
   }
 
   /**
+   * 패킹리스트에 등록된 발주 목록 (일정 물류발송 피커)
+   */
+  async getPurchaseOrdersOnPackingLists(
+    searchTerm?: string,
+    page?: number,
+    limit?: number,
+  ): Promise<{
+    data: Array<{ id: string; po_number: string; product_name: string }>;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    let rows: Array<{ id: string; po_number: string; product_name: string }>;
+    let total: number;
+
+    if (page !== undefined && limit !== undefined) {
+      const offset = (page - 1) * limit;
+      rows = await this.repository.findPurchaseOrdersOnPackingLists(searchTerm, limit, offset);
+      total = await this.repository.countPurchaseOrdersOnPackingLists(searchTerm);
+    } else {
+      rows = await this.repository.findPurchaseOrdersOnPackingLists(searchTerm, undefined, undefined);
+      total = rows.length;
+    }
+
+    const currentPage = page || 1;
+    const currentLimit = limit || total;
+    const totalPages = limit ? Math.ceil(total / limit) : 1;
+
+    return {
+      data: rows,
+      total,
+      page: currentPage,
+      limit: currentLimit,
+      totalPages,
+    };
+  }
+
+  /**
    * ID로 발주 조회
    */
   async getPurchaseOrderById(id: string): Promise<PurchaseOrderPublic | null> {
