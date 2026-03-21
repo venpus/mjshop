@@ -79,13 +79,13 @@ export function WeekStrip({
                 sel && "ring-2 ring-purple-500",
               )}
             >
-              <div className="flex w-full shrink-0 items-start justify-between gap-0.5 px-0.5 pt-1">
-                <span className="shrink-0 text-[10px] font-medium text-gray-500">
+              <div className="flex w-full min-w-0 shrink-0 items-start justify-between gap-0.5 px-0.5 pt-1">
+                <span className="min-w-0 max-w-[45%] truncate text-[11px] font-medium text-gray-500 sm:text-xs">
                   {d.toLocaleDateString(locale, { weekday: "short" })}
                 </span>
                 <span
                   className={cn(
-                    "shrink-0 text-sm font-bold tabular-nums leading-none",
+                    "shrink-0 text-base font-bold tabular-nums leading-none sm:text-lg",
                     isHoliday ? "text-red-600" : "text-gray-900",
                   )}
                 >
@@ -93,11 +93,11 @@ export function WeekStrip({
                 </span>
               </div>
               {dayHolidays.length > 0 && (
-                <div className="mt-0.5 w-full shrink-0 space-y-0.5 px-0.5 text-right">
+                <div className="mt-0.5 w-full min-w-0 shrink-0 space-y-0.5 px-0.5">
                   {dayHolidays.map((h) => (
                     <div
                       key={h.id}
-                      className="truncate text-[7px] font-semibold leading-tight text-red-700 md:text-[8px]"
+                      className="w-full min-w-0 break-words text-left text-[10px] font-semibold leading-snug text-red-700 sm:text-xs"
                       title={h.title || undefined}
                     >
                       {h.title?.trim() ? h.title : "—"}
@@ -105,8 +105,8 @@ export function WeekStrip({
                   ))}
                 </div>
               )}
-              <div className="mt-auto min-h-0 w-full flex-1 overflow-y-auto">
-                <ScheduleDayKindCounts counts={kindCounts} className="mt-1 max-w-full text-[7px] md:text-[8px]" />
+              <div className="mt-auto min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+                <ScheduleDayKindCounts counts={kindCounts} className="mt-1" size="compact" />
               </div>
             </button>
           );

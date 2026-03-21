@@ -33,19 +33,29 @@ export function addDays(d: Date, delta: number): Date {
   return x;
 }
 
+/** 해당 월이 걸치는 주만 포함(4~6주, 28~42칸). 빈 6번째 줄 없음. */
 export function getMonthGridCells(monthAnchor: Date): { date: Date; inMonth: boolean }[] {
   const first = startOfMonth(monthAnchor);
   const start = startOfWeekSunday(first);
+  const lastDayOfMonth = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 0);
+  const lastWeekSunday = startOfWeekSunday(lastDayOfMonth);
+  const gridEnd = addDays(lastWeekSunday, 6);
+
   const cells: { date: Date; inMonth: boolean }[] = [];
   const m = monthAnchor.getMonth();
-  for (let i = 0; i < 42; i++) {
-    const date = addDays(start, i);
-    cells.push({ date, inMonth: date.getMonth() === m });
+  let cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const end = new Date(gridEnd.getFullYear(), gridEnd.getMonth(), gridEnd.getDate());
+  while (cursor.getTime() <= end.getTime()) {
+    cells.push({
+      date: new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate()),
+      inMonth: cursor.getMonth() === m,
+    });
+    cursor = addDays(cursor, 1);
   }
   return cells;
 }
 
-/** 월 그리드(42칸)의 첫날·마지막날 키 — API 조회 범위에 사용 */
+/** 월 그리드(표시 칸)의 첫날·마지막날 키 — API 조회 범위에 사용 */
 export function getCalendarViewportBounds(monthAnchor: Date): { fromKey: string; toKey: string } {
   const cells = getMonthGridCells(monthAnchor);
   const first = cells[0].date;

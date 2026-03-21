@@ -34,6 +34,7 @@ export function MonthGridCalendar({
   const { language } = useLanguage();
   const weekdays = language === "zh" ? WEEKDAYS_ZH : WEEKDAYS_KO;
   const cells = getMonthGridCells(month);
+  const weekRows = cells.length / 7;
   const visible = filterEvents(events, filters);
 
   return (
@@ -43,14 +44,19 @@ export function MonthGridCalendar({
         className,
       )}
     >
-      <div className="grid shrink-0 grid-cols-7 gap-0 border border-gray-200 text-center text-[11px] text-gray-500 md:text-xs">
+      <div className="grid shrink-0 grid-cols-7 gap-0 border border-gray-200 text-center text-xs font-medium text-gray-600 md:text-sm">
         {weekdays.map((w) => (
-          <div key={w} className="py-1.5 font-medium md:py-2">
+          <div key={w} className="py-1.5 md:py-2">
             {w}
           </div>
         ))}
       </div>
-      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-7 grid-rows-[repeat(6,minmax(4rem,1fr))] gap-0 border-x border-b border-gray-200 md:grid-rows-[repeat(6,minmax(4.5rem,1fr))]">
+      <div
+        className="grid min-h-0 min-w-0 flex-1 grid-cols-7 gap-0 border-x border-b border-gray-200"
+        style={{
+          gridTemplateRows: `repeat(${weekRows}, minmax(6rem, 1fr))`,
+        }}
+      >
         {cells.map(({ date, inMonth }) => {
           const key = toDateKey(date);
           const dayEvents = eventsForDateKey(visible, key);
@@ -71,7 +77,7 @@ export function MonthGridCalendar({
                 onCellContextMenu(date, e.clientX, e.clientY);
               }}
               className={cn(
-                "flex h-full min-h-0 w-full min-w-0 flex-col items-stretch overflow-hidden border border-gray-200 px-0.5 pb-1 pt-0 text-[13px] transition-colors md:px-1",
+                "flex h-full min-h-0 w-full min-w-0 flex-col items-stretch overflow-hidden border border-gray-200 px-0.5 pb-1 pt-0 transition-colors md:px-1",
                 !inMonth && "text-gray-300",
                 inMonth && "text-gray-900",
                 isToday && "border-purple-300 bg-purple-50/50",
@@ -79,10 +85,10 @@ export function MonthGridCalendar({
                 isSel && "ring-2 ring-purple-500 ring-offset-1",
               )}
             >
-              <div className="flex w-full shrink-0 justify-end pr-0.5 pt-0.5">
+              <div className="flex w-full min-w-0 shrink-0 justify-end pr-0.5 pt-0.5">
                 <span
                   className={cn(
-                    "tabular-nums font-bold leading-none",
+                    "text-sm tabular-nums font-bold leading-none md:text-base",
                     !inMonth && "opacity-40",
                     isHoliday ? "text-red-600" : inMonth && "text-gray-900",
                   )}
@@ -91,11 +97,11 @@ export function MonthGridCalendar({
                 </span>
               </div>
               {dayHolidays.length > 0 && (
-                <div className="mt-0.5 w-full max-w-[5.75rem] shrink-0 space-y-0.5 px-0.5 text-right">
+                <div className="mt-0.5 w-full min-w-0 shrink-0 space-y-0.5 px-0.5">
                   {dayHolidays.map((h) => (
                     <div
                       key={h.id}
-                      className="truncate text-[7px] font-semibold leading-tight text-red-700 md:text-[8px]"
+                      className="w-full min-w-0 break-words text-left text-[11px] font-semibold leading-snug text-red-700 sm:text-xs md:text-sm"
                       title={h.title || undefined}
                     >
                       {h.title?.trim() ? h.title : "—"}
@@ -103,8 +109,8 @@ export function MonthGridCalendar({
                   ))}
                 </div>
               )}
-              <div className="mt-auto min-h-0 w-full max-w-[5.75rem] flex-1 overflow-y-auto">
-                <ScheduleDayKindCounts counts={kindCounts} className="mt-0.5" />
+              <div className="mt-auto min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+                <ScheduleDayKindCounts counts={kindCounts} className="mt-0.5" size="month" />
               </div>
             </button>
           );
