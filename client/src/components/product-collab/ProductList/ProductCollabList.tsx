@@ -65,6 +65,8 @@ export function ProductCollabList() {
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  /** 필터/뷰포트 효과에서 이미 loadPage(1) 했을 때, 같은 틱의 page 효과 중복 요청 방지 */
+  const skipNextDesktopPageEffect = useRef(false);
 
   const [filters, setFilters] = useState<ProductListFiltersValue>(() => ({
     ...defaultFilters,
@@ -129,12 +131,18 @@ export function ProductCollabList() {
     } else {
       setPage(1);
       loadPage(1);
+      skipNextDesktopPageEffect.current = true;
     }
   }, [isMobile, filters.status, filters.search, filters.category]);
 
   useEffect(() => {
-    if (!isMobile && page > 1) loadPage(page);
-  }, [page, isMobile]);
+    if (isMobile) return;
+    if (skipNextDesktopPageEffect.current) {
+      skipNextDesktopPageEffect.current = false;
+      return;
+    }
+    loadPage(page);
+  }, [page, isMobile, loadPage]);
 
   useEffect(() => {
     if (!isMobile || !sentinelRef.current || list.length >= total || loading || loadingMore) return;
@@ -156,6 +164,7 @@ export function ProductCollabList() {
     } else {
       setPage(1);
       loadPage(1);
+      skipNextDesktopPageEffect.current = true;
     }
   };
 
