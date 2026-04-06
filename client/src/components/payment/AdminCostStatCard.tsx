@@ -10,6 +10,8 @@ export interface AdminCostStatCardProps {
   highlightClassName: string;
   /** 설정 시 카드 클릭으로 상세 모달 등 열기 */
   onCardClick?: () => void;
+  /** 클릭 가능일 때 테두리/포커스 링 색 (Tailwind 클래스) */
+  clickableAccentClassName?: string;
 }
 
 function useFormatCurrency() {
@@ -61,14 +63,13 @@ export function AdminCostStatCard({
   detail,
   highlightClassName,
   onCardClick,
+  clickableAccentClassName = 'hover:border-amber-400 focus-visible:outline focus-visible:ring-2 focus-visible:ring-amber-500',
 }: AdminCostStatCardProps) {
   const clickable = Boolean(onCardClick) && !isLoading;
   return (
     <div
       className={`bg-white p-6 rounded-xl border-2 border-gray-200 shadow-md transition-shadow ${
-        clickable
-          ? 'cursor-pointer hover:shadow-lg hover:border-amber-400 focus-visible:outline focus-visible:ring-2 focus-visible:ring-amber-500'
-          : 'hover:shadow-lg'
+        clickable ? `cursor-pointer hover:shadow-lg ${clickableAccentClassName}` : 'hover:shadow-lg'
       }`}
       onClick={clickable ? onCardClick : undefined}
       onKeyDown={

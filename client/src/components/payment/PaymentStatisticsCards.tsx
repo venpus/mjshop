@@ -9,11 +9,13 @@ import { AdminCostStatCard } from './AdminCostStatCard';
 import {
   aggregateAdminCostByPaymentBucket,
   collectAdminCostConfirmedItems,
+  collectAdminCostPaidItems,
   emptyAdminCostDetail,
   type AdminCostDetail,
   type AdminCostConfirmedRow,
 } from '../../utils/adminCostStatistics';
 import { AdminCostConfirmedModal } from './AdminCostConfirmedModal';
+import { AdminCostPaidModal } from './AdminCostLedgerModal';
 import { FactoryCostRequestCard } from './FactoryCostRequestCard';
 
 interface PaymentDetail {
@@ -85,6 +87,9 @@ export function PaymentStatisticsCards({
   const [confirmedModalOpen, setConfirmedModalOpen] = useState(false);
   const [confirmedPoRows, setConfirmedPoRows] = useState<AdminCostConfirmedRow[]>([]);
   const [confirmedPlRows, setConfirmedPlRows] = useState<AdminCostConfirmedRow[]>([]);
+  const [paidModalOpen, setPaidModalOpen] = useState(false);
+  const [paidPoRows, setPaidPoRows] = useState<AdminCostConfirmedRow[]>([]);
+  const [paidPlRows, setPaidPlRows] = useState<AdminCostConfirmedRow[]>([]);
 
   useEffect(() => {
     loadStatistics();
@@ -207,6 +212,9 @@ export function PaymentStatisticsCards({
       const confirmedLists = collectAdminCostConfirmedItems(allHistory, isOnOrAfterAdminCostFromDate);
       setConfirmedPoRows(confirmedLists.purchaseOrders);
       setConfirmedPlRows(confirmedLists.packingLists);
+      const paidLists = collectAdminCostPaidItems(allHistory, isOnOrAfterAdminCostFromDate);
+      setPaidPoRows(paidLists.purchaseOrders);
+      setPaidPlRows(paidLists.packingLists);
 
       setStatistics({
         paidAmount,
@@ -338,17 +346,27 @@ export function PaymentStatisticsCards({
             total={statistics.adminCostPaid}
             detail={statistics.adminCostPaidDetail}
             highlightClassName="text-green-600"
+            onCardClick={() => setPaidModalOpen(true)}
+            clickableAccentClassName="hover:border-green-400 focus-visible:outline focus-visible:ring-2 focus-visible:ring-green-500"
           />
         </div>
       )}
 
       {!isLevelC && (
-        <AdminCostConfirmedModal
-          isOpen={confirmedModalOpen}
-          onClose={() => setConfirmedModalOpen(false)}
-          purchaseOrders={confirmedPoRows}
-          packingLists={confirmedPlRows}
-        />
+        <>
+          <AdminCostConfirmedModal
+            isOpen={confirmedModalOpen}
+            onClose={() => setConfirmedModalOpen(false)}
+            purchaseOrders={confirmedPoRows}
+            packingLists={confirmedPlRows}
+          />
+          <AdminCostPaidModal
+            isOpen={paidModalOpen}
+            onClose={() => setPaidModalOpen(false)}
+            purchaseOrders={paidPoRows}
+            packingLists={paidPlRows}
+          />
+        </>
       )}
     </div>
   );

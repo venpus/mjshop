@@ -138,11 +138,66 @@ export function aggregateAdminCostByPaymentBucket(
   };
 }
 
-/** 지급 확정 모달용 행 (이름 + 금액) */
+/** 지급 확정 모달용 행 (이름 + 금액 + 날짜 그룹 키) */
 export interface AdminCostConfirmedRow {
   id: string;
   name: string;
   amount: number;
+  /** YYYY-MM-DD. 확정: 발주 잔금일·패킹 wk_payment_date / 완료: admin_cost_paid_date. 없으면 날짜 미지정 */
+  groupDateKey: string | null;
+}
+
+/** 모달 날짜별 접기용 그룹 */
+export interface AdminCostConfirmedDateGroup {
+  dateKey: string | null;
+  rows: AdminCostConfirmedRow[];
+  subtotal: number;
+}
+
+function normalizeDateKey(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  return s.slice(0, 10);
+}
+
+/** 발주·패킹 행을 한 목록으로 합칠 때 React key 충돌 방지 */
+export function mergeAdminCostLedgerRowsForModal(
+  purchaseOrders: AdminCostConfirmedRow[],
+  packingLists: AdminCostConfirmedRow[]
+): AdminCostConfirmedRow[] {
+  const po = purchaseOrders.map((r) => ({ ...r, id: `ledger-po:${r.id}` }));
+  const pl = packingLists.map((r) => ({ ...r, id: `ledger-pl:${r.id}` }));
+  return [...po, ...pl];
+}
+
+/**
+ * 지급 확정 행을 날짜별로 묶음. 날짜는 내림차순, 날짜 미지정은 맨 아래. 그룹 내 이름 순.
+ */
+export function groupAdminCostConfirmedRowsByDate(rows: AdminCostConfirmedRow[]): AdminCostConfirmedDateGroup[] {
+  const bucket = new Map<string | null, AdminCostConfirmedRow[]>();
+  for (const row of rows) {
+    const key = row.groupDateKey ?? null;
+    const list = bucket.get(key);
+    if (list) list.push(row);
+    else bucket.set(key, [row]);
+  }
+  const groups: AdminCostConfirmedDateGroup[] = [];
+  for (const [dateKey, list] of bucket) {
+    const sortedRows = [...list].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    groups.push({
+      dateKey,
+      rows: sortedRows,
+      subtotal: sortedRows.reduce((s, r) => s + r.amount, 0),
+    });
+  }
+  groups.sort((a, b) => {
+    if (a.dateKey === null && b.dateKey === null) return 0;
+    if (a.dateKey === null) return 1;
+    if (b.dateKey === null) return -1;
+    return b.dateKey.localeCompare(a.dateKey);
+  });
+  return groups;
 }
 
 function buildPurchaseOrderDisplayName(item: PaymentHistoryItem): string {
@@ -184,6 +239,7 @@ export function collectAdminCostConfirmedItems(
         id: item.id,
         name: buildPurchaseOrderDisplayName(item),
         amount: total,
+        groupDateKey: normalizeDateKey(item.balance_payment_date),
       });
     });
 
@@ -200,13 +256,53 @@ export function collectAdminCostConfirmedItems(
         id: item.id,
         name: buildPackingListDisplayName(item),
         amount: diff,
+        groupDateKey: normalizeDateKey(item.wk_payment_date),
       });
     });
 
-  const byName = (a: AdminCostConfirmedRow, b: AdminCostConfirmedRow) =>
-    a.name.localeCompare(b.name, 'ko');
-  purchaseOrders.sort(byName);
-  packingLists.sort(byName);
+  return { purchaseOrders, packingLists };
+}
+
+/**
+ * A레벨 관리자 비용 지급완료(admin_cost_paid) 항목만 목록화 (금액 0 초과만).
+ * 날짜 그룹은 admin_cost_paid_date 기준.
+ */
+export function collectAdminCostPaidItems(
+  allHistory: PaymentHistoryItem[],
+  isOnOrAfterAdminCostFromDate: (dateStr: string | null | undefined) => boolean
+): { purchaseOrders: AdminCostConfirmedRow[]; packingLists: AdminCostConfirmedRow[] } {
+  const purchaseOrders: AdminCostConfirmedRow[] = [];
+  const packingLists: AdminCostConfirmedRow[] = [];
+
+  allHistory
+    .filter((item) => item.source_type === 'purchase_order' && isOnOrAfterAdminCostFromDate(item.order_date))
+    .forEach((item) => {
+      if (item.admin_cost_paid !== true) return;
+      const { total } = getPurchaseOrderAdminCostParts(item);
+      if (total <= 0) return;
+      purchaseOrders.push({
+        id: item.id,
+        name: buildPurchaseOrderDisplayName(item),
+        amount: total,
+        groupDateKey: normalizeDateKey(item.admin_cost_paid_date),
+      });
+    });
+
+  allHistory
+    .filter((item) =>
+      item.source_type === 'packing_list' && isOnOrAfterAdminCostFromDate(item.shipment_date || item.pl_created_at)
+    )
+    .forEach((item) => {
+      if (!item.admin_cost_paid) return;
+      const diff = item.shipping_cost_difference || 0;
+      if (diff <= 0) return;
+      packingLists.push({
+        id: item.id,
+        name: buildPackingListDisplayName(item),
+        amount: diff,
+        groupDateKey: normalizeDateKey(item.admin_cost_paid_date),
+      });
+    });
 
   return { purchaseOrders, packingLists };
 }
