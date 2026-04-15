@@ -1,6 +1,18 @@
 import { pool } from '../config/database.js';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
+/** JSON 배열에 저장된 토큰이 검색어(코드만 또는 code::…)와 일치하는지 */
+export function packingListJsonElementMatchesQuery(element: string, query: string): boolean {
+  const el = String(element).trim();
+  const q = String(query).trim();
+  if (!el || !q) return false;
+  if (el === q) return true;
+  if (!q.includes('::')) {
+    return el.startsWith(`${q}::`);
+  }
+  return false;
+}
+
 export interface SweetTrackerInvoiceCacheListRow extends RowDataPacket {
   invoice_no: string;
   is_delivery_complete: number;
@@ -168,7 +180,7 @@ export class SweetTrackerInvoiceCacheRepository {
         if (!Array.isArray(parsed)) continue;
         let hit = false;
         for (const el of parsed) {
-          if (typeof el === 'string' && el.trim() === code) {
+          if (typeof el === 'string' && packingListJsonElementMatchesQuery(el, code)) {
             hit = true;
             break;
           }

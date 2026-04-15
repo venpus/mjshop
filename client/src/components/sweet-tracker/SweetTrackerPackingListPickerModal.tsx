@@ -6,6 +6,8 @@ import {
   type PackingListItemWithDetails,
   type PackingListWithItems,
 } from '../../api/packingListApi';
+import { parsePackingListCodesInput } from '../../api/sweetTrackerApi';
+import { packingListRowToken } from '../../utils/packingListLinkToken';
 
 function resolveProductImageUrl(url: string | null | undefined): string | null {
   if (!url?.trim()) return null;
@@ -48,6 +50,7 @@ export function SweetTrackerPackingListPickerModal({
   const [listError, setListError] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+  const [manualExtra, setManualExtra] = useState('');
   const [applying, setApplying] = useState(false);
 
   useEffect(() => {
@@ -64,6 +67,7 @@ export function SweetTrackerPackingListPickerModal({
   useEffect(() => {
     if (isOpen) {
       setSelectedCodes([...initialCodes]);
+      setManualExtra('');
       setQuery('');
       setDebouncedQuery('');
       setPage(1);
@@ -105,17 +109,41 @@ export function SweetTrackerPackingListPickerModal({
     return () => document.removeEventListener('keydown', onKey);
   }, [isOpen, onClose]);
 
-  const toggleCode = (code: string) => {
-    const c = code.trim();
-    if (!c) return;
-    setSelectedCodes((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
+  const toggleRowSelection = (pl: PackingListWithItems) => {
+    const token = packingListRowToken(pl);
+    if (!token) return;
+    setSelectedCodes((prev) => (prev.includes(token) ? prev.filter((x) => x !== token) : [...prev, token]));
   };
+
+  const toggleChip = (token: string) => {
+    const t = token.trim();
+    if (!t) return;
+    setSelectedCodes((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  };
+
+  function mergeTokensFromPickerAndManual(picker: string[], manualRaw: string): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const s of picker) {
+      const v = s.trim();
+      if (!v || seen.has(v)) continue;
+      seen.add(v);
+      out.push(v);
+    }
+    for (const v of parsePackingListCodesInput(manualRaw)) {
+      const x = v.trim();
+      if (!x || seen.has(x)) continue;
+      seen.add(x);
+      out.push(x);
+    }
+    return out;
+  }
 
   const handleApply = async () => {
     setApplying(true);
     setApplyError(null);
     try {
-      await onApply(selectedCodes);
+      await onApply(mergeTokensFromPickerAndManual(selectedCodes, manualExtra));
       onClose();
     } catch (e) {
       setApplyError(e instanceof Error ? e.message : String(e));
@@ -155,6 +183,19 @@ export function SweetTrackerPackingListPickerModal({
           />
         </div>
 
+        <div className="border-b border-gray-100 px-4 py-2">
+          <label className="block text-xs font-medium text-gray-600">
+            {t('sweetTracker.cacheList.packingPickerManualLabel')}
+          </label>
+          <textarea
+            value={manualExtra}
+            onChange={(e) => setManualExtra(e.target.value)}
+            rows={2}
+            placeholder={t('sweetTracker.cacheList.packingPickerManualPlaceholder')}
+            className="mt-1 w-full resize-y rounded-md border border-gray-300 px-3 py-2 font-mono text-xs text-gray-900 placeholder:text-gray-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+          />
+        </div>
+
         {selectedCodes.length > 0 && (
           <div className="max-h-24 overflow-y-auto border-b border-gray-100 bg-gray-50 px-4 py-2">
             <p className="text-xs font-medium text-gray-600">
@@ -165,7 +206,7 @@ export function SweetTrackerPackingListPickerModal({
                 <button
                   key={c}
                   type="button"
-                  onClick={() => toggleCode(c)}
+                  onClick={() => toggleChip(c)}
                   className="rounded border border-gray-300 bg-white px-2 py-0.5 font-mono text-xs text-gray-800 hover:bg-gray-100"
                   title={t('sweetTracker.cacheList.packingPickerRemoveChip')}
                 >
@@ -201,7 +242,8 @@ export function SweetTrackerPackingListPickerModal({
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {rows.map((pl) => {
-                  const checked = selectedCodes.includes(pl.code);
+                  const rowToken = packingListRowToken(pl);
+                  const checked = selectedCodes.includes(rowToken);
                   const lineItems = pl.items ?? [];
                   const { totalQty, totalBoxes } = sumPackingListQtyAndBoxes(lineItems);
                   return (
@@ -210,9 +252,9 @@ export function SweetTrackerPackingListPickerModal({
                         <input
                           type="checkbox"
                           checked={checked}
-                          onChange={() => toggleCode(pl.code)}
+                          onChange={() => toggleRowSelection(pl)}
                           className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                          aria-label={pl.code}
+                          aria-label={`${pl.code} ${pl.shipment_date ?? ''}`}
                         />
                       </td>
                       <td className="min-w-[18rem] px-2 py-2 align-top">
@@ -284,7 +326,13 @@ export function SweetTrackerPackingListPickerModal({
                         )}
                       </td>
                       <td className="whitespace-nowrap px-2 py-2 align-top pt-3 font-mono text-sm text-gray-900">
-                        {pl.code}
+                        <button
+                          type="button"
+                          onClick={() => toggleRowSelection(pl)}
+                          className="rounded px-0.5 text-left hover:bg-purple-100/80 hover:underline focus:outline-none focus:ring-2 focus:ring-purple-400"
+                        >
+                          {pl.code}
+                        </button>
                       </td>
                       <td className="whitespace-nowrap px-2 py-2 align-top pt-3 text-gray-700">
                         {pl.shipment_date || '—'}

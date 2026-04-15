@@ -97,7 +97,10 @@ export const translations: Record<Language, Record<string, string>> = {
     'sweetTracker.cacheList.packingPickerOpen': '패킹리스트 선택',
     'sweetTracker.cacheList.packingPickerTitle': '패킹리스트 연결',
     'sweetTracker.cacheList.packingPickerHint':
-      '목록에서 체크하여 두 개 이상 포함해 여러 패킹리스트를 선택할 수 있습니다. 모두 해제한 뒤 적용하면 연결이 없어집니다.',
+      '목록에서는 출고일이 다른 동일 코드도 각각 따로 선택됩니다. 아래 직접 입력란에 쉼표로 토큰을 추가할 수 있으며, 목록 선택과 함께 적용됩니다. 모두 해제한 뒤 적용하면 연결이 없어집니다.',
+    'sweetTracker.cacheList.packingPickerManualLabel': '직접 입력 (쉼표로 구분)',
+    'sweetTracker.cacheList.packingPickerManualPlaceholder':
+      '예: ABC-1, XYZ-2::2025-12-01 (코드만 또는 코드::출고일)',
     'sweetTracker.cacheList.packingPickerSearchPlaceholder': '코드·물류 등 검색',
     'sweetTracker.cacheList.packingPickerSelected': '선택 {n}건',
     'sweetTracker.cacheList.packingPickerRemoveChip': '선택 해제',
@@ -794,7 +797,10 @@ export const translations: Record<Language, Record<string, string>> = {
     'sweetTracker.cacheList.packingPickerOpen': '选择装箱单',
     'sweetTracker.cacheList.packingPickerTitle': '关联装箱单',
     'sweetTracker.cacheList.packingPickerHint':
-      '可在列表中勾选多个装箱单（含两个及以上）。若全部取消勾选后应用，将清除关联。',
+      '列表中相同代码、不同发货日会分别勾选。可在下方文本框用逗号追加令牌，并与列表勾选一并应用。若全部取消勾选后应用，将清除关联。',
+    'sweetTracker.cacheList.packingPickerManualLabel': '手动输入（逗号分隔）',
+    'sweetTracker.cacheList.packingPickerManualPlaceholder':
+      '例：ABC-1, XYZ-2::2025-12-01（仅代码或 代码::发货日）',
     'sweetTracker.cacheList.packingPickerSearchPlaceholder': '按代码、物流等搜索',
     'sweetTracker.cacheList.packingPickerSelected': '已选 {n} 条',
     'sweetTracker.cacheList.packingPickerRemoveChip': '取消选择',

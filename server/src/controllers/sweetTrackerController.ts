@@ -13,7 +13,8 @@ const DEFAULT_T_CODE = '04';
 const MAX_CACHE_LIST_LIMIT = 500;
 const DEFAULT_CACHE_LIST_LIMIT = 200;
 const MAX_PACKING_LIST_CODES = 40;
-const MAX_PACKING_LIST_CODE_LEN = 120;
+/** code::YYYY-MM-DD 또는 code::id:n 형태 허용 */
+const MAX_PACKING_LIST_CODE_LEN = 180;
 
 const sweetTrackerInvoiceCacheRepository = new SweetTrackerInvoiceCacheRepository();
 
