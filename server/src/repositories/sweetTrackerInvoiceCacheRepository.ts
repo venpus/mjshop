@@ -76,11 +76,30 @@ export class SweetTrackerInvoiceCacheRepository {
   async listByTCodePaged(
     tCode: string,
     limit: number,
-    offset: number
+    offset: number,
+    filter?: { deliveryComplete?: boolean; invoiceNoQuery?: string }
   ): Promise<{ rows: SweetTrackerInvoiceCacheListRow[]; total: number }> {
+    const whereParts: string[] = ['t_code = ?'];
+    const whereArgs: any[] = [tCode];
+    if (filter?.deliveryComplete === true) {
+      whereParts.push('is_delivery_complete = 1');
+    } else if (filter?.deliveryComplete === false) {
+      whereParts.push('is_delivery_complete = 0');
+    }
+    if (filter?.invoiceNoQuery) {
+      // LIKE 안전 처리: \, %, _ escape
+      const q = filter.invoiceNoQuery.trim();
+      if (q) {
+        const escaped = q.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+        whereParts.push('invoice_no LIKE ? ESCAPE \'\\\\\'');
+        whereArgs.push(`%${escaped}%`);
+      }
+    }
+    const whereSql = whereParts.join(' AND ');
+
     const [countRows] = await pool.execute<RowDataPacket[]>(
-      'SELECT COUNT(*) AS cnt FROM sweet_tracker_invoice_cache WHERE t_code = ?',
-      [tCode]
+      `SELECT COUNT(*) AS cnt FROM sweet_tracker_invoice_cache WHERE ${whereSql}`,
+      whereArgs
     );
     const total = Number((countRows[0] as { cnt: number }).cnt ?? 0);
 
@@ -88,10 +107,10 @@ export class SweetTrackerInvoiceCacheRepository {
       `SELECT invoice_no, is_delivery_complete, last_kind, last_where, last_time_string,
               packing_list_codes_json
        FROM sweet_tracker_invoice_cache
-       WHERE t_code = ?
+       WHERE ${whereSql}
        ORDER BY updated_at DESC, invoice_no ASC
        LIMIT ? OFFSET ?`,
-      [tCode, limit, offset]
+      [...whereArgs, limit, offset]
     );
 
     return { rows, total };

@@ -88,7 +88,12 @@ export async function postSweetTrackerBulkDeliveryCompleted(
 
 export async function getSweetTrackerCachedInvoices(
   userId: string | undefined,
-  options?: { limit?: number; offset?: number }
+  options?: {
+    limit?: number;
+    offset?: number;
+    deliveryComplete?: 'complete' | 'not_complete';
+    invoiceNoQuery?: string;
+  }
 ): Promise<{ success: true; data: SweetTrackerCachedInvoiceListData }> {
   const headers: Record<string, string> = {};
   if (userId) headers['X-User-Id'] = userId;
@@ -96,6 +101,8 @@ export async function getSweetTrackerCachedInvoices(
   const q = new URLSearchParams();
   if (options?.limit != null) q.set('limit', String(options.limit));
   if (options?.offset != null) q.set('offset', String(options.offset));
+  if (options?.deliveryComplete) q.set('deliveryComplete', options.deliveryComplete);
+  if (options?.invoiceNoQuery?.trim()) q.set('invoiceNo', options.invoiceNoQuery.trim());
   const qs = q.toString();
 
   const res = await fetch(`${API_BASE}/sweet-tracker/invoice-cache${qs ? `?${qs}` : ''}`, {

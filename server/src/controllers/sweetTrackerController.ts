@@ -141,12 +141,24 @@ export async function getCachedInvoiceList(req: Request, res: Response): Promise
     ? Math.min(MAX_CACHE_LIST_LIMIT, Math.max(1, rawLimit))
     : DEFAULT_CACHE_LIST_LIMIT;
   const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
+  const rawFilter =
+    typeof req.query.deliveryComplete === 'string' ? req.query.deliveryComplete.trim().toLowerCase() : '';
+  const deliveryComplete =
+    rawFilter === 'complete' || rawFilter === 'completed' || rawFilter === '1' || rawFilter === 'true'
+      ? true
+      : rawFilter === 'not_complete' || rawFilter === 'not-complete' || rawFilter === '0' || rawFilter === 'false'
+        ? false
+        : undefined;
+  const invoiceNoQuery = typeof req.query.invoiceNo === 'string' ? req.query.invoiceNo.trim() : '';
 
   try {
     const { rows, total } = await sweetTrackerInvoiceCacheRepository.listByTCodePaged(
       DEFAULT_T_CODE,
       limit,
-      offset
+      offset,
+      deliveryComplete === undefined && !invoiceNoQuery
+        ? undefined
+        : { deliveryComplete, invoiceNoQuery: invoiceNoQuery || undefined }
     );
     res.json({
       success: true,
