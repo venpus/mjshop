@@ -131,6 +131,7 @@ export async function fetchDataByIntent(
             배송중수량: item.shipping_quantity,
             예상도착일: item.estimated_delivery ?? '-',
             주문일: item.order_date ?? '-',
+            단가: item.expected_final_unit_price ?? null,
             미도착금액: item.unit_price * item.not_arrived_quantity,
           })),
         };

@@ -2119,6 +2119,7 @@ export class PurchaseOrderRepository {
       arrived_quantity: number;
       unit_price: number;
       order_unit_price: number | null;
+      expected_final_unit_price: number | null;
       advance_payment_amount: number | null;
       advance_payment_date: Date | null;
       balance_payment_amount: number | null;
@@ -2147,6 +2148,7 @@ export class PurchaseOrderRepository {
         po.quantity,
         po.unit_price,
         po.order_unit_price,
+        po.expected_final_unit_price,
         po.advance_payment_amount,
         po.advance_payment_date,
         po.balance_payment_amount,
@@ -2180,6 +2182,10 @@ export class PurchaseOrderRepository {
       arrived_quantity: Number(row.arrived_quantity),
       unit_price: Number(row.unit_price),
       order_unit_price: row.order_unit_price ? Number(row.order_unit_price) : null,
+      expected_final_unit_price:
+        row.expected_final_unit_price !== null && row.expected_final_unit_price !== undefined
+          ? Number(row.expected_final_unit_price)
+          : null,
       advance_payment_amount: row.advance_payment_amount !== null ? Number(row.advance_payment_amount) : null,
       advance_payment_date: row.advance_payment_date ?? null,
       balance_payment_amount: row.balance_payment_amount !== null ? Number(row.balance_payment_amount) : null,

@@ -247,6 +247,8 @@ export interface NotArrivedItem {
   arrived_quantity: number;
   unit_price: number;
   order_unit_price: number | null;
+  /** 발주관리·DB `expected_final_unit_price` — 미도착 분석·엑셀에서는 단가 열로 표시 */
+  expected_final_unit_price: number | null;
   advance_payment_amount: number | null;
   advance_payment_date: string | null;
   balance_payment_amount: number | null;

@@ -50,7 +50,7 @@ export async function exportNotArrivedAnalysisToExcel(
     { width: 12 }, // 미출고 수량
     { width: 12 }, // 한국 배송 중
     { width: 12 }, // 한국 도착
-    { width: 15 }, // 단가
+    { width: 15 }, // 단가 (예상 최종 단가)
     { width: 15 }, // 선금 금액
     { width: 14 }, // 선금 상태
     { width: 15 }, // 잔금 금액
@@ -100,7 +100,7 @@ export async function exportNotArrivedAnalysisToExcel(
       item.unreceived_quantity,
       item.shipping_quantity,
       item.arrived_quantity,
-      item.order_unit_price || item.unit_price,
+      item.expected_final_unit_price ?? '-',
       item.advance_payment_amount ?? '-',
       item.advance_payment_date ? `지급완료 (${item.advance_payment_date})` : '미지급',
       item.balance_payment_amount ?? '-',
@@ -151,7 +151,7 @@ export async function exportNotArrivedAnalysisToExcel(
     row.getCell(7).numFmt = '#,##0'; // 미출고 수량
     row.getCell(8).numFmt = '#,##0'; // 한국 배송 중
     row.getCell(9).numFmt = '#,##0'; // 한국 도착
-    row.getCell(10).numFmt = '#,##0.00'; // 단가
+    if (typeof item.expected_final_unit_price === 'number') row.getCell(10).numFmt = '#,##0.00';
     // 선금/잔금 금액(11, 13)은 숫자일 때만 포맷 적용
     if (typeof item.advance_payment_amount === 'number') row.getCell(11).numFmt = '#,##0.00';
     if (typeof item.balance_payment_amount === 'number') row.getCell(13).numFmt = '#,##0.00';
@@ -189,7 +189,6 @@ export async function exportNotArrivedAnalysisToExcel(
     '',
     summary.total_quantity,
     summary.not_arrived_quantity,
-    '',
     '',
     '',
     '',

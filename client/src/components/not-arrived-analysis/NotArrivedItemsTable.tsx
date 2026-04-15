@@ -125,7 +125,9 @@ export function NotArrivedItemsTable({
                   {formatNumber(item.arrived_quantity)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                  {formatCurrency(item.order_unit_price || item.unit_price)}
+                  {item.expected_final_unit_price != null
+                    ? formatCurrency(item.expected_final_unit_price)
+                    : '-'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <PaymentAmountCell amount={item.advance_payment_amount} formatCurrency={formatCurrency} />
