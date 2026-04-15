@@ -1,12 +1,29 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Package, Calendar, Truck, MapPin, Weight, Plus, Trash2, Save } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { getPackingListById } from '../api/packingListApi';
+import {
+  getSweetTrackerInvoicesByPackingListCode,
+  parsePackingListCodesInput,
+  patchSweetTrackerInvoicePackingListCodes,
+  postSweetTrackerBulkDeliveryCompleted,
+  type SweetTrackerCachedInvoiceItem,
+} from '../api/sweetTrackerApi';
 import type { PackingListWithItems } from '../api/packingListApi';
+import { SweetTrackerCachedInvoicesTable } from './sweet-tracker/SweetTrackerCachedInvoicesTable';
+import { SweetTrackerPackingListPickerModal } from './sweet-tracker/SweetTrackerPackingListPickerModal';
 import { ProductImagePreview } from './ui/product-image-preview';
 import { GalleryImageModal } from './GalleryImageModal';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const MAX_PACKING_LIST_CODES = 40;
+
+function sameStringArrayOrder(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
 
 type OverseasInvoice = {
   id?: number;
@@ -23,6 +40,7 @@ interface PackingListDetailProps {
 }
 
 export function PackingListDetail({ packingListId, onClose, onCloseRequest }: PackingListDetailProps) {
+  const { t } = useLanguage();
   const { user } = useAuth();
   
   // A레벨, C0 레벨, D0 레벨만 접근 가능
@@ -42,6 +60,19 @@ export function PackingListDetail({ packingListId, onClose, onCloseRequest }: Pa
   const [hoveredImageUrl, setHoveredImageUrl] = useState<string | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [relatedTrackingItems, setRelatedTrackingItems] = useState<SweetTrackerCachedInvoiceItem[]>([]);
+  const [relatedTrackingLoading, setRelatedTrackingLoading] = useState(false);
+  const [relatedTrackingError, setRelatedTrackingError] = useState<string | null>(null);
+  const [relatedBusyInvoiceNo, setRelatedBusyInvoiceNo] = useState<string | null>(null);
+  const [relatedPackingDraftByInvoice, setRelatedPackingDraftByInvoice] = useState<Record<string, string>>({});
+  const [relatedPickerInvoiceNo, setRelatedPickerInvoiceNo] = useState<string | null>(null);
+  const [relatedPickerInitialCodes, setRelatedPickerInitialCodes] = useState<string[]>([]);
+
+  const relatedItemsRef = useRef(relatedTrackingItems);
+  relatedItemsRef.current = relatedTrackingItems;
+  const relatedLatestPackingTextRef = useRef<Record<string, string>>({});
+  const relatedPackingDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const relatedPackingSaveGenRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (!canAccess) {
@@ -100,6 +131,152 @@ export function PackingListDetail({ packingListId, onClose, onCloseRequest }: Pa
 
     loadPackingList();
   }, [packingListId, canAccess]);
+
+  useEffect(() => {
+    const timers = relatedPackingDebounceRef.current;
+    return () => {
+      for (const k of Object.keys(timers)) {
+        clearTimeout(timers[k]!);
+        delete timers[k];
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!canAccess || !user?.id || !packingList?.code?.trim()) {
+      setRelatedTrackingItems([]);
+      setRelatedTrackingError(null);
+      setRelatedTrackingLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const code = packingList.code.trim();
+
+    (async () => {
+      setRelatedTrackingLoading(true);
+      setRelatedTrackingError(null);
+      try {
+        const rows = await getSweetTrackerInvoicesByPackingListCode(user.id, code);
+        if (!cancelled) setRelatedTrackingItems(rows);
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setRelatedTrackingItems([]);
+          setRelatedTrackingError(err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        if (!cancelled) setRelatedTrackingLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canAccess, user?.id, packingList?.code]);
+
+  const flushRelatedPackingAutosave = useCallback(
+    async (invoiceNo: string) => {
+      const row = relatedItemsRef.current.find((x) => x.invoiceNo === invoiceNo);
+      const raw = relatedLatestPackingTextRef.current[invoiceNo] ?? '';
+      const codes = parsePackingListCodesInput(raw);
+      if (codes.length > MAX_PACKING_LIST_CODES) {
+        setRelatedTrackingError(
+          t('sweetTracker.cacheList.packingCodesTooMany').replace('{max}', String(MAX_PACKING_LIST_CODES))
+        );
+        return;
+      }
+      const prevCodes = row?.packingListCodes ?? [];
+      if (sameStringArrayOrder(codes, prevCodes)) {
+        setRelatedPackingDraftByInvoice((prev) => {
+          if (prev[invoiceNo] === undefined) return prev;
+          const next = { ...prev };
+          delete next[invoiceNo];
+          return next;
+        });
+        return;
+      }
+
+      relatedPackingSaveGenRef.current[invoiceNo] = (relatedPackingSaveGenRef.current[invoiceNo] ?? 0) + 1;
+      const gen = relatedPackingSaveGenRef.current[invoiceNo];
+
+      setRelatedTrackingError(null);
+      try {
+        await patchSweetTrackerInvoicePackingListCodes(user?.id, invoiceNo, codes);
+        if (relatedPackingSaveGenRef.current[invoiceNo] !== gen) return;
+
+        setRelatedTrackingItems((prev) =>
+          prev.map((it) => (it.invoiceNo === invoiceNo ? { ...it, packingListCodes: codes } : it))
+        );
+        setRelatedPackingDraftByInvoice((prev) => {
+          const draft = prev[invoiceNo];
+          if (draft === undefined) return prev;
+          const draftCodes = parsePackingListCodesInput(draft);
+          if (sameStringArrayOrder(draftCodes, codes)) {
+            const next = { ...prev };
+            delete next[invoiceNo];
+            return next;
+          }
+          return prev;
+        });
+      } catch (e) {
+        if (relatedPackingSaveGenRef.current[invoiceNo] === gen) {
+          setRelatedTrackingError(e instanceof Error ? e.message : String(e));
+        }
+      }
+    },
+    [user?.id, t]
+  );
+
+  const openRelatedPackingPicker = useCallback(
+    (invoiceNo: string) => {
+      const row = relatedTrackingItems.find((i) => i.invoiceNo === invoiceNo);
+      const draftText = relatedPackingDraftByInvoice[invoiceNo];
+      const text =
+        draftText !== undefined
+          ? draftText
+          : row?.packingListCodes?.length
+            ? row.packingListCodes.join(', ')
+            : '';
+      setRelatedPickerInitialCodes(parsePackingListCodesInput(text));
+      setRelatedPickerInvoiceNo(invoiceNo);
+    },
+    [relatedTrackingItems, relatedPackingDraftByInvoice]
+  );
+
+  const closeRelatedPackingPicker = useCallback(() => setRelatedPickerInvoiceNo(null), []);
+
+  const applyRelatedPackingPickerSelection = useCallback(
+    async (codes: string[]) => {
+      const inv = relatedPickerInvoiceNo;
+      if (!inv) return;
+      const joined = codes.join(', ');
+      relatedLatestPackingTextRef.current[inv] = joined;
+      setRelatedPackingDraftByInvoice((prev) => ({ ...prev, [inv]: joined }));
+      const tid = relatedPackingDebounceRef.current[inv];
+      if (tid) clearTimeout(tid);
+      delete relatedPackingDebounceRef.current[inv];
+      await flushRelatedPackingAutosave(inv);
+    },
+    [relatedPickerInvoiceNo, flushRelatedPackingAutosave]
+  );
+
+  const handleRelatedLookupOne = useCallback(
+    async (invoiceNo: string) => {
+      setRelatedBusyInvoiceNo(invoiceNo);
+      setRelatedTrackingError(null);
+      try {
+        await postSweetTrackerBulkDeliveryCompleted(user?.id, [invoiceNo]);
+        if (!user?.id || !packingList?.code?.trim()) return;
+        const rows = await getSweetTrackerInvoicesByPackingListCode(user.id, packingList.code.trim());
+        setRelatedTrackingItems(rows);
+      } catch (e) {
+        setRelatedTrackingError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setRelatedBusyInvoiceNo(null);
+      }
+    },
+    [user?.id, packingList?.code]
+  );
 
   // 변경사항 감지
   useEffect(() => {
@@ -444,6 +621,38 @@ export function PackingListDetail({ packingListId, onClose, onCloseRequest }: Pa
             추가
           </button>
         </div>
+
+        {packingList.code ? (
+          <div className="mb-5 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+            <h3 className="text-sm font-semibold text-gray-800">
+              {t('sweetTracker.cacheList.relatedInPackingTitle')}
+            </h3>
+            <p className="mt-1 text-xs text-gray-500">
+              {t('sweetTracker.cacheList.relatedInPackingDesc').replace('{code}', packingList.code)}
+            </p>
+            {relatedTrackingLoading && (
+              <p className="mt-2 text-sm text-gray-600">{t('sweetTracker.cacheList.relatedInPackingLoading')}</p>
+            )}
+            {relatedTrackingError && !relatedTrackingLoading && (
+              <p className="mt-2 text-sm text-red-600" role="alert">
+                {relatedTrackingError}
+              </p>
+            )}
+            {!relatedTrackingLoading && !relatedTrackingError && relatedTrackingItems.length === 0 && (
+              <p className="mt-2 text-sm text-gray-600">{t('sweetTracker.cacheList.relatedInPackingEmpty')}</p>
+            )}
+            <SweetTrackerCachedInvoicesTable
+              t={t}
+              items={relatedTrackingItems}
+              busyInvoiceNo={relatedBusyInvoiceNo}
+              onLookupOne={handleRelatedLookupOne}
+              listLoading={relatedTrackingLoading}
+              packingDraftByInvoice={relatedPackingDraftByInvoice}
+              onOpenPackingPicker={openRelatedPackingPicker}
+              wrapperClassName="mt-3 overflow-x-auto rounded-lg border border-gray-200 bg-white"
+            />
+          </div>
+        ) : null}
         
         {overseasInvoices.length === 0 ? (
           <div className="text-center text-gray-500 py-8 text-base">해외송장이 없습니다.</div>
@@ -521,6 +730,13 @@ export function PackingListDetail({ packingListId, onClose, onCloseRequest }: Pa
           </button>
         </div>
       </div>
+
+      <SweetTrackerPackingListPickerModal
+        isOpen={relatedPickerInvoiceNo !== null}
+        initialCodes={relatedPickerInitialCodes}
+        onClose={closeRelatedPackingPicker}
+        onApply={applyRelatedPackingPickerSelection}
+      />
 
       {/* 이미지 마우스오버 미리보기 */}
       <ProductImagePreview

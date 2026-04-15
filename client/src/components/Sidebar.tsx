@@ -33,6 +33,7 @@ import {
   Wrench,
   Activity,
   Calendar,
+  Search,
 } from "lucide-react";
 import { SidebarExternalLink } from "./sidebar/SidebarExternalLink";
 
@@ -62,7 +63,8 @@ type PageType =
   | "ai-search"
   | "product-collab"
   | "schedule"
-  | "settings";
+  | "settings"
+  | "sweet-tracker-test";
 
 interface SidebarProps {
   currentPage: PageType | 'purchase-order-detail';
@@ -124,6 +126,20 @@ export function Sidebar({
               >
                 <PackageSearch className="w-5 h-5 flex-shrink-0" />
                 {!isCollapsed && <span>{t('menu.packingList')}</span>}
+              </button>
+            )}
+            {hasPermission('shipping-history', 'read') && (
+              <button
+                onClick={() => onPageChange("sweet-tracker-test")}
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-colors ${
+                  currentPage === "sweet-tracker-test"
+                    ? "bg-purple-50 text-purple-600"
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
+                title={isCollapsed ? t('menu.sweetTrackerTest') : undefined}
+              >
+                <Search className="w-5 h-5 flex-shrink-0" />
+                {!isCollapsed && <span>{t('menu.sweetTrackerTest')}</span>}
               </button>
             )}
           </>
@@ -269,6 +285,20 @@ export function Sidebar({
                   >
                     <PackageSearch className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
                     {!isCollapsed && <span>{t('menu.packingList')}</span>}
+                  </button>
+                )}
+                {hasPermission('shipping-history', 'read') && (
+                  <button
+                    onClick={() => onPageChange("sweet-tracker-test")}
+                    className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
+                      currentPage === "sweet-tracker-test"
+                        ? "bg-purple-50 text-purple-600"
+                        : "text-gray-600 hover:bg-gray-50"
+                    }`}
+                    title={isCollapsed ? t('menu.sweetTrackerTest') : undefined}
+                  >
+                    <Search className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
+                    {!isCollapsed && <span>{t('menu.sweetTrackerTest')}</span>}
                   </button>
                 )}
                 {/* 결제내역 */}

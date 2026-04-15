@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import type { PackingListItem } from './types';
-import { 
-  transformToExcelData, 
-  fetchPurchaseOrderNumbers, 
-  createExcelFile 
+import {
+  transformToExcelData,
+  fetchPurchaseOrderNumbers,
+  fetchRelatedTrackingInvoiceNosForExport,
+  createExcelFile,
 } from '../../utils/packingListExport';
 
 interface ExportButtonProps {
@@ -18,6 +20,7 @@ export function ExportButton({
   packingListItems,
   disabled = false 
 }: ExportButtonProps) {
+  const { user } = useAuth();
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExport = async () => {
@@ -44,10 +47,11 @@ export function ExportButton({
       // 2. 발주코드 조회
       const poNumberMap = await fetchPurchaseOrderNumbers(codeGroups);
 
-      // 3. 엑셀 파일 생성 및 다운로드
-      await createExcelFile(codeGroups, poNumberMap);
+      // 3. 택배 조회 DB 연동 운송장 번호
+      const relatedInvoiceMap = await fetchRelatedTrackingInvoiceNosForExport(user?.id, codeGroups);
 
-      alert('엑셀 파일이 다운로드되었습니다.');
+      // 4. 엑셀 파일 생성 및 다운로드
+      await createExcelFile(codeGroups, poNumberMap, relatedInvoiceMap);
     } catch (error: any) {
       console.error('엑셀 내보내기 오류:', error);
       alert(error.message || '엑셀 내보내기 중 오류가 발생했습니다.');

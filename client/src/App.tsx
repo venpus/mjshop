@@ -34,6 +34,7 @@ import { ProjectDetail } from './components/ProjectDetail';
 import { AiSearch } from './components/AiSearch';
 import { ProductCollabRoutes } from './components/product-collab/routes';
 import { ScheduleCalendarPage } from './components/schedule/ScheduleCalendarPage';
+import { SweetTrackerTestPage } from './components/sweet-tracker/SweetTrackerTestPage';
 import { Login } from './components/Login';
 import { useAuth } from './contexts/AuthContext';
 import { usePermission } from './contexts/PermissionContext';
@@ -282,6 +283,11 @@ function AdminLayout() {
                   <ShippingHistory />
                 </PermissionCheckWrapper>
               } />
+              <Route path="/sweet-tracker-test" element={
+                <PermissionCheckWrapper resource="shipping-history" permissionType="read">
+                  <SweetTrackerTestPage />
+                </PermissionCheckWrapper>
+              } />
               <Route path="*" element={<Navigate to="/admin/shipping-history" replace />} />
             </>
           ) : (
@@ -346,6 +352,11 @@ function AdminLayout() {
               <Route path="/shipping-history" element={
                 <PermissionCheckWrapper resource="shipping-history" permissionType="read">
                   <ShippingHistory />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/sweet-tracker-test" element={
+                <PermissionCheckWrapper resource="shipping-history" permissionType="read">
+                  <SweetTrackerTestPage />
                 </PermissionCheckWrapper>
               } />
               <Route path="/china-payment" element={<ChinaPayment />} />

@@ -19,6 +19,7 @@ import normalInvoiceRoutes from './normalInvoices.js';
 import paymentMiscEntryRoutes from './paymentMiscEntries.js';
 import scheduleEventRoutes from './scheduleEvents.js';
 import calendarHolidayRoutes from './calendarHolidays.js';
+import sweetTrackerRoutes from './sweetTracker.js';
 
 const router = Router();
 
@@ -46,6 +47,7 @@ router.use('/normal-invoices', normalInvoiceRoutes);
 router.use('/payment-misc-entries', paymentMiscEntryRoutes);
 router.use('/schedule-events', scheduleEventRoutes);
 router.use('/calendar-holidays', calendarHolidayRoutes);
+router.use('/sweet-tracker', sweetTrackerRoutes);
 
 router.get('/', (req, res) => {
   res.json({ 
