@@ -247,6 +247,10 @@ export interface NotArrivedItem {
   arrived_quantity: number;
   unit_price: number;
   order_unit_price: number | null;
+  advance_payment_amount: number | null;
+  advance_payment_date: string | null;
+  balance_payment_amount: number | null;
+  balance_payment_date: string | null;
   total_amount: number;
   not_arrived_quantity: number;
 }

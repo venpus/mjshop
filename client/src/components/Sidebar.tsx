@@ -227,7 +227,7 @@ export function Sidebar({
                   </button>
                 )}
                 {/* 미도착 물품 분석 - 숨김 */}
-                {false && hasPermission('purchase-orders', 'read') && (
+                {user?.id === 'venpus' && hasPermission('purchase-orders', 'read') && (
                   <button
                     onClick={() => onPageChange("not-arrived-analysis")}
                     className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${

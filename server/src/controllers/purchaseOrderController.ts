@@ -1488,6 +1488,8 @@ export class PurchaseOrderController {
         ...item,
         order_date: formatDateToKSTString(item.order_date),
         estimated_delivery: formatDateToKSTString(item.estimated_delivery),
+        advance_payment_date: formatDateToKSTString(item.advance_payment_date),
+        balance_payment_date: formatDateToKSTString(item.balance_payment_date),
       }));
 
       res.json({

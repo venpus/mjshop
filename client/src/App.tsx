@@ -328,9 +328,13 @@ function AdminLayout() {
                 </PermissionCheckWrapper>
               } />
               <Route path="/not-arrived-analysis" element={
-                <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
-                  <NotArrivedAnalysis />
-                </PermissionCheckWrapper>
+                user?.id === 'venpus' ? (
+                  <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
+                    <NotArrivedAnalysis />
+                  </PermissionCheckWrapper>
+                ) : (
+                  <Navigate to="/admin/product-collab" replace />
+                )
               } />
               <Route path="/cost-analysis" element={
                 user?.id === 'venpus' ? (

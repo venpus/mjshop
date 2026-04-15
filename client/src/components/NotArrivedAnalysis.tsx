@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getNotArrivedAnalysis, NotArrivedAnalysis as NotArrivedAnalysisType, getFullImageUrl } from '../api/purchaseOrderApi';
 import { Loader2, AlertCircle, RefreshCw, TrendingUp, Download } from 'lucide-react';
 import { exportNotArrivedAnalysisToExcel } from '../utils/excelExport';
+import { PaymentAmountCell, PaymentStatusCell } from './not-arrived-analysis/PaymentAmountStatusCell';
 
 export function NotArrivedAnalysis() {
   const [data, setData] = useState<NotArrivedAnalysisType | null>(null);
@@ -182,13 +183,17 @@ export function NotArrivedAnalysis() {
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">한국 배송 중</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">한국 도착</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">단가</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">선금 금액</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">선금 상태</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">잔금 금액</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">잔금 상태</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">총 금액</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {data.items.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={15} className="px-6 py-8 text-center text-gray-500">
                     미도착 물품이 없습니다.
                   </td>
                 </tr>
@@ -237,6 +242,18 @@ export function NotArrivedAnalysis() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
                       {formatCurrency(item.order_unit_price || item.unit_price)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <PaymentAmountCell amount={item.advance_payment_amount} formatCurrency={formatCurrency} />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <PaymentStatusCell paidDate={item.advance_payment_date} />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <PaymentAmountCell amount={item.balance_payment_amount} formatCurrency={formatCurrency} />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <PaymentStatusCell paidDate={item.balance_payment_date} />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
                       {formatCurrency(item.total_amount)}

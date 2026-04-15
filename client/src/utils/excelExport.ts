@@ -51,6 +51,10 @@ export async function exportNotArrivedAnalysisToExcel(
     { width: 12 }, // 한국 배송 중
     { width: 12 }, // 한국 도착
     { width: 15 }, // 단가
+    { width: 15 }, // 선금 금액
+    { width: 14 }, // 선금 상태
+    { width: 15 }, // 잔금 금액
+    { width: 14 }, // 잔금 상태
     { width: 15 }, // 총 금액
   ];
 
@@ -66,6 +70,10 @@ export async function exportNotArrivedAnalysisToExcel(
     '한국 배송 중',
     '한국 도착',
     '단가',
+    '선금 금액',
+    '선금 상태',
+    '잔금 금액',
+    '잔금 상태',
     '총 금액',
   ]);
 
@@ -93,6 +101,10 @@ export async function exportNotArrivedAnalysisToExcel(
       item.shipping_quantity,
       item.arrived_quantity,
       item.order_unit_price || item.unit_price,
+      item.advance_payment_amount ?? '-',
+      item.advance_payment_date ? `지급완료 (${item.advance_payment_date})` : '미지급',
+      item.balance_payment_amount ?? '-',
+      item.balance_payment_date ? `지급완료 (${item.balance_payment_date})` : '미지급',
       item.total_amount,
     ]);
 
@@ -140,7 +152,10 @@ export async function exportNotArrivedAnalysisToExcel(
     row.getCell(8).numFmt = '#,##0'; // 한국 배송 중
     row.getCell(9).numFmt = '#,##0'; // 한국 도착
     row.getCell(10).numFmt = '#,##0.00'; // 단가
-    row.getCell(11).numFmt = '#,##0.00'; // 총 금액
+    // 선금/잔금 금액(11, 13)은 숫자일 때만 포맷 적용
+    if (typeof item.advance_payment_amount === 'number') row.getCell(11).numFmt = '#,##0.00';
+    if (typeof item.balance_payment_amount === 'number') row.getCell(13).numFmt = '#,##0.00';
+    row.getCell(15).numFmt = '#,##0.00'; // 총 금액
 
     // 정렬 설정
     row.getCell(1).alignment = { horizontal: 'center' }; // 발주 날짜
@@ -153,7 +168,11 @@ export async function exportNotArrivedAnalysisToExcel(
     row.getCell(8).alignment = { horizontal: 'right' }; // 한국 배송 중
     row.getCell(9).alignment = { horizontal: 'right' }; // 한국 도착
     row.getCell(10).alignment = { horizontal: 'right' }; // 단가
-    row.getCell(11).alignment = { horizontal: 'right' }; // 총 금액
+    row.getCell(11).alignment = { horizontal: 'right' }; // 선금 금액
+    row.getCell(12).alignment = { horizontal: 'right' }; // 선금 상태
+    row.getCell(13).alignment = { horizontal: 'right' }; // 잔금 금액
+    row.getCell(14).alignment = { horizontal: 'right' }; // 잔금 상태
+    row.getCell(15).alignment = { horizontal: 'right' }; // 총 금액
 
     // 색상 적용
     row.getCell(7).font = { color: { argb: 'FFFF6B00' } }; // 미출고 수량 - 주황색
@@ -173,6 +192,10 @@ export async function exportNotArrivedAnalysisToExcel(
     '',
     '',
     '',
+    '',
+    '',
+    '',
+    '',
     summary.total_amount,
   ]);
 
@@ -184,10 +207,10 @@ export async function exportNotArrivedAnalysisToExcel(
   };
   summaryRow.getCell(6).numFmt = '#,##0';
   summaryRow.getCell(7).numFmt = '#,##0';
-  summaryRow.getCell(11).numFmt = '#,##0.00';
+  summaryRow.getCell(15).numFmt = '#,##0.00';
   summaryRow.getCell(6).alignment = { horizontal: 'right' };
   summaryRow.getCell(7).alignment = { horizontal: 'right' };
-  summaryRow.getCell(11).alignment = { horizontal: 'right' };
+  summaryRow.getCell(15).alignment = { horizontal: 'right' };
 
   // 엑셀 파일 다운로드
   const buffer = await workbook.xlsx.writeBuffer();
