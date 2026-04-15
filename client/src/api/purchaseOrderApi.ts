@@ -267,8 +267,16 @@ export interface NotArrivedAnalysis {
   summary: NotArrivedSummary;
 }
 
-export async function getNotArrivedAnalysis(): Promise<NotArrivedAnalysis> {
-  const response = await fetch(`${API_BASE_URL}/purchase-orders/analysis/not-arrived`, {
+export async function getNotArrivedAnalysis(params?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<NotArrivedAnalysis> {
+  const search = new URLSearchParams();
+  if (params?.startDate?.trim()) search.set('startDate', params.startDate.trim());
+  if (params?.endDate?.trim()) search.set('endDate', params.endDate.trim());
+  const qs = search.toString();
+  const url = `${API_BASE_URL}/purchase-orders/analysis/not-arrived${qs ? `?${qs}` : ''}`;
+  const response = await fetch(url, {
     credentials: 'include',
   });
 

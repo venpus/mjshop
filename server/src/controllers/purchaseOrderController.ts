@@ -1481,7 +1481,32 @@ export class PurchaseOrderController {
    */
   getNotArrivedAnalysis = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.getNotArrivedAnalysis();
+      const rawStart = req.query.startDate;
+      const rawEnd = req.query.endDate;
+      const startDate =
+        typeof rawStart === 'string' && rawStart.trim() !== '' ? rawStart.trim() : undefined;
+      const endDate = typeof rawEnd === 'string' && rawEnd.trim() !== '' ? rawEnd.trim() : undefined;
+      const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+      if (startDate && !dateRe.test(startDate)) {
+        return res.status(400).json({
+          success: false,
+          error: 'startDate는 YYYY-MM-DD 형식이어야 합니다.',
+        });
+      }
+      if (endDate && !dateRe.test(endDate)) {
+        return res.status(400).json({
+          success: false,
+          error: 'endDate는 YYYY-MM-DD 형식이어야 합니다.',
+        });
+      }
+      if (startDate && endDate && startDate > endDate) {
+        return res.status(400).json({
+          success: false,
+          error: '시작일은 종료일 이전이어야 합니다.',
+        });
+      }
+
+      const result = await this.service.getNotArrivedAnalysis({ startDate, endDate });
 
       const { formatDateToKSTString } = await import('../utils/dateUtils.js');
       const formattedItems = result.items.map(item => ({

@@ -1027,9 +1027,10 @@ export class PurchaseOrderService {
 
   /**
    * 한국에 도착하지 않은 물품 분석 조회
+   * @param options.startDate, options.endDate 발주일(order_date) 기준 YYYY-MM-DD (선택)
    */
-  async getNotArrivedAnalysis() {
-    return await this.repository.findNotArrivedAnalysis();
+  async getNotArrivedAnalysis(options?: { startDate?: string; endDate?: string }) {
+    return await this.repository.findNotArrivedAnalysis(options);
   }
 
   /**

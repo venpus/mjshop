@@ -2080,7 +2080,32 @@ export class PurchaseOrderRepository {
     // 예: 'PO001', 'PO002'
   ];
 
-  async findNotArrivedAnalysis(): Promise<{
+  /** 미도착 분석 목록·요약 공통 WHERE (미도착 조건, 제외 ID, 발주일 범위) */
+  private buildNotArrivedAnalysisWhere(options?: {
+    startDate?: string;
+    endDate?: string;
+  }): { whereSql: string; params: unknown[] } {
+    const params: unknown[] = [];
+    let whereSql = 'po.quantity > COALESCE(summary.arrived_quantity, 0)';
+    if (this.EXCLUDED_PO_IDS.length > 0) {
+      whereSql += ` AND po.id NOT IN (${this.EXCLUDED_PO_IDS.map(() => '?').join(', ')})`;
+      params.push(...this.EXCLUDED_PO_IDS);
+    }
+    if (options?.startDate) {
+      whereSql += ' AND po.order_date >= ?';
+      params.push(options.startDate);
+    }
+    if (options?.endDate) {
+      whereSql += ' AND po.order_date <= ?';
+      params.push(options.endDate);
+    }
+    return { whereSql, params };
+  }
+
+  async findNotArrivedAnalysis(options?: {
+    startDate?: string;
+    endDate?: string;
+  }): Promise<{
     items: Array<{
       id: string;
       po_number: string;
@@ -2108,15 +2133,8 @@ export class PurchaseOrderRepository {
       not_arrived_amount: number;
     };
   }> {
-    // 제외할 발주 ID가 있으면 WHERE 조건에 추가
-    const excludeCondition = this.EXCLUDED_PO_IDS.length > 0 
-      ? `AND po.id NOT IN (${this.EXCLUDED_PO_IDS.map(() => '?').join(', ')})`
-      : '';
-    
-    const queryParams: any[] = [];
-    if (this.EXCLUDED_PO_IDS.length > 0) {
-      queryParams.push(...this.EXCLUDED_PO_IDS);
-    }
+    const { whereSql, params } = this.buildNotArrivedAnalysisWhere(options);
+    const execParams = [...params];
 
     const [rows] = await pool.execute<RowDataPacket[]>(`
       SELECT 
@@ -2145,10 +2163,9 @@ export class PurchaseOrderRepository {
         (COALESCE(po.order_unit_price, po.unit_price) * (po.quantity - COALESCE(summary.arrived_quantity, 0))) AS not_arrived_amount
       FROM purchase_orders po
       LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
-      WHERE po.quantity > COALESCE(summary.arrived_quantity, 0)
-        ${excludeCondition}
+      WHERE ${whereSql}
       ORDER BY po.order_date DESC, po.estimated_delivery ASC, po.po_number ASC
-    `, queryParams);
+    `, execParams);
 
     const items = rows.map(row => ({
       id: row.id,
@@ -2171,7 +2188,7 @@ export class PurchaseOrderRepository {
       not_arrived_quantity: Number(row.not_arrived_quantity),
     }));
 
-    // 전체 합계 계산 (모든 발주 대상)
+    // 목록과 동일 조건으로 합계 (미도착 + 제외 ID + 발주일 범위)
     const [summaryRows] = await pool.execute<RowDataPacket[]>(`
       SELECT 
         SUM(po.quantity) AS total_quantity,
@@ -2180,7 +2197,8 @@ export class PurchaseOrderRepository {
         SUM(COALESCE(po.order_unit_price, po.unit_price) * (po.quantity - COALESCE(summary.arrived_quantity, 0))) AS not_arrived_amount
       FROM purchase_orders po
       LEFT JOIN v_purchase_order_shipping_summary summary ON po.id = summary.purchase_order_id
-    `);
+      WHERE ${whereSql}
+    `, [...params]);
 
     const summary = {
       total_quantity: Number(summaryRows[0]?.total_quantity || 0),
