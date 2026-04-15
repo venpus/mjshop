@@ -91,7 +91,7 @@ export async function getSweetTrackerCachedInvoices(
   options?: {
     limit?: number;
     offset?: number;
-    deliveryComplete?: 'complete' | 'not_complete';
+    deliveryComplete?: 'all' | 'complete' | 'not_complete';
     invoiceNoQuery?: string;
   }
 ): Promise<{ success: true; data: SweetTrackerCachedInvoiceListData }> {
@@ -101,7 +101,7 @@ export async function getSweetTrackerCachedInvoices(
   const q = new URLSearchParams();
   if (options?.limit != null) q.set('limit', String(options.limit));
   if (options?.offset != null) q.set('offset', String(options.offset));
-  if (options?.deliveryComplete) q.set('deliveryComplete', options.deliveryComplete);
+  if (options?.deliveryComplete && options.deliveryComplete !== 'all') q.set('deliveryComplete', options.deliveryComplete);
   if (options?.invoiceNoQuery?.trim()) q.set('invoiceNo', options.invoiceNoQuery.trim());
   const qs = q.toString();
 

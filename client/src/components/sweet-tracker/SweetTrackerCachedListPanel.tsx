@@ -31,7 +31,7 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
   const [items, setItems] = useState<SweetTrackerCachedInvoiceItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [deliveryFilter, setDeliveryFilter] = useState<'complete' | 'not_complete'>('not_complete');
+  const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'complete' | 'not_complete'>('all');
   const [invoiceSearchText, setInvoiceSearchText] = useState('');
   const [invoiceSearchApplied, setInvoiceSearchApplied] = useState('');
   const [loading, setLoading] = useState(false);
@@ -284,6 +284,16 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
             </button>
           </div>
           <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white p-1">
+            <button
+              type="button"
+              onClick={() => setDeliveryFilter('all')}
+              disabled={loading || bulkBusy}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                deliveryFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {t('sweetTracker.cacheList.filterAll')}
+            </button>
             <button
               type="button"
               onClick={() => setDeliveryFilter('not_complete')}
