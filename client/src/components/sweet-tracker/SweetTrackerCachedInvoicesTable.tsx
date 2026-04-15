@@ -10,6 +10,11 @@ export interface SweetTrackerCachedInvoicesTableProps {
   listLoading?: boolean;
   packingDraftByInvoice: Record<string, string>;
   onOpenPackingPicker: (invoiceNo: string) => void;
+  /** 선택 기능 (대량 적용 등) */
+  enableSelection?: boolean;
+  selectedInvoiceNos?: Set<string>;
+  onToggleSelect?: (invoiceNo: string) => void;
+  onToggleSelectAll?: (checked: boolean, invoiceNos: string[]) => void;
   /** 테이블 바깥 래퍼 class (기본: 택배 조회 패널과 동일) */
   wrapperClassName?: string;
 }
@@ -22,15 +27,42 @@ export function SweetTrackerCachedInvoicesTable({
   listLoading = false,
   packingDraftByInvoice,
   onOpenPackingPicker,
+  enableSelection = false,
+  selectedInvoiceNos,
+  onToggleSelect,
+  onToggleSelectAll,
   wrapperClassName = 'mt-3 overflow-x-auto rounded-lg border border-gray-200',
 }: SweetTrackerCachedInvoicesTableProps) {
   if (items.length === 0) return null;
+
+  const invoiceNos = items.map((x) => x.invoiceNo);
+  const selectionActive = enableSelection && selectedInvoiceNos && onToggleSelect;
+  const allSelected =
+    selectionActive && invoiceNos.length > 0 ? invoiceNos.every((no) => selectedInvoiceNos.has(no)) : false;
+  const someSelected =
+    selectionActive && invoiceNos.length > 0 ? invoiceNos.some((no) => selectedInvoiceNos.has(no)) : false;
 
   return (
     <div className={wrapperClassName}>
       <table className="min-w-full divide-y divide-gray-200 text-sm">
         <thead className="bg-gray-50">
           <tr>
+            {selectionActive && (
+              <th className="w-10 px-3 py-2 text-left font-medium text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (!el) return;
+                    el.indeterminate = !allSelected && someSelected;
+                  }}
+                  onChange={(e) => onToggleSelectAll?.(e.target.checked, invoiceNos)}
+                  disabled={listLoading}
+                  className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  aria-label={t('sweetTracker.cacheList.colSelect')}
+                />
+              </th>
+            )}
             <th className="px-3 py-2 text-left font-medium text-gray-700">{t('sweetTracker.cacheList.colInvoice')}</th>
             <th className="min-w-[12rem] px-3 py-2 text-left font-medium text-gray-700">
               {t('sweetTracker.cacheList.colPackingListCodes')}
@@ -50,6 +82,18 @@ export function SweetTrackerCachedInvoicesTable({
                 : (r.packingListCodes ?? []);
             return (
               <tr key={r.invoiceNo}>
+                {selectionActive && (
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedInvoiceNos.has(r.invoiceNo)}
+                      onChange={() => onToggleSelect(r.invoiceNo)}
+                      disabled={listLoading}
+                      className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      aria-label={r.invoiceNo}
+                    />
+                  </td>
+                )}
                 <td className="whitespace-nowrap px-3 py-2 font-mono text-gray-900">{r.invoiceNo}</td>
                 <td className="min-w-[12rem] max-w-[28rem] px-3 py-2 align-middle">
                   <div className="flex min-h-[2rem] flex-wrap items-center gap-1">

@@ -33,9 +33,12 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyInvoiceNo, setBusyInvoiceNo] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [packingDraftByInvoice, setPackingDraftByInvoice] = useState<Record<string, string>>({});
   const [pickerInvoiceNo, setPickerInvoiceNo] = useState<string | null>(null);
   const [pickerInitialCodes, setPickerInitialCodes] = useState<string[]>([]);
+  const [bulkPickerOpen, setBulkPickerOpen] = useState(false);
 
   const itemsRef = useRef(items);
   itemsRef.current = items;
@@ -103,6 +106,56 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
       setBusyInvoiceNo(null);
     }
   };
+
+  const toggleBulkSelect = useCallback((invoiceNo: string) => {
+    setBulkSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(invoiceNo)) next.delete(invoiceNo);
+      else next.add(invoiceNo);
+      return next;
+    });
+  }, []);
+
+  const toggleBulkSelectAllVisible = useCallback((checked: boolean, invoiceNos: string[]) => {
+    setBulkSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        for (const no of invoiceNos) next.add(no);
+      } else {
+        for (const no of invoiceNos) next.delete(no);
+      }
+      return next;
+    });
+  }, []);
+
+  const clearBulkSelection = useCallback(() => setBulkSelected(new Set()), []);
+
+  const openBulkPackingPicker = useCallback(() => {
+    setBulkPickerOpen(true);
+  }, []);
+
+  const applyBulkPackingCodes = useCallback(
+    async (codes: string[]) => {
+      if (bulkSelected.size === 0) return;
+      const invoiceNos = Array.from(bulkSelected);
+      setBulkBusy(true);
+      setError(null);
+      try {
+        const CHUNK = 10;
+        for (let i = 0; i < invoiceNos.length; i += CHUNK) {
+          const slice = invoiceNos.slice(i, i + CHUNK);
+          await Promise.all(slice.map((inv) => patchSweetTrackerInvoicePackingListCodes(user?.id, inv, codes)));
+        }
+        await load(0, false);
+        clearBulkSelection();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setBulkBusy(false);
+      }
+    },
+    [bulkSelected, user?.id, load, clearBulkSelection]
+  );
 
   const flushPackingAutosave = useCallback(
     async (invoiceNo: string) => {
@@ -190,14 +243,39 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
         <div>
           <h2 className="text-lg font-semibold text-gray-900">{t('sweetTracker.cacheList.title')}</h2>
         </div>
-        <button
-          type="button"
-          onClick={() => void load(0, false)}
-          disabled={loading}
-          className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
-        >
-          {loading ? t('sweetTracker.cacheList.loading') : t('sweetTracker.cacheList.refresh')}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {bulkSelected.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5">
+              <span className="text-sm font-medium text-purple-900">
+                {t('sweetTracker.cacheList.bulkSelected').replace('{n}', String(bulkSelected.size))}
+              </span>
+              <button
+                type="button"
+                onClick={openBulkPackingPicker}
+                disabled={loading || bulkBusy}
+                className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+              >
+                {bulkBusy ? t('sweetTracker.cacheList.bulkApplying') : t('sweetTracker.cacheList.bulkApplyOpen')}
+              </button>
+              <button
+                type="button"
+                onClick={clearBulkSelection}
+                disabled={loading || bulkBusy}
+                className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {t('sweetTracker.cacheList.bulkClear')}
+              </button>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => void load(0, false)}
+            disabled={loading || bulkBusy}
+            className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {loading ? t('sweetTracker.cacheList.loading') : t('sweetTracker.cacheList.refresh')}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -226,6 +304,10 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
         listLoading={loading}
         packingDraftByInvoice={packingDraftByInvoice}
         onOpenPackingPicker={openPackingPicker}
+        enableSelection
+        selectedInvoiceNos={bulkSelected}
+        onToggleSelect={toggleBulkSelect}
+        onToggleSelectAll={toggleBulkSelectAllVisible}
       />
 
       {hasMore && (
@@ -244,6 +326,13 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
         initialCodes={pickerInitialCodes}
         onClose={closePackingPicker}
         onApply={applyPackingPickerSelection}
+      />
+
+      <SweetTrackerPackingListPickerModal
+        isOpen={bulkPickerOpen}
+        initialCodes={[]}
+        onClose={() => setBulkPickerOpen(false)}
+        onApply={applyBulkPackingCodes}
       />
     </section>
   );
