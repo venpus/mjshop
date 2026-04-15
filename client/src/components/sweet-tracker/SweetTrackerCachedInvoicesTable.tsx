@@ -42,6 +42,16 @@ export function SweetTrackerCachedInvoicesTable({
   const someSelected =
     selectionActive && invoiceNos.length > 0 ? invoiceNos.some((no) => selectedInvoiceNos.has(no)) : false;
 
+  const openPackingListInNewTab = (token: string) => {
+    const raw = token.trim();
+    if (!raw) return;
+    const codeOnly = raw.split('::')[0]!.trim();
+    if (!codeOnly) return;
+    const params = new URLSearchParams();
+    params.set('search', codeOnly);
+    window.open(`/admin/shipping-history?${params.toString()}`, '_blank');
+  };
+
   return (
     <div className={wrapperClassName}>
       <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -98,12 +108,15 @@ export function SweetTrackerCachedInvoicesTable({
                 <td className="min-w-[12rem] max-w-[28rem] px-3 py-2 align-middle">
                   <div className="flex min-h-[2rem] flex-wrap items-center gap-1">
                     {displayCodes.map((c) => (
-                      <span
+                      <button
                         key={c}
+                        type="button"
+                        onClick={() => openPackingListInNewTab(c)}
                         className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-800"
+                        title={c}
                       >
                         {c}
-                      </span>
+                      </button>
                     ))}
                     <button
                       type="button"

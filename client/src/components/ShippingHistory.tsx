@@ -102,6 +102,20 @@ export function ShippingHistory() {
     }
   }, [location.search]);
 
+  // URL 쿼리에서 패킹리스트 코드 검색 적용 (택배조회에서 새 탭으로 진입 시)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const raw = params.get('search') || params.get('packingListCode') || '';
+    const value = raw ? decodeURIComponent(raw).trim() : '';
+    if (!value) return;
+    // 발주 필터 진입과 충돌 방지: poId가 있으면 그 흐름을 우선
+    const poId = params.get('purchaseOrderId');
+    if (poId?.trim()) return;
+    setInputSearchTerm(value);
+    setSearchTerm(value);
+    setCurrentPage(1);
+  }, [location.search]);
+
   // location state에서 initialPackingListData / initialPackingListCode 확인 (공장→물류창고·패킹리스트 코드에서 전달)
   useEffect(() => {
     const state = location.state as {
