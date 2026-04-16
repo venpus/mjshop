@@ -6,6 +6,7 @@ import {
   parsePackingListCodesInput,
   patchSweetTrackerInvoicePackingListCodes,
   postSweetTrackerBulkDeliveryCompleted,
+  postSweetTrackerRefreshAllNotCompleteCached,
   type SweetTrackerCachedInvoiceItem,
 } from '../../api/sweetTrackerApi';
 import { SweetTrackerCachedInvoicesTable } from './SweetTrackerCachedInvoicesTable';
@@ -13,6 +14,8 @@ import { SweetTrackerPackingListPickerModal } from './SweetTrackerPackingListPic
 
 const PAGE_LIMIT = 50;
 const MAX_PACKING_LIST_CODES = 40;
+/** 서버 `postBulkDeliveryCompleted`와 동일 상한 */
+const BULK_INVOICE_LOOKUP_CHUNK = 150;
 
 function sameStringArrayOrder(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
@@ -38,6 +41,9 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
   const [error, setError] = useState<string | null>(null);
   const [busyInvoiceNo, setBusyInvoiceNo] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [refreshAllNotCompleteBusy, setRefreshAllNotCompleteBusy] = useState(false);
+  const [bulkSelectedRefreshBusy, setBulkSelectedRefreshBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [packingDraftByInvoice, setPackingDraftByInvoice] = useState<Record<string, string>>({});
   const [pickerInvoiceNo, setPickerInvoiceNo] = useState<string | null>(null);
@@ -112,6 +118,29 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
     setBulkSelected(new Set());
   }, [invoiceSearchText]);
 
+  const handleRefreshAllNotComplete = async () => {
+    if (!window.confirm(t('sweetTracker.cacheList.refreshAllNotCompleteConfirm'))) return;
+    setRefreshAllNotCompleteBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const json = await postSweetTrackerRefreshAllNotCompleteCached(user?.id);
+      const errN = json.data.errors.length;
+      setNotice(
+        t('sweetTracker.cacheList.refreshAllNotCompleteDone')
+          .replace('{requested}', String(json.meta.requested))
+          .replace('{fromApi}', String(json.meta.from_api))
+          .replace('{fromCache}', String(json.meta.from_cache))
+          .replace('{errors}', String(errN))
+      );
+      await load((page - 1) * PAGE_LIMIT);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRefreshAllNotCompleteBusy(false);
+    }
+  };
+
   const handleLookupOne = async (invoiceNo: string) => {
     setBusyInvoiceNo(invoiceNo);
     setError(null);
@@ -147,6 +176,47 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
   }, []);
 
   const clearBulkSelection = useCallback(() => setBulkSelected(new Set()), []);
+
+  const handleBulkRefreshSelected = useCallback(async () => {
+    if (bulkSelected.size === 0) return;
+    const invoiceNos = Array.from(bulkSelected);
+    if (
+      !window.confirm(
+        t('sweetTracker.cacheList.bulkRefreshSelectedConfirm').replace('{n}', String(invoiceNos.length))
+      )
+    ) {
+      return;
+    }
+    setBulkSelectedRefreshBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      let totalRequested = 0;
+      let totalFromApi = 0;
+      let totalFromCache = 0;
+      let totalErrors = 0;
+      for (let i = 0; i < invoiceNos.length; i += BULK_INVOICE_LOOKUP_CHUNK) {
+        const slice = invoiceNos.slice(i, i + BULK_INVOICE_LOOKUP_CHUNK);
+        const json = await postSweetTrackerBulkDeliveryCompleted(user?.id, slice);
+        totalRequested += json.meta.requested;
+        totalFromApi += json.meta.from_api;
+        totalFromCache += json.meta.from_cache;
+        totalErrors += json.data.errors.length;
+      }
+      setNotice(
+        t('sweetTracker.cacheList.bulkRefreshSelectedDone')
+          .replace('{requested}', String(totalRequested))
+          .replace('{fromApi}', String(totalFromApi))
+          .replace('{fromCache}', String(totalFromCache))
+          .replace('{errors}', String(totalErrors))
+      );
+      await load((page - 1) * PAGE_LIMIT);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBulkSelectedRefreshBusy(false);
+    }
+  }, [bulkSelected, user?.id, t, load, page]);
 
   const openBulkPackingPicker = useCallback(() => {
     setBulkPickerOpen(true);
@@ -255,6 +325,8 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
     await flushPackingAutosave(inv);
   };
 
+  const panelBlocking = loading || bulkBusy || refreshAllNotCompleteBusy || bulkSelectedRefreshBusy;
+
   return (
     <section className="mt-10 border-t border-gray-200 pt-8">
       <div className="flex flex-wrap items-end justify-between gap-2">
@@ -271,13 +343,13 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
                 if (e.key === 'Enter') applyInvoiceSearch();
               }}
               placeholder={t('sweetTracker.cacheList.searchPlaceholder')}
-              disabled={loading || bulkBusy}
+              disabled={panelBlocking}
               className="w-56 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50"
             />
             <button
               type="button"
               onClick={applyInvoiceSearch}
-              disabled={loading || bulkBusy}
+              disabled={panelBlocking}
               className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
             >
               {t('sweetTracker.cacheList.searchButton')}
@@ -287,7 +359,7 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
             <button
               type="button"
               onClick={() => setDeliveryFilter('all')}
-              disabled={loading || bulkBusy}
+              disabled={panelBlocking}
               className={`rounded-md px-3 py-1.5 text-sm font-medium ${
                 deliveryFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
@@ -297,7 +369,7 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
             <button
               type="button"
               onClick={() => setDeliveryFilter('not_complete')}
-              disabled={loading || bulkBusy}
+              disabled={panelBlocking}
               className={`rounded-md px-3 py-1.5 text-sm font-medium ${
                 deliveryFilter === 'not_complete' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
@@ -307,7 +379,7 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
             <button
               type="button"
               onClick={() => setDeliveryFilter('complete')}
-              disabled={loading || bulkBusy}
+              disabled={panelBlocking}
               className={`rounded-md px-3 py-1.5 text-sm font-medium ${
                 deliveryFilter === 'complete' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
@@ -315,6 +387,18 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
               {t('sweetTracker.cacheList.filterComplete')}
             </button>
           </div>
+          {deliveryFilter === 'not_complete' && (
+            <button
+              type="button"
+              onClick={() => void handleRefreshAllNotComplete()}
+              disabled={panelBlocking}
+              className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+            >
+              {refreshAllNotCompleteBusy
+                ? t('sweetTracker.cacheList.refreshAllNotCompleteBusy')
+                : t('sweetTracker.cacheList.refreshAllNotComplete')}
+            </button>
+          )}
           {bulkSelected.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5">
               <span className="text-sm font-medium text-purple-900">
@@ -322,8 +406,18 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
               </span>
               <button
                 type="button"
+                onClick={() => void handleBulkRefreshSelected()}
+                disabled={panelBlocking}
+                className="rounded-md border border-amber-400 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+              >
+                {bulkSelectedRefreshBusy
+                  ? t('sweetTracker.cacheList.bulkRefreshSelectedBusy')
+                  : t('sweetTracker.cacheList.bulkRefreshSelected')}
+              </button>
+              <button
+                type="button"
                 onClick={openBulkPackingPicker}
-                disabled={loading || bulkBusy}
+                disabled={panelBlocking}
                 className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
               >
                 {bulkBusy ? t('sweetTracker.cacheList.bulkApplying') : t('sweetTracker.cacheList.bulkApplyOpen')}
@@ -331,7 +425,7 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
               <button
                 type="button"
                 onClick={clearBulkSelection}
-                disabled={loading || bulkBusy}
+                disabled={panelBlocking}
                 className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
               >
                 {t('sweetTracker.cacheList.bulkClear')}
@@ -341,7 +435,7 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
           <button
             type="button"
             onClick={() => void load((page - 1) * PAGE_LIMIT)}
-            disabled={loading || bulkBusy}
+            disabled={panelBlocking}
             className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
           >
             {loading ? t('sweetTracker.cacheList.loading') : t('sweetTracker.cacheList.refresh')}
@@ -352,6 +446,12 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
       {error && (
         <p className="mt-3 text-sm text-red-600" role="alert">
           {error}
+        </p>
+      )}
+
+      {notice && (
+        <p className="mt-3 text-sm text-emerald-800" role="status">
+          {notice}
         </p>
       )}
 
@@ -372,7 +472,7 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
         items={items}
         busyInvoiceNo={busyInvoiceNo}
         onLookupOne={handleLookupOne}
-        listLoading={loading}
+        listLoading={panelBlocking}
         packingDraftByInvoice={packingDraftByInvoice}
         onOpenPackingPicker={openPackingPicker}
         enableSelection
@@ -385,7 +485,7 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           <button
             type="button"
-            disabled={page <= 1 || loading || bulkBusy}
+            disabled={page <= 1 || panelBlocking}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-40"
           >
@@ -398,7 +498,7 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
           </span>
           <button
             type="button"
-            disabled={page >= totalPages || loading || bulkBusy}
+            disabled={page >= totalPages || panelBlocking}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-40"
           >

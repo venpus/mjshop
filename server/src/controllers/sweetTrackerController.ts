@@ -4,8 +4,11 @@ import {
   type SweetTrackerInvoiceCacheListRow,
 } from '../repositories/sweetTrackerInvoiceCacheRepository.js';
 import { bulkResolveTrackingWithCache } from '../services/sweetTrackerBulkCacheService.js';
+import type { BulkDeliveryCompletedResult } from '../services/sweetTrackerService.js';
 
 const MAX_INVOICES = 150;
+/** DB 미완료 전체 일괄 재조회 상한(청크는 MAX_INVOICES 단위) */
+const MAX_REFRESH_ALL_NOT_COMPLETE = 2000;
 /** 로컬·기존 테스트와 동일 키 — 운영에서는 SWEET_TRACKER_API_KEY 환경변수 사용 권장 */
 const FALLBACK_API_KEY = '6oxGctW6rrSzxm5kOP631A';
 const DEFAULT_T_CODE = '04';
@@ -116,6 +119,93 @@ export async function postBulkDeliveryCompleted(req: Request, res: Response): Pr
         requested: invoices.length,
         from_cache: cacheMeta.from_cache,
         from_api: cacheMeta.from_api,
+      },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ success: false, message: msg });
+  }
+}
+
+/**
+ * POST /api/sweet-tracker/invoice-cache/refresh-all-not-complete
+ * body: { t_code?: string } — DB에 저장된 배송 미완료 운송장 전체를 청크 단위로 재조회
+ */
+export async function postRefreshAllNotCompleteCached(req: Request, res: Response): Promise<void> {
+  const user = (req as { user?: { id?: string } }).user;
+  if (!user?.id) {
+    res.status(401).json({ success: false, message: '로그인이 필요합니다.' });
+    return;
+  }
+
+  const body = req.body as { t_code?: unknown };
+  const tCode =
+    typeof body.t_code === 'string' && body.t_code.trim() !== ''
+      ? body.t_code.trim()
+      : DEFAULT_T_CODE;
+
+  try {
+    const nos = await sweetTrackerInvoiceCacheRepository.listInvoiceNosNotCompleteByTCode(
+      tCode,
+      MAX_REFRESH_ALL_NOT_COMPLETE + 1
+    );
+    if (nos.length > MAX_REFRESH_ALL_NOT_COMPLETE) {
+      res.status(400).json({
+        success: false,
+        message: `미완료 운송장이 ${MAX_REFRESH_ALL_NOT_COMPLETE}건을 초과합니다. 일부를 완료 처리한 뒤 다시 시도해 주세요.`,
+      });
+      return;
+    }
+
+    const empty: BulkDeliveryCompletedResult = { completed: [], notComplete: [], errors: [] };
+    if (nos.length === 0) {
+      res.json({
+        success: true,
+        data: empty,
+        meta: {
+          t_code: tCode,
+          requested: 0,
+          chunks: 0,
+          from_cache: 0,
+          from_api: 0,
+        },
+      });
+      return;
+    }
+
+    const aggregated: BulkDeliveryCompletedResult = { completed: [], notComplete: [], errors: [] };
+    let from_cache = 0;
+    let from_api = 0;
+    const apiKey = getApiKey();
+
+    for (let i = 0; i < nos.length; i += MAX_INVOICES) {
+      const slice = nos.slice(i, i + MAX_INVOICES);
+      const { result, meta } = await bulkResolveTrackingWithCache(
+        apiKey,
+        tCode,
+        slice,
+        sweetTrackerInvoiceCacheRepository
+      );
+      aggregated.completed.push(...result.completed);
+      aggregated.notComplete.push(...result.notComplete);
+      aggregated.errors.push(...result.errors);
+      from_cache += meta.from_cache;
+      from_api += meta.from_api;
+    }
+
+    aggregated.completed.sort((a, b) => a.invoiceNo.localeCompare(b.invoiceNo, 'ko'));
+    aggregated.notComplete.sort((a, b) => a.invoiceNo.localeCompare(b.invoiceNo, 'ko'));
+    aggregated.errors.sort((a, b) => a.invoice.localeCompare(b.invoice, 'ko'));
+
+    res.json({
+      success: true,
+      data: aggregated,
+      meta: {
+        t_code: tCode,
+        requested: nos.length,
+        chunks: Math.ceil(nos.length / MAX_INVOICES),
+        from_cache,
+        from_api,
       },
     });
   } catch (e) {

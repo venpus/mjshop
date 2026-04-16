@@ -71,7 +71,8 @@ export class SweetTrackerInvoiceCacheRepository {
   }
 
   /**
-   * t_code 기준 저장된 운송장 목록 (최근 갱신순)
+   * t_code 기준 저장된 운송장 목록 (최초 캐시 저장 시각 기준, 신규 상단).
+   * 개별 재조회 시 updated_at만 바뀌므로 행 순서가 유지됩니다.
    */
   async listByTCodePaged(
     tCode: string,
@@ -108,12 +109,29 @@ export class SweetTrackerInvoiceCacheRepository {
               packing_list_codes_json
        FROM sweet_tracker_invoice_cache
        WHERE ${whereSql}
-       ORDER BY updated_at DESC, invoice_no ASC
+       ORDER BY created_at DESC, invoice_no ASC
        LIMIT ? OFFSET ?`,
       [...whereArgs, limit, offset]
     );
 
     return { rows, total };
+  }
+
+  /**
+   * t_code 기준 배송 미완료(is_delivery_complete = 0) 운송장 번호만 조회 (갱신 오래된 순)
+   */
+  async listInvoiceNosNotCompleteByTCode(tCode: string, maxRows: number): Promise<string[]> {
+    const cap = Math.max(0, Math.floor(maxRows));
+    if (cap === 0) return [];
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT invoice_no
+       FROM sweet_tracker_invoice_cache
+       WHERE t_code = ? AND is_delivery_complete = 0
+       ORDER BY updated_at ASC, invoice_no ASC
+       LIMIT ?`,
+      [tCode, cap]
+    );
+    return rows.map((r) => String((r as { invoice_no: string }).invoice_no));
   }
 
   /**

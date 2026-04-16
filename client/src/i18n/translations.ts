@@ -107,6 +107,17 @@ export const translations: Record<Language, Record<string, string>> = {
     'sweetTracker.cacheList.bulkApplyOpen': '패킹리스트 코드 일괄 적용',
     'sweetTracker.cacheList.bulkApplying': '적용 중…',
     'sweetTracker.cacheList.bulkClear': '선택 해제',
+    'sweetTracker.cacheList.bulkRefreshSelected': '선택 재조회',
+    'sweetTracker.cacheList.bulkRefreshSelectedBusy': '선택 재조회 중…',
+    'sweetTracker.cacheList.bulkRefreshSelectedConfirm': '선택한 {n}건의 운송장을 스위트트래커로 다시 조회합니다. 진행할까요?',
+    'sweetTracker.cacheList.bulkRefreshSelectedDone':
+      '선택 재조회를 마쳤습니다. 대상 {requested}건 · API 조회 {fromApi} · 캐시 사용 {fromCache} · 조회 오류 {errors}건.',
+    'sweetTracker.cacheList.refreshAllNotComplete': '전체 미완료 재조회',
+    'sweetTracker.cacheList.refreshAllNotCompleteBusy': '전체 미완료 재조회 중…',
+    'sweetTracker.cacheList.refreshAllNotCompleteConfirm':
+      'DB에 저장된 배송 미완료 운송장 전체를 스위트트래커로 다시 조회합니다. 목록의 송장 검색·페이지는 적용되지 않으며, 저장된 미완료 전체가 대상입니다. 건수가 많으면 시간이 오래 걸릴 수 있습니다. 진행할까요?',
+    'sweetTracker.cacheList.refreshAllNotCompleteDone':
+      '재조회를 마쳤습니다. 대상 {requested}건 · API 조회 {fromApi} · 캐시 사용 {fromCache} · 조회 오류 {errors}건.',
     'sweetTracker.cacheList.packingPickerOpen': '패킹리스트 선택',
     'sweetTracker.cacheList.packingPickerTitle': '패킹리스트 연결',
     'sweetTracker.cacheList.packingPickerHint':
@@ -820,6 +831,17 @@ export const translations: Record<Language, Record<string, string>> = {
     'sweetTracker.cacheList.bulkApplyOpen': '批量关联装箱单代码',
     'sweetTracker.cacheList.bulkApplying': '应用中…',
     'sweetTracker.cacheList.bulkClear': '取消选择',
+    'sweetTracker.cacheList.bulkRefreshSelected': '重新查询所选',
+    'sweetTracker.cacheList.bulkRefreshSelectedBusy': '正在重新查询所选…',
+    'sweetTracker.cacheList.bulkRefreshSelectedConfirm': '将重新查询已选 {n} 条运单，是否继续？',
+    'sweetTracker.cacheList.bulkRefreshSelectedDone':
+      '所选重新查询完成。共 {requested} 条 · API {fromApi} · 缓存 {fromCache} · 查询错误 {errors} 条。',
+    'sweetTracker.cacheList.refreshAllNotComplete': '全部未完成运单重新查询',
+    'sweetTracker.cacheList.refreshAllNotCompleteBusy': '正在重新查询全部未完成…',
+    'sweetTracker.cacheList.refreshAllNotCompleteConfirm':
+      '将重新查询数据库中已保存的全部未完成运单（与当前列表搜索、分页无关）。数量较多时可能耗时较长，是否继续？',
+    'sweetTracker.cacheList.refreshAllNotCompleteDone':
+      '重新查询完成。共 {requested} 条 · API {fromApi} · 缓存 {fromCache} · 查询错误 {errors} 条。',
     'sweetTracker.cacheList.packingPickerOpen': '选择装箱单',
     'sweetTracker.cacheList.packingPickerTitle': '关联装箱单',
     'sweetTracker.cacheList.packingPickerHint':

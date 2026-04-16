@@ -86,6 +86,43 @@ export async function postSweetTrackerBulkDeliveryCompleted(
   return json;
 }
 
+/** DB에 저장된 배송 미완료 운송장 전체를 서버에서 청크로 나눠 일괄 재조회 */
+export async function postSweetTrackerRefreshAllNotCompleteCached(userId: string | undefined): Promise<{
+  success: true;
+  data: SweetTrackerBulkDeliveryCompletedData;
+  meta: {
+    t_code: string;
+    requested: number;
+    chunks: number;
+    from_cache: number;
+    from_api: number;
+  };
+}> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (userId) headers['X-User-Id'] = userId;
+
+  const res = await fetch(`${API_BASE}/sweet-tracker/invoice-cache/refresh-all-not-complete`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({}),
+  });
+
+  const json = (await res.json()) as
+    | {
+        success: true;
+        data: SweetTrackerBulkDeliveryCompletedData;
+        meta: { t_code: string; requested: number; chunks: number; from_cache: number; from_api: number };
+      }
+    | { success: false; message?: string };
+
+  if (!res.ok || !json.success) {
+    const msg = 'message' in json && json.message ? json.message : `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+
+  return json;
+}
+
 export async function getSweetTrackerCachedInvoices(
   userId: string | undefined,
   options?: {

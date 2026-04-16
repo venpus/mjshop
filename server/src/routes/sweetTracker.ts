@@ -12,6 +12,10 @@ router.patch(
   '/invoice-cache/packing-codes',
   sweetTrackerController.patchInvoicePackingListCodes
 );
+router.post(
+  '/invoice-cache/refresh-all-not-complete',
+  sweetTrackerController.postRefreshAllNotCompleteCached
+);
 router.post('/bulk-delivery-completed', sweetTrackerController.postBulkDeliveryCompleted);
 
 export default router;
