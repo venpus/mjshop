@@ -164,6 +164,20 @@ export class ProductCollabService {
     return this.repository.getProductCounts();
   }
 
+  async getUnreadThreadMessageCount(userId: string): Promise<number> {
+    return this.repository.countUnreadThreadMessagesForUser(userId);
+  }
+
+  /** 제품 스레드 페이지 조회 완료 시 호출: 현재까지의 최신 메시지 시각까지 읽음 처리 */
+  async markThreadViewed(userId: string, productId: number): Promise<boolean> {
+    const product = await this.repository.findProductById(productId, userId);
+    if (!product) return false;
+    const maxAt = await this.repository.getMaxMessageCreatedAtForProduct(productId);
+    const cursor = maxAt ?? new Date();
+    await this.repository.upsertThreadView(userId, productId, cursor);
+    return true;
+  }
+
   async getConfirmationsReceived(authorId: string, options?: { limit?: number; offset?: number }): Promise<{ items: DashboardConfirmation[]; total: number }> {
     return this.repository.findConfirmationsReceived(authorId, options);
   }

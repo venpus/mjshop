@@ -4,6 +4,7 @@ import { getProductById, updateProduct, uploadProductImages, deleteProduct } fro
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { getAdminUser } from '../../../utils/authStorage';
 import { useProductCollabCounts } from '../ProductCollabCountsContext';
+import { useProductCollabThreadUnread } from '../../../contexts/ProductCollabThreadUnreadContext';
 import type { ProductCollabProductDetail, ProductCollabMessage } from '../types';
 import { getProductCollabImageUrl } from '../utils/imageUrl';
 import { ImageModal } from '../shared/ImageModal';
@@ -15,6 +16,7 @@ import { SpecForm } from '../shared/SpecForm';
 export function ProductCollabThread() {
   const { t } = useLanguage();
   const countsContext = useProductCollabCounts();
+  const threadUnread = useProductCollabThreadUnread();
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -45,8 +47,10 @@ export function ProductCollabThread() {
     }
     getProductById(id).then((res) => {
       setLoading(false);
-      if (res.success && res.data) setProduct(res.data);
-      else setError(res.error ?? t('productCollab.loadFailed'));
+      if (res.success && res.data) {
+        setProduct(res.data);
+        void threadUnread?.markThreadViewed(id).then(() => threadUnread?.refresh());
+      } else setError(res.error ?? t('productCollab.loadFailed'));
     });
   };
 

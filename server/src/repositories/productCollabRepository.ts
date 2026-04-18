@@ -1,5 +1,8 @@
 import { pool } from '../config/database.js';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
+
+/** 미확인 스레드 집계: 이 일시 이후 작성된 메시지·답글만 포함 (그 이전 기록은 집계 제외) */
+const PRODUCT_COLLAB_THREAD_UNREAD_SINCE = '2026-04-18 00:00:00';
 import type {
   ProductCollabProduct,
   ProductCollabProductListItem,
@@ -1079,5 +1082,48 @@ export class ProductCollabRepository {
       [id]
     );
     return res.affectedRows > 0;
+  }
+
+  /** 제품 스레드의 메시지·답글 중 최대 created_at (없으면 null) */
+  async getMaxMessageCreatedAtForProduct(productId: number): Promise<Date | null> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT MAX(created_at) AS mx FROM product_collab_messages WHERE product_id = ?',
+      [productId]
+    );
+    const mx = (rows as RowDataPacket[])[0]?.mx;
+    if (mx == null) return null;
+    return mx instanceof Date ? mx : new Date(mx as string);
+  }
+
+  /** 스레드 조회(읽음) 커서 저장 — 이 시각 이하의 타인 메시지는 미확인에서 제외 */
+  async upsertThreadView(userId: string, productId: number, lastSeenMessageCreatedAt: Date): Promise<void> {
+    await pool.execute(
+      `INSERT INTO product_collab_thread_views (user_id, product_id, last_seen_message_created_at)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE last_seen_message_created_at = VALUES(last_seen_message_created_at)`,
+      [userId, productId, lastSeenMessageCreatedAt]
+    );
+  }
+
+  /**
+   * 전 제품 합산: 타인이 작성한 메시지·답글 중, 해당 제품 스레드 페이지를 아직 열지 않았거나
+   * 열었던 시점의 커서보다 이후에 생성된 행만 카운트.
+   */
+  async countUnreadThreadMessagesForUser(userId: string): Promise<number> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt
+       FROM product_collab_messages m
+       JOIN product_collab_products p ON p.id = m.product_id
+       LEFT JOIN product_collab_thread_views v
+         ON v.product_id = m.product_id AND v.user_id = ?
+       WHERE m.author_id <> ?
+         AND m.created_at >= ?
+         AND (
+           v.last_seen_message_created_at IS NULL
+           OR m.created_at > v.last_seen_message_created_at
+         )`,
+      [userId, userId, PRODUCT_COLLAB_THREAD_UNREAD_SINCE]
+    );
+    return Number((rows as RowDataPacket[])[0]?.cnt ?? 0);
   }
 }

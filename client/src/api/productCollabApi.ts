@@ -261,6 +261,31 @@ export async function getProductCounts(): Promise<ApiResponse<ProductCollabCount
   return { success: true, data: json.data };
 }
 
+export interface ThreadUnreadCountData {
+  total: number;
+}
+
+/** A-SuperAdmin: 타인 작성 미확인 스레드·답글 전 제품 합산 */
+export async function getThreadUnreadCount(): Promise<ApiResponse<ThreadUnreadCountData>> {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/thread-unread-count`, {
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) return { success: false, error: json.error || '미확인 수 조회 실패' };
+  return { success: true, data: json.data };
+}
+
+/** A-SuperAdmin: 해당 제품 스레드 페이지 조회(읽음 커서 갱신) */
+export async function markProductThreadViewed(productId: number): Promise<ApiResponse<void>> {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/products/${productId}/thread-view`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) return { success: false, error: json.error || '읽음 처리 실패' };
+  return { success: true };
+}
+
 export async function getCompletedProducts(params?: {
   search?: string;
 }): Promise<ApiResponse<ProductCollabProductListItem[]>> {

@@ -70,6 +70,51 @@ export class ProductCollabController {
     }
   };
 
+  /** A-SuperAdmin: 2026-04-18 이후 타인 작성 스레드·답글 중, 스레드 미조회 또는 조회 이후 신규분 합산 */
+  getThreadUnreadCount = async (req: Request, res: Response) => {
+    try {
+      const userId = (req as unknown as { user?: { id: string } }).user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, error: '로그인이 필요합니다.' });
+      }
+      const account = await this.adminAccountService.getAccountById(userId);
+      if (!account || account.level !== 'A-SuperAdmin') {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+      const total = await this.service.getUnreadThreadMessageCount(userId);
+      res.json({ success: true, data: { total } });
+    } catch (error: unknown) {
+      console.error('Product collab thread unread count error:', error);
+      res.status(500).json({ success: false, error: '미확인 스레드 수 조회 중 오류가 발생했습니다.' });
+    }
+  };
+
+  /** A-SuperAdmin: 제품 스레드 페이지 조회 시 읽음 커서 갱신 */
+  markThreadViewed = async (req: Request, res: Response) => {
+    try {
+      const userId = (req as unknown as { user?: { id: string } }).user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, error: '로그인이 필요합니다.' });
+      }
+      const account = await this.adminAccountService.getAccountById(userId);
+      if (!account || account.level !== 'A-SuperAdmin') {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ success: false, error: '유효하지 않은 제품 ID입니다.' });
+      }
+      const ok = await this.service.markThreadViewed(userId, id);
+      if (!ok) {
+        return res.status(404).json({ success: false, error: '제품을 찾을 수 없습니다.' });
+      }
+      res.json({ success: true });
+    } catch (error: unknown) {
+      console.error('Product collab mark thread viewed error:', error);
+      res.status(500).json({ success: false, error: '읽음 처리 중 오류가 발생했습니다.' });
+    }
+  };
+
   getProductById = async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id, 10);

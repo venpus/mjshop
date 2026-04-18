@@ -15,6 +15,7 @@ router.get('/ai-work-summary/status', controller.getAiWorkSummaryStatus);
 router.get('/ai-work-summary/logs', controller.getAiWorkSummaryLogs);
 router.get('/dashboard/section/:section', controller.getDashboardSection);
 router.get('/dashboard', controller.getDashboard);
+router.get('/thread-unread-count', controller.getThreadUnreadCount);
 router.get('/mentionable-users', controller.getMentionableUsers);
 router.get('/products', controller.getActiveProducts);
 router.get('/products/counts', controller.getProductCounts);
@@ -45,6 +46,7 @@ router.post(
   controller.uploadProductImages
 );
 router.get('/products/:id', controller.getProductById);
+router.post('/products/:id/thread-view', controller.markThreadViewed);
 router.post('/products', controller.createProduct);
 router.put('/products/:id', controller.updateProduct);
 router.delete('/products/:id', controller.deleteProduct);

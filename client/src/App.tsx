@@ -40,6 +40,8 @@ import { useAuth } from './contexts/AuthContext';
 import { usePermission } from './contexts/PermissionContext';
 import { useLanguage, Language } from './contexts/LanguageContext';
 import { PackingListUnsavedProvider, usePackingListUnsaved } from './contexts/PackingListUnsavedContext';
+import { ProductCollabThreadUnreadProvider } from './contexts/ProductCollabThreadUnreadContext';
+import { ProductCollabThreadUnreadFloating } from './components/product-collab/floating/ProductCollabThreadUnreadFloating';
 import { useForceMobileLayout } from './hooks/useForceMobileLayout';
 
 /** 권한 체크 래퍼 — 반드시 모듈 레벨에 두어 매 렌더마다 새 참조가 되지 않게 함. 그렇지 않으면 Route 자식(ShippingHistory 등)이 매번 리마운트되어 state가 초기화됨. */
@@ -118,6 +120,7 @@ function AdminLayout() {
   const { hasUnsavedChanges: packingListHasUnsaved } = usePackingListUnsaved();
 
   const useMobileLayout = useForceMobileLayout();
+  const collabThreadUnreadEnabled = user?.level === 'A-SuperAdmin';
 
   // 경로가 변경될 때 패킹리스트 또는 발주관리면 사이드바 접기, 아니면 펼치기
   useEffect(() => {
@@ -145,6 +148,7 @@ function AdminLayout() {
   };
 
   return (
+    <ProductCollabThreadUnreadProvider enabled={collabThreadUnreadEnabled}>
     <div className="flex h-screen min-h-0 overflow-hidden lg:min-h-[1080px] bg-gray-50">
       {/* Overlay */}
       {isSidebarOpen && (
@@ -435,7 +439,9 @@ function AdminLayout() {
           </Routes>
         </div>
       </main>
+      {collabThreadUnreadEnabled ? <ProductCollabThreadUnreadFloating /> : null}
     </div>
+    </ProductCollabThreadUnreadProvider>
   );
 }
 
