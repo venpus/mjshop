@@ -89,6 +89,29 @@ export class ProductCollabController {
     }
   };
 
+  /** A-SuperAdmin: 미확인 메시지·답글 목록 (집계와 동일 조건) */
+  getThreadUnreadItems = async (req: Request, res: Response) => {
+    try {
+      const userId = (req as unknown as { user?: { id: string } }).user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, error: '로그인이 필요합니다.' });
+      }
+      const account = await this.adminAccountService.getAccountById(userId);
+      if (!account || account.level !== 'A-SuperAdmin') {
+        return res.status(403).json({ success: false, error: '권한이 없습니다.' });
+      }
+      const limitRaw = req.query.limit != null ? parseInt(String(req.query.limit), 10) : undefined;
+      const items = await this.service.getUnreadThreadMessageItems(
+        userId,
+        limitRaw != null && !isNaN(limitRaw) ? limitRaw : undefined
+      );
+      res.json({ success: true, data: { items } });
+    } catch (error: unknown) {
+      console.error('Product collab thread unread items error:', error);
+      res.status(500).json({ success: false, error: '미확인 목록 조회 중 오류가 발생했습니다.' });
+    }
+  };
+
   /** A-SuperAdmin: 제품 스레드 페이지 조회 시 읽음 커서 갱신 */
   markThreadViewed = async (req: Request, res: Response) => {
     try {

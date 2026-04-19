@@ -16,6 +16,7 @@ router.get('/ai-work-summary/logs', controller.getAiWorkSummaryLogs);
 router.get('/dashboard/section/:section', controller.getDashboardSection);
 router.get('/dashboard', controller.getDashboard);
 router.get('/thread-unread-count', controller.getThreadUnreadCount);
+router.get('/thread-unread-items', controller.getThreadUnreadItems);
 router.get('/mentionable-users', controller.getMentionableUsers);
 router.get('/products', controller.getActiveProducts);
 router.get('/products/counts', controller.getProductCounts);

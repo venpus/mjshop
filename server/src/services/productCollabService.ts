@@ -168,6 +168,10 @@ export class ProductCollabService {
     return this.repository.countUnreadThreadMessagesForUser(userId);
   }
 
+  async getUnreadThreadMessageItems(userId: string, limit?: number) {
+    return this.repository.findUnreadThreadMessagesForUser(userId, limit ?? 500);
+  }
+
   /** 제품 스레드 페이지 조회 완료 시 호출: 현재까지의 최신 메시지 시각까지 읽음 처리 */
   async markThreadViewed(userId: string, productId: number): Promise<boolean> {
     const product = await this.repository.findProductById(productId, userId);

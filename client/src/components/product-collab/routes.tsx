@@ -6,6 +6,7 @@ import { ProductCollabList } from './ProductList/ProductCollabList';
 import { ProductCollabThread } from './ProductThread/ProductCollabThread';
 import { ProductCollabArchive } from './CompletedArchive/ProductCollabArchive';
 import { ProductCollabCancelled } from './CancelledList/ProductCollabCancelled';
+import { UnreadThreadListPage } from './unread/UnreadThreadListPage';
 
 export function ProductCollabRoutes() {
   return (
@@ -14,6 +15,7 @@ export function ProductCollabRoutes() {
         <Route index element={<ProductCollabDashboard />} />
         <Route path="dashboard/more/:section" element={<DashboardSectionMore />} />
         <Route path="list" element={<ProductCollabList />} />
+        <Route path="unread" element={<UnreadThreadListPage />} />
         <Route path="thread/:productId" element={<ProductCollabThread />} />
         <Route path="archive" element={<ProductCollabArchive />} />
         <Route path="cancelled" element={<ProductCollabCancelled />} />

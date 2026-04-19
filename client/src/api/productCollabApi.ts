@@ -275,6 +275,31 @@ export async function getThreadUnreadCount(): Promise<ApiResponse<ThreadUnreadCo
   return { success: true, data: json.data };
 }
 
+export interface ThreadUnreadItem {
+  message_id: number;
+  product_id: number;
+  product_name: string;
+  parent_id: number | null;
+  author_id: string;
+  author_name: string | null;
+  body: string | null;
+  created_at: string;
+}
+
+export interface ThreadUnreadItemsData {
+  items: ThreadUnreadItem[];
+}
+
+/** A-SuperAdmin: 미확인 메시지·답글 목록 */
+export async function getThreadUnreadItems(): Promise<ApiResponse<ThreadUnreadItemsData>> {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/thread-unread-items`, {
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) return { success: false, error: json.error || '미확인 목록 조회 실패' };
+  return { success: true, data: json.data };
+}
+
 /** A-SuperAdmin: 해당 제품 스레드 페이지 조회(읽음 커서 갱신) */
 export async function markProductThreadViewed(productId: number): Promise<ApiResponse<void>> {
   const res = await fetch(`${getApiBaseUrl()}/product-collab/products/${productId}/thread-view`, {

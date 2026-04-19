@@ -1,17 +1,47 @@
-import { Link } from 'react-router-dom';
+import type { MouseEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useProductCollabThreadUnread } from '../../../contexts/ProductCollabThreadUnreadContext';
+import { useDraggableFloatingPosition } from '../../../hooks/useDraggableFloatingPosition';
+
+const FLOAT_POS_STORAGE_KEY = 'mjshop_product_collab_thread_float_pos';
 
 export function ProductCollabThreadUnreadFloating() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const ctx = useProductCollabThreadUnread();
   const total = ctx?.total ?? 0;
+  const drag = useDraggableFloatingPosition(FLOAT_POS_STORAGE_KEY);
+
+  const goUnread = () => {
+    if (total <= 0) return;
+    navigate('/admin/product-collab/unread');
+  };
+
+  const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
+    if (drag.consumeClickIfDrag()) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    goUnread();
+  };
 
   return (
-    <Link
-      to="/admin/product-collab/list"
-      className="fixed bottom-4 right-4 z-30 flex items-center gap-2 rounded-full border border-[#C7D2FE] bg-white px-3 py-2 shadow-lg shadow-indigo-900/10 transition hover:bg-[#EEF2FF] sm:bottom-6 sm:right-6"
+    <button
+      type="button"
+      ref={drag.ref}
+      style={drag.positionStyle}
+      onClick={handleClick}
+      onPointerDown={drag.onPointerDown}
+      onPointerMove={drag.onPointerMove}
+      onPointerUp={drag.onPointerUp}
+      onPointerCancel={drag.onPointerCancel}
+      aria-disabled={total <= 0}
+      className={`fixed z-30 flex select-none touch-none items-center gap-2 rounded-full border border-[#C7D2FE] bg-white px-3 py-2 shadow-lg shadow-indigo-900/10 ${
+        drag.positionClass
+      } ${total > 0 ? 'cursor-grab active:cursor-grabbing hover:bg-[#EEF2FF]' : 'cursor-default opacity-80'}`}
       aria-label={`${t('productCollab.threadUnreadFloatingAria')}: ${total}`}
       title={t('productCollab.threadUnreadFloatingTitle')}
     >
@@ -26,6 +56,6 @@ export function ProductCollabThreadUnreadFloating() {
       <span className="hidden max-w-[10rem] truncate text-xs font-medium text-[#374151] sm:inline">
         {t('productCollab.threadUnreadFloatingTitle')}
       </span>
-    </Link>
+    </button>
   );
 }

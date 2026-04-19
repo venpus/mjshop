@@ -21,6 +21,7 @@ export function ProductCollabThread() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fromSummary = searchParams.get('from') === 'summary';
+  const fromUnread = searchParams.get('from') === 'unread';
   const [product, setProduct] = useState<ProductCollabProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,10 +117,12 @@ export function ProductCollabThread() {
         <p className="text-red-600">{error ?? t('productCollab.productNotFound')}</p>
         <button
           type="button"
-          onClick={() => navigate('/admin/product-collab/list')}
+          onClick={() =>
+            navigate(fromUnread ? '/admin/product-collab/unread' : '/admin/product-collab/list')
+          }
           className="mt-2 text-[#2563EB] text-sm"
         >
-          {t('productCollab.backToList')}
+          {fromUnread ? t('productCollab.backToUnreadList') : t('productCollab.backToList')}
         </button>
       </div>
     );
@@ -128,7 +131,15 @@ export function ProductCollabThread() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3 flex-wrap">
-        {fromSummary ? (
+        {fromUnread ? (
+          <button
+            type="button"
+            onClick={() => navigate('/admin/product-collab/unread')}
+            className="text-[#2563EB] text-sm"
+          >
+            ← {t('productCollab.backToUnreadList')}
+          </button>
+        ) : fromSummary ? (
           <button
             type="button"
             onClick={() => navigate('/admin/product-collab')}

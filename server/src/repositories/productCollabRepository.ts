@@ -1126,4 +1126,48 @@ export class ProductCollabRepository {
     );
     return Number((rows as RowDataPacket[])[0]?.cnt ?? 0);
   }
+
+  /** 미확인 메시지·답글 목록 (집계와 동일 조건, 최신순) */
+  async findUnreadThreadMessagesForUser(userId: string, limit: number): Promise<
+    {
+      message_id: number;
+      product_id: number;
+      product_name: string;
+      parent_id: number | null;
+      author_id: string;
+      author_name: string | null;
+      body: string | null;
+      created_at: Date;
+    }[]
+  > {
+    const lim = Math.min(Math.max(1, limit), 500);
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT m.id AS message_id, m.product_id, m.parent_id, m.author_id, m.body, m.created_at,
+              p.name AS product_name, a.name AS author_name
+       FROM product_collab_messages m
+       JOIN product_collab_products p ON p.id = m.product_id
+       LEFT JOIN admin_accounts a ON a.id = m.author_id
+       LEFT JOIN product_collab_thread_views v
+         ON v.product_id = m.product_id AND v.user_id = ?
+       WHERE m.author_id <> ?
+         AND m.created_at >= ?
+         AND (
+           v.last_seen_message_created_at IS NULL
+           OR m.created_at > v.last_seen_message_created_at
+         )
+       ORDER BY m.created_at DESC
+       LIMIT ${lim}`,
+      [userId, userId, PRODUCT_COLLAB_THREAD_UNREAD_SINCE]
+    );
+    return (rows as RowDataPacket[]).map((r) => ({
+      message_id: Number(r.message_id),
+      product_id: Number(r.product_id),
+      product_name: String(r.product_name ?? ''),
+      parent_id: r.parent_id != null ? Number(r.parent_id) : null,
+      author_id: String(r.author_id ?? ''),
+      author_name: r.author_name != null ? String(r.author_name) : null,
+      body: r.body != null ? String(r.body) : null,
+      created_at: r.created_at instanceof Date ? r.created_at : new Date(r.created_at as string),
+    }));
+  }
 }
