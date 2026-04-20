@@ -5,6 +5,9 @@ import { updateMessage, deleteMessage, createMessage, completeTask, getAuthHeade
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { MessageAttachmentImage } from './MessageAttachmentImage';
 import { ImagePlus, X, AtSign } from 'lucide-react';
+import { isVideoByName } from '../utils/fileKind';
+import { VideoAttachmentThumb } from './VideoAttachmentThumb';
+import { VideoModal } from '../shared/VideoModal';
 
 /** 선택한 파일과 미리보기용 object URL (답글 업로드용) */
 interface FileWithPreview {
@@ -71,6 +74,42 @@ function FileDownloadLink({
         {downloading ? t('productCollab.downloading') : t('productCollab.download')}
       </button>
     </div>
+  );
+}
+
+function VideoAttachmentCard({
+  productId,
+  url,
+  originalFilename,
+}: {
+  productId: number;
+  url: string;
+  originalFilename?: string | null;
+}) {
+  const fullUrl = getProductCollabImageUrl(url);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className="inline-flex items-center gap-2 px-2 py-2 rounded-lg border border-[#E5E7EB] bg-[#F8FAFC] hover:bg-white"
+        onClick={() => setOpen(true)}
+      >
+        <VideoAttachmentThumb src={fullUrl} alt={originalFilename ?? undefined} />
+        <span className="text-sm font-medium text-[#1F2937] max-w-[160px] sm:max-w-[220px] truncate" title={originalFilename ?? url}>
+          {originalFilename ?? url.split('/').pop() ?? 'video'}
+        </span>
+      </button>
+      <VideoModal videoUrl={open ? fullUrl : null} onClose={() => setOpen(false)} actions={
+        <a
+          href={getProductCollabDownloadUrl(productId, url, originalFilename)}
+          className="px-2 py-1 text-xs font-medium text-white bg-white/10 hover:bg-white/20 rounded"
+          onClick={(e) => e.stopPropagation()}
+        >
+          Download
+        </a>
+      } />
+    </>
   );
 }
 
@@ -391,6 +430,13 @@ function MessageItem({
                     imageUrl={att.url}
                     productId={productId}
                     onAdded={onMessageUpdated}
+                  />
+                ) : isVideoByName(att.original_filename ?? att.url) ? (
+                  <VideoAttachmentCard
+                    key={att.id}
+                    productId={productId}
+                    url={att.url}
+                    originalFilename={att.original_filename}
                   />
                 ) : (
                   <FileDownloadLink

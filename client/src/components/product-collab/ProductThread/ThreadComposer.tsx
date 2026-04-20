@@ -3,7 +3,10 @@ import type { MessageTag } from '../types';
 import { createMessage, uploadProductImages, getMentionableUsers, type MentionableUser } from '../../../api/productCollabApi';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { ImageModal } from '../shared/ImageModal';
+import { VideoModal } from '../shared/VideoModal';
 import { ImagePlus, AtSign } from 'lucide-react';
+import { VideoAttachmentThumb } from './VideoAttachmentThumb';
+import { isVideoByName } from '../utils/fileKind';
 
 /** 선택한 파일과 미리보기용 object URL */
 interface FileWithPreview {
@@ -40,6 +43,7 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
   /** @ 입력 시 검색어(커서 앞 문자열). 빈 문자열이면 @ 직후 */
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
+  const [modalVideoUrl, setModalVideoUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mentionListRef = useRef<HTMLUListElement>(null);
@@ -433,6 +437,19 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
                       {item.file.name}
                     </p>
                   </>
+                ) : item.file.type.startsWith('video/') || isVideoByName(item.file.name) ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setModalVideoUrl(item.objectUrl)}
+                      className="w-20 h-20 rounded-lg border border-[#E5E7EB] overflow-hidden bg-[#111827] flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                    >
+                      <VideoAttachmentThumb src={item.objectUrl} alt={item.file.name} width={80} height={80} />
+                    </button>
+                    <p className="mt-1 text-xs text-[#6B7280] max-w-[88px] truncate" title={item.file.name}>
+                      {item.file.name}
+                    </p>
+                  </>
                 ) : (
                   <div className="relative flex items-center gap-2 px-3 py-2 rounded-lg border border-[#E5E7EB] bg-[#F8F9FB] min-w-0 max-w-[200px] sm:max-w-[240px]">
                     <span className="text-sm font-medium text-[#1F2937] truncate" title={item.file.name}>
@@ -453,6 +470,7 @@ export function ThreadComposer({ productId, onSent }: ThreadComposerProps) {
           </ul>
         )}
         <ImageModal imageUrl={modalImageUrl} onClose={() => setModalImageUrl(null)} />
+        <VideoModal videoUrl={modalVideoUrl} onClose={() => setModalVideoUrl(null)} />
         {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
     </form>
