@@ -1,8 +1,11 @@
 import type { SweetTrackerCachedInvoiceItem } from '../../api/sweetTrackerApi';
 import { parsePackingListCodesInput } from '../../api/sweetTrackerApi';
+import { PackingListCodeButtonWithHoverPreview } from './PackingListCodeButtonWithHoverPreview';
 
 export interface SweetTrackerCachedInvoicesTableProps {
   t: (key: string) => string;
+  /** 있으면 패킹 코드 칩에 마우스를 올렸을 때 제품 이미지 프리뷰를 요청합니다. */
+  userId?: string;
   items: SweetTrackerCachedInvoiceItem[];
   busyInvoiceNo: string | null;
   onLookupOne: (invoiceNo: string) => void;
@@ -21,6 +24,7 @@ export interface SweetTrackerCachedInvoicesTableProps {
 
 export function SweetTrackerCachedInvoicesTable({
   t,
+  userId,
   items,
   busyInvoiceNo,
   onLookupOne,
@@ -107,17 +111,27 @@ export function SweetTrackerCachedInvoicesTable({
                 <td className="whitespace-nowrap px-3 py-2 font-mono text-gray-900">{r.invoiceNo}</td>
                 <td className="min-w-[12rem] max-w-[28rem] px-3 py-2 align-middle">
                   <div className="flex min-h-[2rem] flex-wrap items-center gap-1">
-                    {displayCodes.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => openPackingListInNewTab(c)}
-                        className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-800"
-                        title={c}
-                      >
-                        {c}
-                      </button>
-                    ))}
+                    {displayCodes.map((c) =>
+                      userId ? (
+                        <PackingListCodeButtonWithHoverPreview
+                          key={c}
+                          token={c}
+                          userId={userId}
+                          t={t}
+                          onOpenPackingList={openPackingListInNewTab}
+                        />
+                      ) : (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => openPackingListInNewTab(c)}
+                          className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-800"
+                          title={c}
+                        >
+                          {c}
+                        </button>
+                      )
+                    )}
                     <button
                       type="button"
                       onClick={() => onOpenPackingPicker(r.invoiceNo)}

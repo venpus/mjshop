@@ -119,6 +119,9 @@ export const translations: Record<Language, Record<string, string>> = {
     'sweetTracker.cacheList.refreshAllNotCompleteDone':
       '재조회를 마쳤습니다. 대상 {requested}건 · API 조회 {fromApi} · 캐시 사용 {fromCache} · 조회 오류 {errors}건.',
     'sweetTracker.cacheList.packingPickerOpen': '패킹리스트 선택',
+    'sweetTracker.cacheList.packingPreviewLoading': '이미지 불러오는 중…',
+    'sweetTracker.cacheList.packingPreviewNotFound': '등록된 패킹리스트를 찾지 못했습니다.',
+    'sweetTracker.cacheList.packingPreviewNoLines': '연결된 품목이 없습니다.',
     'sweetTracker.cacheList.packingPickerTitle': '패킹리스트 연결',
     'sweetTracker.cacheList.packingPickerHint':
       '목록에서는 출고일이 다른 동일 코드도 각각 따로 선택됩니다. 아래 직접 입력란에 쉼표로 토큰을 추가할 수 있으며, 목록 선택과 함께 적용됩니다. 모두 해제한 뒤 적용하면 연결이 없어집니다.',
@@ -853,6 +856,9 @@ export const translations: Record<Language, Record<string, string>> = {
     'sweetTracker.cacheList.refreshAllNotCompleteDone':
       '重新查询完成。共 {requested} 条 · API {fromApi} · 缓存 {fromCache} · 查询错误 {errors} 条。',
     'sweetTracker.cacheList.packingPickerOpen': '选择装箱单',
+    'sweetTracker.cacheList.packingPreviewLoading': '正在加载图片…',
+    'sweetTracker.cacheList.packingPreviewNotFound': '未找到已登记的装箱单。',
+    'sweetTracker.cacheList.packingPreviewNoLines': '没有关联的明细行。',
     'sweetTracker.cacheList.packingPickerTitle': '关联装箱单',
     'sweetTracker.cacheList.packingPickerHint':
       '列表中相同代码、不同发货日会分别勾选。可在下方文本框用逗号追加令牌，并与列表勾选一并应用。若全部取消勾选后应用，将清除关联。',

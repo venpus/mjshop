@@ -4,6 +4,7 @@ import * as sweetTrackerController from '../controllers/sweetTrackerController.j
 const router = Router();
 
 router.get('/invoice-cache', sweetTrackerController.getCachedInvoiceList);
+router.get('/packing-list-preview', sweetTrackerController.getPackingListPreviewByToken);
 router.get(
   '/invoice-cache/related-by-packing-code',
   sweetTrackerController.getRelatedInvoicesByPackingListCode

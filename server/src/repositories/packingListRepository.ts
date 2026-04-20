@@ -418,6 +418,44 @@ export class PackingListRepository {
   }
 
   /**
+   * 택배조회 등에 저장된 패킹 토큰으로 패킹리스트 헤더 1건 조회.
+   * - `코드` → 최신 출고일 기준 1건 (findByCode)
+   * - `코드::YYYY-MM-DD` → findByCodeAndDate
+   * - `코드::id:N` 또는 `id:N`만 → packing_lists.id = N
+   */
+  async findHeaderBySweetTrackerPackingToken(rawToken: string): Promise<PackingList | null> {
+    const token = String(rawToken ?? '').trim();
+    if (!token) return null;
+
+    const wholeIdMatch = token.match(/^id:(\d+)$/i);
+    if (wholeIdMatch) {
+      const id = parseInt(wholeIdMatch[1], 10);
+      if (!Number.isFinite(id) || id <= 0) return null;
+      return this.findById(id);
+    }
+
+    const sep = token.indexOf('::');
+    const codePart = (sep === -1 ? token : token.slice(0, sep)).trim();
+    const suffix = sep === -1 ? '' : token.slice(sep + 2).trim();
+
+    const idOnly = suffix.match(/^id:(\d+)$/i);
+    if (idOnly) {
+      const id = parseInt(idOnly[1], 10);
+      if (!Number.isFinite(id) || id <= 0) return null;
+      return this.findById(id);
+    }
+
+    if (!codePart) return null;
+
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(suffix);
+    if (dateOnly) {
+      return this.findByCodeAndDate(codePart, suffix);
+    }
+
+    return this.findByCode(codePart);
+  }
+
+  /**
    * 패킹리스트 생성
    */
   async create(data: CreatePackingListDTO): Promise<PackingList> {

@@ -643,6 +643,7 @@ export function PackingListDetail({ packingListId, onClose, onCloseRequest }: Pa
             )}
             <SweetTrackerCachedInvoicesTable
               t={t}
+              userId={user?.id}
               items={relatedTrackingItems}
               busyInvoiceNo={relatedBusyInvoiceNo}
               onLookupOne={handleRelatedLookupOne}

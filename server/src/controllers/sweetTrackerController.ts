@@ -3,6 +3,7 @@ import {
   SweetTrackerInvoiceCacheRepository,
   type SweetTrackerInvoiceCacheListRow,
 } from '../repositories/sweetTrackerInvoiceCacheRepository.js';
+import { PackingListRepository } from '../repositories/packingListRepository.js';
 import { bulkResolveTrackingWithCache } from '../services/sweetTrackerBulkCacheService.js';
 import type { BulkDeliveryCompletedResult } from '../services/sweetTrackerService.js';
 
@@ -20,6 +21,19 @@ const MAX_PACKING_LIST_CODES = 40;
 const MAX_PACKING_LIST_CODE_LEN = 180;
 
 const sweetTrackerInvoiceCacheRepository = new SweetTrackerInvoiceCacheRepository();
+const packingListRepository = new PackingListRepository();
+
+function packingListShipmentDateToYmd(d: Date | string): string {
+  if (d instanceof Date && !Number.isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${mo}-${day}`;
+  }
+  const s = String(d);
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : s.slice(0, 10);
+}
 
 function getApiKey(): string {
   const fromEnv = process.env.SWEET_TRACKER_API_KEY?.trim();
@@ -218,6 +232,58 @@ export async function postRefreshAllNotCompleteCached(req: Request, res: Respons
  * GET /api/sweet-tracker/invoice-cache?limit=&offset=
  * 고정 택배사 코드(04) 기준 DB에 저장된 운송장 캐시 목록
  */
+/**
+ * GET /api/sweet-tracker/packing-list-preview?token=
+ * 패킹 토큰에 해당하는 패킹리스트 품목의 제품명·메인 이미지 URL(발주 연동 시 발주 메인 이미지 우선)
+ */
+export async function getPackingListPreviewByToken(req: Request, res: Response): Promise<void> {
+  const user = (req as { user?: { id?: string } }).user;
+  if (!user?.id) {
+    res.status(401).json({ success: false, message: '로그인이 필요합니다.' });
+    return;
+  }
+
+  const raw = typeof req.query.token === 'string' ? req.query.token.trim() : '';
+  if (!raw) {
+    res.status(400).json({ success: false, message: 'token(패킹리스트 토큰)이 필요합니다.' });
+    return;
+  }
+  if (raw.length > MAX_PACKING_LIST_CODE_LEN) {
+    res.status(400).json({ success: false, message: '패킹리스트 토큰이 너무 깁니다.' });
+    return;
+  }
+
+  try {
+    const pl = await packingListRepository.findHeaderBySweetTrackerPackingToken(raw);
+    if (!pl) {
+      res.json({
+        success: true,
+        data: { found: false, token: raw, packingListId: null, code: null, shipmentDate: null, lines: [] },
+      });
+      return;
+    }
+    const items = await packingListRepository.findItemsByPackingListId(pl.id);
+    const lines = items.map((it) => ({
+      productName: it.product_name,
+      imageUrl: it.product_image_url,
+    }));
+    res.json({
+      success: true,
+      data: {
+        found: true,
+        token: raw,
+        packingListId: pl.id,
+        code: pl.code,
+        shipmentDate: packingListShipmentDateToYmd(pl.shipment_date),
+        lines,
+      },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ success: false, message: msg });
+  }
+}
+
 export async function getCachedInvoiceList(req: Request, res: Response): Promise<void> {
   const user = (req as { user?: { id?: string } }).user;
   if (!user?.id) {

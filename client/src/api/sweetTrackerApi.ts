@@ -53,6 +53,20 @@ export interface SweetTrackerCachedInvoiceListData {
   t_code: string;
 }
 
+export interface SweetTrackerPackingListPreviewLine {
+  productName: string;
+  imageUrl: string | null;
+}
+
+export interface SweetTrackerPackingListPreviewData {
+  found: boolean;
+  token: string;
+  packingListId: number | null;
+  code: string | null;
+  shipmentDate: string | null;
+  lines: SweetTrackerPackingListPreviewLine[];
+}
+
 export async function postSweetTrackerBulkDeliveryCompleted(
   userId: string | undefined,
   invoices: string[]
@@ -225,6 +239,32 @@ export async function getSweetTrackerInvoicesByPackingListCode(
       packingListCodes: Array.isArray(row.packingListCodes) ? row.packingListCodes : [],
     };
   });
+}
+
+export async function getSweetTrackerPackingListPreview(
+  userId: string | undefined,
+  token: string
+): Promise<{ success: true; data: SweetTrackerPackingListPreviewData }> {
+  const headers: Record<string, string> = {};
+  if (userId) headers['X-User-Id'] = userId;
+
+  const q = new URLSearchParams();
+  q.set('token', token);
+  const res = await fetch(`${API_BASE}/sweet-tracker/packing-list-preview?${q}`, {
+    method: 'GET',
+    headers,
+  });
+
+  const json = (await res.json()) as
+    | { success: true; data: SweetTrackerPackingListPreviewData }
+    | { success: false; message?: string };
+
+  if (!res.ok || !json.success) {
+    const msg = 'message' in json && json.message ? json.message : `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+
+  return json;
 }
 
 function parseDelimitedTokens(raw: string, delimiterRe: RegExp): string[] {

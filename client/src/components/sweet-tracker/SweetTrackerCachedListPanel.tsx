@@ -469,6 +469,7 @@ export function SweetTrackerCachedListPanel({ reloadKey = 0 }: SweetTrackerCache
 
       <SweetTrackerCachedInvoicesTable
         t={t}
+        userId={user?.id}
         items={items}
         busyInvoiceNo={busyInvoiceNo}
         onLookupOne={handleLookupOne}
