@@ -7,6 +7,7 @@ import { deletePaymentRequest, completePaymentRequest, createPaymentRequest } fr
 import { PaymentHistoryItem } from '../../api/paymentHistoryApi';
 import { formatDateKST, getLocalDateString } from '../../utils/dateUtils';
 import { updatePackingList, getPackingListByCode, updatePackingListAdminCostPaid } from '../../api/packingListApi';
+import { getPackingListIdStringsFromHistoryItem } from '../../utils/paymentHistoryPackingList';
 
 interface PaymentHistoryRowProps {
   item: PaymentHistoryItem;
@@ -117,19 +118,13 @@ export function PaymentHistoryRow({
     setIsUpdating(true);
 
     try {
-      // 패킹리스트 ID 가져오기
       let packingListId: number | null = null;
-      
-      if (item.packing_list_ids) {
-        // packing_list_ids가 있으면 첫 번째 ID 사용
-        const ids = item.packing_list_ids.split(',').map(id => id.trim());
-        packingListId = parseInt(ids[0], 10);
+      const idStrings = getPackingListIdStringsFromHistoryItem(item);
+      if (idStrings.length > 0) {
+        packingListId = parseInt(idStrings[0], 10);
       } else if (item.packing_code) {
-        // packing_code가 있으면 코드로 조회
         const packingList = await getPackingListByCode(item.packing_code);
-        if (packingList) {
-          packingListId = packingList.id;
-        }
+        if (packingList) packingListId = packingList.id;
       }
 
       if (!packingListId || isNaN(packingListId)) {
@@ -255,40 +250,38 @@ export function PaymentHistoryRow({
     try {
       if (checked) {
         // 체크: 지급요청 생성
-        // 패킹리스트 ID 목록 가져오기
-        const packingListIds = item.packing_list_ids 
-          ? item.packing_list_ids.split(',').map(id => id.trim()).filter(id => id)
-          : [];
-        
+        const packingListIds = getPackingListIdStringsFromHistoryItem(item);
+
         // amount가 없거나 0이면 지급요청 생성 불가
         if (!item.pl_shipping_cost || item.pl_shipping_cost <= 0) {
           throw new Error('배송비가 없어 지급요청을 생성할 수 없습니다.');
         }
-        
+
         let createdRequest;
         if (packingListIds.length === 0) {
-          // ID가 없으면 코드로 조회
-          const packingList = await getPackingListByCode(item.packing_code || item.source_id);
+          if (!item.packing_code) {
+            throw new Error('패킹리스트 ID를 찾을 수 없습니다.');
+          }
+          const packingList = await getPackingListByCode(item.packing_code);
           if (!packingList) {
             throw new Error('패킹리스트를 찾을 수 없습니다.');
           }
-          
+
           createdRequest = await createPaymentRequest({
             source_type: 'packing_list',
-            source_id: String(packingList.id), // 패킹리스트 ID로 전달
+            source_id: String(packingList.id),
             payment_type: 'shipping',
             amount: item.pl_shipping_cost,
           });
         } else {
-          // 첫 번째 패킹리스트 ID 사용
           const firstPackingListId = packingListIds[0];
           if (!firstPackingListId) {
             throw new Error('패킹리스트 ID를 찾을 수 없습니다.');
           }
-          
+
           createdRequest = await createPaymentRequest({
             source_type: 'packing_list',
-            source_id: firstPackingListId, // 패킹리스트 ID로 전달
+            source_id: firstPackingListId,
             payment_type: 'shipping',
             amount: item.pl_shipping_cost,
           });
@@ -352,14 +345,13 @@ export function PaymentHistoryRow({
     try {
       const today = checked ? getLocalDateString() : null;
       
-      // 패킹리스트 ID 목록 가져오기
-      const packingListIds = item.packing_list_ids 
-        ? item.packing_list_ids.split(',').map(id => id.trim()).filter(id => id)
-        : [];
-      
+      const packingListIds = getPackingListIdStringsFromHistoryItem(item);
+
       if (packingListIds.length === 0) {
-        // ID가 없으면 코드로 조회
-        const packingList = await getPackingListByCode(item.packing_code || item.source_id);
+        if (!item.packing_code) {
+          throw new Error('패킹리스트를 찾을 수 없습니다.');
+        }
+        const packingList = await getPackingListByCode(item.packing_code);
         if (!packingList) {
           throw new Error('패킹리스트를 찾을 수 없습니다.');
         }

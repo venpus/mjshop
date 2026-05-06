@@ -425,7 +425,7 @@ export class PaymentHistoryService {
   }
 
   /**
-   * 패킹리스트 결제 내역 조회 (패킹리스트 코드 기준으로 그룹화)
+   * 패킹리스트 결제 내역 조회 (packing_lists 행 단위 — 코드가 같아도 물류·일정·구성이 다르면 별도 행)
    */
   private async getPackingListPayments(
     filter?: PaymentHistoryFilter
@@ -433,59 +433,50 @@ export class PaymentHistoryService {
     try {
     let query = `
       SELECT 
-        pl.code,
+        pl.id as packing_list_id,
+        MAX(pl.code) as code,
         MAX(pl.logistics_company) as logistics_company,
         GROUP_CONCAT(DISTINCT po.po_number ORDER BY po.po_number SEPARATOR ', ') as po_numbers,
-        SUM(pl.actual_weight) as total_actual_weight,
-        AVG(pl.weight_ratio) as avg_weight_ratio,
-        SUM(pl.calculated_weight) as total_calculated_weight,
-        SUM(pl.shipping_cost) as total_shipping_cost,
+        MAX(pl.actual_weight) as total_actual_weight,
+        MAX(pl.weight_ratio) as avg_weight_ratio,
+        MAX(pl.calculated_weight) as total_calculated_weight,
+        MAX(pl.shipping_cost) as total_shipping_cost,
         MAX(pl.wk_payment_date) as latest_payment_date,
-        MIN(pl.shipment_date) as earliest_shipment_date,
         MAX(pl.shipment_date) as latest_shipment_date,
-        MIN(pl.created_at) as earliest_created_at,
         MAX(pl.created_at) as latest_created_at,
         MAX(pl.admin_cost_paid) as admin_cost_paid,
-        MAX(pl.admin_cost_paid_date) as admin_cost_paid_date,
-        GROUP_CONCAT(DISTINCT pl.id ORDER BY pl.id SEPARATOR ',') as packing_list_ids
+        MAX(pl.admin_cost_paid_date) as admin_cost_paid_date
       FROM packing_lists pl
       LEFT JOIN packing_list_items pli ON pl.id = pli.packing_list_id
       LEFT JOIN purchase_orders po ON pli.purchase_order_id = po.id
       WHERE (pl.logistics_company IS NULL OR pl.logistics_company != '정상해운')
-      GROUP BY pl.code
     `;
     const params: any[] = [];
-    const havingConditions: string[] = [];
 
-    // 검색어 필터 (HAVING 절에서 처리)
     if (filter?.search) {
-      havingConditions.push('pl.code LIKE ?');
+      query += ` AND pl.code LIKE ?`;
       params.push(`%${filter.search}%`);
     }
 
-    // 기간 필터 (HAVING 절에서 처리)
     if (filter?.start_date) {
-      havingConditions.push(`(
-        MAX(pl.wk_payment_date) >= ? OR
-        (MAX(pl.wk_payment_date) IS NULL AND MAX(pl.shipment_date) >= ?)
-      )`);
+      query += ` AND (
+        pl.wk_payment_date >= ? OR
+        (pl.wk_payment_date IS NULL AND pl.shipment_date >= ?)
+      )`;
       params.push(filter.start_date, filter.start_date);
     }
 
     if (filter?.end_date) {
-      havingConditions.push(`(
-        MAX(pl.wk_payment_date) <= ? OR
-        (MAX(pl.wk_payment_date) IS NULL AND MAX(pl.shipment_date) <= ?)
-      )`);
+      query += ` AND (
+        pl.wk_payment_date <= ? OR
+        (pl.wk_payment_date IS NULL AND pl.shipment_date <= ?)
+      )`;
       params.push(filter.end_date, filter.end_date);
     }
 
-    // HAVING 절 추가
-    if (havingConditions.length > 0) {
-      query += ` HAVING ${havingConditions.join(' AND ')}`;
-    }
+    query += ` GROUP BY pl.id`;
 
-    // 정렬: 최신 발송일 기준
+    // 정렬: 최신 발송일 기준 (JOIN으로 행이 늘어나도 packing_list_id별로 동일한 날짜)
     query += ` ORDER BY MAX(pl.shipment_date) DESC, MAX(pl.created_at) DESC`;
 
     const [rows] = await pool.execute<RowDataPacket[]>(query, params);
@@ -501,8 +492,7 @@ export class PaymentHistoryService {
         if (filter.status === 'pending' && status !== 'pending') continue;
       }
 
-      // 패킹리스트 ID 목록 가져오기
-      const packingListIds = row.packing_list_ids ? row.packing_list_ids.split(',').map((id: string) => id.trim()) : [];
+      const packingListIds = row.packing_list_id != null ? [String(row.packing_list_id)] : [];
 
       // 한국 도착일 조회 (패킹리스트 코드에 속한 모든 패킹리스트의 아이템들의 한국 도착일)
       let koreaArrivalDates: string[] = [];
@@ -522,7 +512,7 @@ export class PaymentHistoryService {
             .filter((date): date is string => date !== null);
         }
       } catch (error) {
-        console.error(`한국 도착일 조회 오류 (Code: ${row.code}):`, error);
+        console.error(`한국 도착일 조회 오류 (pl.id=${row.packing_list_id}, code=${row.code}):`, error);
       }
 
       // 지급요청 정보 조회 (패킹리스트 코드에 속한 모든 패킹리스트 ID에 대해 조회)
@@ -537,7 +527,7 @@ export class PaymentHistoryService {
           }
         }
       } catch (error) {
-        console.error(`패킹리스트 지급요청 조회 오류 (Code: ${row.code}):`, error);
+        console.error(`패킹리스트 지급요청 조회 오류 (pl.id=${row.packing_list_id}, code=${row.code}):`, error);
       }
 
       // 발주별 상품 정보 및 수량 계산
@@ -610,7 +600,7 @@ export class PaymentHistoryService {
             .join('|');
         }
       } catch (error) {
-        console.error(`발주별 상품 정보 및 수량 계산 오류 (Code: ${row.code}):`, error);
+        console.error(`발주별 상품 정보 및 수량 계산 오류 (pl.id=${row.packing_list_id}, code=${row.code}):`, error);
       }
 
       // 배송비 차액 계산 (합계 기준)
@@ -634,9 +624,9 @@ export class PaymentHistoryService {
       }
 
       items.push({
-        id: `pl-code-${row.code}`,
+        id: `pl-${row.packing_list_id}`,
         source_type: 'packing_list',
-        source_id: row.code, // 패킹리스트 코드를 source_id로 사용
+        source_id: String(row.packing_list_id),
         packing_code: row.code,
         logistics_company: row.logistics_company || undefined, // 물류회사
         po_number: row.po_numbers || undefined, // 발주코드 (여러 개일 수 있음)
@@ -654,7 +644,7 @@ export class PaymentHistoryService {
               status: pendingRequest.status,
             }
           : undefined,
-        packing_list_ids: row.packing_list_ids || undefined, // 패킹리스트 ID 목록 (쉼표로 구분)
+        packing_list_ids: String(row.packing_list_id),
         pl_shipping_cost: totalShippingCost,
         wk_payment_date: row.latest_payment_date
           ? formatDateToKSTString(row.latest_payment_date)
