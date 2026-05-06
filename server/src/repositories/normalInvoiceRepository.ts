@@ -36,9 +36,17 @@ export class NormalInvoiceRepository {
         created_at: row.created_at,
         updated_at: row.updated_at,
         invoice_file: invoiceFile
-          ? { file_path: invoiceFile.file_path, original_name: invoiceFile.original_name }
+          ? {
+              id: invoiceFile.id,
+              file_path: invoiceFile.file_path,
+              original_name: invoiceFile.original_name,
+            }
           : null,
-        photo_files: photoFiles.map((f) => ({ file_path: f.file_path, original_name: f.original_name })),
+        photo_files: photoFiles.map((f) => ({
+          id: f.id,
+          file_path: f.file_path,
+          original_name: f.original_name,
+        })),
       });
     }
     return entries;
@@ -64,9 +72,17 @@ export class NormalInvoiceRepository {
       created_at: row.created_at,
       updated_at: row.updated_at,
       invoice_file: invoiceFile
-        ? { file_path: invoiceFile.file_path, original_name: invoiceFile.original_name }
+        ? {
+            id: invoiceFile.id,
+            file_path: invoiceFile.file_path,
+            original_name: invoiceFile.original_name,
+          }
         : null,
-      photo_files: photoFiles.map((f) => ({ file_path: f.file_path, original_name: f.original_name })),
+      photo_files: photoFiles.map((f) => ({
+        id: f.id,
+        file_path: f.file_path,
+        original_name: f.original_name,
+      })),
     };
   }
 
@@ -153,5 +169,13 @@ export class NormalInvoiceRepository {
       [entryId]
     );
     return rows;
+  }
+
+  async findFileByEntryAndId(entryId: number, fileId: number): Promise<NormalInvoiceFile | null> {
+    const [rows] = await pool.query<FileRow[]>(
+      'SELECT id, entry_id, file_kind, file_path, original_name, display_order, created_at FROM normal_invoice_files WHERE entry_id = ? AND id = ?',
+      [entryId, fileId]
+    );
+    return rows[0] ?? null;
   }
 }

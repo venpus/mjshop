@@ -6,6 +6,8 @@ import {
   createNormalInvoice,
   updateNormalInvoice,
   deleteNormalInvoice,
+  downloadNormalInvoiceInvoiceFile,
+  downloadNormalInvoicePhotoFile,
 } from '../controllers/normalInvoiceController.js';
 
 const router = express.Router();
@@ -15,6 +17,8 @@ const uploadFields = normalInvoiceFileUpload.fields([
 ]);
 
 router.get('/', listNormalInvoices);
+router.get('/:id/invoice/download', downloadNormalInvoiceInvoiceFile);
+router.get('/:id/photos/:fileId/download', downloadNormalInvoicePhotoFile);
 router.get('/:id', getNormalInvoiceById);
 router.post('/', uploadFields, createNormalInvoice);
 router.put('/:id', uploadFields, updateNormalInvoice);

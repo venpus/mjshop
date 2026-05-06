@@ -1363,6 +1363,27 @@ export async function deleteNormalInvoiceEntryFiles(entryId: number): Promise<vo
   }
 }
 
+const normalInvoiceUploadsRoot = path.join(__dirname, '../../uploads');
+
+/**
+ * DB에 저장된 상대 경로(normal-invoices/{entryId}/...)를 검증 후 절대 경로로 반환.
+ * uploads/normal-invoices 밖으로 나가는 경로는 거부한다.
+ */
+export function resolveNormalInvoiceStoredPath(relativePath: string): string | null {
+  const normalized = relativePath.replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!/^normal-invoices\/\d+\//.test(normalized)) return null;
+  const abs = path.resolve(normalInvoiceUploadsRoot, normalized);
+  const scopedRoot = path.resolve(normalInvoiceUploadsRoot, 'normal-invoices');
+  const rel = path.relative(scopedRoot, abs);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) return null;
+  try {
+    if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return null;
+  } catch {
+    return null;
+  }
+  return abs;
+}
+
 /** 별도처리 금액 첨부파일 */
 const paymentMiscRoot = path.join(__dirname, '../../uploads/payment-misc');
 const paymentMiscAllowed = new Set([

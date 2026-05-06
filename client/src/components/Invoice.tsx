@@ -24,6 +24,8 @@ function apiToEntry(e: NormalInvoiceEntryResponse): InvoiceEntry {
     photoFiles: [],
     invoiceFileName: e.invoice_file?.original_name,
     photoFileNames: e.photo_files.map((p) => p.original_name),
+    hasServerInvoice: Boolean(e.invoice_file),
+    serverPhotoFiles: e.photo_files.map((p) => ({ id: p.id, original_name: p.original_name })),
   };
 }
 

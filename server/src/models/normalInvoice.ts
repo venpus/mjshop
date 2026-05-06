@@ -17,8 +17,8 @@ export interface NormalInvoiceFile {
 }
 
 export interface NormalInvoiceEntryWithFiles extends NormalInvoiceEntry {
-  invoice_file: { file_path: string; original_name: string } | null;
-  photo_files: { file_path: string; original_name: string }[];
+  invoice_file: { id: number; file_path: string; original_name: string } | null;
+  photo_files: { id: number; file_path: string; original_name: string }[];
 }
 
 export interface CreateNormalInvoiceEntryDTO {

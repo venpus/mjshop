@@ -1,7 +1,18 @@
+import path from 'path';
 import { Request, Response } from 'express';
 import { NormalInvoiceService } from '../services/normalInvoiceService.js';
 
 const service = new NormalInvoiceService();
+
+function setAttachmentFilename(res: Response, originalName: string): void {
+  const baseName = path.basename(originalName) || 'download';
+  const fallback = baseName.replace(/[^\x20-\x7E]/g, '_') || 'download';
+  const encoded = encodeURIComponent(baseName);
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${fallback.replace(/"/g, "'")}"; filename*=UTF-8''${encoded}`
+  );
+}
 
 /**
  * GET /api/normal-invoices
@@ -128,6 +139,55 @@ export async function deleteNormalInvoice(req: Request, res: Response) {
     res.status(500).json({
       success: false,
       error: err instanceof Error ? err.message : '삭제에 실패했습니다.',
+    });
+  }
+}
+
+/**
+ * GET /api/normal-invoices/:id/invoice/download
+ */
+export async function downloadNormalInvoiceInvoiceFile(req: Request, res: Response) {
+  try {
+    const entryId = parseInt(req.params.id, 10);
+    if (isNaN(entryId)) {
+      return res.status(400).json({ success: false, error: '잘못된 ID입니다.' });
+    }
+    const info = await service.getInvoiceDownloadInfo(entryId);
+    if (!info) {
+      return res.status(404).json({ success: false, error: '파일을 찾을 수 없습니다.' });
+    }
+    setAttachmentFilename(res, info.originalName);
+    res.sendFile(info.absolutePath);
+  } catch (err: unknown) {
+    console.error('Normal invoice file download error:', err);
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : '다운로드에 실패했습니다.',
+    });
+  }
+}
+
+/**
+ * GET /api/normal-invoices/:id/photos/:fileId/download
+ */
+export async function downloadNormalInvoicePhotoFile(req: Request, res: Response) {
+  try {
+    const entryId = parseInt(req.params.id, 10);
+    const fileId = parseInt(req.params.fileId, 10);
+    if (isNaN(entryId) || isNaN(fileId)) {
+      return res.status(400).json({ success: false, error: '잘못된 ID입니다.' });
+    }
+    const info = await service.getPhotoDownloadInfo(entryId, fileId);
+    if (!info) {
+      return res.status(404).json({ success: false, error: '파일을 찾을 수 없습니다.' });
+    }
+    setAttachmentFilename(res, info.originalName);
+    res.sendFile(info.absolutePath);
+  } catch (err: unknown) {
+    console.error('Normal invoice photo download error:', err);
+    res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : '다운로드에 실패했습니다.',
     });
   }
 }

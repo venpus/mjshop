@@ -7,6 +7,7 @@ import type {
 import {
   saveNormalInvoiceFile,
   deleteNormalInvoiceEntryFiles,
+  resolveNormalInvoiceStoredPath,
 } from '../utils/upload.js';
 
 const repository = new NormalInvoiceRepository();
@@ -81,5 +82,26 @@ export class NormalInvoiceService {
       await deleteNormalInvoiceEntryFiles(id);
     }
     return deleted;
+  }
+
+  /** 인보이스 파일(단일) 다운로드용 절대 경로 */
+  async getInvoiceDownloadInfo(entryId: number): Promise<{ absolutePath: string; originalName: string } | null> {
+    const entry = await repository.findById(entryId);
+    if (!entry?.invoice_file) return null;
+    const abs = resolveNormalInvoiceStoredPath(entry.invoice_file.file_path);
+    if (!abs) return null;
+    return { absolutePath: abs, originalName: entry.invoice_file.original_name };
+  }
+
+  /** 사진 파일 다운로드용 절대 경로 */
+  async getPhotoDownloadInfo(
+    entryId: number,
+    fileId: number
+  ): Promise<{ absolutePath: string; originalName: string } | null> {
+    const file = await repository.findFileByEntryAndId(entryId, fileId);
+    if (!file || file.file_kind !== 'photo') return null;
+    const abs = resolveNormalInvoiceStoredPath(file.file_path);
+    if (!abs) return null;
+    return { absolutePath: abs, originalName: file.original_name };
   }
 }
