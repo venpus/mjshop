@@ -5,22 +5,30 @@ import { getActiveProducts, createProduct, uploadProductImages, updateProduct } 
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useProductCollabCounts } from '../ProductCollabCountsContext';
 import type { ProductCollabProductListItem, ProductCollabStatus } from '../types';
+import { ProductListStatusCountBar } from './ProductListStatusCountBar';
 import { PRODUCT_COLLAB_STATUS_LABEL_KEYS } from '../types';
 import { getProductCollabImageUrl } from '../utils/imageUrl';
 import { ImageModal } from '../shared/ImageModal';
 import { CreateProductModal } from './CreateProductModal';
 import { ProductListFilters, type ProductListFiltersValue } from './ProductListFilters';
+import { useDeferredSearch } from '../../../hooks/useDeferredSearch';
+import {
+  buildProductListSearchParams,
+  buildThreadDetailPath,
+  parseProductListSearchParams,
+  productListUrlStateEquals,
+  type ProductListUrlState,
+} from './productListUrlParams';
 
 const defaultFilters: ProductListFiltersValue = {
-  search: '',
   status: '',
   category: '',
 };
 
-const PAGE_SIZE = 15; // 5 columns × 3 rows (web)
+const PAGE_SIZE = 15; // 5 columns ? 3 rows (web)
 const MOBILE_BREAKPOINT = 1024; // below = infinite scroll, >= = paging
 
-/** 상태별 뱃지 배경/텍스트 색상 - types의 PRODUCT_COLLAB_STATUS_BADGE_CLASS와 동일 유지 */
+/** ??? ?? ??/??? ?? - types? PRODUCT_COLLAB_STATUS_BADGE_CLASS? ?? ?? */
 const statusBadgeClass: Record<ProductCollabStatus, string> = {
   RESEARCH: 'bg-[#CCFBF1] text-[#115E59]',
   SAMPLE_TEST: 'bg-[#DBEAFE] text-[#1E40AF]',
@@ -49,32 +57,54 @@ function useIsMobileViewport() {
 
 export function ProductCollabList() {
   const { t, language } = useLanguage();
-  const { counts } = useProductCollabCounts() ?? {};
+  const countsContext = useProductCollabCounts();
+  const counts = countsContext?.counts;
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const statusFromUrl = searchParams.get('status') ?? '';
+  const initialUrl = parseProductListSearchParams(searchParams);
   const isMobile = useIsMobileViewport();
 
   const [list, setList] = useState<ProductCollabProductListItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(initialUrl.page);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [statusCountsRefreshKey, setStatusCountsRefreshKey] = useState(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  /** 필터/뷰포트 효과에서 이미 loadPage(1) 했을 때, 같은 틱의 page 효과 중복 요청 방지 */
+  /** ??/??? ???? ?? loadPage(1) ?? ?, ?? ?? page ?? ?? ?? ?? */
   const skipNextDesktopPageEffect = useRef(false);
+  const isFirstFilterLoadRef = useRef(true);
+  const prevFilterKeyRef = useRef<string | null>(null);
 
   const [filters, setFilters] = useState<ProductListFiltersValue>(() => ({
-    ...defaultFilters,
-    status: statusFromUrl,
+    status: initialUrl.status,
+    category: initialUrl.category,
   }));
+  const search = useDeferredSearch(initialUrl.search);
+
+  const getListUrlState = useCallback(
+    (): ProductListUrlState => ({
+      page,
+      search: search.applied,
+      status: filters.status,
+      category: filters.category,
+    }),
+    [page, search.applied, filters.status, filters.category]
+  );
+
+  const navigateToThread = useCallback(
+    (productId: number) => {
+      navigate(buildThreadDetailPath(productId, getListUrlState()));
+    },
+    [navigate, getListUrlState]
+  );
 
   const apiParams = {
-    search: filters.search.trim() || undefined,
+    search: search.applied.trim() || undefined,
     status: filters.status || undefined,
     category: filters.category || undefined,
   };
@@ -125,7 +155,41 @@ export function ProductCollabList() {
     });
   }, [apiParams.search, apiParams.status, apiParams.category, list.length, total, loadingMore]);
 
+  // URL ? ?? ?? ??? (??????? ?? ? ?????? ??)
   useEffect(() => {
+    const fromUrl = parseProductListSearchParams(searchParams);
+    const current = getListUrlState();
+    if (productListUrlStateEquals(fromUrl, current)) return;
+    setPage(fromUrl.page);
+    setFilters({ status: fromUrl.status, category: fromUrl.category });
+    search.setApplied(fromUrl.search);
+    search.setInput(fromUrl.search);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  useEffect(() => {
+    const current = getListUrlState();
+    const fromUrl = parseProductListSearchParams(searchParams);
+    if (productListUrlStateEquals(fromUrl, current)) return;
+    setSearchParams(buildProductListSearchParams(current), { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, search.applied, filters.status, filters.category]);
+
+  useEffect(() => {
+    const filterKey = `${filters.status}\0${search.applied}\0${filters.category}`;
+    if (isFirstFilterLoadRef.current) {
+      isFirstFilterLoadRef.current = false;
+      prevFilterKeyRef.current = filterKey;
+      if (isMobile) {
+        loadInitialMobile();
+      } else {
+        loadPage(page);
+        skipNextDesktopPageEffect.current = true;
+      }
+      return;
+    }
+    if (prevFilterKeyRef.current === filterKey) return;
+    prevFilterKeyRef.current = filterKey;
     if (isMobile) {
       loadInitialMobile();
     } else {
@@ -133,7 +197,7 @@ export function ProductCollabList() {
       loadPage(1);
       skipNextDesktopPageEffect.current = true;
     }
-  }, [isMobile, filters.status, filters.search, filters.category]);
+  }, [isMobile, filters.status, search.applied, filters.category, loadInitialMobile, loadPage, page]);
 
   useEffect(() => {
     if (isMobile) return;
@@ -157,23 +221,28 @@ export function ProductCollabList() {
     return () => observer.disconnect();
   }, [isMobile, list.length, total, loading, loadingMore, loadMoreMobile]);
 
-  const handleApplyFilters = () => {
+  const commitSearchAndReload = () => {
+    search.commit();
     setError(null);
-    if (isMobile) {
-      loadInitialMobile();
-    } else {
-      setPage(1);
-      loadPage(1);
-      skipNextDesktopPageEffect.current = true;
-    }
+  };
+
+  const handleApplyFilters = () => {
+    commitSearchAndReload();
   };
 
   const hasActiveFilters = Boolean(
-    (filters.search && filters.search.trim()) || filters.status || filters.category
+    search.applied.trim() || filters.status || filters.category
   );
   const handleClearFilters = () => {
+    search.reset();
     setFilters(defaultFilters);
+    setPage(1);
     setSearchParams({});
+  };
+
+  const handleStatusCardSelect = (status: ProductCollabStatus) => {
+    setFilters((f) => ({ ...f, status }));
+    setError(null);
   };
 
   const handleCreate = async (payload: {
@@ -210,7 +279,7 @@ export function ProductCollabList() {
     }
     if (isMobile) loadInitialMobile();
     else loadPage(page);
-    navigate(`/admin/product-collab/thread/${productId}`);
+    navigateToThread(productId);
   };
 
   const handleCancelProduct = async (e: React.MouseEvent, productId: number) => {
@@ -220,6 +289,8 @@ export function ProductCollabList() {
     const res = await updateProduct(productId, { status: 'CANCELLED' });
     setCancellingId(null);
     if (res.success) {
+      setStatusCountsRefreshKey((k) => k + 1);
+      void countsContext?.refresh();
       if (isMobile) loadInitialMobile();
       else loadPage(page);
     }
@@ -227,7 +298,7 @@ export function ProductCollabList() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const pagination = !isMobile && total > 0 && (
-    <nav className="flex items-center justify-center gap-1 flex-wrap" aria-label="페이지 네비게이션">
+    <nav className="flex items-center justify-center gap-1 flex-wrap" aria-label="page navigation">
       <button
         type="button"
         onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -273,9 +344,17 @@ export function ProductCollabList() {
           {t('productCollab.registerProduct')}
         </button>
       </div>
+      <ProductListStatusCountBar
+        selectedStatus={filters.status}
+        onSelectStatus={handleStatusCardSelect}
+        refreshKey={statusCountsRefreshKey}
+      />
       <ProductListFilters
-        value={filters}
-        onChange={setFilters}
+        filterValue={filters}
+        onFilterChange={setFilters}
+        searchValue={search.input}
+        onSearchChange={search.handleInputChange}
+        onSearchSubmit={commitSearchAndReload}
         onApply={handleApplyFilters}
       />
       {hasActiveFilters && (
@@ -290,7 +369,7 @@ export function ProductCollabList() {
         </div>
       )}
 
-      {/* 웹: 상단 페이징 */}
+      {/* ?? ??? ?????*/}
       {pagination}
 
       <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -301,8 +380,8 @@ export function ProductCollabList() {
               key={p.id}
               role="button"
               tabIndex={0}
-              onClick={() => navigate(`/admin/product-collab/thread/${p.id}`)}
-              onKeyDown={(e) => e.key === 'Enter' && navigate(`/admin/product-collab/thread/${p.id}`)}
+              onClick={() => navigateToThread(p.id)}
+              onKeyDown={(e) => e.key === 'Enter' && navigateToThread(p.id)}
               className={`relative bg-white rounded-lg border p-4 text-left hover:border-[#2563EB] transition-colors cursor-pointer ${
                 p.status === 'ISSUE_OCCURRED' ? 'border-2 border-red-500' : 'border border-[#E5E7EB]'
               }`}
@@ -370,13 +449,13 @@ export function ProductCollabList() {
         })}
       </div>
 
-      {/* 모바일: 무한 스크롤 감지용 센티넬 */}
+      {/* ???: ?? ??? ??? ??? */}
       {isMobile && <div ref={sentinelRef} className="h-4" aria-hidden />}
       {isMobile && loadingMore && (
         <p className="text-center text-sm text-[#6B7280] py-4">{t('productCollab.loading')}</p>
       )}
 
-      {/* 웹: 하단 페이징 */}
+      {/* ?? ??? ?????*/}
       {pagination}
 
       <ImageModal imageUrl={modalImageUrl} onClose={() => setModalImageUrl(null)} />

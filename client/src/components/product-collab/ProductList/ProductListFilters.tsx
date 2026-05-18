@@ -1,5 +1,6 @@
-import type { ProductCollabStatus, ProductCollabCategory } from '../types';
+import type { ProductCollabCategory } from '../types';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { SubmitSearchField } from '../../ui/submit-search-field';
 
 const STATUS_OPTIONS: { value: string; labelKey: string }[] = [
   { value: '', labelKey: 'productCollab.statusAll' },
@@ -21,37 +22,44 @@ const CATEGORY_OPTIONS: { value: '' | ProductCollabCategory; labelKey: string }[
 ];
 
 export interface ProductListFiltersValue {
-  search: string;
   status: string;
   category: string;
 }
 
 interface ProductListFiltersProps {
-  value: ProductListFiltersValue;
-  onChange: (v: ProductListFiltersValue) => void;
+  filterValue: ProductListFiltersValue;
+  onFilterChange: (v: ProductListFiltersValue) => void;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  onSearchSubmit: () => void;
   onApply: () => void;
 }
 
-export function ProductListFilters({ value, onChange, onApply }: ProductListFiltersProps) {
+export function ProductListFilters({
+  filterValue,
+  onFilterChange,
+  searchValue,
+  onSearchChange,
+  onSearchSubmit,
+  onApply,
+}: ProductListFiltersProps) {
   const { t } = useLanguage();
   return (
     <div className="flex flex-wrap items-end gap-3 p-4 bg-white rounded-lg border border-[#E5E7EB]">
-      <div className="min-w-[180px]">
+      <div>
         <label className="block text-xs font-medium text-[#6B7280] mb-1">{t('common.search')}</label>
-        <input
-          type="text"
-          value={value.search}
-          onChange={(e) => onChange({ ...value, search: e.target.value })}
-          onKeyDown={(e) => e.key === 'Enter' && onApply()}
+        <SubmitSearchField
+          value={searchValue}
+          onChange={onSearchChange}
+          onSubmit={onSearchSubmit}
           placeholder={t('productCollab.filterSearchPlaceholder')}
-          className="w-full px-3 py-2 border border-[#E5E7EB] rounded-lg text-sm"
         />
       </div>
       <div>
         <label className="block text-xs font-medium text-[#6B7280] mb-1">{t('productCollab.filterStatus')}</label>
         <select
-          value={value.status}
-          onChange={(e) => onChange({ ...value, status: e.target.value })}
+          value={filterValue.status}
+          onChange={(e) => onFilterChange({ ...filterValue, status: e.target.value })}
           className="px-3 py-2 border border-[#E5E7EB] rounded-lg text-sm"
         >
           {STATUS_OPTIONS.map((o) => (
@@ -64,8 +72,8 @@ export function ProductListFilters({ value, onChange, onApply }: ProductListFilt
       <div>
         <label className="block text-xs font-medium text-[#6B7280] mb-1">{t('productCollab.filterCategory')}</label>
         <select
-          value={value.category}
-          onChange={(e) => onChange({ ...value, category: e.target.value })}
+          value={filterValue.category}
+          onChange={(e) => onFilterChange({ ...filterValue, category: e.target.value })}
           className="px-3 py-2 border border-[#E5E7EB] rounded-lg text-sm"
         >
           {CATEGORY_OPTIONS.map((o) => (

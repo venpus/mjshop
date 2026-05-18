@@ -13,6 +13,7 @@ import type {
   ProductCollabProductDetail,
   ProductCollabMessage,
   DashboardData,
+  DashboardStatusCount,
 } from '../components/product-collab/types';
 
 export interface ApiResponse<T> {
@@ -258,6 +259,15 @@ export async function getProductCounts(): Promise<ApiResponse<ProductCollabCount
   });
   const json = await res.json();
   if (!res.ok) return { success: false, error: json.error || '제품 수 조회 실패' };
+  return { success: true, data: json.data };
+}
+
+export async function getProductStatusCounts(): Promise<ApiResponse<DashboardStatusCount[]>> {
+  const res = await fetch(`${getApiBaseUrl()}/product-collab/products/status-counts`, {
+    headers: getAuthHeaders(),
+  });
+  const json = await res.json();
+  if (!res.ok) return { success: false, error: json.error || '상태별 제품 수 조회 실패' };
   return { success: true, data: json.data };
 }
 

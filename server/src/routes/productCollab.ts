@@ -20,6 +20,7 @@ router.get('/thread-unread-items', controller.getThreadUnreadItems);
 router.get('/mentionable-users', controller.getMentionableUsers);
 router.get('/products', controller.getActiveProducts);
 router.get('/products/counts', controller.getProductCounts);
+router.get('/products/status-counts', controller.getProductStatusCounts);
 router.get('/products/archive', controller.getCompletedProducts);
 router.get('/products/cancelled', controller.getCancelledProducts);
 router.get('/products/:productId/download', controller.downloadAttachment);

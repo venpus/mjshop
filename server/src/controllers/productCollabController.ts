@@ -70,6 +70,16 @@ export class ProductCollabController {
     }
   };
 
+  getProductStatusCounts = async (_req: Request, res: Response) => {
+    try {
+      const statusCounts = await this.service.getStatusCounts();
+      res.json({ success: true, data: statusCounts });
+    } catch (error: unknown) {
+      console.error('Product collab status counts error:', error);
+      res.status(500).json({ success: false, error: '상태별 제품 수 조회 중 오류가 발생했습니다.' });
+    }
+  };
+
   /** A-SuperAdmin: 2026-04-18 이후 타인 작성 스레드·답글 중, 스레드 미조회 또는 조회 이후 신규분 합산 */
   getThreadUnreadCount = async (req: Request, res: Response) => {
     try {

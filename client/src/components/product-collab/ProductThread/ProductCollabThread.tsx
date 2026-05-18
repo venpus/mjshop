@@ -12,6 +12,7 @@ import { ThreadComposer } from './ThreadComposer';
 import { ThreadMessageList } from './ThreadMessageList';
 import { MainImageSection } from './MainImageSection';
 import { SpecForm } from '../shared/SpecForm';
+import { sanitizeProductListReturnTo } from '../ProductList/productListUrlParams';
 
 export function ProductCollabThread() {
   const { t } = useLanguage();
@@ -22,6 +23,7 @@ export function ProductCollabThread() {
   const [searchParams] = useSearchParams();
   const fromSummary = searchParams.get('from') === 'summary';
   const fromUnread = searchParams.get('from') === 'unread';
+  const listReturnTo = sanitizeProductListReturnTo(searchParams.get('returnTo'));
   const [product, setProduct] = useState<ProductCollabProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -118,7 +120,7 @@ export function ProductCollabThread() {
         <button
           type="button"
           onClick={() =>
-            navigate(fromUnread ? '/admin/product-collab/unread' : '/admin/product-collab/list')
+            navigate(fromUnread ? '/admin/product-collab/unread' : listReturnTo)
           }
           className="mt-2 text-[#2563EB] text-sm"
         >
@@ -150,7 +152,7 @@ export function ProductCollabThread() {
         ) : (
           <button
             type="button"
-            onClick={() => navigate('/admin/product-collab/list')}
+            onClick={() => navigate(listReturnTo)}
             className="text-[#2563EB] text-sm"
           >
             ← {t('productCollab.list')}
@@ -173,7 +175,7 @@ export function ProductCollabThread() {
                 const res = await deleteProduct(product.id);
                 if (!res.success) throw new Error(res.error);
                 await countsContext?.refresh();
-                navigate('/admin/product-collab/list');
+                navigate(listReturnTo);
               } catch (err) {
                 alert(err instanceof Error ? err.message : t('productCollab.deleteFailed'));
               } finally {
