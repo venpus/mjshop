@@ -160,3 +160,57 @@ export async function downloadManufacturingDocument(req: Request, res: Response)
     res.status(500).json({ success: false, error: err.message || '다운로드에 실패했습니다.' });
   }
 }
+
+/**
+ * POST /api/manufacturing-documents/:id/finished-product-image
+ */
+export async function uploadFinishedProductImage(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const file = req.file;
+    if (!file?.path) {
+      return res.status(400).json({ success: false, error: '이미지 파일을 선택해 주세요.' });
+    }
+    const { saveManufacturingFinishedImage } = await import('../utils/upload.js');
+    const relativePath = await saveManufacturingFinishedImage(file.path, id);
+    await service.updateFinishedProductImage(id, relativePath);
+    res.json({ success: true, data: { url: relativePath } });
+  } catch (err: any) {
+    console.error('Manufacturing finished image upload error:', err);
+    res.status(500).json({ success: false, error: err.message || '이미지 업로드에 실패했습니다.' });
+  }
+}
+
+/**
+ * POST /api/manufacturing-documents/:id/steps/:stepId/images
+ */
+export async function uploadStepImages(req: Request, res: Response) {
+  try {
+    const { id, stepId } = req.params;
+    const stepIdNum = parseInt(stepId, 10);
+    if (Number.isNaN(stepIdNum)) {
+      return res.status(400).json({ success: false, error: '유효하지 않은 공정 ID입니다.' });
+    }
+    const files = (req.files as Express.Multer.File[]) ?? [];
+    if (files.length === 0) {
+      return res.status(400).json({ success: false, error: '이미지 파일을 선택해 주세요.' });
+    }
+    const {
+      getNextManufacturingStepImageNumber,
+      saveManufacturingStepImage,
+    } = await import('../utils/upload.js');
+    const path = await import('path');
+    const urls: string[] = [];
+    for (const file of files) {
+      if (!file.path) continue;
+      const imageNumber = await getNextManufacturingStepImageNumber(id, stepIdNum);
+      const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+      const url = await saveManufacturingStepImage(file.path, id, stepIdNum, imageNumber, ext);
+      urls.push(url);
+    }
+    res.json({ success: true, data: { urls } });
+  } catch (err: any) {
+    console.error('Manufacturing step images upload error:', err);
+    res.status(500).json({ success: false, error: err.message || '이미지 업로드에 실패했습니다.' });
+  }
+}

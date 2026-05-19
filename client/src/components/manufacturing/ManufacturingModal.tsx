@@ -149,7 +149,7 @@ export function ManufacturingModal({
           purchase_order_id: purchaseOrderId,
           product_name: payload.product_name,
           product_name_zh: payload.product_name_zh,
-          product_image,
+          product_image: productImage,
           quantity: payload.quantity,
           finished_product_image: payload.finished_product_image,
           small_pack_count: payload.small_pack_count,

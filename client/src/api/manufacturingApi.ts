@@ -1,5 +1,9 @@
 import { getApiBaseUrl, getServerOrigin } from './baseUrl';
-import type { ManufacturingDocument } from '../types/manufacturing';
+import type {
+  ManufacturingDocument,
+  CreateManufacturingDocumentDTO,
+  UpdateManufacturingDocumentDTO,
+} from '../types/manufacturing';
 
 const API_BASE = getApiBaseUrl();
 const SERVER_ORIGIN = getServerOrigin();
@@ -94,3 +98,82 @@ export async function deleteManufacturingDocument(id: string): Promise<void> {
   }
 }
 
+export async function createManufacturingDocument(
+  dto: CreateManufacturingDocumentDTO
+): Promise<ManufacturingDocument> {
+  const res = await fetch(`${API_BASE}/manufacturing-documents`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(dto),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || '제조 문서 생성에 실패했습니다.');
+  }
+  const json = await res.json();
+  return json.data;
+}
+
+export async function updateManufacturingDocument(
+  id: string,
+  dto: UpdateManufacturingDocumentDTO
+): Promise<ManufacturingDocument> {
+  const res = await fetch(`${API_BASE}/manufacturing-documents/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(dto),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || '제조 문서 수정에 실패했습니다.');
+  }
+  const json = await res.json();
+  return json.data;
+}
+
+export function getFullManufacturingImageUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  return `${SERVER_ORIGIN}${url.startsWith('/') ? url : `/${url}`}`;
+}
+
+export async function uploadFinishedProductImage(documentId: string, file: File): Promise<string> {
+  const form = new FormData();
+  form.append('image', file);
+  const res = await fetch(`${API_BASE}/manufacturing-documents/${documentId}/finished-product-image`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || '이미지 업로드에 실패했습니다.');
+  }
+  const json = await res.json();
+  return json.data?.url ?? json.data;
+}
+
+export async function uploadStepImages(
+  documentId: string,
+  stepId: number,
+  files: File[]
+): Promise<string[]> {
+  const form = new FormData();
+  files.forEach((f) => form.append('images', f));
+  const res = await fetch(
+    `${API_BASE}/manufacturing-documents/${documentId}/steps/${stepId}/images`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || '이미지 업로드에 실패했습니다.');
+  }
+  const json = await res.json();
+  return json.data?.urls ?? json.data ?? [];
+}

@@ -1,8 +1,11 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { PaymentRequest } from '../api/paymentRequestApi';
 import { formatDateKST, getLocalDateString } from './dateUtils';
 import { addNanumGothicFontToPDF } from './fontLoader';
+import {
+  buildPurchaseOrderLedgerRow,
+  PaymentRequestLedgerDateGroup,
+} from './paymentRequestLedgerUtils';
 
 const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
@@ -40,20 +43,10 @@ async function imageToBase64(url: string): Promise<string | null> {
   }
 }
 
-interface DateGroup {
-  date: string;
-  items: PaymentRequest[];
-  totals: {
-    advance: number;
-    balance: number;
-    shipping: number;
-  };
-}
-
 /**
  * 지급요청 장부 PDF 생성 (단일 날짜 그룹)
  */
-export async function generateSingleDateGroupPDF(group: DateGroup): Promise<void> {
+export async function generateSingleDateGroupPDF(group: PaymentRequestLedgerDateGroup): Promise<void> {
   // A4 크기 PDF 생성 (포트레이트, 단위: mm)
   const doc = new jsPDF('p', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
@@ -127,25 +120,22 @@ export async function generateSingleDateGroupPDF(group: DateGroup): Promise<void
     const purchaseTableData: any[] = [];
     
     for (let i = 0; i < purchaseOrderItems.length; i++) {
-      const item = purchaseOrderItems[i];
-      const paymentTypeLabel = item.payment_type === 'advance' ? '선금' : '잔금';
-      const productName = item.source_info?.product_name || '-';
-      const poNumber = item.source_info?.po_number || item.source_id;
-      const amount = `¥${item.amount.toLocaleString()}`;
-      
+      const row = buildPurchaseOrderLedgerRow(purchaseOrderItems[i]);
+
       purchaseTableData.push([
         '', // 이미지는 didDrawCell에서 추가
-        productName,
-        poNumber,
-        paymentTypeLabel,
-        amount,
+        row.productName,
+        row.poNumber,
+        row.quantityLabel,
+        row.paymentTypeLabel,
+        row.amountLabel,
       ]);
     }
 
     // 테이블 생성
     autoTable(doc, {
       startY: yPos,
-      head: [['이미지', '상품명', 'PO번호', '항목', '금액']],
+      head: [['이미지', '상품명', 'PO번호', '수량', '항목', '금액']],
       body: purchaseTableData,
       theme: 'striped',
       headStyles: {
@@ -161,11 +151,12 @@ export async function generateSingleDateGroupPDF(group: DateGroup): Promise<void
         ...(fontLoaded ? { font: 'NanumGothic' } : {}),
       },
       columnStyles: {
-        0: { cellWidth: 20 }, // 이미지
-        1: { cellWidth: 50 }, // 상품명
-        2: { cellWidth: 35 }, // PO번호
-        3: { cellWidth: 25 }, // 항목
-        4: { cellWidth: 30, halign: 'right' }, // 금액
+        0: { cellWidth: 18 }, // 이미지
+        1: { cellWidth: 42 }, // 상품명
+        2: { cellWidth: 30 }, // PO번호
+        3: { cellWidth: 22, halign: 'center' }, // 수량
+        4: { cellWidth: 22 }, // 항목
+        5: { cellWidth: 28, halign: 'right' }, // 금액
       },
       didDrawCell: (data: any) => {
         // 이미지 셀에 이미지 추가
@@ -250,7 +241,9 @@ export async function generateSingleDateGroupPDF(group: DateGroup): Promise<void
 /**
  * 지급요청 장부 PDF 생성 (전체 날짜 그룹) - 호환성을 위해 유지
  */
-export async function generatePaymentRequestLedgerPDF(dateGroups: DateGroup[]): Promise<void> {
+export async function generatePaymentRequestLedgerPDF(
+  dateGroups: PaymentRequestLedgerDateGroup[]
+): Promise<void> {
   if (dateGroups.length === 0) return;
   // 단일 그룹 함수를 사용
   await generateSingleDateGroupPDF(dateGroups[0]);

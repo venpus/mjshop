@@ -26,6 +26,7 @@ export interface PaymentRequest {
     packing_code?: string;
     product_name?: string;
     product_image?: string;
+    quantity?: number;
     shipping_date?: string;
   };
   requester_name?: string;

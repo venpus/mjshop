@@ -1,17 +1,10 @@
-import { PaymentRequest } from '../api/paymentRequestApi';
-import { formatDateKST, getLocalDateString } from './dateUtils';
+import { formatDateKST } from './dateUtils';
+import {
+  buildPurchaseOrderLedgerRow,
+  PaymentRequestLedgerDateGroup,
+} from './paymentRequestLedgerUtils';
 
 const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
-
-interface DateGroup {
-  date: string;
-  items: PaymentRequest[];
-  totals: {
-    advance: number;
-    balance: number;
-    shipping: number;
-  };
-}
 
 /**
  * 이미지 URL을 절대 경로로 변환
@@ -27,7 +20,7 @@ function getFullImageUrl(imagePath: string | undefined | null): string {
 /**
  * 지급요청 장부 인쇄 (브라우저 인쇄 기능 사용)
  */
-export function printPaymentRequestLedger(group: DateGroup): void {
+export function printPaymentRequestLedger(group: PaymentRequestLedgerDateGroup): void {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
     alert('팝업이 차단되어 있습니다. 팝업을 허용해주세요.');
@@ -155,6 +148,10 @@ export function printPaymentRequestLedger(group: DateGroup): void {
           width: 15%;
           text-align: center;
         }
+        .print-table .quantity-col {
+          width: 10%;
+          text-align: center;
+        }
         .print-table .type-col {
           width: 10%;
           text-align: center;
@@ -277,33 +274,33 @@ export function printPaymentRequestLedger(group: DateGroup): void {
                   <th class="image-col">이미지</th>
                   <th class="product-col">상품명</th>
                   <th class="code-col">PO번호</th>
+                  <th class="quantity-col">수량</th>
                   <th class="type-col">항목</th>
                   <th class="amount-col">금액</th>
                 </tr>
               </thead>
               <tbody>
                 ${purchaseOrderItems.map(item => {
-                  const imageUrl = item.source_info?.product_image 
-                    ? getFullImageUrl(item.source_info.product_image) 
+                  const row = buildPurchaseOrderLedgerRow(item);
+                  const imageUrl = row.productImage
+                    ? getFullImageUrl(row.productImage)
                     : '';
-                  const productName = item.source_info?.product_name || '-';
-                  const poNumber = item.source_info?.po_number || item.source_id;
-                  const paymentTypeLabel = item.payment_type === 'advance' ? '선금' : '잔금';
                   const amount = item.amount.toLocaleString();
                   
                   return `
                     <tr>
                       <td class="image-col">
                         ${imageUrl 
-                          ? `<img src="${imageUrl}" alt="${productName}" class="product-image" onerror="this.style.display='none';" />` 
+                          ? `<img src="${imageUrl}" alt="${row.productName}" class="product-image" onerror="this.style.display='none';" />` 
                           : '<div class="product-image-placeholder">📦</div>'}
                       </td>
                       <td class="product-col">
-                        <div class="product-name">${productName}</div>
-                        <div class="product-code">PO: ${poNumber}</div>
+                        <div class="product-name">${row.productName}</div>
+                        <div class="product-code">PO: ${row.poNumber}</div>
                       </td>
-                      <td class="code-col">${poNumber}</td>
-                      <td class="type-col">${paymentTypeLabel}</td>
+                      <td class="code-col">${row.poNumber}</td>
+                      <td class="quantity-col">${row.quantityLabel}</td>
+                      <td class="type-col">${row.paymentTypeLabel}</td>
                       <td class="amount-col">¥${amount}</td>
                     </tr>
                   `;

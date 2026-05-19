@@ -381,6 +381,7 @@ export class PaymentRequestService {
           po_number: po.po_number,
           product_name: po.product_name || undefined,
           product_image: po.product_main_image || undefined,
+          quantity: po.quantity,
         };
       }
     } else if (request.source_type === 'packing_list') {

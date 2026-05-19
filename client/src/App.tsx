@@ -35,6 +35,10 @@ import { AiSearch } from './components/AiSearch';
 import { ProductCollabRoutes } from './components/product-collab/routes';
 import { ScheduleCalendarPage } from './components/schedule/ScheduleCalendarPage';
 import { SweetTrackerTestPage } from './components/sweet-tracker/SweetTrackerTestPage';
+import { ManufacturingPurchaseOrderPage } from './components/manufacturing/ManufacturingPurchaseOrderPage';
+import { ManufacturingDetailPage } from './components/manufacturing/ManufacturingDetailPage';
+import { ManufacturingList } from './components/manufacturing/ManufacturingList';
+import { ManufacturingNewPage } from './components/manufacturing/ManufacturingNewPage';
 import { Login } from './components/Login';
 import { useAuth } from './contexts/AuthContext';
 import { usePermission } from './contexts/PermissionContext';
@@ -335,6 +339,26 @@ function AdminLayout() {
               <Route path="/purchase-orders/:id" element={
                 <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
                   <PurchaseOrderDetailWrapper onBack={handleBackToPurchaseOrders} />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/manufacturing/purchase-order/:purchaseOrderId" element={
+                <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
+                  <ManufacturingPurchaseOrderPage />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/manufacturing/new" element={
+                <PermissionCheckWrapper resource="purchase-orders" permissionType="write">
+                  <ManufacturingNewPage />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/manufacturing/:id" element={
+                <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
+                  <ManufacturingDetailPage />
+                </PermissionCheckWrapper>
+              } />
+              <Route path="/manufacturing" element={
+                <PermissionCheckWrapper resource="purchase-orders" permissionType="read">
+                  <ManufacturingList />
                 </PermissionCheckWrapper>
               } />
               <Route path="/not-arrived-analysis" element={

@@ -132,7 +132,9 @@ export class ManufacturingDocumentRepository {
        document_file_path, original_file_name,
        COALESCE(translation_status, 'idle') AS translation_status,
        created_at, updated_at, created_by, updated_by
-       FROM manufacturing_documents WHERE purchase_order_id = ? LIMIT 1`,
+       FROM manufacturing_documents WHERE purchase_order_id = ?
+       ORDER BY (document_file_path IS NULL OR document_file_path = '') DESC, created_at DESC
+       LIMIT 1`,
       [purchaseOrderId]
     );
     const row = rows[0];
