@@ -32,23 +32,27 @@ export class PaymentRequestRepository {
    */
   async generateRequestNumber(): Promise<string> {
     const currentYear = new Date().getFullYear();
+    const prefix = `PR-${currentYear}-`;
     const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT request_number 
-       FROM payment_requests 
-       WHERE request_number LIKE ? 
-       ORDER BY request_number DESC 
-       LIMIT 1`,
-      [`PR-${currentYear}-%`]
+      `SELECT MAX(CAST(SUBSTRING_INDEX(request_number, '-', -1) AS UNSIGNED)) AS max_seq
+       FROM payment_requests
+       WHERE request_number LIKE ?`,
+      [`${prefix}%`]
     );
 
-    let sequence = 1;
-    if (rows.length > 0) {
-      const lastNumber = rows[0].request_number;
-      const lastSequence = parseInt(lastNumber.split('-')[2]);
-      sequence = lastSequence + 1;
-    }
+    const maxSeq = rows[0]?.max_seq != null ? Number(rows[0].max_seq) : 0;
+    const sequence = maxSeq + 1;
 
-    return `PR-${currentYear}-${sequence.toString().padStart(3, '0')}`;
+    return `${prefix}${sequence.toString().padStart(3, '0')}`;
+  }
+
+  private isDuplicateRequestNumberError(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'errno' in error &&
+      (error as { errno?: number }).errno === 1062
+    );
   }
 
   /**
@@ -149,32 +153,45 @@ export class PaymentRequestRepository {
    * 지급요청 생성
    */
   async create(data: CreatePaymentRequestDTO): Promise<PaymentRequest> {
-    const requestNumber = await this.generateRequestNumber();
     const requestDate = new Date().toISOString().split('T')[0];
+    const maxAttempts = 3;
 
-    const [result] = await pool.execute<ResultSetHeader>(
-      `INSERT INTO payment_requests 
-       (request_number, source_type, source_id, payment_type, amount, status, 
-        request_date, requested_by, memo)
-       VALUES (?, ?, ?, ?, ?, '요청중', ?, ?, ?)`,
-      [
-        requestNumber,
-        data.source_type,
-        data.source_id,
-        data.payment_type,
-        data.amount,
-        requestDate,
-        data.requested_by || null,
-        data.memo || null,
-      ]
-    );
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const requestNumber = await this.generateRequestNumber();
 
-    const created = await this.findById(result.insertId);
-    if (!created) {
-      throw new Error('지급요청 생성 후 조회 실패');
+      try {
+        const [result] = await pool.execute<ResultSetHeader>(
+          `INSERT INTO payment_requests 
+           (request_number, source_type, source_id, payment_type, amount, status, 
+            request_date, requested_by, memo)
+           VALUES (?, ?, ?, ?, ?, '요청중', ?, ?, ?)`,
+          [
+            requestNumber,
+            data.source_type,
+            data.source_id,
+            data.payment_type,
+            data.amount,
+            requestDate,
+            data.requested_by || null,
+            data.memo || null,
+          ]
+        );
+
+        const created = await this.findById(result.insertId);
+        if (!created) {
+          throw new Error('지급요청 생성 후 조회 실패');
+        }
+
+        return created;
+      } catch (error) {
+        if (this.isDuplicateRequestNumberError(error) && attempt < maxAttempts - 1) {
+          continue;
+        }
+        throw error;
+      }
     }
 
-    return created;
+    throw new Error('지급요청 번호 생성에 실패했습니다.');
   }
 
   /**
