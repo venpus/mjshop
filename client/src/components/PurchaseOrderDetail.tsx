@@ -67,6 +67,11 @@ import { useCostItemHandlers } from "../hooks/useCostItemHandlers";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermission } from "../contexts/PermissionContext";
 import { formatDateForInput } from "../utils/dateUtils";
+import {
+  DEFAULT_COMMISSION_OPTION,
+  resolveCommissionSelection,
+} from "../constants/commissionOptions";
+import { DEFAULT_ADVANCE_PAYMENT_RATE } from "../constants/paymentDefaults";
 import { convertFactoryShipmentsToFormData } from "../utils/packingListTransform";
 
 interface PurchaseOrderDetailProps {
@@ -139,8 +144,8 @@ export function PurchaseOrderDetail({
   // 연관 패킹리스트 목록
   const [relatedPackingLists, setRelatedPackingLists] = useState<RelatedPackingList[]>([]);
   const [isLoadingPackingLists, setIsLoadingPackingLists] = useState(false);
-  const [commissionRate, setCommissionRate] = useState(0);
-  const [commissionType, setCommissionType] = useState("");
+  const [commissionRate, setCommissionRate] = useState(DEFAULT_COMMISSION_OPTION.rate);
+  const [commissionType, setCommissionType] = useState(DEFAULT_COMMISSION_OPTION.label);
   const [optionCost, setOptionCost] = useState(0);
   const [orderDate, setOrderDate] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
@@ -167,7 +172,7 @@ export function PurchaseOrderDetail({
   const [productGalleryImages, setProductGalleryImages] = useState<Array<{ id?: number; url: string; type?: string }>>([]);
 
   // 선금/잔금 관리
-  const [advancePaymentRate, setAdvancePaymentRate] = useState(0);
+  const [advancePaymentRate, setAdvancePaymentRate] = useState(DEFAULT_ADVANCE_PAYMENT_RATE);
   const [advancePaymentDate, setAdvancePaymentDate] = useState("");
   const [balancePaymentDate, setBalancePaymentDate] = useState("");
 
@@ -541,9 +546,9 @@ export function PurchaseOrderDetail({
       setPackaging(0);
       setShippingCost(0);
       setWarehouseShippingCost(0);
-      setCommissionRate(0);
-      setCommissionType('');
-      setAdvancePaymentRate(0);
+      setCommissionRate(DEFAULT_COMMISSION_OPTION.rate);
+      setCommissionType(DEFAULT_COMMISSION_OPTION.label);
+      setAdvancePaymentRate(DEFAULT_ADVANCE_PAYMENT_RATE);
       setAdvancePaymentDate('');
       setBalancePaymentDate('');
       setIsOrderConfirmed(false);
@@ -572,8 +577,12 @@ export function PurchaseOrderDetail({
       if (order._rawData) {
         setShippingCost(order._rawData.shipping_cost || 0);
         setWarehouseShippingCost(order._rawData.warehouse_shipping_cost || 0);
-        setCommissionRate(order._rawData.commission_rate || 0);
-        setCommissionType(order._rawData.commission_type || "");
+        const commission = resolveCommissionSelection(
+          order._rawData.commission_rate ?? 0,
+          order._rawData.commission_type,
+        );
+        setCommissionRate(commission.rate);
+        setCommissionType(commission.label);
         setAdvancePaymentRate(order._rawData.advance_payment_rate || 0);
         setAdvancePaymentDate(formatDateForInput(order._rawData.advance_payment_date));
         setBalancePaymentDate(formatDateForInput(order._rawData.balance_payment_date));
@@ -722,6 +731,10 @@ export function PurchaseOrderDetail({
 
         // originalData를 설정하는 함수
         const updateOriginalData = () => {
+          const commission = resolveCommissionSelection(
+            order._rawData.commission_rate ?? 0,
+            order._rawData.commission_type,
+          );
           // order._rawData에서 직접 값을 가져와서 originalData 설정 (state가 아직 업데이트되지 않았을 수 있으므로)
           const originalData = {
             unit_price: order._rawData.unit_price || 0,
@@ -731,8 +744,8 @@ export function PurchaseOrderDetail({
             quantity: order._rawData.quantity || 0,
             shipping_cost: order._rawData.shipping_cost || 0,
             warehouse_shipping_cost: order._rawData.warehouse_shipping_cost || 0,
-            commission_rate: order._rawData.commission_rate || 0,
-            commission_type: order._rawData.commission_type || "",
+            commission_rate: commission.rate,
+            commission_type: commission.label,
             advance_payment_rate: order._rawData.advance_payment_rate || 0,
             advance_payment_date: formatDateForInput(order._rawData.advance_payment_date),
             balance_payment_date: formatDateForInput(order._rawData.balance_payment_date),

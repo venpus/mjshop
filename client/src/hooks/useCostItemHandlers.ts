@@ -1,4 +1,5 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
+import { COMMISSION_OPTIONS } from "../constants/commissionOptions";
 import type { LaborCostItem } from "../components/tabs/CostPaymentTab";
 
 interface UseCostItemHandlersProps {
@@ -38,27 +39,16 @@ export function useCostItemHandlers({
   setCommissionType,
   setCommissionRate,
 }: UseCostItemHandlersProps): UseCostItemHandlersReturn {
-  // 수수료 타입 옵션
-  const commissionOptions = useMemo(
-    () => [
-      { label: "5만위안 이상 재주문 5%", rate: 5 },
-      { label: "5만위안 이하 재주문 7%", rate: 7 },
-      { label: "5만위안 이상 신규주문 8%", rate: 8 },
-      { label: "5만위안이하 신규주문 10%", rate: 10 },
-    ],
-    [],
-  );
-
   // 수수료 타입 변경 핸들러
   const handleCommissionTypeChange = useCallback(
     (value: string) => {
       setCommissionType(value);
-      const selected = commissionOptions.find((opt) => opt.label === value);
+      const selected = COMMISSION_OPTIONS.find((opt) => opt.label === value);
       if (selected) {
         setCommissionRate(selected.rate);
       }
     },
-    [commissionOptions, setCommissionType, setCommissionRate],
+    [setCommissionType, setCommissionRate],
   );
 
   // 인건비 항목 추가
@@ -192,7 +182,7 @@ export function useCostItemHandlers({
   );
 
   return {
-    commissionOptions,
+    commissionOptions: COMMISSION_OPTIONS,
     handleCommissionTypeChange,
     addLaborCostItem,
     removeLaborCostItem,

@@ -569,10 +569,10 @@ export function usePurchaseOrderSave({
         advancePaymentAmount
       );
       
-      let savedOrderId = orderId;
+      let targetOrderId = orderId;
       
       if (isNewOrder) {
-        // 새 발주 생성
+        // 새 발주 생성 (기본 정보만 POST — 비용·결제 정보는 이후 PUT으로 저장)
         const createData: any = {
           product_name: productName || '',
           product_size: productSize || undefined,
@@ -580,21 +580,9 @@ export function usePurchaseOrderSave({
           product_packaging_size: productPackagingSize || undefined,
           unit_price: unitPrice,
           quantity: quantity,
-          shipping_cost: shippingCost || 0,
-          warehouse_shipping_cost: warehouseShippingCost || 0,
-          commission_rate: commissionRate || 0,
-          commission_type: commissionType || null,
-          advance_payment_rate: advancePaymentRate || 0,
-          advance_payment_amount: advancePaymentAmount || null,
-          advance_payment_date: advancePaymentDate || null,
-          balance_payment_amount: balancePaymentAmount || null,
-          balance_payment_date: balancePaymentDate || null,
           packaging: packaging || 0,
           order_date: orderDate || null,
           estimated_shipment_date: deliveryDate || null,
-          work_start_date: workStartDate || null,
-          work_end_date: workEndDate || null,
-          is_confirmed: isOrderConfirmed,
           created_by: currentUserId,
         };
 
@@ -614,28 +602,23 @@ export function usePurchaseOrderSave({
         }
 
         const createResult = await createResponse.json();
-        savedOrderId = createResult.data.id;
-        console.log('[usePurchaseOrderSave] 새 발주 생성 성공, ID:', savedOrderId);
-        
-        // 새 발주 생성 후 ID 반환 (페이지 이동은 호출하는 쪽에서 처리)
-        // 나머지 저장 로직은 스킵하고 ID만 반환
-        setIsSaving(false);
-        return savedOrderId;
+        targetOrderId = createResult.data.id;
+        console.log('[usePurchaseOrderSave] 새 발주 생성 성공, ID:', targetOrderId);
       }
 
-      // 기존 발주 수정
+      // 발주 정보 저장 (신규 생성 직후에도 동일하게 실행)
       const updateData: any = {
         unit_price: unitPrice,
         back_margin: backMargin || null,
         quantity: quantity,
         shipping_cost: shippingCost || 0,
         warehouse_shipping_cost: warehouseShippingCost || 0,
-        commission_rate: commissionRate || 0,
+        commission_rate: commissionRate,
         commission_type: commissionType || null,
-        advance_payment_rate: advancePaymentRate || 0,
-        advance_payment_amount: advancePaymentAmount || null,
+        advance_payment_rate: advancePaymentRate,
+        advance_payment_amount: advancePaymentAmount,
         advance_payment_date: advancePaymentDate || null,
-        balance_payment_amount: balancePaymentAmount || null,
+        balance_payment_amount: balancePaymentAmount,
         balance_payment_date: balancePaymentDate || null,
         packaging: packaging || 0,
         order_date: orderDate || null,
@@ -650,7 +633,7 @@ export function usePurchaseOrderSave({
         updated_by: currentUserId,
       };
 
-      const response = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}`, {
+      const response = await fetch(`${API_BASE_URL}/purchase-orders/${targetOrderId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -711,7 +694,7 @@ export function usePurchaseOrderSave({
         throw new Error('A 레벨 관리자 전용 항목이 포함되어 있어 저장할 수 없습니다. 페이지를 새로고침해주세요.');
       }
       
-      const costItemsResponse = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}/cost-items`, {
+      const costItemsResponse = await fetch(`${API_BASE_URL}/purchase-orders/${targetOrderId}/cost-items`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -740,7 +723,7 @@ export function usePurchaseOrderSave({
         };
       });
 
-      const factoryShipmentsResponse = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}/factory-shipments`, {
+      const factoryShipmentsResponse = await fetch(`${API_BASE_URL}/purchase-orders/${targetOrderId}/factory-shipments`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -779,7 +762,7 @@ export function usePurchaseOrderSave({
               console.log(`  파일 ${index + 1}: ${file.name} (${file.size} bytes)`);
             });
 
-            const uploadUrl = `${API_BASE_URL}/purchase-orders/${orderId}/images/factory_shipment/${savedShipmentIds[i]}`;
+            const uploadUrl = `${API_BASE_URL}/purchase-orders/${targetOrderId}/images/factory_shipment/${savedShipmentIds[i]}`;
             console.log(`이미지 업로드 URL: ${uploadUrl}`);
 
             const imageUploadResponse = await fetch(uploadUrl, {
@@ -825,7 +808,7 @@ export function usePurchaseOrderSave({
         };
       });
 
-      const returnExchangesResponse = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}/return-exchanges`, {
+      const returnExchangesResponse = await fetch(`${API_BASE_URL}/purchase-orders/${targetOrderId}/return-exchanges`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -854,7 +837,7 @@ export function usePurchaseOrderSave({
             });
 
             const imageUploadResponse = await fetch(
-              `${API_BASE_URL}/purchase-orders/${orderId}/images/return_exchange/${savedReturnExchangeIds[i]}`,
+              `${API_BASE_URL}/purchase-orders/${targetOrderId}/images/return_exchange/${savedReturnExchangeIds[i]}`,
               {
                 method: 'POST',
                 credentials: 'include',
@@ -903,7 +886,7 @@ export function usePurchaseOrderSave({
         };
       });
 
-      const workItemsResponse = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}/work-items`, {
+      const workItemsResponse = await fetch(`${API_BASE_URL}/purchase-orders/${targetOrderId}/work-items`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -933,7 +916,7 @@ export function usePurchaseOrderSave({
             });
 
             const imageUploadResponse = await fetch(
-              `${API_BASE_URL}/purchase-orders/${orderId}/images/work_item/${savedWorkItemIds[i]}`,
+              `${API_BASE_URL}/purchase-orders/${targetOrderId}/images/work_item/${savedWorkItemIds[i]}`,
               {
                 method: 'POST',
                 credentials: 'include',
@@ -1016,7 +999,7 @@ export function usePurchaseOrderSave({
 
       let deliverySetsResponse: Response;
       try {
-        deliverySetsResponse = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}/delivery-sets`, {
+        deliverySetsResponse = await fetch(`${API_BASE_URL}/purchase-orders/${targetOrderId}/delivery-sets`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -1072,7 +1055,7 @@ export function usePurchaseOrderSave({
               });
 
               const imageUploadResponse = await fetch(
-                `${API_BASE_URL}/purchase-orders/${orderId}/images/logistics_info/${savedLogisticsId}`,
+                `${API_BASE_URL}/purchase-orders/${targetOrderId}/images/logistics_info/${savedLogisticsId}`,
                 {
                   method: 'POST',
                   credentials: 'include',
@@ -1194,6 +1177,10 @@ export function usePurchaseOrderSave({
         
         if (isManual) {
           alert('저장되었습니다.');
+        }
+
+        if (isNewOrder) {
+          return targetOrderId;
         }
       }
     } catch (err: any) {
