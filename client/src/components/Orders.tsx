@@ -53,7 +53,20 @@ export function Orders() {
   }, [orders]);
 
   const lineCount = useMemo(
-    () => orders.reduce((sum, order) => sum + (order.lines.length || order.lineCount), 0),
+    () =>
+      orders.reduce(
+        (sum, order) => sum + order.lines.filter((line) => !line.isReservation).length,
+        0
+      ),
+    [orders]
+  );
+
+  const reservationCount = useMemo(
+    () =>
+      orders.reduce(
+        (sum, order) => sum + order.lines.filter((line) => line.isReservation).length,
+        0
+      ),
     [orders]
   );
 
@@ -83,6 +96,7 @@ export function Orders() {
         onTabChange={handleTabChange}
         productCount={orders.length}
         lineCount={lineCount}
+        reservationCount={reservationCount}
       />
 
       {isLoading ? (
@@ -92,7 +106,12 @@ export function Orders() {
       ) : activeTab === 'products' ? (
         <ShopOrderProductListTab orders={orders} listTab={activeTab} onReload={loadOrders} />
       ) : (
-        <ShopOrderLineListTab orders={orders} listTab={activeTab} onReload={loadOrders} />
+        <ShopOrderLineListTab
+          orders={orders}
+          listTab={activeTab}
+          lineKind={activeTab === 'reservations' ? 'reservations' : 'orders'}
+          onReload={loadOrders}
+        />
       )}
     </div>
   );

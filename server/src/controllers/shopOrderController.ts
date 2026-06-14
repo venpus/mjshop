@@ -104,6 +104,19 @@ export class ShopOrderController {
     }
   };
 
+  deleteOrder = async (req: Request, res: Response): Promise<void> => {
+    try {
+      await this.service.deleteOrder(req.params.id);
+      res.json({ success: true, message: '주문을 삭제했습니다.' });
+    } catch (error: unknown) {
+      console.error('주문 삭제 오류:', error);
+      res.status(400).json({
+        success: false,
+        error: error instanceof Error ? error.message : '주문 삭제 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
   syncOrderDetail = async (req: Request, res: Response): Promise<void> => {
     try {
       const data: SyncShopOrderDetailDTO = {
@@ -148,8 +161,13 @@ export class ShopOrderController {
 
   addOrderLine = async (req: Request, res: Response): Promise<void> => {
     try {
-      const order = await this.service.addOrderLine(req.params.id);
-      res.status(201).json({ success: true, data: order, message: '주문이 추가되었습니다.' });
+      const isReservation = Boolean(req.body?.isReservation);
+      const order = await this.service.addOrderLine(req.params.id, isReservation);
+      res.status(201).json({
+        success: true,
+        data: order,
+        message: isReservation ? '예약이 추가되었습니다.' : '주문이 추가되었습니다.',
+      });
     } catch (error: unknown) {
       console.error('주문 라인 추가 오류:', error);
       res.status(400).json({
@@ -168,6 +186,89 @@ export class ShopOrderController {
       res.status(400).json({
         success: false,
         error: error instanceof Error ? error.message : '주문 삭제 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  convertOrderLineToReservation = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const order = await this.service.convertOrderLineToReservation(
+        req.params.id,
+        req.params.lineId
+      );
+      res.json({ success: true, data: order, message: '주문을 예약으로 전환했습니다.' });
+    } catch (error: unknown) {
+      console.error('예약 전환 오류:', error);
+      res.status(400).json({
+        success: false,
+        error: error instanceof Error ? error.message : '예약 전환 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  convertReservationLineToOrder = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const order = await this.service.convertReservationLineToOrder(
+        req.params.id,
+        req.params.lineId
+      );
+      res.json({ success: true, data: order, message: '예약을 주문으로 전환했습니다.' });
+    } catch (error: unknown) {
+      console.error('주문 전환 오류:', error);
+      res.status(400).json({
+        success: false,
+        error: error instanceof Error ? error.message : '주문 전환 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  getReservationTransferTargets = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const excludeParam = req.query.excludeShopOrderId;
+      const excludeShopOrderIds = Array.isArray(excludeParam)
+        ? excludeParam.map(String)
+        : typeof excludeParam === 'string' && excludeParam
+          ? excludeParam.split(',').map((value) => value.trim()).filter(Boolean)
+          : [];
+
+      const productName =
+        typeof req.query.productName === 'string' ? req.query.productName.trim() : undefined;
+
+      const targets = await this.service.getReservationTransferTargets(
+        excludeShopOrderIds,
+        productName
+      );
+      res.json({ success: true, data: targets });
+    } catch (error: unknown) {
+      console.error('예약 옮기기 대상 조회 오류:', error);
+      res.status(400).json({
+        success: false,
+        error: error instanceof Error ? error.message : '대상 주문 조회 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  transferReservationsToOrder = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const targetShopOrderId = String(req.body?.targetShopOrderId ?? '');
+      const items = Array.isArray(req.body?.items)
+        ? req.body.items.map((item: Record<string, unknown>) => ({
+            shopOrderId: String(item.shopOrderId ?? ''),
+            lineId: String(item.lineId ?? ''),
+          }))
+        : [];
+
+      const result = await this.service.transferReservationsToOrder(items, targetShopOrderId);
+      res.json({
+        success: true,
+        data: result,
+        message: `${result.transferredCount}건의 예약을 주문으로 옮겼습니다.`,
+      });
+    } catch (error: unknown) {
+      console.error('예약 옮기기 오류:', error);
+      res.status(400).json({
+        success: false,
+        error: error instanceof Error ? error.message : '예약 옮기기 중 오류가 발생했습니다.',
       });
     }
   };
@@ -280,6 +381,35 @@ export class ShopOrderController {
       res.status(400).json({
         success: false,
         error: error instanceof Error ? error.message : '명세서 생성 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  cancelBulkStatements = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
+      const items = rawItems
+        .map((item: unknown) => {
+          if (!item || typeof item !== 'object') return null;
+          const record = item as Record<string, unknown>;
+          const shopOrderId = String(record.shopOrderId ?? '').trim();
+          const lineId = String(record.lineId ?? '').trim();
+          if (!shopOrderId || !lineId) return null;
+          return { shopOrderId, lineId };
+        })
+        .filter(Boolean) as Array<{ shopOrderId: string; lineId: string }>;
+
+      const result = await this.service.cancelBulkStatements(items);
+      res.json({
+        success: true,
+        data: result,
+        message: `명세서 ${result.cancelledCount}건을 취소했습니다.`,
+      });
+    } catch (error: unknown) {
+      console.error('명세서 취소 오류:', error);
+      res.status(400).json({
+        success: false,
+        error: error instanceof Error ? error.message : '명세서 취소 중 오류가 발생했습니다.',
       });
     }
   };

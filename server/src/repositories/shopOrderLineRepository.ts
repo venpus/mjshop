@@ -6,11 +6,14 @@ import {
   CreateShopOrderLineDTO,
   UpdateShopOrderLineDTO,
 } from '../models/shopOrderLine.js';
+import { generateRandomLineOrderNumber } from '../utils/shopOrderLineNumber.js';
 
 interface ShopOrderLineRow extends RowDataPacket {
   id: string;
+  line_order_number: string | null;
   shop_order_id: string;
   sort_order: number;
+  is_reservation: number;
   company_name: string | null;
   order_box_count: number;
   quantity_per_box: number;
@@ -41,7 +44,7 @@ interface ShopOrderLineRow extends RowDataPacket {
   updated_at: Date;
 }
 
-const LINE_SELECT = `id, shop_order_id, sort_order, company_name, order_box_count, quantity_per_box,
+const LINE_SELECT = `id, line_order_number, shop_order_id, sort_order, is_reservation, company_name, order_box_count, quantity_per_box,
   sale_unit_price, delivery_fee, product_supply_amount, vat_amount, total_amount, address, recipient_name, phone_number,
   tracking_number, statement_issued, payment_received, product_arrived, tax_invoice_issued,
   cny_exchange_rate, wk_settlement_paid, inventio_settlement_paid, shipment_box_count,
@@ -91,16 +94,57 @@ export class ShopOrderLineRepository {
     return Number(rows[0]?.next_sort) || 0;
   }
 
+  async generateUniqueLineOrderNumber(maxAttempts = 30): Promise<string> {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const candidate = generateRandomLineOrderNumber();
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT id FROM kr_shop_order_lines WHERE line_order_number = ? LIMIT 1`,
+        [candidate]
+      );
+      if (rows.length === 0) {
+        return candidate;
+      }
+    }
+    throw new Error('고유 주문번호 생성에 실패했습니다.');
+  }
+
+  async backfillMissingLineOrderNumbers(): Promise<number> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT id FROM kr_shop_order_lines
+       WHERE line_order_number IS NULL OR line_order_number = ''`
+    );
+
+    let count = 0;
+    for (const row of rows) {
+      const lineOrderNumber = await this.generateUniqueLineOrderNumber();
+      await pool.execute<ResultSetHeader>(
+        `UPDATE kr_shop_order_lines SET line_order_number = ? WHERE id = ?`,
+        [lineOrderNumber, row.id]
+      );
+      count += 1;
+    }
+    return count;
+  }
+
   async create(data: CreateShopOrderLineDTO): Promise<ShopOrderLine> {
     const id = randomUUID();
     const sortOrder =
       data.sortOrder ?? (await this.getNextSortOrder(data.shopOrderId));
+    const lineOrderNumber = await this.generateUniqueLineOrderNumber();
 
     await pool.execute<ResultSetHeader>(
       `INSERT INTO kr_shop_order_lines
-       (id, shop_order_id, sort_order, quantity_per_box, sale_unit_price)
-       VALUES (?, ?, ?, ?, ?)`,
-      [id, data.shopOrderId, sortOrder, data.quantityPerBox ?? 0, data.saleUnitPrice ?? null]
+       (id, line_order_number, shop_order_id, sort_order, is_reservation, quantity_per_box, sale_unit_price)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        lineOrderNumber,
+        data.shopOrderId,
+        sortOrder,
+        data.isReservation ? 1 : 0,
+        data.quantityPerBox ?? 0,
+        data.saleUnitPrice ?? null,
+      ]
     );
 
     const created = await this.findById(id);
@@ -226,6 +270,14 @@ export class ShopOrderLineRepository {
       fields.push('sort_order = ?');
       values.push(data.sortOrder);
     }
+    if (data.isReservation !== undefined) {
+      fields.push('is_reservation = ?');
+      values.push(data.isReservation ? 1 : 0);
+    }
+    if (data.shopOrderId !== undefined) {
+      fields.push('shop_order_id = ?');
+      values.push(data.shopOrderId);
+    }
 
     if (fields.length === 0) {
       return this.findById(id);
@@ -259,8 +311,10 @@ export class ShopOrderLineRepository {
   private mapRow(row: ShopOrderLineRow): ShopOrderLine {
     return {
       id: row.id,
+      lineOrderNumber: row.line_order_number,
       shopOrderId: row.shop_order_id,
       sortOrder: Number(row.sort_order) || 0,
+      isReservation: Boolean(row.is_reservation),
       companyName: row.company_name,
       orderBoxCount: Number(row.order_box_count) || 0,
       quantityPerBox: Number(row.quantity_per_box) || 0,

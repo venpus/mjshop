@@ -1656,6 +1656,16 @@ export async function readShopOrderLineStatementHtml(
   return fs.promises.readFile(absolutePath, 'utf8');
 }
 
+export async function deleteShopOrderLineStatementHtml(
+  orderId: string,
+  lineId: string
+): Promise<void> {
+  const filePath = getShopOrderLineStatementPath(orderId, lineId);
+  if (fs.existsSync(filePath)) {
+    await fs.promises.unlink(filePath).catch(() => {});
+  }
+}
+
 export function getShopOrderLineStatementAbsolutePath(relativePath: string): string {
   return getShopOrderStatementAbsolutePath(relativePath);
 }
@@ -1708,6 +1718,49 @@ export async function deleteShopOrderLinePaymentProofImage(
       await fs.promises.unlink(imagePath).catch(() => {});
     }
   }
+}
+
+export async function moveShopOrderLineFilesDir(
+  fromOrderId: string,
+  toOrderId: string,
+  lineId: string
+): Promise<{ statementFilePath: string | null; paymentProofImage: string | null }> {
+  const fromDir = getShopOrderLineDir(fromOrderId, lineId);
+  if (!fs.existsSync(fromDir)) {
+    return { statementFilePath: null, paymentProofImage: null };
+  }
+
+  const toDir = getShopOrderLineDir(toOrderId, lineId);
+  const toParent = path.dirname(toDir);
+  if (!fs.existsSync(toParent)) {
+    await fs.promises.mkdir(toParent, { recursive: true });
+  }
+  if (fs.existsSync(toDir)) {
+    await fs.promises.rm(toDir, { recursive: true }).catch(() => {});
+  }
+
+  await fs.promises.rename(fromDir, toDir);
+
+  let statementFilePath: string | null = null;
+  let paymentProofImage: string | null = null;
+
+  const statementPath = getShopOrderLineStatementPath(toOrderId, lineId);
+  if (fs.existsSync(statementPath)) {
+    statementFilePath = getShopOrderLineStatementRelativePath(toOrderId, lineId);
+  }
+
+  const possibleExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  for (const ext of possibleExtensions) {
+    const proofPath = getShopOrderLinePaymentProofPath(toOrderId, lineId, ext);
+    if (fs.existsSync(proofPath)) {
+      paymentProofImage = getShopOrderFileUrl(
+        `shop-orders/${toOrderId}/lines/${lineId}/payment-proof${ext}`
+      );
+      break;
+    }
+  }
+
+  return { statementFilePath, paymentProofImage };
 }
 
 export async function deleteShopOrderLineFilesDir(orderId: string, lineId: string): Promise<void> {

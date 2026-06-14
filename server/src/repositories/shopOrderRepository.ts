@@ -215,6 +215,14 @@ export class ShopOrderRepository {
     return this.findById(id);
   }
 
+  async delete(id: string): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      `DELETE FROM kr_shop_orders WHERE id = ?`,
+      [id]
+    );
+    return result.affectedRows > 0;
+  }
+
   async syncStockQuantityFromInbound(stockInboundItemId: number, stockQuantity: number): Promise<void> {
     await pool.execute<ResultSetHeader>(
       `UPDATE kr_shop_orders SET stock_quantity = ? WHERE stock_inbound_item_id = ?`,
@@ -263,8 +271,10 @@ export class ShopOrderRepository {
 
     return {
       id: `${order.id}-legacy-line`,
+      lineOrderNumber: null,
       shopOrderId: order.id,
       sortOrder: 0,
+      isReservation: false,
       companyName: order.companyName,
       orderBoxCount: order.orderBoxCount,
       quantityPerBox: order.quantityPerBox,

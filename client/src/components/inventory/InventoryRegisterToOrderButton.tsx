@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ShoppingCart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { createShopOrderFromInbound } from '../../api/shopOrderApi';
+import { shopOrderDetailPath } from '../orders/shopOrderListNavigation';
 import type { InventoryListItem } from './types';
 
 interface InventoryRegisterToOrderButtonProps {
@@ -33,7 +34,9 @@ export function InventoryRegisterToOrderButton({
         alert('이미 주문 관리에 등록된 제품입니다. 상세 페이지로 이동합니다.');
       }
 
-      navigate(`/admin/orders/${order.id}`);
+      navigate(
+        shopOrderDetailPath(order.id, 'products', encodeURIComponent('/admin/inventory'))
+      );
     } catch (err) {
       alert(err instanceof Error ? err.message : '주문 등록 중 오류가 발생했습니다.');
     } finally {

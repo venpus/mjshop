@@ -7,10 +7,12 @@ import {
   FileText,
   Loader2,
   Search,
+  Trash2,
   Truck,
 } from 'lucide-react';
 import {
   createShopOrderBulkStatements,
+  deleteShopOrder,
   getShopOrderById,
   getShopOrderStatusClass,
   SHOP_ORDER_STATUS_OPTIONS,
@@ -25,6 +27,10 @@ import {
   exportShopOrderTrackingExcel,
   flattenShopOrderLines,
 } from '../../utils/shopOrderListExport';
+import {
+  canDeleteShopOrder,
+  SHOP_ORDER_DELETE_BLOCKED_MESSAGE,
+} from '../../utils/shopOrderDeleteUtils';
 import { shopOrderDetailPath } from './shopOrderListNavigation';
 import { ShopOrderListPagination } from './ShopOrderListPagination';
 import {
@@ -49,6 +55,7 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
   const [bulkBusy, setBulkBusy] = useState(false);
   const [statementModalOpen, setStatementModalOpen] = useState(false);
   const [statementGroups, setStatementGroups] = useState<ShopOrderStatementGroupPreview[]>([]);
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
 
   const checkboxClass =
     'w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer';
@@ -106,6 +113,33 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
 
   const handleViewDetail = (orderId: string) => {
     navigate(shopOrderDetailPath(orderId, listTab));
+  };
+
+  const handleDeleteProductOrder = async (order: ShopOrder, event: React.MouseEvent) => {
+    event.stopPropagation();
+
+    if (!canDeleteShopOrder(order)) {
+      alert(SHOP_ORDER_DELETE_BLOCKED_MESSAGE);
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `「${order.productName}」(${order.orderNumber}) 제품 주문을 삭제하시겠습니까?`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingOrderId(order.id);
+    try {
+      await deleteShopOrder(order.id);
+      await onReload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '제품 주문 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setDeletingOrderId(null);
+    }
   };
 
   const getSelectedOrderIds = (): string[] | null => {
@@ -369,7 +403,13 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
                           aria-label={`${order.orderNumber} 선택`}
                         />
                       </td>
-                      <td className="px-6 py-4 text-gray-900">{order.orderNumber}</td>
+                      <td
+                        className="px-6 py-4 text-gray-900 select-text cursor-text"
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {order.orderNumber}
+                      </td>
                       <td className="px-6 py-4 text-gray-600">{order.orderDate ?? '-'}</td>
                       <td className="px-6 py-4">
                         {imageUrl ? (
@@ -412,17 +452,32 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewDetail(order.id);
-                          }}
-                          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                          title="상세 보기"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewDetail(order.id);
+                            }}
+                            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="상세 보기"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deletingOrderId === order.id}
+                            onClick={(e) => void handleDeleteProductOrder(order, e)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                            title="제품 주문 삭제"
+                          >
+                            {deletingOrderId === order.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

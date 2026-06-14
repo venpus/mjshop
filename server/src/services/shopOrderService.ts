@@ -13,8 +13,11 @@ import {
 import { groupStatementLines } from '../utils/shopOrderStatementGroup.js';
 import {
   deleteShopOrderLinePaymentProofImage,
+  deleteShopOrderLineStatementHtml,
   deleteShopOrderLineFilesDir,
+  deleteShopOrderFilesDir,
   getShopOrderFileUrl,
+  moveShopOrderLineFilesDir,
   readShopOrderLineStatementHtml,
   saveShopOrderLinePaymentProofImage,
   saveShopOrderLineStatementHtml,
@@ -38,6 +41,16 @@ export interface BulkStatementGroupResult {
 export interface BulkStatementResult {
   groups: BulkStatementGroupResult[];
   statementCount: number;
+}
+
+export interface ShopOrderReservationTransferTarget {
+  id: string;
+  orderNumber: string;
+  productName: string;
+  productMainImage: string | null;
+  warehouseStockQuantity: number;
+  stockQuantity: number;
+  status: ShopOrder['status'];
 }
 
 function calculateOrderQuantity(order: ShopOrder): number {
@@ -65,6 +78,7 @@ export class ShopOrderService {
   private repository: ShopOrderRepository;
   private stockInboundRepository: StockInboundRepository;
   private buyerRepository: ShopBuyerRepository;
+  private lineOrderNumberBackfillPromise: Promise<void> | null = null;
 
   constructor() {
     this.repository = new ShopOrderRepository();
@@ -74,6 +88,23 @@ export class ShopOrderService {
 
   private get lineRepository() {
     return this.repository.getLineRepository();
+  }
+
+  private async ensureLineOrderNumbersBackfilled(): Promise<void> {
+    if (!this.lineOrderNumberBackfillPromise) {
+      this.lineOrderNumberBackfillPromise = this.lineRepository
+        .backfillMissingLineOrderNumbers()
+        .then((count) => {
+          if (count > 0) {
+            console.log(`[shopOrder] 주문건 번호 백필 완료: ${count}건`);
+          }
+        });
+    }
+    await this.lineOrderNumberBackfillPromise;
+  }
+
+  private resolveLineOrderNumber(line: ShopOrderLine, order: ShopOrder): string {
+    return line.lineOrderNumber ?? order.orderNumber;
   }
 
   private async enrichOrderStock(order: ShopOrder): Promise<ShopOrder> {
@@ -114,11 +145,13 @@ export class ShopOrderService {
   }
 
   async getAllOrders(): Promise<ShopOrder[]> {
+    await this.ensureLineOrderNumbersBackfilled();
     const orders = await this.repository.findAll();
     return Promise.all(orders.map((order) => this.enrichOrderStock(order)));
   }
 
   async getOrderById(id: string): Promise<ShopOrder | null> {
+    await this.ensureLineOrderNumbersBackfilled();
     const order = await this.repository.findById(id);
     if (!order) return null;
 
@@ -187,6 +220,33 @@ export class ShopOrderService {
       throw new Error('주문 수정에 실패했습니다.');
     }
     return updated;
+  }
+
+  async deleteOrder(id: string): Promise<void> {
+    const order = await this.repository.findById(id);
+    if (!order) {
+      throw new Error('주문을 찾을 수 없습니다.');
+    }
+
+    const lineCount = await this.lineRepository.countByShopOrderId(id);
+    if (lineCount > 0) {
+      throw new Error(
+        '등록된 주문·예약이 있어 삭제할 수 없습니다. 모든 주문 건을 먼저 삭제해 주세요.'
+      );
+    }
+
+    if (order.lines.length > 0) {
+      throw new Error(
+        '등록된 주문·예약이 있어 삭제할 수 없습니다. 모든 주문 건을 먼저 삭제해 주세요.'
+      );
+    }
+
+    const deleted = await this.repository.delete(id);
+    if (!deleted) {
+      throw new Error('주문 삭제에 실패했습니다.');
+    }
+
+    await deleteShopOrderFilesDir(id);
   }
 
   async syncOrderDetail(id: string, data: SyncShopOrderDetailDTO): Promise<ShopOrder> {
@@ -280,7 +340,7 @@ export class ShopOrderService {
     return this.enrichOrderStock(refreshed);
   }
 
-  async addOrderLine(shopOrderId: string): Promise<ShopOrder> {
+  async addOrderLine(shopOrderId: string, isReservation = false): Promise<ShopOrder> {
     const order = await this.repository.findById(shopOrderId);
     if (!order) {
       throw new Error('주문을 찾을 수 없습니다.');
@@ -288,6 +348,7 @@ export class ShopOrderService {
 
     await this.lineRepository.create({
       shopOrderId,
+      isReservation,
       saleUnitPrice: order.sellingPrice,
       quantityPerBox: order.quantityPerBox,
     });
@@ -323,6 +384,207 @@ export class ShopOrderService {
       throw new Error('주문 조회에 실패했습니다.');
     }
     return this.enrichOrderStock(refreshed);
+  }
+
+  async convertOrderLineToReservation(shopOrderId: string, lineId: string): Promise<ShopOrder> {
+    if (lineId.endsWith('-legacy-line')) {
+      throw new Error('레거시 주문 건은 예약으로 전환할 수 없습니다.');
+    }
+
+    const order = await this.repository.findById(shopOrderId);
+    if (!order) {
+      throw new Error('주문을 찾을 수 없습니다.');
+    }
+
+    const line = order.lines.find((item) => item.id === lineId);
+    if (!line) {
+      throw new Error('주문 건을 찾을 수 없습니다.');
+    }
+
+    if (line.isReservation) {
+      throw new Error('이미 예약으로 등록된 건입니다.');
+    }
+
+    const updated = await this.lineRepository.update(lineId, { isReservation: true });
+    if (!updated) {
+      throw new Error('예약 전환에 실패했습니다.');
+    }
+
+    await this.repository.syncQuantityFromLines(shopOrderId);
+
+    const refreshed = await this.repository.findById(shopOrderId);
+    if (!refreshed) {
+      throw new Error('주문 조회에 실패했습니다.');
+    }
+    return this.enrichOrderStock(refreshed);
+  }
+
+  async convertReservationLineToOrder(shopOrderId: string, lineId: string): Promise<ShopOrder> {
+    if (lineId.endsWith('-legacy-line')) {
+      throw new Error('레거시 예약 건은 주문으로 전환할 수 없습니다.');
+    }
+
+    const order = await this.repository.findById(shopOrderId);
+    if (!order) {
+      throw new Error('주문을 찾을 수 없습니다.');
+    }
+
+    const line = order.lines.find((item) => item.id === lineId);
+    if (!line) {
+      throw new Error('주문 건을 찾을 수 없습니다.');
+    }
+
+    if (!line.isReservation) {
+      throw new Error('이미 일반 주문으로 등록된 건입니다.');
+    }
+
+    const updated = await this.lineRepository.update(lineId, { isReservation: false });
+    if (!updated) {
+      throw new Error('주문 전환에 실패했습니다.');
+    }
+
+    await this.repository.syncQuantityFromLines(shopOrderId);
+
+    const refreshed = await this.repository.findById(shopOrderId);
+    if (!refreshed) {
+      throw new Error('주문 조회에 실패했습니다.');
+    }
+    return this.enrichOrderStock(refreshed);
+  }
+
+  async getReservationTransferTargets(
+    excludeShopOrderIds: string[] = [],
+    productName?: string
+  ): Promise<ShopOrderReservationTransferTarget[]> {
+    const orders = await this.getAllOrders();
+    const exclude = new Set(excludeShopOrderIds.filter(Boolean));
+    const normalizedProductName = productName?.trim();
+
+    return orders
+      .filter((order) => {
+        if (exclude.has(order.id)) return false;
+        if (normalizedProductName && order.productName.trim() !== normalizedProductName) {
+          return false;
+        }
+        return (
+          order.stockInboundItemId != null && (order.warehouseStockQuantity ?? 0) >= 0
+        );
+      })
+      .map((order) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        productName: order.productName,
+        productMainImage: order.productMainImage,
+        warehouseStockQuantity: order.warehouseStockQuantity,
+        stockQuantity: order.stockQuantity,
+        status: order.status,
+      }))
+      .sort((a, b) => a.orderNumber.localeCompare(b.orderNumber, 'ko'));
+  }
+
+  private async transferSingleReservationLine(
+    sourceOrderId: string,
+    lineId: string,
+    targetOrderId: string
+  ): Promise<void> {
+    if (lineId.endsWith('-legacy-line')) {
+      throw new Error('레거시 주문 건은 예약 옮기기를 할 수 없습니다.');
+    }
+
+    if (sourceOrderId === targetOrderId) {
+      throw new Error('같은 제품 주문으로는 옮길 수 없습니다.');
+    }
+
+    const sourceOrder = await this.repository.findById(sourceOrderId);
+    if (!sourceOrder) {
+      throw new Error('주문을 찾을 수 없습니다.');
+    }
+
+    const targetOrderRaw = await this.repository.findById(targetOrderId);
+    if (!targetOrderRaw) {
+      throw new Error('대상 주문을 찾을 수 없습니다.');
+    }
+
+    const targetOrder = await this.enrichOrderStock(targetOrderRaw);
+    if (!targetOrder.stockInboundItemId) {
+      throw new Error('입고 등록된 주문만 선택할 수 있습니다.');
+    }
+    if ((targetOrder.warehouseStockQuantity ?? 0) < 0) {
+      throw new Error('재고가 0 이상인 주문만 선택할 수 있습니다.');
+    }
+    if (targetOrder.productName.trim() !== sourceOrder.productName.trim()) {
+      throw new Error('동일한 제품명의 주문만 선택할 수 있습니다.');
+    }
+
+    const line = sourceOrder.lines.find((item) => item.id === lineId);
+    if (!line) {
+      throw new Error('주문 건을 찾을 수 없습니다.');
+    }
+    if (!line.isReservation) {
+      throw new Error('예약 건이 아닙니다.');
+    }
+
+    const quantityPerBox = line.quantityPerBox || targetOrder.quantityPerBox;
+    const saleUnitPrice = line.saleUnitPrice ?? targetOrder.sellingPrice;
+    const breakdown = calculateShopOrderAmountBreakdown(
+      line.orderBoxCount,
+      quantityPerBox,
+      saleUnitPrice,
+      line.deliveryFee
+    );
+
+    const nextSort = await this.lineRepository.getNextSortOrder(targetOrderId);
+    const movedFiles = await moveShopOrderLineFilesDir(sourceOrderId, targetOrderId, lineId);
+
+    const updateData: UpdateShopOrderLineDTO = {
+      shopOrderId: targetOrderId,
+      isReservation: false,
+      sortOrder: nextSort,
+      quantityPerBox,
+      saleUnitPrice,
+      productSupplyAmount: breakdown?.productSupplyAmount ?? null,
+      vatAmount: breakdown?.vatAmount ?? null,
+      totalAmount: breakdown?.totalAmount ?? null,
+    };
+
+    if (movedFiles.statementFilePath != null) {
+      updateData.statementFilePath = movedFiles.statementFilePath;
+      updateData.statementIssued = true;
+    }
+    if (movedFiles.paymentProofImage != null) {
+      updateData.paymentProofImage = movedFiles.paymentProofImage;
+    }
+
+    const updated = await this.lineRepository.update(lineId, updateData);
+    if (!updated) {
+      throw new Error('예약 옮기기에 실패했습니다.');
+    }
+  }
+
+  async transferReservationsToOrder(
+    items: Array<{ shopOrderId: string; lineId: string }>,
+    targetShopOrderId: string
+  ): Promise<{ transferredCount: number; targetOrderId: string }> {
+    if (items.length === 0) {
+      throw new Error('옮길 예약 건을 선택해 주세요.');
+    }
+
+    const uniqueItems = Array.from(
+      new Map(items.map((item) => [`${item.shopOrderId}:${item.lineId}`, item])).values()
+    );
+
+    const sourceOrderIds = new Set<string>();
+    for (const item of uniqueItems) {
+      await this.transferSingleReservationLine(item.shopOrderId, item.lineId, targetShopOrderId);
+      sourceOrderIds.add(item.shopOrderId);
+    }
+
+    for (const sourceOrderId of sourceOrderIds) {
+      await this.repository.syncQuantityFromLines(sourceOrderId);
+    }
+    await this.repository.syncQuantityFromLines(targetShopOrderId);
+
+    return { transferredCount: uniqueItems.length, targetOrderId: targetShopOrderId };
   }
 
   async updateLineCnyExchangeRate(
@@ -446,7 +708,7 @@ export class ShopOrderService {
 
   private buildStatementContext(order: ShopOrder, line: ShopOrderLine) {
     return {
-      orderNumber: order.orderNumber,
+      orderNumber: this.resolveLineOrderNumber(line, order),
       productName: order.productName,
       orderDate: order.orderDate,
       quantityPerBox: line.quantityPerBox || order.quantityPerBox,
@@ -542,8 +804,7 @@ export class ShopOrderService {
       const fileName =
         contexts.length === 1
           ? getShopOrderStatementFileName(
-              group.lines[0].orderNumber,
-              group.lines[0].line.sortOrder
+              this.resolveLineOrderNumber(group.lines[0].line, group.lines[0].order)
             )
           : getConsolidatedShopOrderStatementFileName(
               group.companyName,
@@ -572,6 +833,58 @@ export class ShopOrderService {
     }
 
     return { groups: results, statementCount };
+  }
+
+  async cancelBulkStatements(
+    items: Array<{ shopOrderId: string; lineId: string }>
+  ): Promise<{ cancelledCount: number }> {
+    if (items.length === 0) {
+      throw new Error('취소할 명세서가 없습니다.');
+    }
+
+    const uniqueItems = Array.from(
+      new Map(items.map((item) => [`${item.shopOrderId}:${item.lineId}`, item])).values()
+    );
+
+    let cancelledCount = 0;
+    for (const item of uniqueItems) {
+      const cancelled = await this.cancelStatementLine(item.shopOrderId, item.lineId);
+      if (cancelled) cancelledCount += 1;
+    }
+
+    if (cancelledCount === 0) {
+      throw new Error('취소할 명세서가 없습니다.');
+    }
+
+    return { cancelledCount };
+  }
+
+  private async cancelStatementLine(shopOrderId: string, lineId: string): Promise<boolean> {
+    if (lineId.endsWith('-legacy-line')) {
+      throw new Error('레거시 주문 건은 명세서를 취소할 수 없습니다.');
+    }
+
+    const order = await this.repository.findById(shopOrderId);
+    if (!order) {
+      throw new Error('주문을 찾을 수 없습니다.');
+    }
+
+    const line = order.lines.find((item) => item.id === lineId);
+    if (!line) {
+      throw new Error('주문 건을 찾을 수 없습니다.');
+    }
+
+    if (!line.statementIssued && !line.statementFilePath) {
+      return false;
+    }
+
+    await deleteShopOrderLineStatementHtml(shopOrderId, lineId);
+    await this.lineRepository.update(lineId, {
+      statementFilePath: null,
+      statementIssued: false,
+    });
+
+    return true;
   }
 
   async createOrUpdateStatement(shopOrderId: string, lineId: string): Promise<ShopOrder> {
@@ -615,7 +928,7 @@ export class ShopOrderService {
     const html = await this.readSavedOrBuildStatementHtml(order, line);
     return {
       html,
-      fileName: getShopOrderStatementFileName(order.orderNumber, line.sortOrder),
+      fileName: getShopOrderStatementFileName(this.resolveLineOrderNumber(line, order)),
     };
   }
 
@@ -632,7 +945,7 @@ export class ShopOrderService {
     const html = await this.readSavedOrBuildStatementHtml(order, line);
     return {
       html,
-      fileName: getShopOrderStatementFileName(order.orderNumber, line.sortOrder),
+      fileName: getShopOrderStatementFileName(this.resolveLineOrderNumber(line, order)),
     };
   }
 

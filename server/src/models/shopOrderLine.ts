@@ -1,7 +1,9 @@
 export interface ShopOrderLine {
   id: string;
+  lineOrderNumber: string | null;
   shopOrderId: string;
   sortOrder: number;
+  isReservation: boolean;
   companyName: string | null;
   orderBoxCount: number;
   quantityPerBox: number;
@@ -35,6 +37,7 @@ export interface ShopOrderLine {
 export interface CreateShopOrderLineDTO {
   shopOrderId: string;
   sortOrder?: number;
+  isReservation?: boolean;
   saleUnitPrice?: number | null;
   quantityPerBox?: number;
 }
@@ -67,4 +70,6 @@ export interface UpdateShopOrderLineDTO {
   statementFilePath?: string | null;
   paymentProofImage?: string | null;
   sortOrder?: number;
+  isReservation?: boolean;
+  shopOrderId?: string;
 }

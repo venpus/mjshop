@@ -41,6 +41,7 @@ type PageType =
   | "dashboard"
   | "products"
   | "orders"
+  | "shop-statements"
   | "sales-settlement"
   | "shop-buyers"
   | "shipping"
@@ -448,6 +449,18 @@ export function Sidebar({
                 >
                   <ShoppingCart className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
                   {!isCollapsed && <span>{t('menu.orders')}</span>}
+                </button>
+                <button
+                  onClick={() => onPageChange("shop-statements")}
+                  className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
+                    currentPage === "shop-statements"
+                      ? "bg-purple-50 text-purple-600"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                  title={isCollapsed ? t('menu.shopStatements') : undefined}
+                >
+                  <FileText className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
+                  {!isCollapsed && <span>{t('menu.shopStatements')}</span>}
                 </button>
                 <button
                   onClick={() => onPageChange("sales-settlement")}

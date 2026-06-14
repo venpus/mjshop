@@ -55,7 +55,8 @@ export function ShopShippingManagementPage() {
         row.line.phoneNumber ?? '',
         row.line.address ?? '',
         row.line.trackingNumber ?? '',
-        formatLineOrderRef(row.orderNumber, row.lineIndex),
+        row.line.lineOrderNumber ?? '',
+        formatLineOrderRef(row.line.lineOrderNumber, row.orderNumber, row.lineIndex),
       ]
         .join(' ')
         .toLowerCase();
@@ -174,8 +175,12 @@ export function ShopShippingManagementPage() {
 
                     return (
                       <tr key={row.rowKey} className="hover:bg-gray-50">
-                        <td className="px-3 py-3 whitespace-nowrap font-medium text-gray-900">
-                          {formatLineOrderRef(row.orderNumber, row.lineIndex)}
+                        <td className="px-3 py-3 whitespace-nowrap font-medium text-gray-900 select-text cursor-text">
+                          {formatLineOrderRef(
+                            row.line.lineOrderNumber,
+                            row.orderNumber,
+                            row.lineIndex
+                          )}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap text-gray-700">
                           {row.orderDate ?? '-'}

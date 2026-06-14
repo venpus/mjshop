@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  ArrowRightLeft,
   ClipboardList,
   Eye,
   FileSpreadsheet,
   FileText,
   Loader2,
+  Package,
   Search,
   Truck,
 } from 'lucide-react';
+import { getFullImageUrl } from '../../api/purchaseOrderApi';
 import { getShopBuyerById, getShopBuyers } from '../../api/shopBuyerApi';
 import {
   createShopOrderBulkStatements,
@@ -23,6 +26,7 @@ import {
   exportShopOrderFormExcel,
   exportShopOrderTaxInvoiceExcel,
   exportShopOrderTrackingExcel,
+  type ShopOrderLineListKind,
   type ShopOrderLineListRow,
 } from '../../utils/shopOrderListExport';
 import { findShopBuyerByCompanyName } from '../../utils/shopBuyerDisplay';
@@ -43,6 +47,7 @@ import {
 import { ShopBuyerInfoModal } from './ShopBuyerInfoModal';
 import { ShopOrderListPagination } from './ShopOrderListPagination';
 import { shopOrderDetailPath } from './shopOrderListNavigation';
+import { ShopOrderReservationTransferModal, type ReservationTransferItem } from './ShopOrderReservationTransferModal';
 import {
   ShopOrderStatementModal,
   type ShopOrderStatementGroupPreview,
@@ -52,6 +57,7 @@ import type { ShopOrderListTab } from './ShopOrderListTabs';
 interface ShopOrderLineListTabProps {
   orders: ShopOrder[];
   listTab: ShopOrderListTab;
+  lineKind: Extract<ShopOrderLineListKind, 'orders' | 'reservations'>;
   onReload: () => Promise<void>;
 }
 
@@ -95,7 +101,27 @@ function ProgressFlags({ line }: { line: ShopOrderLine }) {
   );
 }
 
-export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLineListTabProps) {
+export function ShopOrderLineListTab({
+  orders,
+  listTab,
+  lineKind,
+  onReload,
+}: ShopOrderLineListTabProps) {
+  const isReservationTab = lineKind === 'reservations';
+  const accentRingClass = isReservationTab ? 'focus:ring-amber-500' : 'focus:ring-emerald-500';
+  const accentCheckboxClass = isReservationTab
+    ? 'w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500 cursor-pointer'
+    : 'w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 cursor-pointer';
+  const accentFilterActiveClass = isReservationTab
+    ? 'bg-amber-600 text-white border-amber-600'
+    : 'bg-emerald-600 text-white border-emerald-600';
+  const accentCompanyLinkClass = isReservationTab
+    ? 'text-left text-amber-800 hover:text-amber-950 hover:underline font-medium'
+    : 'text-left text-emerald-700 hover:text-emerald-900 hover:underline font-medium';
+  const emptyMessage = isReservationTab
+    ? '등록된 예약 건이 없습니다. 제품 상세에서 「예약 추가」로 등록하세요.'
+    : '등록된 판매 주문이 없습니다. 제품 상세에서 「주문 추가」로 등록하세요.';
+  const orderRefPrefix = isReservationTab ? '예약' : undefined;
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(ALL_STATUS);
@@ -107,6 +133,9 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
   const [selectedRowKeys, setSelectedRowKeys] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [statementModalOpen, setStatementModalOpen] = useState(false);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferItems, setTransferItems] = useState<ReservationTransferItem[]>([]);
+  const [transferProductName, setTransferProductName] = useState('');
   const [statementGroups, setStatementGroups] = useState<ShopOrderStatementGroupPreview[]>([]);
   const [buyers, setBuyers] = useState<ShopBuyerListItem[]>([]);
   const [buyerModalOpen, setBuyerModalOpen] = useState(false);
@@ -120,8 +149,7 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
     phoneNumber: string | null;
   } | null>(null);
 
-  const checkboxClass =
-    'w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 cursor-pointer';
+  const checkboxClass = accentCheckboxClass;
 
   const loadBuyers = useCallback(async () => {
     try {
@@ -136,7 +164,7 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
     void loadBuyers();
   }, [loadBuyers]);
 
-  const lineRows = useMemo(() => buildShopOrderLineListRows(orders), [orders]);
+  const lineRows = useMemo(() => buildShopOrderLineListRows(orders, lineKind), [orders, lineKind]);
 
   const filteredRows = useMemo(() => {
     const lower = searchTerm.trim().toLowerCase();
@@ -144,7 +172,8 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
       const matchesSearch =
         !lower ||
         row.orderNumber.toLowerCase().includes(lower) ||
-        formatLineOrderRef(row.orderNumber, row.lineIndex).toLowerCase().includes(lower) ||
+        formatLineOrderRef(row.line.lineOrderNumber, row.orderNumber, row.lineIndex).toLowerCase().includes(lower) ||
+        (row.line.lineOrderNumber ?? '').toLowerCase().includes(lower) ||
         row.productName.toLowerCase().includes(lower) ||
         (row.line.companyName ?? '').toLowerCase().includes(lower) ||
         (row.line.recipientName ?? '').toLowerCase().includes(lower) ||
@@ -158,7 +187,7 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
     });
   }, [lineRows, searchTerm, statusFilter, dateFrom, dateTo, fulfillmentFilters]);
 
-  const paginationResetKey = `${searchTerm}|${statusFilter}|${dateFrom}|${dateTo}|${JSON.stringify(fulfillmentFilters)}`;
+  const paginationResetKey = `${lineKind}|${searchTerm}|${statusFilter}|${dateFrom}|${dateTo}|${JSON.stringify(fulfillmentFilters)}`;
   const {
     paginatedItems: paginatedRows,
     currentPage,
@@ -294,6 +323,34 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
     }
   };
 
+  const handleOpenTransferModal = () => {
+    const selectedRows = getSelectedRows();
+    if (!selectedRows || selectedRows.length === 0) return;
+
+    const productNames = [...new Set(selectedRows.map((row) => row.productName.trim()))];
+    if (productNames.length !== 1) {
+      alert('동일한 제품명의 예약만 함께 이동할 수 있습니다.');
+      return;
+    }
+
+    setTransferProductName(productNames[0]);
+    setTransferItems(
+      selectedRows.map((row) => ({
+        shopOrderId: row.shopOrderId,
+        lineId: row.line.id,
+      }))
+    );
+    setTransferModalOpen(true);
+  };
+
+  const handleReservationTransferred = async (targetOrderId: string, transferredCount: number) => {
+    setSelectedRowKeys(new Set());
+    setTransferProductName('');
+    await onReload();
+    alert(`${transferredCount.toLocaleString()}건의 예약을 선택한 주문으로 이동했습니다.`);
+    navigate(shopOrderDetailPath(targetOrderId, listTab));
+  };
+
   const handleViewDetail = (shopOrderId: string) => {
     navigate(shopOrderDetailPath(shopOrderId, listTab));
   };
@@ -357,11 +414,7 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
   const fulfillmentFilterActive = hasActiveLineFulfillmentFilters(fulfillmentFilters);
 
   if (lineRows.length === 0) {
-    return (
-      <div className="py-16 text-center text-gray-500">
-        등록된 판매 주문이 없습니다. 제품 상세에서 판매 주문을 추가하세요.
-      </div>
-    );
+    return <div className="py-16 text-center text-gray-500">{emptyMessage}</div>;
   }
 
   return (
@@ -375,13 +428,13 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
               placeholder="주문번호, 상품명, 상호, 수령인, 전화, 주소, 송장으로 검색..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className={`w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${accentRingClass}`}
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none bg-white"
+            className={`px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${accentRingClass} appearance-none bg-white`}
             title="제품 상태 필터"
           >
             <option value={ALL_STATUS}>제품 상태: {ALL_STATUS}</option>
@@ -405,7 +458,7 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
                   onClick={() => toggleFulfillmentFilter(option.key)}
                   className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
                     active
-                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      ? accentFilterActiveClass
                       : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                   }`}
                 >
@@ -430,14 +483,14 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${accentRingClass}`}
             />
             <span className="text-gray-400">~</span>
             <input
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${accentRingClass}`}
             />
             {(dateFrom || dateTo) && (
               <button
@@ -465,6 +518,21 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-gray-200 bg-gray-50/80">
           <span className="text-sm text-gray-600 mr-1">선택 {selectedRowKeys.size}건</span>
+          {isReservationTab && (
+            <button
+              type="button"
+              disabled={bulkBusy || selectedRowKeys.size === 0}
+              onClick={() => handleOpenTransferModal()}
+              className={`${bulkActionButtonClass} border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100`}
+            >
+              {bulkBusy ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ArrowRightLeft className="w-4 h-4" />
+              )}
+              주문 이동하기
+            </button>
+          )}
           <button
             type="button"
             disabled={bulkBusy || selectedRowKeys.size === 0}
@@ -536,6 +604,7 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
                   </th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">주문</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">등록일</th>
+                  <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">사진</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">상호명</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">상품명</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">수량</th>
@@ -551,6 +620,9 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
                 {paginatedRows.map((row) => {
                   const { line } = row;
                   const progressStatus = deriveLineProgressStatus(line);
+                  const imageUrl = row.productMainImage
+                    ? getFullImageUrl(row.productMainImage)
+                    : null;
 
                   return (
                     <tr
@@ -564,19 +636,44 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
                           checked={selectedRowKeys.has(row.rowKey)}
                           onChange={() => handleToggleSelect(row.rowKey)}
                           className={checkboxClass}
-                          aria-label={`${formatLineOrderRef(row.orderNumber, row.lineIndex)} 선택`}
+                          aria-label={`${formatLineOrderRef(row.line.lineOrderNumber, row.orderNumber, row.lineIndex, orderRefPrefix)} 선택`}
                         />
                       </td>
-                      <td className="px-4 py-4 text-gray-900 whitespace-nowrap font-medium">
-                        {formatLineOrderRef(row.orderNumber, row.lineIndex)}
+                      <td
+                        className="px-4 py-4 text-gray-900 whitespace-nowrap font-medium select-text cursor-text"
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {formatLineOrderRef(
+                          row.line.lineOrderNumber,
+                          row.orderNumber,
+                          row.lineIndex,
+                          orderRefPrefix
+                        )}
                       </td>
                       <td className="px-4 py-4 text-gray-600 whitespace-nowrap">{row.orderDate ?? '-'}</td>
+                      <td className="px-4 py-4">
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={row.productName}
+                            className="w-10 h-10 rounded object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <div
+                            className="w-10 h-10 rounded border border-gray-200 bg-gray-100 flex items-center justify-center"
+                            aria-hidden
+                          >
+                            <Package className="w-5 h-5 text-gray-400" />
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-4 text-gray-900" onClick={(e) => e.stopPropagation()}>
                         {line.companyName ? (
                           <button
                             type="button"
                             onClick={(e) => void handleCompanyNameClick(line, e)}
-                            className="text-left text-emerald-700 hover:text-emerald-900 hover:underline font-medium"
+                            className={accentCompanyLinkClass}
                             title="구매자 정보 보기"
                           >
                             {line.companyName}
@@ -651,6 +748,21 @@ export function ShopOrderLineListTab({ orders, listTab, onReload }: ShopOrderLin
         unmatchedMessage={buyerUnmatchedMessage}
         orderLineInfo={buyerOrderLineInfo ?? undefined}
       />
+
+      {transferModalOpen && (
+        <ShopOrderReservationTransferModal
+          isOpen={transferModalOpen}
+          items={transferItems}
+          productName={transferProductName}
+          onClose={() => {
+            setTransferModalOpen(false);
+            setTransferProductName('');
+          }}
+          onTransferred={(targetOrderId, transferredCount) =>
+            void handleReservationTransferred(targetOrderId, transferredCount)
+          }
+        />
+      )}
 
       <ShopOrderStatementModal
         isOpen={statementModalOpen}

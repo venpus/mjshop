@@ -1,5 +1,6 @@
 import type { ShopOrder } from '../api/shopOrderApi';
 import { buildShopOrderLineListRows } from './shopOrderListExport';
+import { formatLineOrderRef } from './shopOrderLineListUtils';
 
 export const LOGISTICS_FEE_PER_BOX_KRW = 1200;
 export const WK_PROFIT_SHARE_RATE = 0.6;
@@ -15,6 +16,8 @@ export interface SalesSettlementRow {
   lineId: string;
   shopOrderId: string;
   isLegacyLine: boolean;
+  isReservation: boolean;
+  lineOrderNumber: string | null;
   orderNumber: string;
   lineIndex: number;
   companyName: string | null;
@@ -139,6 +142,44 @@ export function calculatePartnerProfitShares(profitAmount: number | null): Partn
   return { wkProfitAmount, inventioProfitAmount };
 }
 
+export function formatSalesSettlementOrderRef(row: Pick<
+  SalesSettlementRow,
+  'lineOrderNumber' | 'orderNumber' | 'lineIndex' | 'isReservation'
+>): string {
+  return formatLineOrderRef(
+    row.lineOrderNumber,
+    row.orderNumber,
+    row.lineIndex,
+    row.isReservation ? '예약' : undefined
+  );
+}
+
+function buildLineIndexMaps(orders: ShopOrder[]): {
+  orderLineIndexByKey: Map<string, number>;
+  reservationLineIndexByKey: Map<string, number>;
+} {
+  const orderLineIndexByKey = new Map<string, number>();
+  const reservationLineIndexByKey = new Map<string, number>();
+
+  for (const order of orders) {
+    let orderIndex = 0;
+    let reservationIndex = 0;
+
+    for (const line of order.lines) {
+      const rowKey = `${order.id}:${line.id}`;
+      if (line.isReservation) {
+        reservationIndex += 1;
+        reservationLineIndexByKey.set(rowKey, reservationIndex);
+      } else {
+        orderIndex += 1;
+        orderLineIndexByKey.set(rowKey, orderIndex);
+      }
+    }
+  }
+
+  return { orderLineIndexByKey, reservationLineIndexByKey };
+}
+
 export function buildSalesSettlementRows(
   orders: ShopOrder[],
   exchangeRatesByRowKey: Record<string, number | null>,
@@ -146,9 +187,14 @@ export function buildSalesSettlementRows(
 ): SalesSettlementRow[] {
   const lineRows = buildShopOrderLineListRows(orders);
   const orderById = new Map(orders.map((order) => [order.id, order]));
+  const { orderLineIndexByKey, reservationLineIndexByKey } = buildLineIndexMaps(orders);
 
   return lineRows.map((row) => {
     const order = orderById.get(row.shopOrderId);
+    const isReservation = row.line.isReservation;
+    const lineIndex = isReservation
+      ? (reservationLineIndexByKey.get(row.rowKey) ?? row.lineIndex)
+      : (orderLineIndexByKey.get(row.rowKey) ?? row.lineIndex);
     const unitCostCny = order?.unitPrice ?? null;
     const lineQuantity = calculateLineQuantity(row.line.orderBoxCount, row.line.quantityPerBox);
     const salesAmountExVat = row.line.productSupplyAmount;
@@ -175,8 +221,10 @@ export function buildSalesSettlementRows(
       lineId: row.line.id,
       shopOrderId: row.shopOrderId,
       isLegacyLine: row.line.id.endsWith('-legacy-line'),
+      isReservation,
+      lineOrderNumber: row.line.lineOrderNumber,
       orderNumber: row.orderNumber,
-      lineIndex: row.lineIndex,
+      lineIndex,
       companyName: row.line.companyName,
       productName: row.productName,
       orderDate: row.orderDate,

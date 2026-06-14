@@ -154,7 +154,7 @@ function buildItemRows(
       <td class="center">${formatAmount(amounts.quantity)}</td>
       <td class="right">${formatAmount(amounts.unitPrice)}</td>
       <td class="right">${formatAmount(amounts.productSupply)}</td>
-      <td></td>
+      <td class="center">${escapeHtml(order.orderNumber)}</td>
     </tr>`);
 
   rows.push(`
@@ -253,7 +253,7 @@ function buildConsolidatedItemRows(
       <td class="center">${formatAmount(amounts.quantity)}</td>
       <td class="right">${formatAmount(amounts.unitPrice)}</td>
       <td class="right">${formatAmount(amounts.productSupply)}</td>
-      <td>${escapeHtml(context.orderNumber)}</td>
+      <td class="center">${escapeHtml(context.orderNumber)}</td>
     </tr>`);
   }
 
@@ -576,7 +576,7 @@ export function buildShopOrderConsolidatedStatementHtml(
           <th style="width:8%">수량</th>
           <th style="width:12%">단가</th>
           <th style="width:12%">금액</th>
-          <th>비고</th>
+          <th>주문번호</th>
         </tr>
       </thead>
       <tbody>${itemRows}</tbody>
@@ -910,7 +910,7 @@ export function buildShopOrderStatementHtml(order: ShopOrderStatementContext): s
           <th style="width:8%">수량</th>
           <th style="width:12%">단가</th>
           <th style="width:12%">금액</th>
-          <th>비고</th>
+          <th>주문번호</th>
         </tr>
       </thead>
       <tbody>${itemRows}</tbody>
@@ -946,8 +946,7 @@ export function buildShopOrderStatementHtml(order: ShopOrderStatementContext): s
 </html>`;
 }
 
-export function getShopOrderStatementFileName(orderNumber: string, lineIndex = 0): string {
-  const safeNumber = orderNumber.replace(/[^\w-]+/g, '_');
-  const suffix = lineIndex > 0 ? `_${lineIndex + 1}` : '';
-  return `거래명세표_${safeNumber}${suffix}.html`;
+export function getShopOrderStatementFileName(displayNumber: string): string {
+  const safeNumber = displayNumber.replace(/[^\w-]+/g, '_');
+  return `거래명세표_${safeNumber}.html`;
 }

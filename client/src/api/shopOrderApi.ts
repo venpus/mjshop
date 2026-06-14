@@ -6,8 +6,10 @@ export type ShopOrderStatus = '판매대기' | '판매중' | '품절' | '판매�
 
 export interface ShopOrderLine {
   id: string;
+  lineOrderNumber: string | null;
   shopOrderId: string;
   sortOrder: number;
+  isReservation: boolean;
   companyName: string | null;
   orderBoxCount: number;
   quantityPerBox: number;
@@ -71,8 +73,10 @@ function mapOptionalIsoDate(raw: unknown): string | null {
 function mapShopOrderLine(raw: Record<string, unknown>): ShopOrderLine {
   return {
     id: String(raw.id),
+    lineOrderNumber: raw.lineOrderNumber != null ? String(raw.lineOrderNumber) : null,
     shopOrderId: String(raw.shopOrderId),
     sortOrder: Number(raw.sortOrder) || 0,
+    isReservation: Boolean(raw.isReservation),
     companyName: raw.companyName != null ? String(raw.companyName) : null,
     orderBoxCount: Number(raw.orderBoxCount) || 0,
     quantityPerBox: Number(raw.quantityPerBox) || 0,
@@ -226,16 +230,35 @@ export async function syncShopOrderDetail(
   return mapShopOrder(data.data);
 }
 
-export async function addShopOrderLine(id: string): Promise<ShopOrder> {
+export async function addShopOrderLine(
+  id: string,
+  options?: { isReservation?: boolean }
+): Promise<ShopOrder> {
   const response = await fetch(`${API_BASE_URL}/shop-orders/${id}/lines`, {
     method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ isReservation: options?.isReservation ?? false }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(
+      data.error ||
+        (options?.isReservation ? '예약 추가에 실패했습니다.' : '주문 추가에 실패했습니다.')
+    );
+  }
+  return mapShopOrder(data.data);
+}
+
+export async function deleteShopOrder(orderId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/shop-orders/${orderId}`, {
+    method: 'DELETE',
     credentials: 'include',
   });
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error || '주문 추가에 실패했습니다.');
+    throw new Error(data.error || '제품 주문 삭제에 실패했습니다.');
   }
-  return mapShopOrder(data.data);
 }
 
 export async function deleteShopOrderLine(orderId: string, lineId: string): Promise<ShopOrder> {
@@ -248,6 +271,106 @@ export async function deleteShopOrderLine(orderId: string, lineId: string): Prom
     throw new Error(data.error || '주문 삭제에 실패했습니다.');
   }
   return mapShopOrder(data.data);
+}
+
+export async function convertShopOrderLineToReservation(
+  orderId: string,
+  lineId: string
+): Promise<ShopOrder> {
+  const response = await fetch(
+    `${API_BASE_URL}/shop-orders/${orderId}/lines/${lineId}/convert-to-reservation`,
+    {
+      method: 'POST',
+      credentials: 'include',
+    }
+  );
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || '예약 전환에 실패했습니다.');
+  }
+  return mapShopOrder(data.data);
+}
+
+export async function convertShopOrderLineToOrder(
+  orderId: string,
+  lineId: string
+): Promise<ShopOrder> {
+  const response = await fetch(
+    `${API_BASE_URL}/shop-orders/${orderId}/lines/${lineId}/convert-to-order`,
+    {
+      method: 'POST',
+      credentials: 'include',
+    }
+  );
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || '주문 전환에 실패했습니다.');
+  }
+  return mapShopOrder(data.data);
+}
+
+export interface ShopOrderReservationTransferTarget {
+  id: string;
+  orderNumber: string;
+  productName: string;
+  productMainImage: string | null;
+  warehouseStockQuantity: number;
+  stockQuantity: number;
+  status: ShopOrderStatus;
+}
+
+export async function getShopOrderReservationTransferTargets(
+  excludeShopOrderIds: string[] = [],
+  productName?: string
+): Promise<ShopOrderReservationTransferTarget[]> {
+  const params = new URLSearchParams();
+  for (const orderId of excludeShopOrderIds) {
+    if (orderId) params.append('excludeShopOrderId', orderId);
+  }
+  const trimmedProductName = productName?.trim();
+  if (trimmedProductName) {
+    params.set('productName', trimmedProductName);
+  }
+  const query = params.toString();
+  const response = await fetch(
+    `${API_BASE_URL}/shop-orders/reservation-transfer-targets${query ? `?${query}` : ''}`,
+    { credentials: 'include' }
+  );
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || '옮길 주문 목록을 불러오지 못했습니다.');
+  }
+  return (data.data as Record<string, unknown>[]).map((raw) => ({
+    id: String(raw.id),
+    orderNumber: String(raw.orderNumber),
+    productName: String(raw.productName),
+    productMainImage: raw.productMainImage != null ? String(raw.productMainImage) : null,
+    warehouseStockQuantity: Number(raw.warehouseStockQuantity) || 0,
+    stockQuantity: Number(raw.stockQuantity) || 0,
+    status: raw.status as ShopOrderStatus,
+  }));
+}
+
+export interface TransferReservationsResult {
+  transferredCount: number;
+  targetOrderId: string;
+}
+
+export async function transferShopOrderReservationsToOrder(
+  targetShopOrderId: string,
+  items: Array<{ shopOrderId: string; lineId: string }>
+): Promise<TransferReservationsResult> {
+  const response = await fetch(`${API_BASE_URL}/shop-orders/reservations/transfer`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targetShopOrderId, items }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || '주문 이동에 실패했습니다.');
+  }
+  return data.data as TransferReservationsResult;
 }
 
 export async function createShopOrderStatement(
@@ -295,6 +418,26 @@ export async function createShopOrderBulkStatements(
     throw new Error(data.error || '명세서 생성에 실패했습니다.');
   }
   return data.data as ShopOrderBulkStatementResult;
+}
+
+export interface CancelShopOrderStatementsResult {
+  cancelledCount: number;
+}
+
+export async function cancelShopOrderStatements(
+  items: Array<{ shopOrderId: string; lineId: string }>
+): Promise<CancelShopOrderStatementsResult> {
+  const response = await fetch(`${API_BASE_URL}/shop-orders/statements/cancel`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || '명세서 취소에 실패했습니다.');
+  }
+  return data.data as CancelShopOrderStatementsResult;
 }
 
 export async function getShopOrderStatementPreview(

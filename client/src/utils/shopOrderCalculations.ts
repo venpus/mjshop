@@ -54,6 +54,8 @@ export function calculateShopOrderTotalAmount(
 
 export interface ShopOrderLineForm {
   id: string;
+  lineOrderNumber?: string | null;
+  isReservation: boolean;
   companyName: string;
   orderBoxCount: number;
   quantityPerBox: number;
@@ -92,6 +94,7 @@ export function createEmptyLineForm(
 ): ShopOrderLineForm {
   return {
     id,
+    isReservation: false,
     companyName: '',
     orderBoxCount: 0,
     quantityPerBox,

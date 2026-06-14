@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 
-import { DollarSign, Plus, Trash2 } from 'lucide-react';
+import { DollarSign, ArrowRightLeft, Bookmark, Plus, ShoppingBag, Trash2 } from 'lucide-react';
 
 import type { ShopBuyerListItem } from '../buyers/types';
 
@@ -28,7 +28,15 @@ interface ShopOrderProgressFieldsProps {
 
   onAddLine: () => void;
 
+  onAddReservation: () => void;
+
   onDeleteLine: (lineId: string) => void;
+
+  onConvertLineToReservation: (lineId: string) => void;
+
+  onConvertReservationLineToOrder: (lineId: string) => void;
+
+  onTransferReservationLine: (lineId: string) => void;
 
   onLineChange: <K extends keyof ShopOrderLineForm>(
 
@@ -98,7 +106,7 @@ function ShopOrderLineRow({
 
   line,
 
-  lineIndex,
+  lineLabel,
 
   buyers,
 
@@ -107,6 +115,12 @@ function ShopOrderLineRow({
   isLineBusy,
 
   onDeleteLine,
+
+  onConvertLineToReservation,
+
+  onConvertReservationLineToOrder,
+
+  onTransferReservationLine,
 
   onLineChange,
 
@@ -120,7 +134,7 @@ function ShopOrderLineRow({
 
   line: ShopOrderLineForm;
 
-  lineIndex: number;
+  lineLabel: string;
 
   buyers: ShopBuyerListItem[];
 
@@ -129,6 +143,12 @@ function ShopOrderLineRow({
   isLineBusy: boolean;
 
   onDeleteLine: (lineId: string) => void;
+
+  onConvertLineToReservation: (lineId: string) => void;
+
+  onConvertReservationLineToOrder: (lineId: string) => void;
+
+  onTransferReservationLine: (lineId: string) => void;
 
   onLineChange: ShopOrderProgressFieldsProps['onLineChange'];
 
@@ -279,13 +299,53 @@ function ShopOrderLineRow({
 
   return (
 
-    <div className="border border-gray-200 rounded-lg p-3 bg-gray-50/50 min-w-0">
+    <div
+      className={`border rounded-lg p-3 min-w-0 ${
+        line.isReservation
+          ? 'border-amber-200 bg-amber-50/40'
+          : 'border-gray-200 bg-gray-50/50'
+      }`}
+    >
 
       <div className="flex items-center justify-between mb-2 gap-2">
 
-        <span className="text-sm font-semibold text-gray-700">주문 {lineIndex + 1}</span>
+        <span className="text-sm font-semibold text-gray-700 select-text cursor-text">{lineLabel}</span>
 
-        <button
+        <div className="flex items-center gap-1 shrink-0">
+          {!line.isReservation && (
+            <button
+              type="button"
+              disabled={isLineBusy}
+              onClick={() => onConvertLineToReservation(line.id)}
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            >
+              <Bookmark className="w-3 h-3" />
+              예약으로 전환
+            </button>
+          )}
+          {line.isReservation && (
+            <>
+              <button
+                type="button"
+                disabled={isLineBusy}
+                onClick={() => onTransferReservationLine(line.id)}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              >
+                <ArrowRightLeft className="w-3 h-3" />
+                주문 이동하기
+              </button>
+              <button
+                type="button"
+                disabled={isLineBusy}
+                onClick={() => onConvertReservationLineToOrder(line.id)}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-green-300 text-green-700 bg-green-50 hover:bg-green-100 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              >
+                <ShoppingBag className="w-3 h-3" />
+                주문으로 전환
+              </button>
+            </>
+          )}
+          <button
 
           type="button"
 
@@ -302,6 +362,7 @@ function ShopOrderLineRow({
           삭제
 
         </button>
+        </div>
 
       </div>
 
@@ -609,50 +670,67 @@ function ShopOrderLineRow({
 
 export function ShopOrderProgressFields(props: ShopOrderProgressFieldsProps) {
 
-  const { lines, quantityPerBox, isLineBusy, onAddLine, onDeleteLine } = props;
+  const { lines, isLineBusy, onDeleteLine } = props;
 
+  const orderLines = lines.filter((line) => !line.isReservation);
+  const reservationLines = lines.filter((line) => line.isReservation);
 
+  const renderLineRows = (
+    sectionLines: ShopOrderLineForm[],
+    labelPrefix: '주문' | '예약'
+  ) =>
+    sectionLines.map((line, index) => (
+      <ShopOrderLineRow
+        key={line.id}
+        line={line}
+        lineLabel={
+          line.lineOrderNumber ??
+          `${labelPrefix} ${index + 1}`
+        }
+        buyers={props.buyers}
+        orderId={props.orderId}
+        isLineBusy={isLineBusy}
+        onDeleteLine={onDeleteLine}
+        onConvertLineToReservation={props.onConvertLineToReservation}
+        onConvertReservationLineToOrder={props.onConvertReservationLineToOrder}
+        onTransferReservationLine={props.onTransferReservationLine}
+        onLineChange={props.onLineChange}
+        onLineBatchChange={props.onLineBatchChange}
+        onOrderUpdated={props.onOrderUpdated}
+        onSaveIfNeeded={props.onSaveIfNeeded}
+      />
+    ));
 
   return (
+    <div className="space-y-6">
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <h4 className="text-sm font-bold text-gray-900">주문</h4>
+          <span className="text-xs text-gray-500">({orderLines.length}건)</span>
+        </div>
+        {orderLines.length === 0 ? (
+          <p className="text-sm text-gray-500 py-2 border border-dashed border-gray-200 rounded-lg px-3">
+            등록된 주문이 없습니다. 「주문 추가」로 등록하세요.
+          </p>
+        ) : (
+          <div className="space-y-3">{renderLineRows(orderLines, '주문')}</div>
+        )}
+      </section>
 
-    <div className="space-y-3">
-
-      {lines.length === 0 ? (
-        <p className="text-sm text-gray-500 py-2">등록된 주문이 없습니다. 「주문 추가」로 등록하세요.</p>
-      ) : (
-        lines.map((line, index) => (
-
-        <ShopOrderLineRow
-
-          key={line.id}
-
-          line={line}
-
-          lineIndex={index}
-
-          buyers={props.buyers}
-
-          orderId={props.orderId}
-
-          isLineBusy={isLineBusy}
-
-          onDeleteLine={onDeleteLine}
-
-          onLineChange={props.onLineChange}
-
-          onLineBatchChange={props.onLineBatchChange}
-
-          onOrderUpdated={props.onOrderUpdated}
-
-          onSaveIfNeeded={props.onSaveIfNeeded}
-
-        />
-
-      ))
-      )}
-
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <h4 className="text-sm font-bold text-amber-900">예약</h4>
+          <span className="text-xs text-gray-500">({reservationLines.length}건)</span>
+        </div>
+        {reservationLines.length === 0 ? (
+          <p className="text-sm text-gray-500 py-2 border border-dashed border-amber-200 rounded-lg px-3 bg-amber-50/40">
+            등록된 예약이 없습니다. 「예약 추가」로 등록하세요.
+          </p>
+        ) : (
+          <div className="space-y-3">{renderLineRows(reservationLines, '예약')}</div>
+        )}
+      </section>
     </div>
-
   );
 
 }
@@ -660,6 +738,9 @@ export function ShopOrderProgressFields(props: ShopOrderProgressFieldsProps) {
 
 
 export function ShopOrderProgressPanel(props: ShopOrderProgressFieldsProps) {
+
+  const orderCount = props.lines.filter((line) => !line.isReservation).length;
+  const reservationCount = props.lines.filter((line) => line.isReservation).length;
 
   return (
 
@@ -677,27 +758,32 @@ export function ShopOrderProgressPanel(props: ShopOrderProgressFieldsProps) {
 
           <h3 className="text-lg font-bold text-gray-900">주문 진행 관리</h3>
 
-          <span className="text-sm text-gray-500">({props.lines.length}건)</span>
+          <span className="text-sm text-gray-500">
+            (주문 {orderCount} · 예약 {reservationCount})
+          </span>
 
         </div>
 
-        <button
-
-          type="button"
-
-          disabled={props.isLineBusy}
-
-          onClick={props.onAddLine}
-
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-md border border-green-300 text-green-700 bg-green-50 hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed"
-
-        >
-
-          <Plus className="w-4 h-4" />
-
-          주문 추가
-
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={props.isLineBusy}
+            onClick={props.onAddLine}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-md border border-green-300 text-green-700 bg-green-50 hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-4 h-4" />
+            주문 추가
+          </button>
+          <button
+            type="button"
+            disabled={props.isLineBusy}
+            onClick={props.onAddReservation}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-md border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-4 h-4" />
+            예약 추가
+          </button>
+        </div>
 
       </div>
 

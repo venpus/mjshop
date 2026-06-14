@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { DetailHeader } from '../DetailHeader';
 
@@ -12,9 +12,17 @@ import { ShopOrderProductSection } from './ShopOrderProductSection';
 
 import { ShopOrderProgressPanel } from './ShopOrderProgressFields';
 
+import { ShopOrderReservationTransferModal, type ReservationTransferItem } from './ShopOrderReservationTransferModal';
+
 import {
 
   addShopOrderLine,
+
+  convertShopOrderLineToReservation,
+
+  convertShopOrderLineToOrder,
+
+  deleteShopOrder,
 
   deleteShopOrderLine,
 
@@ -36,9 +44,14 @@ import type { ShopBuyerListItem } from '../buyers/types';
 
 import type { ShopOrderLineForm } from '../../utils/shopOrderCalculations';
 import {
+  canDeleteShopOrder,
+  SHOP_ORDER_DELETE_BLOCKED_MESSAGE,
+} from '../../utils/shopOrderDeleteUtils';
+import {
   calculateRemainingStock,
   calculateTotalOrderQuantity,
 } from '../../utils/shopOrderCalculations';
+import { shopOrderDetailPath, parseShopOrderListTab } from './shopOrderListNavigation';
 
 
 
@@ -80,6 +93,10 @@ function lineToForm(
   return {
 
     id: line.id,
+
+    lineOrderNumber: line.lineOrderNumber,
+
+    isReservation: line.isReservation,
 
     companyName: line.companyName ?? '',
 
@@ -182,6 +199,8 @@ function buildSyncPayload(form: ShopOrderFormState) {
 export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const listTab = parseShopOrderListTab(searchParams.get('tab'));
 
   const [order, setOrder] = useState<ShopOrder | null>(null);
 
@@ -195,11 +214,17 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
   const [isLineBusy, setIsLineBusy] = useState(false);
 
+  const [isDeletingOrder, setIsDeletingOrder] = useState(false);
+
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
   const [error, setError] = useState<string | null>(null);
 
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+
+  const [transferItems, setTransferItems] = useState<ReservationTransferItem[]>([]);
 
   const [buyers, setBuyers] = useState<ShopBuyerListItem[]>([]);
 
@@ -485,7 +510,7 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
 
 
-  const handleAddLine = async () => {
+  const handleAddLine = async (isReservation: boolean) => {
 
     if (!order || isLineBusy) return;
 
@@ -499,13 +524,19 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
       }
 
-      const updated = await addShopOrderLine(order.id);
+      const updated = await addShopOrderLine(order.id, { isReservation });
 
       syncOrderState(updated);
 
     } catch (err) {
 
-      alert(err instanceof Error ? err.message : '주문 추가 중 오류가 발생했습니다.');
+      alert(
+        err instanceof Error
+          ? err.message
+          : isReservation
+            ? '예약 추가 중 오류가 발생했습니다.'
+            : '주문 추가 중 오류가 발생했습니다.'
+      );
 
     } finally {
 
@@ -547,17 +578,150 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
 
 
+  const handleConvertLineToReservation = async (lineId: string) => {
+
+    if (!order || isLineBusy) return;
+
+    if (!window.confirm('이 주문을 예약으로 전환하시겠습니까?')) return;
+
+    setIsLineBusy(true);
+
+    try {
+
+      if (isDirty) {
+
+        await handleSaveIfNeeded();
+
+      }
+
+      const updated = await convertShopOrderLineToReservation(order.id, lineId);
+
+      syncOrderState(updated);
+
+    } catch (err) {
+
+      alert(err instanceof Error ? err.message : '예약 전환 중 오류가 발생했습니다.');
+
+    } finally {
+
+      setIsLineBusy(false);
+
+    }
+
+  };
+
+
+
+  const handleConvertReservationLineToOrder = async (lineId: string) => {
+
+    if (!order || isLineBusy) return;
+
+    if (!window.confirm('이 예약을 주문으로 전환하시겠습니까?')) return;
+
+    setIsLineBusy(true);
+
+    try {
+
+      if (isDirty) {
+
+        await handleSaveIfNeeded();
+
+      }
+
+      const updated = await convertShopOrderLineToOrder(order.id, lineId);
+
+      syncOrderState(updated);
+
+    } catch (err) {
+
+      alert(err instanceof Error ? err.message : '주문 전환 중 오류가 발생했습니다.');
+
+    } finally {
+
+      setIsLineBusy(false);
+
+    }
+
+  };
+
+
+
+  const handleDeleteProductOrder = async () => {
+    if (!order) return;
+
+    if (!canDeleteShopOrder(order)) {
+      alert(SHOP_ORDER_DELETE_BLOCKED_MESSAGE);
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `「${order.productName}」(${order.orderNumber}) 제품 주문을 삭제하시겠습니까?`
+      )
+    ) {
+      return;
+    }
+
+    setIsDeletingOrder(true);
+    try {
+      await deleteShopOrder(order.id);
+      onBack();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '제품 주문 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeletingOrder(false);
+    }
+  };
+
+  const handleBackWithConfirm = useCallback(() => {
+    if (isDirty) {
+      const shouldLeave = window.confirm(
+        '저장되지 않은 변경사항이 있습니다. 정말로 나가시겠습니까? 변경사항이 저장되지 않습니다.'
+      );
+      if (!shouldLeave) return;
+    }
+    onBack();
+  }, [isDirty, onBack]);
+
+  const handleOpenTransferModal = async (lineId: string) => {
+    if (!order || isLineBusy) return;
+
+    const items = [{ shopOrderId: order.id, lineId }];
+
+    if (isDirty) {
+      await handleSaveIfNeeded();
+    }
+    setTransferItems(items);
+    setIsTransferModalOpen(true);
+  };
+
+  const handleCloseTransferModal = () => {
+    setIsTransferModalOpen(false);
+    setTransferItems([]);
+  };
+
+  const handleReservationTransferred = (targetOrderId: string, transferredCount: number) => {
+    alert(`${transferredCount.toLocaleString()}건의 예약을 선택한 주문으로 이동했습니다.`);
+    navigate(shopOrderDetailPath(targetOrderId, listTab));
+  };
+
   if (isLoading) {
 
     return (
 
-      <div className="p-4 md:p-6 min-h-[50vh] flex items-center justify-center">
+      <div className="p-4 md:p-6 min-h-0 pb-8 min-w-0 max-w-full overflow-x-hidden">
 
-        <div className="text-center">
+        <DetailHeader onBack={handleBackWithConfirm} title="주문 상세" />
 
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4" />
+        <div className="min-h-[50vh] flex items-center justify-center">
 
-          <p className="text-gray-600">주문 정보를 불러오는 중...</p>
+          <div className="text-center">
+
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4" />
+
+            <p className="text-gray-600">주문 정보를 불러오는 중...</p>
+
+          </div>
 
         </div>
 
@@ -573,25 +737,31 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
     return (
 
-      <div className="p-6 min-h-[50vh] flex items-center justify-center">
+      <div className="p-4 md:p-6 min-h-0 pb-8 min-w-0 max-w-full overflow-x-hidden">
 
-        <div className="text-center">
+        <DetailHeader onBack={handleBackWithConfirm} title="주문 상세" />
 
-          <p className="text-gray-600 mb-4">{error || '주문을 찾을 수 없습니다.'}</p>
+        <div className="min-h-[50vh] flex items-center justify-center">
 
-          <button
+          <div className="text-center">
 
-            type="button"
+            <p className="text-gray-600 mb-4">{error || '주문을 찾을 수 없습니다.'}</p>
 
-            onClick={onBack}
+            <button
 
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              type="button"
 
-          >
+              onClick={handleBackWithConfirm}
 
-            목록으로 돌아가기
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
 
-          </button>
+            >
+
+              목록으로 돌아가기
+
+            </button>
+
+          </div>
 
         </div>
 
@@ -607,7 +777,12 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
     <div className="p-4 md:p-6 min-h-0 pb-8 min-w-0 max-w-full overflow-x-hidden">
 
-      <DetailHeader onBack={onBack} title="주문 상세" />
+      <DetailHeader
+        onBack={handleBackWithConfirm}
+        onDelete={() => void handleDeleteProductOrder()}
+        deleteDisabled={isDeletingOrder}
+        title="주문 상세"
+      />
 
 
 
@@ -673,9 +848,17 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
           isLineBusy={isLineBusy}
 
-          onAddLine={handleAddLine}
+          onAddLine={() => void handleAddLine(false)}
+
+          onAddReservation={() => void handleAddLine(true)}
 
           onDeleteLine={handleDeleteLine}
+
+          onConvertLineToReservation={(lineId) => void handleConvertLineToReservation(lineId)}
+
+          onConvertReservationLineToOrder={(lineId) => void handleConvertReservationLineToOrder(lineId)}
+
+          onTransferReservationLine={(lineId) => void handleOpenTransferModal(lineId)}
 
           onLineChange={handleLineChange}
 
@@ -695,6 +878,16 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
         <GalleryImageModal imageUrl={productImage} onClose={() => setIsImageModalOpen(false)} />
 
+      )}
+
+      {isTransferModalOpen && (
+        <ShopOrderReservationTransferModal
+          isOpen={isTransferModalOpen}
+          items={transferItems}
+          productName={form.productName}
+          onClose={handleCloseTransferModal}
+          onTransferred={handleReservationTransferred}
+        />
       )}
 
     </div>

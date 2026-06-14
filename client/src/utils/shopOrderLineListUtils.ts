@@ -64,7 +64,18 @@ export function getLineProgressStatusClass(status: ShopOrderLineProgressStatus):
   }
 }
 
-export function formatLineOrderRef(orderNumber: string, lineIndex: number): string {
+export function formatLineOrderRef(
+  lineOrderNumber: string | null | undefined,
+  orderNumber: string,
+  lineIndex: number,
+  kindPrefix?: '예약'
+): string {
+  if (lineOrderNumber?.trim()) {
+    return lineOrderNumber.trim();
+  }
+  if (kindPrefix) {
+    return `${orderNumber}-${kindPrefix}${lineIndex}`;
+  }
   return `${orderNumber}-${lineIndex}`;
 }
 

@@ -72,7 +72,8 @@ export function ShopOrderProductSection({
         <div className="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-1.5 rounded-lg border border-blue-200 min-w-0 flex-1">
           <Package className="w-4 h-4 text-indigo-600 shrink-0" />
           <span className="text-sm md:text-base font-bold text-gray-900 truncate">
-            {productName || '(상품명 없음)'} ({orderNumber})
+            {productName || '(상품명 없음)'}{' '}
+            <span className="select-text cursor-text font-mono">({orderNumber})</span>
           </span>
         </div>
 

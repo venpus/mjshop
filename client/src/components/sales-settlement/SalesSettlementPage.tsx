@@ -14,13 +14,14 @@ import {
   buildShipmentBoxInputsFromOrders,
   formatCnyAmount,
   formatKrwAmount,
+  formatSalesSettlementOrderRef,
   formatSettlementPaidDate,
   parseCnyExchangeRateInput,
   parseShipmentBoxCountInput,
   sumAvailableAmounts,
   type SalesSettlementRow,
 } from '../../utils/shopSalesSettlement';
-import { formatLineOrderRef, matchesLineDateRange } from '../../utils/shopOrderLineListUtils';
+import { matchesLineDateRange } from '../../utils/shopOrderLineListUtils';
 import { ShopOrderListPagination } from '../orders/ShopOrderListPagination';
 import { SalesSettlementStatsPanel } from './SalesSettlementStatsPanel';
 
@@ -113,7 +114,8 @@ export function SalesSettlementPage() {
           row.orderNumber,
           row.companyName ?? '',
           row.productName,
-          formatLineOrderRef(row.orderNumber, row.lineIndex),
+          formatSalesSettlementOrderRef(row),
+          row.isReservation ? '예약' : '일반',
         ]
           .join(' ')
           .toLowerCase()
@@ -587,9 +589,21 @@ export function SalesSettlementPage() {
                       normalizeExchangeRateInput(savedShipmentBoxInputs[row.rowKey] ?? '');
 
                     return (
-                      <tr key={row.rowKey} className="hover:bg-gray-50">
-                        <td className="px-3 py-3 whitespace-nowrap font-medium text-gray-900">
-                          {formatLineOrderRef(row.orderNumber, row.lineIndex)}
+                      <tr
+                        key={row.rowKey}
+                        className={row.isReservation ? 'hover:bg-amber-50/60 bg-amber-50/30' : 'hover:bg-gray-50'}
+                      >
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5 font-medium text-gray-900">
+                            <span className="select-text cursor-text">
+                              {formatSalesSettlementOrderRef(row)}
+                            </span>
+                            {row.isReservation && (
+                              <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                                예약
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap text-gray-700">{row.orderDate ?? '-'}</td>
                         <td className="px-3 py-3 whitespace-nowrap text-gray-700 max-w-[120px] truncate">
@@ -620,7 +634,7 @@ export function SalesSettlementPage() {
                                 onKeyDown={(e) => handleExchangeRateKeyDown(e, row)}
                                 disabled={row.isLegacyLine || isSaving}
                                 placeholder="195.5"
-                                aria-label={`${formatLineOrderRef(row.orderNumber, row.lineIndex)} 환율`}
+                                aria-label={`${formatSalesSettlementOrderRef(row)} 환율`}
                                 className={`w-[96px] px-2 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-right tabular-nums disabled:bg-gray-100 disabled:text-gray-500 ${
                                   saveError
                                     ? 'border-red-400'
@@ -664,7 +678,7 @@ export function SalesSettlementPage() {
                                 onBlur={() => void saveShipmentBoxCount(row)}
                                 disabled={row.isLegacyLine || isShipmentBoxSaving}
                                 placeholder="0"
-                                aria-label={`${formatLineOrderRef(row.orderNumber, row.lineIndex)} 송장 박스수`}
+                                aria-label={`${formatSalesSettlementOrderRef(row)} 송장 박스수`}
                                 className={`w-[72px] px-2 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-right tabular-nums disabled:bg-gray-100 disabled:text-gray-500 ${
                                   shipmentBoxSaveError
                                     ? 'border-red-400'
@@ -696,7 +710,7 @@ export function SalesSettlementPage() {
                           isSaving={Boolean(paymentSavingKeys[`${row.rowKey}:logistics`])}
                           saveError={paymentSaveErrors[`${row.rowKey}:logistics`]}
                           checkboxLabel="지급완료"
-                          label={`${formatLineOrderRef(row.orderNumber, row.lineIndex)} 물류 수수료 지급완료`}
+                          label={`${formatSalesSettlementOrderRef(row)} 물류 수수료 지급완료`}
                           onCheckedChange={(checked) =>
                             void handleSettlementPaidChange(row, 'logistics', checked)
                           }
@@ -733,7 +747,7 @@ export function SalesSettlementPage() {
                           }
                           isSaving={Boolean(paymentSavingKeys[`${row.rowKey}:wk`])}
                           saveError={paymentSaveErrors[`${row.rowKey}:wk`]}
-                          label={`${formatLineOrderRef(row.orderNumber, row.lineIndex)} WK 정산금 지급완료`}
+                          label={`${formatSalesSettlementOrderRef(row)} WK 정산금 지급완료`}
                           checkboxLabel="지급완료"
                           onCheckedChange={(checked) =>
                             void handleSettlementPaidChange(row, 'wk', checked)
@@ -757,7 +771,7 @@ export function SalesSettlementPage() {
                           }
                           isSaving={Boolean(paymentSavingKeys[`${row.rowKey}:inventio`])}
                           saveError={paymentSaveErrors[`${row.rowKey}:inventio`]}
-                          label={`${formatLineOrderRef(row.orderNumber, row.lineIndex)} 인벤티오 정산금 지급완료`}
+                          label={`${formatSalesSettlementOrderRef(row)} 인벤티오 정산금 지급완료`}
                           checkboxLabel="지급완료"
                           onCheckedChange={(checked) =>
                             void handleSettlementPaidChange(row, 'inventio', checked)
