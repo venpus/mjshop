@@ -10,6 +10,7 @@ export interface ShopBuyer {
   id: number;
   companyName: string;
   kakaoId: string | null;
+  email: string | null;
   businessRegistrationNumber: string | null;
   businessRegistrationImage: string | null;
   addresses: ShopBuyerAddress[];
@@ -22,6 +23,7 @@ export interface ShopBuyerListItem {
   id: number;
   companyName: string;
   kakaoId: string | null;
+  email: string | null;
   businessRegistrationNumber: string | null;
   businessRegistrationImage: string | null;
   addresses: ShopBuyerAddress[];
@@ -32,6 +34,7 @@ export interface ShopBuyerListItem {
 export interface CreateShopBuyerDTO {
   companyName: string;
   kakaoId?: string | null;
+  email?: string | null;
   businessRegistrationNumber?: string | null;
   addresses?: ShopBuyerAddress[];
   createdBy?: string;
@@ -40,6 +43,7 @@ export interface CreateShopBuyerDTO {
 export interface UpdateShopBuyerDTO {
   companyName?: string;
   kakaoId?: string | null;
+  email?: string | null;
   businessRegistrationNumber?: string | null;
   addresses?: ShopBuyerAddress[];
   updatedBy?: string;

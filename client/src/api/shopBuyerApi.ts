@@ -27,6 +27,7 @@ function mapListItem(raw: Record<string, unknown>): ShopBuyerListItem {
     id: Number(raw.id),
     companyName: String(raw.companyName),
     kakaoId: raw.kakaoId != null ? String(raw.kakaoId) : null,
+    email: raw.email != null ? String(raw.email) : null,
     businessRegistrationNumber:
       raw.businessRegistrationNumber != null ? String(raw.businessRegistrationNumber) : null,
     businessRegistrationImage:
@@ -46,6 +47,7 @@ function mapBuyer(raw: Record<string, unknown>): ShopBuyer {
     id: Number(raw.id),
     companyName: String(raw.companyName),
     kakaoId: raw.kakaoId != null ? String(raw.kakaoId) : null,
+    email: raw.email != null ? String(raw.email) : null,
     businessRegistrationNumber:
       raw.businessRegistrationNumber != null ? String(raw.businessRegistrationNumber) : null,
     businessRegistrationImage:
@@ -64,6 +66,7 @@ function toPayload(form: ShopBuyerFormData) {
   return {
     companyName: form.companyName.trim(),
     kakaoId: form.kakaoId.trim() || null,
+    email: form.email.trim() || null,
     businessRegistrationNumber: form.businessRegistrationNumber.trim() || null,
     addresses: filledAddresses.map((a) => ({
       address: a.address.trim(),

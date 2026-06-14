@@ -10,6 +10,7 @@ export interface ShopBuyerListItem {
   id: number;
   companyName: string;
   kakaoId: string | null;
+  email: string | null;
   businessRegistrationNumber: string | null;
   businessRegistrationImage: string | null;
   addresses: ShopBuyerAddress[];
@@ -21,6 +22,7 @@ export interface ShopBuyer {
   id: number;
   companyName: string;
   kakaoId: string | null;
+  email: string | null;
   businessRegistrationNumber: string | null;
   businessRegistrationImage: string | null;
   addresses: ShopBuyerAddress[];
@@ -36,6 +38,7 @@ export interface ShopBuyerImageOptions {
 export interface ShopBuyerFormData {
   companyName: string;
   kakaoId: string;
+  email: string;
   businessRegistrationNumber: string;
   addresses: ShopBuyerAddress[];
 }
@@ -50,6 +53,7 @@ export function createEmptyForm(): ShopBuyerFormData {
   return {
     companyName: '',
     kakaoId: '',
+    email: '',
     businessRegistrationNumber: '',
     addresses: [createEmptyAddress()],
   };
@@ -59,6 +63,7 @@ export function buyerToForm(buyer: ShopBuyer): ShopBuyerFormData {
   return {
     companyName: buyer.companyName,
     kakaoId: buyer.kakaoId ?? '',
+    email: buyer.email ?? '',
     businessRegistrationNumber: buyer.businessRegistrationNumber ?? '',
     addresses:
       buyer.addresses.length > 0

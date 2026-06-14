@@ -14,6 +14,14 @@ import {
   saveShopBuyerBusinessRegistrationImage,
 } from '../utils/upload.js';
 
+function validateEmail(email: string | null | undefined): void {
+  if (!email?.trim()) return;
+  const trimmed = email.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    throw new Error('올바른 이메일 주소 형식이 아닙니다.');
+  }
+}
+
 function validateAddresses(addresses: ShopBuyerAddress[]): void {
   if (addresses.length > MAX_BUYER_ADDRESSES) {
     throw new Error(`택배 주소지는 최대 ${MAX_BUYER_ADDRESSES}개까지 등록할 수 있습니다.`);
@@ -53,6 +61,8 @@ export class ShopBuyerService {
       throw new Error('상호명은 필수입니다.');
     }
 
+    validateEmail(data.email);
+
     const addresses = data.addresses ?? [];
     validateAddresses(addresses);
 
@@ -71,6 +81,10 @@ export class ShopBuyerService {
 
     if (data.companyName !== undefined && !data.companyName.trim()) {
       throw new Error('상호명은 필수입니다.');
+    }
+
+    if (data.email !== undefined) {
+      validateEmail(data.email);
     }
 
     if (data.addresses !== undefined) {

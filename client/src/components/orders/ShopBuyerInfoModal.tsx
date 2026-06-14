@@ -80,8 +80,9 @@ export function ShopBuyerInfoModal({
               <dl>
                 <InfoRow label="상호명" value={buyer.companyName} />
                 <InfoRow label="카톡 아이디" value={buyer.kakaoId ?? ''} />
+                <InfoRow label="이메일" value={buyer.email ?? ''} />
                 <InfoRow
-                  label="사업자등록증"
+                  label="사업자등록증 번호"
                   value={buyer.businessRegistrationNumber ?? ''}
                 />
               </dl>

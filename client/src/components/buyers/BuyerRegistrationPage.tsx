@@ -47,6 +47,7 @@ export function BuyerRegistrationPage() {
       (b) =>
         b.companyName.toLowerCase().includes(lower) ||
         (b.kakaoId && b.kakaoId.toLowerCase().includes(lower)) ||
+        (b.email && b.email.toLowerCase().includes(lower)) ||
         (b.businessRegistrationNumber &&
           b.businessRegistrationNumber.toLowerCase().includes(lower)) ||
         b.addresses.some(
@@ -139,7 +140,7 @@ export function BuyerRegistrationPage() {
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="상호명, 카톡, 사업자번호, 주소, 수령인, 전화번호 검색..."
+          placeholder="상호명, 카톡, 이메일, 사업자번호, 주소, 수령인, 전화번호 검색..."
           className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
       </div>
@@ -162,7 +163,8 @@ export function BuyerRegistrationPage() {
                 <tr>
                   <th className="px-6 py-3 text-left text-gray-600">상호명</th>
                   <th className="px-6 py-3 text-left text-gray-600">카톡 아이디</th>
-                  <th className="px-6 py-3 text-left text-gray-600">사업자등록증 번호</th>
+                  <th className="px-6 py-3 text-left text-gray-600">이메일</th>
+                  <th className="px-6 py-3 text-left text-gray-600">사업자등록증</th>
                   <th className="px-6 py-3 text-left text-gray-600 min-w-[320px]">택배 주소지</th>
                   <th className="px-6 py-3 text-left text-gray-600">관리</th>
                 </tr>
@@ -172,8 +174,16 @@ export function BuyerRegistrationPage() {
                   <tr key={buyer.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-gray-900 font-medium">{buyer.companyName}</td>
                     <td className="px-6 py-4 text-gray-600">{buyer.kakaoId || '-'}</td>
+                    <td className="px-6 py-4 text-gray-600">{buyer.email || '-'}</td>
                     <td className="px-6 py-4 text-gray-600">
-                      {buyer.businessRegistrationNumber || '-'}
+                      <div className="space-y-1">
+                        <div>{buyer.businessRegistrationNumber || '-'}</div>
+                        {buyer.businessRegistrationImage && (
+                          <span className="inline-flex text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
+                            사진 등록됨
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 align-top">
                       <BuyerAddressListDisplay addresses={buyer.addresses} />

@@ -12,6 +12,7 @@ interface BuyerRow extends RowDataPacket {
   id: number;
   company_name: string;
   kakao_id: string | null;
+  email: string | null;
   business_registration_number: string | null;
   business_registration_image: string | null;
   created_at: Date;
@@ -23,6 +24,7 @@ interface BuyerListRow extends RowDataPacket {
   id: number;
   company_name: string;
   kakao_id: string | null;
+  email: string | null;
   business_registration_number: string | null;
   business_registration_image: string | null;
   created_at: Date;
@@ -42,7 +44,7 @@ interface AddressRow extends RowDataPacket {
 export class ShopBuyerRepository {
   async findAllList(): Promise<ShopBuyerListItem[]> {
     const [rows] = await pool.execute<BuyerListRow[]>(
-      `SELECT id, company_name, kakao_id, business_registration_number,
+      `SELECT id, company_name, kakao_id, email, business_registration_number,
               business_registration_image, created_at, updated_at
        FROM kr_shop_buyers
        ORDER BY created_at DESC`
@@ -77,6 +79,7 @@ export class ShopBuyerRepository {
       id: row.id,
       companyName: row.company_name,
       kakaoId: row.kakao_id,
+      email: row.email,
       businessRegistrationNumber: row.business_registration_number,
       businessRegistrationImage: row.business_registration_image,
       addresses: addressesByBuyerId.get(row.id) ?? [],
@@ -87,7 +90,7 @@ export class ShopBuyerRepository {
 
   async findById(id: number): Promise<ShopBuyer | null> {
     const [buyerRows] = await pool.execute<BuyerRow[]>(
-      `SELECT id, company_name, kakao_id, business_registration_number,
+      `SELECT id, company_name, kakao_id, email, business_registration_number,
               business_registration_image, created_at, updated_at, created_by
        FROM kr_shop_buyers WHERE id = ?`,
       [id]
@@ -123,11 +126,12 @@ export class ShopBuyerRepository {
       await connection.beginTransaction();
 
       const [result] = await connection.execute<ResultSetHeader>(
-        `INSERT INTO kr_shop_buyers (company_name, kakao_id, business_registration_number, created_by)
-         VALUES (?, ?, ?, ?)`,
+        `INSERT INTO kr_shop_buyers (company_name, kakao_id, email, business_registration_number, created_by)
+         VALUES (?, ?, ?, ?, ?)`,
         [
           data.companyName.trim(),
           data.kakaoId?.trim() || null,
+          data.email?.trim() || null,
           data.businessRegistrationNumber?.trim() || null,
           data.createdBy ?? null,
         ]
@@ -164,6 +168,10 @@ export class ShopBuyerRepository {
       if (data.kakaoId !== undefined) {
         fields.push('kakao_id = ?');
         values.push(data.kakaoId?.trim() || null);
+      }
+      if (data.email !== undefined) {
+        fields.push('email = ?');
+        values.push(data.email?.trim() || null);
       }
       if (data.businessRegistrationNumber !== undefined) {
         fields.push('business_registration_number = ?');
@@ -245,6 +253,7 @@ export class ShopBuyerRepository {
       id: row.id,
       companyName: row.company_name,
       kakaoId: row.kakao_id,
+      email: row.email,
       businessRegistrationNumber: row.business_registration_number,
       businessRegistrationImage: row.business_registration_image,
       addresses,

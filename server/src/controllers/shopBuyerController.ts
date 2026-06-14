@@ -55,6 +55,7 @@ export class ShopBuyerController {
       const data: CreateShopBuyerDTO = {
         companyName: req.body.companyName,
         kakaoId: req.body.kakaoId,
+        email: req.body.email,
         businessRegistrationNumber: req.body.businessRegistrationNumber,
         addresses: mapAddressesFromBody(req.body.addresses),
         createdBy: (req as Request & { user?: { id?: string } }).user?.id,
@@ -76,6 +77,7 @@ export class ShopBuyerController {
       const data: UpdateShopBuyerDTO = {
         companyName: req.body.companyName,
         kakaoId: req.body.kakaoId,
+        email: req.body.email,
         businessRegistrationNumber: req.body.businessRegistrationNumber,
         addresses: req.body.addresses !== undefined ? mapAddressesFromBody(req.body.addresses) : undefined,
         updatedBy: (req as Request & { user?: { id?: string } }).user?.id,

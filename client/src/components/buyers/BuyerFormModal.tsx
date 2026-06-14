@@ -59,6 +59,10 @@ export function BuyerFormModal({
       alert('상호명을 입력해 주세요.');
       return;
     }
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      alert('올바른 이메일 주소 형식을 입력해 주세요.');
+      return;
+    }
     await onSubmit(form, imageOptions);
   };
 
@@ -104,6 +108,20 @@ export function BuyerFormModal({
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">이메일 주소</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                className={inputClass}
+                placeholder="example@company.com"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 p-4 space-y-4 bg-gray-50/50">
+            <h4 className="text-sm font-semibold text-gray-900">사업자등록증</h4>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">사업자등록증 번호</label>
               <input
                 type="text"
@@ -115,14 +133,14 @@ export function BuyerFormModal({
                 placeholder="000-00-00000"
               />
             </div>
-          </div>
 
-          <BuyerBusinessRegistrationImageUpload
-            key={imageUploadKey}
-            imageUrl={buyer?.businessRegistrationImage ?? null}
-            disabled={isSubmitting}
-            onChange={setImageOptions}
-          />
+            <BuyerBusinessRegistrationImageUpload
+              key={imageUploadKey}
+              imageUrl={buyer?.businessRegistrationImage ?? null}
+              disabled={isSubmitting}
+              onChange={setImageOptions}
+            />
+          </div>
 
           <BuyerAddressFields
             addresses={form.addresses}
