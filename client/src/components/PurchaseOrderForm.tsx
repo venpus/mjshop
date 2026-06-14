@@ -2,10 +2,17 @@ import { useState, useRef, useEffect } from "react";
 import { X, UploadCloud } from "lucide-react";
 import { ProductInfoInput, ProductInfoInputData } from "./purchase-order/ProductInfoInput";
 
+export interface PurchaseOrderFormInitialValues {
+  productName?: string;
+  unitPrice?: number;
+  quantity?: number;
+}
+
 interface PurchaseOrderFormProps {
   onClose: () => void;
   onSave: (formData: PurchaseOrderFormData, mainImageFile?: File) => Promise<void>;
   initialMainImageUrl?: string; // 초기 메인 이미지 URL (부자재 테스트 이미지에서 발주 생성 시 사용)
+  initialValues?: PurchaseOrderFormInitialValues;
 }
 
 export interface PurchaseOrderFormData {
@@ -28,9 +35,10 @@ export function PurchaseOrderForm({
   onClose,
   onSave,
   initialMainImageUrl,
+  initialValues,
 }: PurchaseOrderFormProps) {
   const [productInfo, setProductInfo] = useState<ProductInfoInputData>({
-    product_name: "",
+    product_name: initialValues?.productName ?? "",
     product_name_chinese: "",
     product_category: "봉제",
     product_main_image: "", // URL은 더 이상 사용하지 않지만 ProductInfoInputData 인터페이스 유지
@@ -43,8 +51,8 @@ export function PurchaseOrderForm({
   });
 
   const [formData, setFormData] = useState<Omit<PurchaseOrderFormData, keyof ProductInfoInputData>>({
-    unit_price: undefined as any,
-    quantity: undefined as any,
+    unit_price: initialValues?.unitPrice ?? (undefined as any),
+    quantity: initialValues?.quantity ?? (undefined as any),
     order_date: new Date().toISOString().split("T")[0], // 오늘 날짜
     estimated_shipment_date: "",
   });

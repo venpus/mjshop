@@ -19,6 +19,8 @@ export interface TablePaginationProps {
   onPageChange: (page: number) => void;
   /** 페이지당 항목 수 변경 핸들러 */
   onItemsPerPageChange: (items: number) => void;
+  /** 페이지당 표시 개수 선택 UI 표시 여부 */
+  showItemsPerPageSelector?: boolean;
   /** 추가 클래스명 */
   className?: string;
 }
@@ -33,6 +35,7 @@ export function TablePagination({
   itemsPerPageOptions = [15, 20, 25, 30],
   onPageChange,
   onItemsPerPageChange,
+  showItemsPerPageSelector = true,
   className = '',
 }: TablePaginationProps) {
   const handlePrevious = () => {
@@ -97,20 +100,24 @@ export function TablePagination({
     <div className={`px-4 py-3 border-t border-gray-200 flex items-center justify-between ${className}`}>
       {/* 왼쪽: 페이지당 표시 항목 수 선택 */}
       <div className="flex items-center gap-2">
-        <span className="text-gray-600 text-sm">페이지당 표시:</span>
-        <select
-          value={itemsPerPage}
-          onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-          className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-        >
-          {itemsPerPageOptions.map((option) => (
-            <option key={option} value={option}>
-              {option}개
-            </option>
-          ))}
-        </select>
-        <span className="text-gray-600 text-sm ml-4">
-          전체 {totalItems}개 중 {startIndex + 1}-
+        {showItemsPerPageSelector && (
+          <>
+            <span className="text-gray-600 text-sm">페이지당 표시:</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
+              className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              {itemsPerPageOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}개
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+        <span className={`text-gray-600 text-sm ${showItemsPerPageSelector ? 'ml-4' : ''}`}>
+          전체 {totalItems}개 중 {totalItems === 0 ? 0 : startIndex + 1}-
           {Math.min(endIndex, totalItems)}개 표시
         </span>
       </div>

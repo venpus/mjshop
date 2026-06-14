@@ -1,4 +1,4 @@
-import { type InboundItem } from './InboundTab';
+import { type InboundItem } from './types';
 
 interface InboundHistoryTabProps {
   arrivals: InboundItem[];

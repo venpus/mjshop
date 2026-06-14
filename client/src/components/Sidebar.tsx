@@ -4,9 +4,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { usePermission } from '../contexts/PermissionContext';
 import {
   ShoppingCart,
-  Truck,
-  CreditCard,
   Warehouse,
+  Truck,
   Globe,
   ChevronDown,
   ChevronRight,
@@ -18,6 +17,7 @@ import {
   ClipboardList,
   FileSpreadsheet,
   UserCog,
+  UserPlus,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   Box,
@@ -41,6 +41,8 @@ type PageType =
   | "dashboard"
   | "products"
   | "orders"
+  | "sales-settlement"
+  | "shop-buyers"
   | "shipping"
   | "payment"
   | "payment-history"
@@ -448,6 +450,18 @@ export function Sidebar({
                   {!isCollapsed && <span>{t('menu.orders')}</span>}
                 </button>
                 <button
+                  onClick={() => onPageChange("sales-settlement")}
+                  className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
+                    currentPage === "sales-settlement"
+                      ? "bg-purple-50 text-purple-600"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                  title={isCollapsed ? t('menu.salesSettlement') : undefined}
+                >
+                  <Calculator className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
+                  {!isCollapsed && <span>{t('menu.salesSettlement')}</span>}
+                </button>
+                <button
                   onClick={() => onPageChange("shipping")}
                   className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
                     currentPage === "shipping"
@@ -460,16 +474,16 @@ export function Sidebar({
                   {!isCollapsed && <span>{t('menu.shipping')}</span>}
                 </button>
                 <button
-                  onClick={() => onPageChange("payment")}
+                  onClick={() => onPageChange("shop-buyers")}
                   className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
-                    currentPage === "payment"
+                    currentPage === "shop-buyers"
                       ? "bg-purple-50 text-purple-600"
                       : "text-gray-600 hover:bg-gray-50"
                   }`}
-                  title={isCollapsed ? t('menu.payment') : undefined}
+                  title={isCollapsed ? t('menu.shopBuyers') : undefined}
                 >
-                  <CreditCard className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
-                  {!isCollapsed && <span>{t('menu.payment')}</span>}
+                  <UserPlus className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
+                  {!isCollapsed && <span>{t('menu.shopBuyers')}</span>}
                 </button>
                 <button
                   onClick={() => onPageChange("inventory")}

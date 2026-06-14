@@ -85,6 +85,29 @@ export class PackingListService {
   }
 
   /**
+   * 패킹리스트 한국도착 변경 시 입고 재고 동기화
+   */
+  private async syncStockInboundFromPackingListItem(packingListItemId: number): Promise<void> {
+    try {
+      const { StockInboundService } = await import('./stockInboundService.js');
+      const stockInboundService = new StockInboundService();
+      await stockInboundService.syncFromPackingListItem(packingListItemId);
+    } catch (error) {
+      console.error('패킹리스트 한국도착 입고 동기화 오류:', error);
+    }
+  }
+
+  private async syncStockInboundFromPurchaseOrder(purchaseOrderId: string): Promise<void> {
+    try {
+      const { StockInboundService } = await import('./stockInboundService.js');
+      const stockInboundService = new StockInboundService();
+      await stockInboundService.syncFromPurchaseOrder(purchaseOrderId);
+    } catch (error) {
+      console.error('패킹리스트 한국도착 입고 동기화 오류:', error);
+    }
+  }
+
+  /**
    * 패킹리스트 목록만 조회 (아이템 미포함, AI 검색용)
    * findAll/findByMonth/findByDateRange 1회만 호출하여 연결 풀 과부하를 방지합니다.
    */
@@ -458,6 +481,7 @@ export class PackingListService {
     // 삭제 후 관련 발주들의 expected_final_unit_price 재계산
     if (purchaseOrderId) {
       await this.recalculateRelatedPurchaseOrders([String(purchaseOrderId)]);
+      await this.syncStockInboundFromPurchaseOrder(String(purchaseOrderId));
     }
   }
 
@@ -523,7 +547,9 @@ export class PackingListService {
       throw new Error('패킹리스트 아이템을 찾을 수 없습니다.');
     }
 
-    return this.repository.createKoreaArrival(data);
+    const arrival = await this.repository.createKoreaArrival(data);
+    await this.syncStockInboundFromPackingListItem(data.packing_list_item_id);
+    return arrival;
   }
 
   /**
@@ -535,14 +561,26 @@ export class PackingListService {
       throw new Error('한국도착일을 찾을 수 없습니다.');
     }
 
-    return this.repository.updateKoreaArrival(id, data);
+    const arrival = await this.repository.updateKoreaArrival(id, data);
+    await this.syncStockInboundFromPackingListItem(existing.packing_list_item_id);
+    return arrival;
   }
 
   /**
    * 한국도착일 삭제
    */
   async deleteKoreaArrival(id: number): Promise<void> {
+    const existing = await this.repository.findKoreaArrivalById(id);
+    if (!existing) {
+      throw new Error('한국도착일을 찾을 수 없습니다.');
+    }
+
+    const item = await this.repository.findItemById(existing.packing_list_item_id);
     await this.repository.deleteKoreaArrival(id);
+
+    if (item?.purchase_order_id) {
+      await this.syncStockInboundFromPurchaseOrder(String(item.purchase_order_id));
+    }
   }
 
   /**

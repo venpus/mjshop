@@ -1,12 +1,19 @@
 import { useState, useEffect, ReactNode } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { Menu, X, Globe, LogOut, User, Sparkles } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { AdminSidebarHost } from './components/AdminSidebarHost';
 import { Dashboard } from './components/Dashboard';
 import { Products } from './components/Products';
 import { Orders } from './components/Orders';
-import { Shipping } from './components/Shipping';
+import { SalesSettlementPage } from './components/sales-settlement/SalesSettlementPage';
+import { ShopOrderDetail } from './components/orders/ShopOrderDetail';
+import {
+  parseShopOrderListTab,
+  shopOrdersListPath,
+} from './components/orders/shopOrderListNavigation';
+import { BuyerRegistrationPage } from './components/buyers/BuyerRegistrationPage';
+import { ShopShippingManagementPage } from './components/shipping/ShopShippingManagementPage';
 import { Payment } from './components/Payment';
 import { PaymentHistory } from './components/payment/PaymentHistory';
 import { Inventory } from './components/Inventory';
@@ -101,6 +108,10 @@ function AdminLayout() {
     // purchase-orders 상세 페이지인 경우
     if (adminPath.startsWith('purchase-orders/') && adminPath !== 'purchase-orders') {
       return 'purchase-order-detail';
+    }
+    // orders 상세 페이지인 경우
+    if (adminPath.startsWith('orders/') && adminPath !== 'orders') {
+      return 'orders';
     }
     // product-collab 하위 경로
     if (adminPath.startsWith('product-collab')) {
@@ -322,7 +333,10 @@ function AdminLayout() {
                 )
               } />
               <Route path="/orders" element={<Orders />} />
-              <Route path="/shipping" element={<Shipping />} />
+              <Route path="/orders/:id" element={<ShopOrderDetailWrapper />} />
+              <Route path="/sales-settlement" element={<SalesSettlementPage />} />
+              <Route path="/shop-buyers" element={<BuyerRegistrationPage />} />
+              <Route path="/shipping" element={<ShopShippingManagementPage />} />
               <Route path="/payment" element={<Payment />} />
               <Route path="/payment-history" element={
                 <PermissionCheckWrapper resource="payment-history" permissionType="read">
@@ -516,6 +530,25 @@ function PurchaseOrderDetailWrapper({ onBack }: { onBack: () => void }) {
   }
 
   return <PurchaseOrderDetail orderId={id} onBack={handleBackWithPage} initialTab={tabParam} autoSave={autoSaveParam} />;
+}
+
+function ShopOrderDetailWrapper() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  if (!id) {
+    return <Navigate to="/admin/orders" replace />;
+  }
+
+  const listTab = parseShopOrderListTab(searchParams.get('tab'));
+
+  return (
+    <ShopOrderDetail
+      orderId={id}
+      onBack={() => navigate(shopOrdersListPath(listTab))}
+    />
+  );
 }
 
 // MaterialDetail 래퍼 (URL 파라미터 처리)

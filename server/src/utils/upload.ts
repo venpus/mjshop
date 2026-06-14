@@ -1419,3 +1419,300 @@ export const paymentMiscUpload = multer({
     else cb(new Error('허용되지 않는 파일 형식입니다. (PDF, 이미지, Word, Excel, ZIP)'));
   },
 });
+
+// ==================== Shop Buyer Images ====================
+
+const shopBuyerUploadDir = path.join(__dirname, '../../uploads/shop-buyers');
+if (!fs.existsSync(shopBuyerUploadDir)) {
+  fs.mkdirSync(shopBuyerUploadDir, { recursive: true });
+}
+
+const shopBuyerImageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, shopBuyerUploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `temp-${randomUUID()}${ext}`);
+  },
+});
+
+export const shopBuyerImageUpload = multer({
+  storage: shopBuyerImageStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+});
+
+export function getShopBuyerDir(buyerId: number): string {
+  return path.join(shopBuyerUploadDir, String(buyerId));
+}
+
+export function getShopBuyerBusinessRegistrationImagePath(buyerId: number, ext: string): string {
+  return path.join(getShopBuyerDir(buyerId), `business-registration${ext}`);
+}
+
+export async function saveShopBuyerBusinessRegistrationImage(
+  tempFilePath: string,
+  buyerId: number
+): Promise<string> {
+  const buyerDir = getShopBuyerDir(buyerId);
+  if (!fs.existsSync(buyerDir)) {
+    await fs.promises.mkdir(buyerDir, { recursive: true });
+  }
+
+  const ext = path.extname(tempFilePath);
+  const newFilePath = getShopBuyerBusinessRegistrationImagePath(buyerId, ext);
+
+  const possibleExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  for (const possibleExt of possibleExtensions) {
+    const oldPath = getShopBuyerBusinessRegistrationImagePath(buyerId, possibleExt);
+    if (fs.existsSync(oldPath) && oldPath !== newFilePath) {
+      await fs.promises.unlink(oldPath).catch(() => {});
+    }
+  }
+
+  if (!fs.existsSync(tempFilePath)) {
+    throw new Error(`임시 파일을 찾을 수 없습니다: ${tempFilePath}`);
+  }
+
+  await fs.promises.rename(tempFilePath, newFilePath);
+  return `shop-buyers/${buyerId}/business-registration${ext}`;
+}
+
+export function getShopBuyerImageUrl(relativePath: string): string {
+  return `/uploads/${relativePath.replace(/\\/g, '/')}`;
+}
+
+export function getShopBuyerImageFilePathFromUrl(imageUrl: string): string {
+  const normalized = imageUrl.replace(/\\/g, '/');
+  const relative = normalized.startsWith('/uploads/')
+    ? normalized.slice('/uploads/'.length)
+    : normalized;
+  return path.join(__dirname, '../../uploads', relative);
+}
+
+export async function deleteShopBuyerBusinessRegistrationImage(buyerId: number): Promise<void> {
+  const possibleExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  for (const ext of possibleExtensions) {
+    const imagePath = getShopBuyerBusinessRegistrationImagePath(buyerId, ext);
+    if (fs.existsSync(imagePath)) {
+      await fs.promises.unlink(imagePath).catch(() => {});
+    }
+  }
+}
+
+export async function deleteShopBuyerImageDir(buyerId: number): Promise<void> {
+  const dir = getShopBuyerDir(buyerId);
+  if (fs.existsSync(dir)) {
+    await fs.promises.rm(dir, { recursive: true }).catch(() => {});
+  }
+}
+
+// ==================== Shop Order Files ====================
+
+const shopOrderUploadDir = path.join(__dirname, '../../uploads/shop-orders');
+if (!fs.existsSync(shopOrderUploadDir)) {
+  fs.mkdirSync(shopOrderUploadDir, { recursive: true });
+}
+
+const shopOrderImageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, shopOrderUploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `temp-${randomUUID()}${ext}`);
+  },
+});
+
+export const shopOrderImageUpload = multer({
+  storage: shopOrderImageStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+});
+
+export function getShopOrderDir(orderId: string): string {
+  return path.join(shopOrderUploadDir, orderId);
+}
+
+export function getShopOrderStatementPath(orderId: string): string {
+  return path.join(getShopOrderDir(orderId), 'statement.html');
+}
+
+export function getShopOrderStatementRelativePath(orderId: string): string {
+  return `shop-orders/${orderId}/statement.html`;
+}
+
+export async function saveShopOrderStatementHtml(orderId: string, html: string): Promise<string> {
+  const orderDir = getShopOrderDir(orderId);
+  if (!fs.existsSync(orderDir)) {
+    await fs.promises.mkdir(orderDir, { recursive: true });
+  }
+  const filePath = getShopOrderStatementPath(orderId);
+  await fs.promises.writeFile(filePath, html, 'utf8');
+  return getShopOrderStatementRelativePath(orderId);
+}
+
+export function getShopOrderStatementAbsolutePath(relativePath: string): string {
+  const normalized = relativePath.replace(/\\/g, '/');
+  const relative = normalized.startsWith('/uploads/')
+    ? normalized.slice('/uploads/'.length)
+    : normalized;
+  return path.join(__dirname, '../../uploads', relative);
+}
+
+export function getShopOrderFileUrl(relativePath: string): string {
+  return `/uploads/${relativePath.replace(/\\/g, '/')}`;
+}
+
+export function getShopOrderPaymentProofPath(orderId: string, ext: string): string {
+  return path.join(getShopOrderDir(orderId), `payment-proof${ext}`);
+}
+
+export async function saveShopOrderPaymentProofImage(
+  tempFilePath: string,
+  orderId: string
+): Promise<string> {
+  const orderDir = getShopOrderDir(orderId);
+  if (!fs.existsSync(orderDir)) {
+    await fs.promises.mkdir(orderDir, { recursive: true });
+  }
+
+  const ext = path.extname(tempFilePath);
+  const newFilePath = getShopOrderPaymentProofPath(orderId, ext);
+
+  const possibleExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  for (const possibleExt of possibleExtensions) {
+    const oldPath = getShopOrderPaymentProofPath(orderId, possibleExt);
+    if (fs.existsSync(oldPath) && oldPath !== newFilePath) {
+      await fs.promises.unlink(oldPath).catch(() => {});
+    }
+  }
+
+  if (!fs.existsSync(tempFilePath)) {
+    throw new Error(`임시 파일을 찾을 수 없습니다: ${tempFilePath}`);
+  }
+
+  await fs.promises.rename(tempFilePath, newFilePath);
+  return `shop-orders/${orderId}/payment-proof${ext}`;
+}
+
+export async function deleteShopOrderPaymentProofImage(orderId: string): Promise<void> {
+  const possibleExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  for (const ext of possibleExtensions) {
+    const imagePath = getShopOrderPaymentProofPath(orderId, ext);
+    if (fs.existsSync(imagePath)) {
+      await fs.promises.unlink(imagePath).catch(() => {});
+    }
+  }
+}
+
+export async function deleteShopOrderFilesDir(orderId: string): Promise<void> {
+  const dir = getShopOrderDir(orderId);
+  if (fs.existsSync(dir)) {
+    await fs.promises.rm(dir, { recursive: true }).catch(() => {});
+  }
+}
+
+// ==================== Shop Order Line Files ====================
+
+export function getShopOrderLineDir(orderId: string, lineId: string): string {
+  return path.join(getShopOrderDir(orderId), 'lines', lineId);
+}
+
+export function getShopOrderLineStatementPath(orderId: string, lineId: string): string {
+  return path.join(getShopOrderLineDir(orderId, lineId), 'statement.html');
+}
+
+export function getShopOrderLineStatementRelativePath(orderId: string, lineId: string): string {
+  return `shop-orders/${orderId}/lines/${lineId}/statement.html`;
+}
+
+export async function saveShopOrderLineStatementHtml(
+  orderId: string,
+  lineId: string,
+  html: string
+): Promise<string> {
+  const lineDir = getShopOrderLineDir(orderId, lineId);
+  if (!fs.existsSync(lineDir)) {
+    await fs.promises.mkdir(lineDir, { recursive: true });
+  }
+  const filePath = getShopOrderLineStatementPath(orderId, lineId);
+  await fs.promises.writeFile(filePath, html, 'utf8');
+  return getShopOrderLineStatementRelativePath(orderId, lineId);
+}
+
+export async function readShopOrderLineStatementHtml(
+  relativePath: string
+): Promise<string | null> {
+  const absolutePath = getShopOrderLineStatementAbsolutePath(relativePath);
+  if (!fs.existsSync(absolutePath)) {
+    return null;
+  }
+  return fs.promises.readFile(absolutePath, 'utf8');
+}
+
+export function getShopOrderLineStatementAbsolutePath(relativePath: string): string {
+  return getShopOrderStatementAbsolutePath(relativePath);
+}
+
+export function getShopOrderLinePaymentProofPath(
+  orderId: string,
+  lineId: string,
+  ext: string
+): string {
+  return path.join(getShopOrderLineDir(orderId, lineId), `payment-proof${ext}`);
+}
+
+export async function saveShopOrderLinePaymentProofImage(
+  tempFilePath: string,
+  orderId: string,
+  lineId: string
+): Promise<string> {
+  const lineDir = getShopOrderLineDir(orderId, lineId);
+  if (!fs.existsSync(lineDir)) {
+    await fs.promises.mkdir(lineDir, { recursive: true });
+  }
+
+  const ext = path.extname(tempFilePath);
+  const newFilePath = getShopOrderLinePaymentProofPath(orderId, lineId, ext);
+
+  const possibleExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  for (const possibleExt of possibleExtensions) {
+    const oldPath = getShopOrderLinePaymentProofPath(orderId, lineId, possibleExt);
+    if (fs.existsSync(oldPath) && oldPath !== newFilePath) {
+      await fs.promises.unlink(oldPath).catch(() => {});
+    }
+  }
+
+  if (!fs.existsSync(tempFilePath)) {
+    throw new Error(`임시 파일을 찾을 수 없습니다: ${tempFilePath}`);
+  }
+
+  await fs.promises.rename(tempFilePath, newFilePath);
+  return `shop-orders/${orderId}/lines/${lineId}/payment-proof${ext}`;
+}
+
+export async function deleteShopOrderLinePaymentProofImage(
+  orderId: string,
+  lineId: string
+): Promise<void> {
+  const possibleExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  for (const ext of possibleExtensions) {
+    const imagePath = getShopOrderLinePaymentProofPath(orderId, lineId, ext);
+    if (fs.existsSync(imagePath)) {
+      await fs.promises.unlink(imagePath).catch(() => {});
+    }
+  }
+}
+
+export async function deleteShopOrderLineFilesDir(orderId: string, lineId: string): Promise<void> {
+  const dir = getShopOrderLineDir(orderId, lineId);
+  if (fs.existsSync(dir)) {
+    await fs.promises.rm(dir, { recursive: true }).catch(() => {});
+  }
+}
