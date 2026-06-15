@@ -55,6 +55,7 @@ export interface ShopOrderStatementContext {
   address: string | null;
   recipientName: string | null;
   phoneNumber: string | null;
+  isReservation?: boolean;
 }
 
 const BORDER = '#5a7a42';
@@ -138,6 +139,27 @@ function buildAmounts(order: ShopOrderStatementContext) {
   };
 }
 
+function formatStatementProductLabel(order: ShopOrderStatementContext): string {
+  if (order.isReservation) {
+    return `[예약] ${order.productName}`;
+  }
+  return order.productName;
+}
+
+function buildStatementTitleReservationNote(
+  contexts: ShopOrderStatementContext | ShopOrderStatementContext[]
+): string {
+  const list = Array.isArray(contexts) ? contexts : [contexts];
+  if (list.length === 0) return '';
+  if (list.every((context) => context.isReservation)) {
+    return ' · 예약';
+  }
+  if (list.some((context) => context.isReservation)) {
+    return ' · 예약 포함';
+  }
+  return '';
+}
+
 function buildItemRows(
   order: ShopOrderStatementContext,
   date: { month: string; day: string },
@@ -149,7 +171,7 @@ function buildItemRows(
     <tr class="item-row">
       <td class="center">${date.month}</td>
       <td class="center">${date.day}</td>
-      <td>${escapeHtml(order.productName)}</td>
+      <td>${escapeHtml(formatStatementProductLabel(order))}</td>
       <td class="center">${order.orderBoxCount}박스×${order.quantityPerBox}개</td>
       <td class="center">${formatAmount(amounts.quantity)}</td>
       <td class="right">${formatAmount(amounts.unitPrice)}</td>
@@ -248,7 +270,7 @@ function buildConsolidatedItemRows(
     <tr class="item-row">
       <td class="center">${lineDate.month}</td>
       <td class="center">${lineDate.day}</td>
-      <td>${escapeHtml(context.productName)}</td>
+      <td>${escapeHtml(formatStatementProductLabel(context))}</td>
       <td class="center">${context.orderBoxCount}박스×${context.quantityPerBox}개</td>
       <td class="center">${formatAmount(amounts.quantity)}</td>
       <td class="right">${formatAmount(amounts.unitPrice)}</td>
@@ -315,6 +337,7 @@ export function buildShopOrderConsolidatedStatementHtml(
     ? `<img class="statement-seal" src="${sealDataUri}" alt="" aria-hidden="true" />`
     : '';
   const titleLabel = `${recipient.companyName || '거래명세표'} (통합 ${contexts.length}건)`;
+  const reservationNote = buildStatementTitleReservationNote(contexts);
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -514,7 +537,7 @@ export function buildShopOrderConsolidatedStatementHtml(
         </td>
         <td class="title-box">
           거 래 명 세 표
-          <span class="title-sub">(공급받는자용 · 통합 ${contexts.length}건)</span>
+          <span class="title-sub">(공급받는자용 · 통합 ${contexts.length}건${reservationNote})</span>
         </td>
         <td style="width:180px"></td>
       </tr>
@@ -634,6 +657,7 @@ export function buildShopOrderStatementHtml(order: ShopOrderStatementContext): s
   const sealMarkup = sealDataUri
     ? `<img class="statement-seal" src="${sealDataUri}" alt="" aria-hidden="true" />`
     : '';
+  const reservationNote = buildStatementTitleReservationNote(order);
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -848,7 +872,7 @@ export function buildShopOrderStatementHtml(order: ShopOrderStatementContext): s
         </td>
         <td class="title-box">
           거 래 명 세 표
-          <span class="title-sub">(공급받는자용)</span>
+          <span class="title-sub">(공급받는자용${reservationNote})</span>
         </td>
         <td style="width:180px"></td>
       </tr>

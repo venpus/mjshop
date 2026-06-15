@@ -36,6 +36,7 @@ export function ShopStatementsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [busyGroupKey, setBusyGroupKey] = useState<string | null>(null);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [statementModalOpen, setStatementModalOpen] = useState(false);
   const [statementModalTitle, setStatementModalTitle] = useState('거래명세표');
   const [statementHtml, setStatementHtml] = useState('');
@@ -59,6 +60,15 @@ export function ShopStatementsPage() {
 
   const statementLineCount = useMemo(
     () => buildShopOrderStatementListRows(orders).length,
+    [orders]
+  );
+
+  const allStatementCancelItems = useMemo(
+    () =>
+      buildShopOrderStatementListRows(orders).map((row) => ({
+        shopOrderId: row.shopOrderId,
+        lineId: row.line.id,
+      })),
     [orders]
   );
 
@@ -147,6 +157,31 @@ export function ShopStatementsPage() {
     }
   };
 
+  const handleCancelAllStatements = async () => {
+    if (allStatementCancelItems.length === 0) {
+      alert('삭제할 명세서가 없습니다.');
+      return;
+    }
+
+    const message =
+      `발행된 명세서 ${statementGroups.length.toLocaleString()}장` +
+      `(주문건 ${statementLineCount.toLocaleString()}건)을 모두 삭제하시겠습니까?\n` +
+      '모든 주문건에서 명세서 발행이 해제됩니다.';
+
+    if (!window.confirm(message)) return;
+
+    setIsDeletingAll(true);
+    try {
+      const result = await cancelShopOrderStatements(allStatementCancelItems);
+      await loadOrders();
+      alert(`${result.cancelledCount.toLocaleString()}건의 명세서를 삭제했습니다.`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '명세서 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
+
   return (
     <div className="p-8 min-h-[1080px]">
       <div className="mb-8">
@@ -187,10 +222,25 @@ export function ShopStatementsPage() {
           <button
             type="button"
             onClick={() => void loadOrders()}
-            disabled={isLoading}
+            disabled={isLoading || isDeletingAll}
             className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-white disabled:opacity-50"
           >
             새로고침
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleCancelAllStatements()}
+            disabled={
+              isLoading || isDeletingAll || statementGroups.length === 0 || busyGroupKey != null
+            }
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+          >
+            {isDeletingAll ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <XCircle className="w-4 h-4" />
+            )}
+            명세서 모두 삭제
           </button>
         </div>
 
@@ -237,7 +287,7 @@ export function ShopStatementsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {paginatedGroups.map((group) => {
-                    const isBusy = busyGroupKey === group.groupKey;
+                    const isBusy = busyGroupKey === group.groupKey || isDeletingAll;
 
                     return (
                       <tr key={group.groupKey} className="hover:bg-gray-50">

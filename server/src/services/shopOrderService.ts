@@ -719,6 +719,7 @@ export class ShopOrderService {
       address: line.address,
       recipientName: line.recipientName,
       phoneNumber: line.phoneNumber,
+      isReservation: line.isReservation,
     };
   }
 
@@ -736,21 +737,16 @@ export class ShopOrderService {
     return buildShopOrderStatementHtml(this.buildStatementContext(order, line));
   }
 
-  async createBulkStatements(orderIds: string[]): Promise<BulkStatementResult> {
-    if (orderIds.length === 0) {
-      throw new Error('선택한 주문이 없습니다.');
+  async createBulkStatements(
+    items: Array<{ shopOrderId: string; lineId: string }>
+  ): Promise<BulkStatementResult> {
+    if (items.length === 0) {
+      throw new Error('선택한 주문건이 없습니다.');
     }
 
-    const uniqueOrderIds = [...new Set(orderIds)];
-    const orders: ShopOrder[] = [];
-
-    for (const orderId of uniqueOrderIds) {
-      const order = await this.repository.findById(orderId);
-      if (!order) {
-        throw new Error(`주문을 찾을 수 없습니다: ${orderId}`);
-      }
-      orders.push(order);
-    }
+    const uniqueItems = Array.from(
+      new Map(items.map((item) => [`${item.shopOrderId}:${item.lineId}`, item])).values()
+    );
 
     type GroupLine = {
       shopOrderId: string;
@@ -764,25 +760,40 @@ export class ShopOrderService {
       line: ShopOrderLine;
     };
 
+    const orderCache = new Map<string, ShopOrder>();
     const lineInputs: GroupLine[] = [];
-    for (const order of orders) {
-      for (const line of order.lines) {
-        lineInputs.push({
-          shopOrderId: order.id,
-          lineId: line.id,
-          orderNumber: order.orderNumber,
-          companyName: line.companyName,
-          address: line.address,
-          recipientName: line.recipientName,
-          phoneNumber: line.phoneNumber,
-          order,
-          line,
-        });
+
+    for (const item of uniqueItems) {
+      let order = orderCache.get(item.shopOrderId);
+      if (!order) {
+        const loaded = await this.repository.findById(item.shopOrderId);
+        if (!loaded) {
+          throw new Error(`주문을 찾을 수 없습니다: ${item.shopOrderId}`);
+        }
+        orderCache.set(item.shopOrderId, loaded);
+        order = loaded;
       }
+
+      const line = order.lines.find((entry) => entry.id === item.lineId);
+      if (!line) {
+        throw new Error(`주문 건을 찾을 수 없습니다: ${item.lineId}`);
+      }
+
+      lineInputs.push({
+        shopOrderId: order.id,
+        lineId: line.id,
+        orderNumber: order.orderNumber,
+        companyName: line.companyName,
+        address: line.address,
+        recipientName: line.recipientName,
+        phoneNumber: line.phoneNumber,
+        order,
+        line,
+      });
     }
 
     if (lineInputs.length === 0) {
-      throw new Error('선택한 주문에 판매 주문이 없습니다.');
+      throw new Error('선택한 주문건이 없습니다.');
     }
 
     const buyers = (await this.buyerRepository.findAllList()).map((buyer) => ({
