@@ -8,6 +8,7 @@ const controller = new ShopOrderController();
 router.get('/', controller.getAllOrders);
 router.get('/reservation-transfer-targets', controller.getReservationTransferTargets);
 router.post('/bulk/statements', controller.createBulkStatements);
+router.post('/statements/preview', controller.previewStatementGroup);
 router.post('/statements/cancel', controller.cancelBulkStatements);
 router.post('/reservations/transfer', controller.transferReservationsToOrder);
 router.post('/from-inbound', controller.createFromInbound);

@@ -1,5 +1,13 @@
 import html2canvas from 'html2canvas';
 
+export interface StatementPngDownloadItem {
+  html: string;
+  issuedAt: string;
+  companyName: string;
+  lineCount: number;
+  isReservation?: boolean;
+}
+
 function sanitizeFileNamePart(value: string): string {
   return (
     value
@@ -24,11 +32,13 @@ function formatStatementIssueDate(value: string): string {
 export function buildStatementPngFileName(
   issuedAt: string,
   companyName: string,
-  lineCount: number
+  lineCount: number,
+  isReservation = false
 ): string {
   const datePart = formatStatementIssueDate(issuedAt);
   const companyPart = sanitizeFileNamePart(companyName);
-  return `${datePart}_${companyPart}_${lineCount}건.png`;
+  const kindSuffix = isReservation ? '_예약' : '';
+  return `${datePart}_${companyPart}_${lineCount}건${kindSuffix}.png`;
 }
 
 function createStatementRenderRoot(html: string): {
@@ -83,7 +93,7 @@ async function waitForImages(root: HTMLElement): Promise<void> {
   );
 }
 
-export async function downloadHtmlAsPng(html: string, fileName: string): Promise<void> {
+export async function htmlToPngBlob(html: string): Promise<Blob> {
   const { target, cleanup } = createStatementRenderRoot(html);
 
   try {
@@ -108,23 +118,105 @@ export async function downloadHtmlAsPng(html: string, fileName: string): Promise
       throw new Error('PNG 생성에 실패했습니다.');
     }
 
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = fileName.endsWith('.png') ? fileName : `${fileName}.png`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    return blob;
   } finally {
     cleanup();
   }
+}
+
+function triggerBlobDownload(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName.endsWith('.png') ? fileName : `${fileName}.png`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+export function isDirectoryPickerSupported(): boolean {
+  return typeof window.showDirectoryPicker === 'function';
+}
+
+export async function pickStatementDownloadDirectory(): Promise<FileSystemDirectoryHandle> {
+  if (!isDirectoryPickerSupported()) {
+    throw new Error(
+      '이 브라우저는 폴더 선택 다운로드를 지원하지 않습니다. Chrome 또는 Edge를 사용해 주세요.'
+    );
+  }
+
+  return window.showDirectoryPicker();
+}
+
+function ensureUniqueFileName(baseName: string, usedNames: Set<string>): string {
+  if (!usedNames.has(baseName)) {
+    usedNames.add(baseName);
+    return baseName;
+  }
+
+  const ext = '.png';
+  const stem = baseName.endsWith(ext) ? baseName.slice(0, -ext.length) : baseName;
+  let index = 2;
+  while (usedNames.has(`${stem}_${index}${ext}`)) {
+    index += 1;
+  }
+
+  const uniqueName = `${stem}_${index}${ext}`;
+  usedNames.add(uniqueName);
+  return uniqueName;
+}
+
+async function saveBlobToDirectory(
+  dirHandle: FileSystemDirectoryHandle,
+  fileName: string,
+  blob: Blob
+): Promise<void> {
+  const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(blob);
+  await writable.close();
+}
+
+export async function saveStatementPngsToDirectory(
+  items: StatementPngDownloadItem[],
+  dirHandle: FileSystemDirectoryHandle,
+  onProgress?: (current: number, total: number) => void
+): Promise<number> {
+  const usedNames = new Set<string>();
+  let saved = 0;
+
+  for (const item of items) {
+    const baseName = buildStatementPngFileName(
+      item.issuedAt,
+      item.companyName,
+      item.lineCount,
+      item.isReservation ?? false
+    );
+    const fileName = ensureUniqueFileName(baseName, usedNames);
+    const blob = await htmlToPngBlob(item.html);
+    await saveBlobToDirectory(dirHandle, fileName, blob);
+    saved += 1;
+    onProgress?.(saved, items.length);
+  }
+
+  return saved;
+}
+
+export async function downloadHtmlAsPng(html: string, fileName: string): Promise<void> {
+  const blob = await htmlToPngBlob(html);
+  triggerBlobDownload(blob, fileName);
 }
 
 export async function downloadShopOrderStatementAsPng(
   html: string,
   issuedAt: string,
   companyName: string,
-  lineCount: number
+  lineCount: number,
+  isReservation = false
 ): Promise<void> {
-  const fileName = buildStatementPngFileName(issuedAt, companyName, lineCount);
+  const fileName = buildStatementPngFileName(issuedAt, companyName, lineCount, isReservation);
   await downloadHtmlAsPng(html, fileName);
+}
+
+export function isDirectoryPickerAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
 }

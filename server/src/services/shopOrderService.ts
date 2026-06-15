@@ -10,7 +10,7 @@ import {
   getConsolidatedShopOrderStatementFileName,
   getShopOrderStatementFileName,
 } from '../utils/shopOrderStatementHtml.js';
-import { groupStatementLines } from '../utils/shopOrderStatementGroup.js';
+import { groupStatementLines, type StatementGroupLineInput } from '../utils/shopOrderStatementGroup.js';
 import {
   deleteShopOrderLinePaymentProofImage,
   deleteShopOrderLineStatementHtml,
@@ -748,14 +748,7 @@ export class ShopOrderService {
       new Map(items.map((item) => [`${item.shopOrderId}:${item.lineId}`, item])).values()
     );
 
-    type GroupLine = {
-      shopOrderId: string;
-      lineId: string;
-      orderNumber: string;
-      companyName: string | null;
-      address: string | null;
-      recipientName: string | null;
-      phoneNumber: string | null;
+    type GroupLine = StatementGroupLineInput & {
       order: ShopOrder;
       line: ShopOrderLine;
     };
@@ -787,6 +780,7 @@ export class ShopOrderService {
         address: line.address,
         recipientName: line.recipientName,
         phoneNumber: line.phoneNumber,
+        isReservation: line.isReservation,
         order,
         line,
       });
@@ -920,6 +914,59 @@ export class ShopOrderService {
       throw new Error('주문 조회에 실패했습니다.');
     }
     return this.enrichOrderStock(refreshed);
+  }
+
+  async previewStatementGroup(
+    items: Array<{ shopOrderId: string; lineId: string }>
+  ): Promise<{ html: string; fileName: string }> {
+    if (items.length === 0) {
+      throw new Error('미리볼 명세서 주문건이 없습니다.');
+    }
+
+    const uniqueItems = Array.from(
+      new Map(items.map((item) => [`${item.shopOrderId}:${item.lineId}`, item])).values()
+    );
+
+    type LoadedLine = { order: ShopOrder; line: ShopOrderLine };
+    const loaded: LoadedLine[] = [];
+    const orderCache = new Map<string, ShopOrder>();
+
+    for (const item of uniqueItems) {
+      let order = orderCache.get(item.shopOrderId);
+      if (!order) {
+        const fetched = await this.repository.findById(item.shopOrderId);
+        if (!fetched) {
+          throw new Error(`주문을 찾을 수 없습니다: ${item.shopOrderId}`);
+        }
+        orderCache.set(item.shopOrderId, fetched);
+        order = fetched;
+      }
+
+      const line = order.lines.find((entry) => entry.id === item.lineId);
+      if (!line) {
+        throw new Error(`주문 건을 찾을 수 없습니다: ${item.lineId}`);
+      }
+      if (!line.statementIssued && !line.statementFilePath) {
+        throw new Error('생성된 명세서가 없습니다.');
+      }
+
+      loaded.push({ order, line });
+    }
+
+    const contexts = loaded.map(({ order, line }) => this.buildStatementContext(order, line));
+    const html =
+      contexts.length === 1
+        ? buildShopOrderStatementHtml(contexts[0])
+        : buildShopOrderConsolidatedStatementHtml(contexts);
+
+    const first = loaded[0];
+    const companyName = (first.line.companyName ?? '').trim() || '미상';
+    const fileName =
+      contexts.length === 1
+        ? getShopOrderStatementFileName(this.resolveLineOrderNumber(first.line, first.order))
+        : getConsolidatedShopOrderStatementFileName(companyName, contexts.length);
+
+    return { html, fileName };
   }
 
   async getStatementPreview(

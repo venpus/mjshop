@@ -29,7 +29,11 @@ import {
   type ShopOrderLineListKind,
   type ShopOrderLineListRow,
 } from '../../utils/shopOrderListExport';
-import { findShopBuyerByCompanyName } from '../../utils/shopBuyerDisplay';
+import {
+  findShopBuyerByCompanyName,
+  normalizeShopBuyerCompanyName,
+  resolveCompanyNameDisplay,
+} from '../../utils/shopBuyerDisplay';
 import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
 import {
   deriveLineProgressStatus,
@@ -176,6 +180,13 @@ export function ShopOrderLineListTab({
         (row.line.lineOrderNumber ?? '').toLowerCase().includes(lower) ||
         row.productName.toLowerCase().includes(lower) ||
         (row.line.companyName ?? '').toLowerCase().includes(lower) ||
+        buyers.some(
+          (buyer) =>
+            buyer.kakaoId &&
+            buyer.kakaoId.toLowerCase().includes(lower) &&
+            normalizeShopBuyerCompanyName(buyer.companyName) ===
+              normalizeShopBuyerCompanyName(row.line.companyName)
+        ) ||
         (row.line.recipientName ?? '').toLowerCase().includes(lower) ||
         (row.line.phoneNumber ?? '').toLowerCase().includes(lower) ||
         (row.line.address ?? '').toLowerCase().includes(lower) ||
@@ -185,7 +196,7 @@ export function ShopOrderLineListTab({
       const matchesFulfillment = matchesLineFulfillmentFilters(row, fulfillmentFilters);
       return matchesSearch && matchesStatus && matchesDate && matchesFulfillment;
     });
-  }, [lineRows, searchTerm, statusFilter, dateFrom, dateTo, fulfillmentFilters]);
+  }, [lineRows, searchTerm, statusFilter, dateFrom, dateTo, fulfillmentFilters, buyers]);
 
   const paginationResetKey = `${lineKind}|${searchTerm}|${statusFilter}|${dateFrom}|${dateTo}|${JSON.stringify(fulfillmentFilters)}`;
   const {
@@ -428,7 +439,7 @@ export function ShopOrderLineListTab({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="주문번호, 상품명, 상호, 수령인, 전화, 주소, 송장으로 검색..."
+              placeholder="주문번호, 상품명, 상호, 카톡, 수령인, 전화, 주소, 송장으로 검색..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className={`w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${accentRingClass}`}
@@ -679,7 +690,7 @@ export function ShopOrderLineListTab({
                             className={accentCompanyLinkClass}
                             title="구매자 정보 보기"
                           >
-                            {line.companyName}
+                            {resolveCompanyNameDisplay(line.companyName, buyers)}
                           </button>
                         ) : (
                           '-'

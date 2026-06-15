@@ -27,6 +27,33 @@ export function formatShopBuyerAddressLine(addr: ShopBuyerAddress): string {
     .join(' · ');
 }
 
+export function formatCompanyNameWithKakaoId(
+  companyName: string | null | undefined,
+  kakaoId?: string | null
+): string {
+  const name = (companyName ?? '').trim();
+  const kakao = (kakaoId ?? '').trim();
+  if (!name && !kakao) return '';
+  if (!name) return kakao;
+  if (!kakao) return name;
+  return `${name} (${kakao})`;
+}
+
+export function resolveCompanyNameDisplay(
+  companyName: string | null | undefined,
+  buyers: ShopBuyerListItem[]
+): string {
+  const name = (companyName ?? '').trim();
+  if (!name) return '-';
+
+  const match = findShopBuyerByCompanyName(name, buyers);
+  if (match && match !== 'ambiguous') {
+    return formatCompanyNameWithKakaoId(name, match.kakaoId);
+  }
+
+  return name;
+}
+
 export function findMatchingAddressIndex(
   addresses: ShopBuyerAddress[],
   address: string,

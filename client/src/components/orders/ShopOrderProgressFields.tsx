@@ -8,7 +8,7 @@ import type { ShopOrder } from '../../api/shopOrderApi';
 
 import { getLineAmountBreakdown, getLineTotalAmount, type ShopOrderLineForm } from '../../utils/shopOrderCalculations';
 
-import { findMatchingAddressIndex } from '../../utils/shopBuyerDisplay';
+import { findMatchingAddressIndex, formatCompanyNameWithKakaoId } from '../../utils/shopBuyerDisplay';
 
 import { ShopOrderFulfillmentPanel } from './ShopOrderFulfillmentPanel';
 
@@ -402,7 +402,7 @@ function ShopOrderLineRow({
 
                 <option key={buyer.id} value={buyer.id}>
 
-                  {buyer.companyName}
+                  {formatCompanyNameWithKakaoId(buyer.companyName, buyer.kakaoId)}
 
                 </option>
 

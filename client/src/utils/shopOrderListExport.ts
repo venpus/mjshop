@@ -95,8 +95,11 @@ export function buildShopOrderLineListRows(
   return rows;
 }
 
-export function buildShopOrderStatementListRows(orders: ShopOrder[]): ShopOrderLineListRow[] {
-  return buildShopOrderLineListRows(orders, 'all').filter(
+export function buildShopOrderStatementListRows(
+  orders: ShopOrder[],
+  kind: Extract<ShopOrderLineListKind, 'orders' | 'reservations'>
+): ShopOrderLineListRow[] {
+  return buildShopOrderLineListRows(orders, kind).filter(
     (row) => row.line.statementIssued || Boolean(row.line.statementFilePath)
   );
 }
@@ -108,9 +111,11 @@ export function normalizeStatementDisplayField(value: string | null | undefined)
 export function buildStatementDisplayGroupKey(
   companyName: string | null | undefined,
   address: string | null | undefined,
-  recipientName: string | null | undefined
+  recipientName: string | null | undefined,
+  isReservation: boolean
 ): string {
   return [
+    isReservation ? 'r' : 'o',
     normalizeStatementDisplayField(companyName),
     normalizeStatementDisplayField(address),
     normalizeStatementDisplayField(recipientName),
@@ -119,6 +124,7 @@ export function buildStatementDisplayGroupKey(
 
 export interface ShopOrderStatementGroupRow {
   groupKey: string;
+  isReservation: boolean;
   companyName: string;
   address: string;
   recipientName: string;
@@ -131,6 +137,15 @@ export interface ShopOrderStatementGroupRow {
   lines: ShopOrderLineListRow[];
 }
 
+export function buildStatementGroupPreviewItems(
+  group: ShopOrderStatementGroupRow
+): Array<{ shopOrderId: string; lineId: string }> {
+  return group.lines.map((row) => ({
+    shopOrderId: row.shopOrderId,
+    lineId: row.line.id,
+  }));
+}
+
 export function groupShopOrderStatementRows(
   rows: ShopOrderLineListRow[]
 ): ShopOrderStatementGroupRow[] {
@@ -140,7 +155,8 @@ export function groupShopOrderStatementRows(
     const groupKey = buildStatementDisplayGroupKey(
       row.line.companyName,
       row.line.address,
-      row.line.recipientName
+      row.line.recipientName,
+      row.line.isReservation
     );
     const existing = groups.get(groupKey);
     if (existing) {
@@ -162,6 +178,7 @@ export function groupShopOrderStatementRows(
 
     return {
       groupKey,
+      isReservation: representative.line.isReservation,
       companyName: (representative.line.companyName ?? '').trim() || '미상',
       address: (representative.line.address ?? '').trim() || '-',
       recipientName: (representative.line.recipientName ?? '').trim() || '-',

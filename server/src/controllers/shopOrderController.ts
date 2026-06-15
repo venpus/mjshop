@@ -422,6 +422,36 @@ export class ShopOrderController {
     }
   };
 
+  previewStatementGroup = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
+      const items = rawItems
+        .map((item: unknown) => {
+          if (!item || typeof item !== 'object') return null;
+          const record = item as Record<string, unknown>;
+          const shopOrderId = String(record.shopOrderId ?? '').trim();
+          const lineId = String(record.lineId ?? '').trim();
+          if (!shopOrderId || !lineId) return null;
+          return { shopOrderId, lineId };
+        })
+        .filter(Boolean) as Array<{ shopOrderId: string; lineId: string }>;
+
+      if (items.length === 0) {
+        res.status(400).json({ success: false, error: '미리볼 명세서 주문건(items)이 필요합니다.' });
+        return;
+      }
+
+      const preview = await this.service.previewStatementGroup(items);
+      res.json({ success: true, data: preview });
+    } catch (error: unknown) {
+      console.error('명세서 그룹 미리보기 오류:', error);
+      res.status(400).json({
+        success: false,
+        error: error instanceof Error ? error.message : '명세서 미리보기 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
   getStatementPreview = async (req: Request, res: Response): Promise<void> => {
     try {
       const preview = await this.service.getStatementPreview(

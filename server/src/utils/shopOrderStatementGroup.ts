@@ -6,6 +6,7 @@ export interface StatementGroupLineInput {
   address: string | null;
   recipientName: string | null;
   phoneNumber: string | null;
+  isReservation: boolean;
 }
 
 export interface ShopBuyerLookup {
@@ -33,7 +34,7 @@ export function resolveBuyerIdByCompanyName(
 export function buildStatementGroupKey(
   line: Pick<
     StatementGroupLineInput,
-    'companyName' | 'address' | 'recipientName' | 'phoneNumber'
+    'companyName' | 'address' | 'recipientName' | 'phoneNumber' | 'isReservation'
   >,
   buyerId: number | null
 ): string {
@@ -43,6 +44,7 @@ export function buildStatementGroupKey(
       : `c:${normalizeStatementGroupField(line.companyName)}`;
 
   return [
+    line.isReservation ? 'r' : 'o',
     buyerPart,
     normalizeStatementGroupField(line.address),
     normalizeStatementGroupField(line.recipientName),

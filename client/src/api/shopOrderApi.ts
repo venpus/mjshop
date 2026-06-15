@@ -455,6 +455,22 @@ export async function getShopOrderStatementPreview(
   return data.data;
 }
 
+export async function getShopOrderStatementGroupPreview(
+  items: Array<{ shopOrderId: string; lineId: string }>
+): Promise<{ html: string; fileName: string }> {
+  const response = await fetch(`${API_BASE_URL}/shop-orders/statements/preview`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || '명세서 미리보기에 실패했습니다.');
+  }
+  return data.data;
+}
+
 export async function downloadShopOrderStatement(
   orderId: string,
   lineId: string
