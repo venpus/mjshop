@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import type { ShopOrder, ShopOrderLine, ShopOrderStatus } from '../api/shopOrderApi';
+import { getFullImageUrl } from '../api/purchaseOrderApi';
 import { formatLineOrderRef } from './shopOrderLineListUtils';
 
 export const SHOP_ORDER_LINE_TYPE_REGULAR = '일반 주문';
@@ -28,6 +29,7 @@ export interface ShopOrderLineExportRow {
   orderDate: string | null;
   lineIndex: number;
   line: ShopOrderLine;
+  productMainImage?: string | null;
 }
 
 export interface ShopOrderLineListRow extends ShopOrderLineExportRow {
@@ -225,6 +227,56 @@ function styleHeaderRow(row: ExcelJS.Row): void {
   row.alignment = { vertical: 'middle', horizontal: 'center' };
 }
 
+const TRACKING_EXCEL_ROW_HEIGHT = 50;
+const TRACKING_PRODUCT_IMAGE_COL = 6;
+const TRACKING_PRODUCT_IMAGE_SIZE = { width: 46, height: 46 } as const;
+
+function guessTrackingImageExtension(imageUrl: string, mime: string): 'jpeg' | 'png' | 'gif' {
+  if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpeg';
+  if (mime.includes('gif')) return 'gif';
+  if (mime.includes('png')) return 'png';
+  const lower = imageUrl.toLowerCase();
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'jpeg';
+  if (lower.endsWith('.gif')) return 'gif';
+  return 'png';
+}
+
+async function embedTrackingProductImage(
+  workbook: ExcelJS.Workbook,
+  worksheet: ExcelJS.Worksheet,
+  rawUrl: string | null | undefined,
+  dataRowIndex: number
+): Promise<boolean> {
+  const trimmed = rawUrl?.trim();
+  if (!trimmed) return false;
+
+  const imageUrl = getFullImageUrl(trimmed);
+  if (!imageUrl) return false;
+
+  try {
+    const response = await fetch(imageUrl, { credentials: 'include' });
+    if (!response.ok) return false;
+
+    const blob = await response.blob();
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const extension = guessTrackingImageExtension(imageUrl, blob.type || '');
+
+    const imageId = workbook.addImage({
+      buffer: bytes,
+      extension,
+    });
+
+    worksheet.addImage(imageId, {
+      tl: { col: TRACKING_PRODUCT_IMAGE_COL, row: dataRowIndex },
+      ext: TRACKING_PRODUCT_IMAGE_SIZE,
+    });
+    return true;
+  } catch (error) {
+    console.warn('송장 엑셀 제품 사진 삽입 실패:', imageUrl, error);
+    return false;
+  }
+}
+
 export async function exportShopOrderTrackingExcel(rows: ShopOrderLineExportRow[]): Promise<void> {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('송장');
@@ -236,6 +288,7 @@ export async function exportShopOrderTrackingExcel(rows: ShopOrderLineExportRow[
     { header: '수령인', key: 'recipientName', width: 12 },
     { header: '전화번호', key: 'phoneNumber', width: 14 },
     { header: '주소', key: 'address', width: 36 },
+    { header: '제품사진', key: 'productImage', width: 10 },
     { header: '상품명', key: 'productName', width: 24 },
     { header: '박스수', key: 'orderBoxCount', width: 8 },
     { header: '입수', key: 'quantityPerBox', width: 8 },
@@ -246,7 +299,8 @@ export async function exportShopOrderTrackingExcel(rows: ShopOrderLineExportRow[
 
   styleHeaderRow(worksheet.getRow(1));
 
-  for (const row of rows) {
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i];
     const quantity = row.line.orderBoxCount * row.line.quantityPerBox;
     const lineOrderRef = formatLineOrderRef(
       row.line.lineOrderNumber,
@@ -254,13 +308,14 @@ export async function exportShopOrderTrackingExcel(rows: ShopOrderLineExportRow[
       row.lineIndex,
       row.line.isReservation ? '예약' : undefined
     );
-    worksheet.addRow({
+    const excelRow = worksheet.addRow({
       orderNumber: lineOrderRef,
       lineIndex: row.line.lineOrderNumber ? '' : row.lineIndex,
       companyName: row.line.companyName ?? '',
       recipientName: row.line.recipientName ?? '',
       phoneNumber: row.line.phoneNumber ?? '',
       address: row.line.address ?? '',
+      productImage: '',
       productName: row.productName,
       orderBoxCount: row.line.orderBoxCount,
       quantityPerBox: row.line.quantityPerBox,
@@ -268,6 +323,21 @@ export async function exportShopOrderTrackingExcel(rows: ShopOrderLineExportRow[
       trackingNumber: row.line.trackingNumber ?? '',
       note: '',
     });
+
+    excelRow.height = TRACKING_EXCEL_ROW_HEIGHT;
+    excelRow.alignment = { vertical: 'middle', wrapText: true };
+
+    const imageCell = excelRow.getCell(TRACKING_PRODUCT_IMAGE_COL + 1);
+    const embedded = await embedTrackingProductImage(
+      workbook,
+      worksheet,
+      row.productMainImage,
+      i + 1
+    );
+    if (!embedded) {
+      imageCell.value = row.productMainImage ? '사진 없음' : '';
+      imageCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    }
   }
 
   const today = new Date().toISOString().slice(0, 10);
