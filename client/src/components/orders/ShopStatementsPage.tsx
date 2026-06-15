@@ -8,9 +8,9 @@ import {
 } from '../../api/shopOrderApi';
 import {
   downloadShopOrderStatementAsPng,
+  downloadStatementPngsBulk,
+  formatStatementBulkDownloadMessage,
   isDirectoryPickerAbortError,
-  pickStatementDownloadDirectory,
-  saveStatementPngsToDirectory,
   type StatementPngDownloadItem,
 } from '../../utils/shopOrderStatementDownload';
 import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
@@ -187,14 +187,17 @@ export function ShopStatementsPage() {
     return items;
   };
 
-  const downloadGroupsToFolder = async (groups: ShopOrderStatementGroupRow[]): Promise<number> => {
-    const dirHandle = await pickStatementDownloadDirectory();
+  const downloadGroupsBulk = async (
+    groups: ShopOrderStatementGroupRow[]
+  ): Promise<{ saved: number; delivery: 'folder' | 'zip' }> => {
     const items = await buildDownloadItems(groups);
     setDownloadProgress({ current: 0, total: items.length });
 
-    return saveStatementPngsToDirectory(items, dirHandle, (current, total) => {
+    const result = await downloadStatementPngsBulk(items, (current, total) => {
       setDownloadProgress({ current, total });
     });
+
+    return result;
   };
 
   const handleToggleSelectAll = () => {
@@ -229,8 +232,8 @@ export function ShopStatementsPage() {
 
     setIsBulkDownloading(true);
     try {
-      const saved = await downloadGroupsToFolder(statementGroups);
-      alert(`${saved.toLocaleString()}장의 명세서 PNG를 저장했습니다.`);
+      const result = await downloadGroupsBulk(statementGroups);
+      alert(formatStatementBulkDownloadMessage(result.saved, result.delivery));
     } catch (err) {
       if (isDirectoryPickerAbortError(err)) return;
       alert(err instanceof Error ? err.message : '명세서 다운로드 중 오류가 발생했습니다.');
@@ -253,13 +256,8 @@ export function ShopStatementsPage() {
 
     setIsBulkDownloading(true);
     try {
-      const dirHandle = await pickStatementDownloadDirectory();
-      const items = await buildDownloadItems(selectedGroups);
-      setDownloadProgress({ current: 0, total: items.length });
-      const saved = await saveStatementPngsToDirectory(items, dirHandle, (current, total) => {
-        setDownloadProgress({ current, total });
-      });
-      alert(`${saved.toLocaleString()}장의 명세서 PNG를 저장했습니다.`);
+      const result = await downloadGroupsBulk(selectedGroups);
+      alert(formatStatementBulkDownloadMessage(result.saved, result.delivery));
     } catch (err) {
       if (isDirectoryPickerAbortError(err)) return;
       alert(err instanceof Error ? err.message : '명세서 다운로드 중 오류가 발생했습니다.');
@@ -364,6 +362,7 @@ export function ShopStatementsPage() {
         <p className="text-gray-600">
           주문건과 예약건 명세서를 각각 따로 모아 보여줍니다. 같은 상호·주소·수령인 내에서는
           주문끼리·예약끼리만 통합됩니다. 미리보기·PNG 다운로드는 해당 유형의 건만 포함합니다.
+          여러 장은 폴더에 저장하거나(HTTPS·localhost), ZIP 파일로 받을 수 있습니다.
         </p>
       </div>
 

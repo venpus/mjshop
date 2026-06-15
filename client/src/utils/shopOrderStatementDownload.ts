@@ -1,4 +1,5 @@
 import html2canvas from 'html2canvas';
+import JSZip from 'jszip';
 
 export interface StatementPngDownloadItem {
   html: string;
@@ -128,19 +129,21 @@ function triggerBlobDownload(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = fileName.endsWith('.png') ? fileName : `${fileName}.png`;
+  anchor.download = fileName;
   anchor.click();
   URL.revokeObjectURL(url);
 }
 
+export type StatementBulkDownloadDelivery = 'folder' | 'zip';
+
 export function isDirectoryPickerSupported(): boolean {
-  return typeof window.showDirectoryPicker === 'function';
+  return window.isSecureContext && typeof window.showDirectoryPicker === 'function';
 }
 
 export async function pickStatementDownloadDirectory(): Promise<FileSystemDirectoryHandle> {
   if (!isDirectoryPickerSupported()) {
     throw new Error(
-      '이 브라우저는 폴더 선택 다운로드를 지원하지 않습니다. Chrome 또는 Edge를 사용해 주세요.'
+      '폴더 선택 다운로드는 HTTPS 또는 localhost 접속에서만 사용할 수 있습니다. ZIP 다운로드로 대체합니다.'
     );
   }
 
@@ -201,6 +204,75 @@ export async function saveStatementPngsToDirectory(
   return saved;
 }
 
+function buildStatementZipFileName(): string {
+  const today = new Date().toISOString().slice(0, 10);
+  return `명세서_${today}.zip`;
+}
+
+export async function downloadStatementPngsAsZip(
+  items: StatementPngDownloadItem[],
+  onProgress?: (current: number, total: number) => void
+): Promise<number> {
+  if (items.length === 0) return 0;
+
+  const zip = new JSZip();
+  const usedNames = new Set<string>();
+  let saved = 0;
+
+  for (const item of items) {
+    const baseName = buildStatementPngFileName(
+      item.issuedAt,
+      item.companyName,
+      item.lineCount,
+      item.isReservation ?? false
+    );
+    const fileName = ensureUniqueFileName(baseName, usedNames);
+    const blob = await htmlToPngBlob(item.html);
+    zip.file(fileName, blob);
+    saved += 1;
+    onProgress?.(saved, items.length);
+  }
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  triggerBlobDownload(zipBlob, buildStatementZipFileName());
+  return saved;
+}
+
+export async function downloadStatementPngsBulk(
+  items: StatementPngDownloadItem[],
+  onProgress?: (current: number, total: number) => void
+): Promise<{ saved: number; delivery: StatementBulkDownloadDelivery }> {
+  if (items.length === 0) {
+    return { saved: 0, delivery: 'zip' };
+  }
+
+  if (isDirectoryPickerSupported()) {
+    try {
+      const dirHandle = await window.showDirectoryPicker();
+      const saved = await saveStatementPngsToDirectory(items, dirHandle, onProgress);
+      return { saved, delivery: 'folder' };
+    } catch (error) {
+      if (isDirectoryPickerAbortError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  const saved = await downloadStatementPngsAsZip(items, onProgress);
+  return { saved, delivery: 'zip' };
+}
+
+export function formatStatementBulkDownloadMessage(
+  saved: number,
+  delivery: StatementBulkDownloadDelivery
+): string {
+  if (delivery === 'folder') {
+    return `${saved.toLocaleString()}장의 명세서 PNG를 선택한 폴더에 저장했습니다.`;
+  }
+
+  return `${saved.toLocaleString()}장의 명세서를 ZIP 파일로 다운로드했습니다.\n(폴더 선택은 HTTPS 또는 localhost 접속에서 사용할 수 있습니다.)`;
+}
+
 export async function downloadHtmlAsPng(html: string, fileName: string): Promise<void> {
   const blob = await htmlToPngBlob(html);
   triggerBlobDownload(blob, fileName);
@@ -214,7 +286,7 @@ export async function downloadShopOrderStatementAsPng(
   isReservation = false
 ): Promise<void> {
   const fileName = buildStatementPngFileName(issuedAt, companyName, lineCount, isReservation);
-  await downloadHtmlAsPng(html, fileName);
+  await downloadHtmlAsPng(html, fileName.endsWith('.png') ? fileName : `${fileName}.png`);
 }
 
 export function isDirectoryPickerAbortError(error: unknown): boolean {
