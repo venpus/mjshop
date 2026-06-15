@@ -64,11 +64,14 @@ export interface CreateStockInboundItemData {
 export class StockInboundRepository {
   async findAll(): Promise<StockInboundItem[]> {
     const [rows] = await pool.execute<StockInboundItemRow[]>(
-      `SELECT id, purchase_order_id, group_key, product_id, product_name, po_number,
-              product_main_image, unit_price, inbound_quantity, selling_price, stock_quantity,
-              created_at, updated_at, created_by
-       FROM kr_stock_inbound_items
-       ORDER BY created_at DESC`
+      `SELECT inbound.id, inbound.purchase_order_id, inbound.group_key, inbound.product_id,
+              inbound.product_name, inbound.po_number, inbound.product_main_image, inbound.unit_price,
+              inbound.inbound_quantity, inbound.selling_price, inbound.stock_quantity,
+              inbound.created_at, inbound.updated_at, inbound.created_by
+       FROM kr_stock_inbound_items inbound
+       LEFT JOIN kr_shop_orders shop_order ON shop_order.stock_inbound_item_id = inbound.id
+       WHERE shop_order.id IS NULL
+       ORDER BY inbound.created_at DESC`
     );
     return rows.map(this.mapRowToItem);
   }
