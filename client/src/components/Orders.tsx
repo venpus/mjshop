@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   getShopOrders,
@@ -19,19 +19,27 @@ export function Orders() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = parseShopOrderListTab(searchParams.get(SHOP_ORDER_LIST_TAB_PARAM));
   const [orders, setOrders] = useState<ShopOrder[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasLoadedOnceRef = useRef(false);
 
   const loadOrders = useCallback(async () => {
-    setIsLoading(true);
+    if (!hasLoadedOnceRef.current) {
+      setIsInitialLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     setError(null);
     try {
       const data = await getShopOrders();
       setOrders(data);
+      hasLoadedOnceRef.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : '주문 목록을 불러오지 못했습니다.');
     } finally {
-      setIsLoading(false);
+      setIsInitialLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -99,19 +107,34 @@ export function Orders() {
         reservationCount={reservationCount}
       />
 
-      {isLoading ? (
+      {isInitialLoading ? (
         <div className="py-16 text-center text-gray-500">주문 목록을 불러오는 중...</div>
-      ) : error ? (
+      ) : error && orders.length === 0 ? (
         <div className="py-16 text-center text-red-600">{error}</div>
-      ) : activeTab === 'products' ? (
-        <ShopOrderProductListTab orders={orders} listTab={activeTab} onReload={loadOrders} />
       ) : (
-        <ShopOrderLineListTab
-          orders={orders}
-          listTab={activeTab}
-          lineKind={activeTab === 'reservations' ? 'reservations' : 'orders'}
-          onReload={loadOrders}
-        />
+        <>
+          {isRefreshing && (
+            <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
+              <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-purple-600 rounded-full animate-spin" />
+              목록을 새로고치는 중...
+            </div>
+          )}
+          {error && orders.length > 0 && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+          {activeTab === 'products' ? (
+            <ShopOrderProductListTab orders={orders} listTab={activeTab} onReload={loadOrders} />
+          ) : (
+            <ShopOrderLineListTab
+              orders={orders}
+              listTab={activeTab}
+              lineKind={activeTab === 'reservations' ? 'reservations' : 'orders'}
+              onReload={loadOrders}
+            />
+          )}
+        </>
       )}
     </div>
   );
