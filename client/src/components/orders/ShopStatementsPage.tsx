@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, Eye, Loader2, Search, XCircle } from 'lucide-react';
 import {
   cancelShopOrderStatements,
-  downloadShopOrderStatement,
   getShopOrderStatementPreview,
   getShopOrders,
   type ShopOrder,
 } from '../../api/shopOrderApi';
+import { downloadShopOrderStatementAsPng } from '../../utils/shopOrderStatementDownload';
 import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
 import {
   buildShopOrderStatementListRows,
@@ -124,7 +124,16 @@ export function ShopStatementsPage() {
   const handleDownloadStatement = async (group: ShopOrderStatementGroupRow) => {
     setBusyGroupKey(group.groupKey);
     try {
-      await downloadShopOrderStatement(group.previewShopOrderId, group.previewLineId);
+      const preview = await getShopOrderStatementPreview(
+        group.previewShopOrderId,
+        group.previewLineId
+      );
+      await downloadShopOrderStatementAsPng(
+        preview.html,
+        group.latestUpdatedAt,
+        group.companyName,
+        group.lineCount
+      );
     } catch (err) {
       alert(err instanceof Error ? err.message : '명세서 다운로드 중 오류가 발생했습니다.');
     } finally {
@@ -188,7 +197,7 @@ export function ShopStatementsPage() {
         <h2 className="text-gray-900 mb-2">명세서 모아보기</h2>
         <p className="text-gray-600">
           상호명·주소·수령인이 같은 명세서를 묶어서 보여줍니다. 통합 명세서는 한 장으로
-          미리보기·다운로드할 수 있습니다.
+          미리보기·PNG 다운로드할 수 있습니다.
         </p>
       </div>
 
