@@ -361,16 +361,24 @@ export class ShopOrderController {
 
   createBulkStatements = async (req: Request, res: Response): Promise<void> => {
     try {
-      const orderIds = Array.isArray(req.body?.orderIds)
-        ? req.body.orderIds.map((value: unknown) => String(value))
-        : [];
+      const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
+      const items = rawItems
+        .map((item: unknown) => {
+          if (!item || typeof item !== 'object') return null;
+          const record = item as Record<string, unknown>;
+          const shopOrderId = String(record.shopOrderId ?? '').trim();
+          const lineId = String(record.lineId ?? '').trim();
+          if (!shopOrderId || !lineId) return null;
+          return { shopOrderId, lineId };
+        })
+        .filter(Boolean) as Array<{ shopOrderId: string; lineId: string }>;
 
-      if (orderIds.length === 0) {
-        res.status(400).json({ success: false, error: 'orderIds가 필요합니다.' });
+      if (items.length === 0) {
+        res.status(400).json({ success: false, error: '선택한 주문건(items)이 필요합니다.' });
         return;
       }
 
-      const result = await this.service.createBulkStatements(orderIds);
+      const result = await this.service.createBulkStatements(items);
       res.json({
         success: true,
         data: result,

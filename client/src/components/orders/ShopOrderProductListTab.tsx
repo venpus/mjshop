@@ -167,7 +167,20 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
 
     setBulkBusy(true);
     try {
-      const result = await createShopOrderBulkStatements(orderIds);
+      const selectedOrders = await loadSelectedOrdersWithLines(orderIds);
+      const items = selectedOrders.flatMap((order) =>
+        order.lines.map((line) => ({
+          shopOrderId: order.id,
+          lineId: line.id,
+        }))
+      );
+
+      if (items.length === 0) {
+        alert('선택한 주문에 명세서를 생성할 주문건이 없습니다.');
+        return;
+      }
+
+      const result = await createShopOrderBulkStatements(items);
 
       if (result.groups.length === 0) {
         alert('선택한 주문에 판매 주문이 없습니다.');

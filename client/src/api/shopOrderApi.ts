@@ -405,13 +405,13 @@ export interface ShopOrderBulkStatementResult {
 }
 
 export async function createShopOrderBulkStatements(
-  orderIds: string[]
+  items: Array<{ shopOrderId: string; lineId: string }>
 ): Promise<ShopOrderBulkStatementResult> {
   const response = await fetch(`${API_BASE_URL}/shop-orders/bulk/statements`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ orderIds }),
+    body: JSON.stringify({ items }),
   });
   const data = await response.json();
   if (!response.ok) {

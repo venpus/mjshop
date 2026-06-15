@@ -253,14 +253,17 @@ export function ShopOrderLineListTab({
     const selectedRows = getSelectedRows();
     if (!selectedRows) return;
 
-    const orderIds = [...new Set(selectedRows.map((row) => row.shopOrderId))];
+    const items = selectedRows.map((row) => ({
+      shopOrderId: row.shopOrderId,
+      lineId: row.line.id,
+    }));
 
     setBulkBusy(true);
     try {
-      const result = await createShopOrderBulkStatements(orderIds);
+      const result = await createShopOrderBulkStatements(items);
 
       if (result.groups.length === 0) {
-        alert('선택한 주문에 판매 주문이 없습니다.');
+        alert('선택한 주문건에 명세서를 생성할 수 없습니다.');
         return;
       }
 
