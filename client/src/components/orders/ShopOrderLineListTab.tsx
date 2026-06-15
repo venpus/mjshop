@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRightLeft,
+  ArrowUpDown,
   ClipboardList,
   Eye,
   FileSpreadsheet,
@@ -46,6 +47,7 @@ import {
   lineHasStatement,
   matchesLineDateRange,
   matchesLineFulfillmentFilters,
+  sortShopOrderLineRowsByCompanyAddress,
   type ShopOrderLineFulfillmentFilters,
 } from '../../utils/shopOrderLineListUtils';
 import { ShopBuyerInfoModal } from './ShopBuyerInfoModal';
@@ -134,6 +136,7 @@ export function ShopOrderLineListTab({
   const [fulfillmentFilters, setFulfillmentFilters] = useState<ShopOrderLineFulfillmentFilters>(
     EMPTY_LINE_FULFILLMENT_FILTERS
   );
+  const [sortByCompanyAddress, setSortByCompanyAddress] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [statementModalOpen, setStatementModalOpen] = useState(false);
@@ -198,7 +201,12 @@ export function ShopOrderLineListTab({
     });
   }, [lineRows, searchTerm, statusFilter, dateFrom, dateTo, fulfillmentFilters, buyers]);
 
-  const paginationResetKey = `${lineKind}|${searchTerm}|${statusFilter}|${dateFrom}|${dateTo}|${JSON.stringify(fulfillmentFilters)}`;
+  const displayRows = useMemo(() => {
+    if (!sortByCompanyAddress) return filteredRows;
+    return sortShopOrderLineRowsByCompanyAddress(filteredRows);
+  }, [filteredRows, sortByCompanyAddress]);
+
+  const paginationResetKey = `${lineKind}|${searchTerm}|${statusFilter}|${dateFrom}|${dateTo}|${sortByCompanyAddress}|${JSON.stringify(fulfillmentFilters)}`;
   const {
     paginatedItems: paginatedRows,
     currentPage,
@@ -207,7 +215,7 @@ export function ShopOrderLineListTab({
     totalItems,
     startIndex,
     endIndex,
-  } = useShopOrderListPagination(filteredRows, paginationResetKey);
+  } = useShopOrderListPagination(displayRows, paginationResetKey);
 
   const allPageSelected =
     paginatedRows.length > 0 && paginatedRows.every((row) => selectedRowKeys.has(row.rowKey));
@@ -492,6 +500,23 @@ export function ShopOrderLineListTab({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
+            <button
+              type="button"
+              onClick={() => setSortByCompanyAddress((prev) => !prev)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                sortByCompanyAddress
+                  ? accentFilterActiveClass
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+              title={
+                sortByCompanyAddress
+                  ? '주문 순서별 정렬로 전환'
+                  : '상호명·주소가 같은 업체끼리 묶어 정렬'
+              }
+            >
+              <ArrowUpDown className="w-4 h-4" />
+              업체별 정렬
+            </button>
             <span className="text-sm font-medium text-gray-600">등록일</span>
             <input
               type="date"
@@ -522,7 +547,8 @@ export function ShopOrderLineListTab({
         </div>
 
         <p className="text-sm text-gray-500">
-          {filteredRows.length.toLocaleString()}건 표시
+          {displayRows.length.toLocaleString()}건 표시
+          {sortByCompanyAddress ? ' · 업체별 정렬' : ''}
           {fulfillmentFilterActive || dateFrom || dateTo || statusFilter !== ALL_STATUS || searchTerm
             ? ' (필터 적용됨)'
             : ''}

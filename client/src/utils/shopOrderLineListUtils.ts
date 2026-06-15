@@ -122,3 +122,35 @@ export function matchesLineDateRange(
 export function hasActiveLineFulfillmentFilters(filters: ShopOrderLineFulfillmentFilters): boolean {
   return Object.values(filters).some(Boolean);
 }
+
+function normalizeLineListSortField(value: string | null | undefined): string {
+  return (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+export function compareShopOrderLineRowsByCompanyAddress(
+  a: ShopOrderLineListRow,
+  b: ShopOrderLineListRow
+): number {
+  const companyCompare = normalizeLineListSortField(a.line.companyName).localeCompare(
+    normalizeLineListSortField(b.line.companyName),
+    'ko'
+  );
+  if (companyCompare !== 0) return companyCompare;
+
+  const addressCompare = normalizeLineListSortField(a.line.address).localeCompare(
+    normalizeLineListSortField(b.line.address),
+    'ko'
+  );
+  if (addressCompare !== 0) return addressCompare;
+
+  const orderCompare = a.orderNumber.localeCompare(b.orderNumber, 'ko');
+  if (orderCompare !== 0) return orderCompare;
+
+  return a.lineIndex - b.lineIndex;
+}
+
+export function sortShopOrderLineRowsByCompanyAddress(
+  rows: ShopOrderLineListRow[]
+): ShopOrderLineListRow[] {
+  return [...rows].sort(compareShopOrderLineRowsByCompanyAddress);
+}
