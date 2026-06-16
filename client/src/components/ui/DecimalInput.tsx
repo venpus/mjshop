@@ -32,6 +32,7 @@ export function DecimalInput({
   onChange,
   decimalPlaces = 2,
   step = "0.01",
+  onWheel,
   ...rest
 }: DecimalInputProps) {
   const [displayStr, setDisplayStr] = useState("");
@@ -84,12 +85,19 @@ export function DecimalInput({
 
   const displayValue = displayStr !== "" ? displayStr : formatNumberForInput(value);
 
+  const handleWheel = (e: React.WheelEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.currentTarget.blur();
+    onWheel?.(e);
+  };
+
   return (
     <input
       type="number"
       value={displayValue}
       onChange={handleChange}
       onBlur={handleBlur}
+      onWheel={handleWheel}
       step={step}
       {...rest}
     />

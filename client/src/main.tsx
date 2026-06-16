@@ -5,6 +5,9 @@ import "./index.css";
 import { AuthProvider } from "./contexts/AuthContext.tsx";
 import { PermissionProvider } from "./contexts/PermissionContext.tsx";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import { initPreventNumberInputWheelChange } from "./utils/preventNumberInputWheel";
+
+initPreventNumberInputWheelChange();
 
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
