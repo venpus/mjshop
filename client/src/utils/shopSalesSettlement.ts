@@ -269,6 +269,8 @@ export interface SettlementPaymentTotals {
 
 export interface SalesSettlementAggregateStats {
   rowCount: number;
+  orderQuantityTotal: number;
+  orderBoxCountTotal: number;
   salesAmountExVat: number;
   vatAmount: number;
   profitAmount: number;
@@ -341,6 +343,8 @@ export function calculateSalesSettlementAggregateStats(
 ): SalesSettlementAggregateStats {
   return {
     rowCount: rows.length,
+    orderQuantityTotal: rows.reduce((sum, row) => sum + row.lineQuantity, 0),
+    orderBoxCountTotal: rows.reduce((sum, row) => sum + row.orderBoxCount, 0),
     salesAmountExVat: sumAvailableAmounts(rows.map((row) => row.salesAmountExVat)),
     vatAmount: sumAvailableAmounts(rows.map((row) => row.vatAmount)),
     profitAmount: sumAvailableAmounts(rows.map((row) => row.profitAmount)),

@@ -393,25 +393,17 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
 
   const handleSellingPriceChange = (value: number | null) => {
-
     setForm((prev) =>
-
       prev
-
         ? {
-
             ...prev,
-
             sellingPrice: value,
-
-            lines: prev.lines.map((line) => ({ ...line, saleUnitPrice: value })),
-
+            lines: prev.lines.map((line) =>
+              line.saleUnitPrice != null ? line : { ...line, saleUnitPrice: value }
+            ),
           }
-
         : prev
-
     );
-
   };
 
 

@@ -59,6 +59,7 @@ export function SalesSettlementPage() {
   const [shipmentBoxSaveErrors, setShipmentBoxSaveErrors] = useState<Record<string, string>>({});
   const [paymentSavingKeys, setPaymentSavingKeys] = useState<Record<string, boolean>>({});
   const [paymentSaveErrors, setPaymentSaveErrors] = useState<Record<string, string>>({});
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Set<string>>(new Set());
 
   const exchangeRatesByRowKey = useMemo(() => {
     const rates: Record<string, number | null> = {};
@@ -129,6 +130,10 @@ export function SalesSettlementPage() {
 
   const paginationResetKey = `${searchTerm}|${dateFrom}|${dateTo}`;
 
+  useEffect(() => {
+    setSelectedRowKeys(new Set());
+  }, [paginationResetKey]);
+
   const {
     paginatedItems,
     currentPage,
@@ -138,6 +143,43 @@ export function SalesSettlementPage() {
     startIndex,
     endIndex,
   } = useShopOrderListPagination(filteredRows, paginationResetKey);
+
+  const selectedRows = useMemo(
+    () => filteredRows.filter((row) => selectedRowKeys.has(row.rowKey)),
+    [filteredRows, selectedRowKeys]
+  );
+
+  const statsRows = selectedRows.length > 0 ? selectedRows : filteredRows;
+  const statsSelectionLabel =
+    selectedRows.length > 0 ? `선택 ${selectedRows.length.toLocaleString()}건 기준` : null;
+
+  const allPageSelected =
+    paginatedItems.length > 0 &&
+    paginatedItems.every((row) => selectedRowKeys.has(row.rowKey));
+
+  const handleToggleSelectAll = () => {
+    setSelectedRowKeys((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        paginatedItems.forEach((row) => next.delete(row.rowKey));
+      } else {
+        paginatedItems.forEach((row) => next.add(row.rowKey));
+      }
+      return next;
+    });
+  };
+
+  const handleToggleSelect = (rowKey: string) => {
+    setSelectedRowKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowKey)) {
+        next.delete(rowKey);
+      } else {
+        next.add(rowKey);
+      }
+      return next;
+    });
+  };
 
   const handleExchangeRateChange = (rowKey: string, value: string) => {
     setExchangeRateInputs((prev) => ({ ...prev, [rowKey]: value }));
@@ -486,6 +528,9 @@ export function SalesSettlementPage() {
 
         <p className="mt-3 text-sm text-gray-500">
           {filteredRows.length.toLocaleString()}건 표시
+          {selectedRows.length > 0 && (
+            <span className="text-purple-700"> · 선택 {selectedRows.length.toLocaleString()}건</span>
+          )}
           {dateFilterActive || searchTerm ? ' (필터 적용됨)' : ''}
         </p>
 
@@ -495,7 +540,11 @@ export function SalesSettlementPage() {
           인벤티오 40%
         </p>
 
-        <SalesSettlementStatsPanel rows={filteredRows} dateFilterActive={dateFilterActive} />
+        <SalesSettlementStatsPanel
+          rows={statsRows}
+          dateFilterActive={dateFilterActive && selectedRows.length === 0}
+          selectionLabel={statsSelectionLabel}
+        />
       </div>
 
       {isLoading ? (
@@ -521,6 +570,15 @@ export function SalesSettlementPage() {
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  <th className="px-3 py-3 text-center w-10">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 cursor-pointer accent-purple-600"
+                      aria-label="현재 페이지 전체 선택"
+                    />
+                  </th>
                   <th className="px-3 py-3 text-left font-medium text-gray-600 whitespace-nowrap">주문</th>
                   <th className="px-3 py-3 text-left font-medium text-gray-600 whitespace-nowrap">등록일</th>
                   <th className="px-3 py-3 text-left font-medium text-gray-600 whitespace-nowrap">상호</th>
@@ -571,7 +629,7 @@ export function SalesSettlementPage() {
               <tbody className="divide-y divide-gray-100">
                 {paginatedItems.length === 0 ? (
                   <tr>
-                    <td colSpan={17} className="px-3 py-12 text-center text-gray-500">
+                    <td colSpan={18} className="px-3 py-12 text-center text-gray-500">
                       표시할 주문 건이 없습니다.
                     </td>
                   </tr>
@@ -587,12 +645,22 @@ export function SalesSettlementPage() {
                     const isShipmentBoxDirty =
                       normalizeExchangeRateInput(shipmentBoxInputs[row.rowKey] ?? '') !==
                       normalizeExchangeRateInput(savedShipmentBoxInputs[row.rowKey] ?? '');
+                    const isSelected = selectedRowKeys.has(row.rowKey);
 
                     return (
                       <tr
                         key={row.rowKey}
                         className={row.isReservation ? 'hover:bg-amber-50/60 bg-amber-50/30' : 'hover:bg-gray-50'}
                       >
+                        <td className="px-3 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleSelect(row.rowKey)}
+                            className="w-4 h-4 cursor-pointer accent-purple-600"
+                            aria-label={`${formatSalesSettlementOrderRef(row)} 선택`}
+                          />
+                        </td>
                         <td className="px-3 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-1.5 font-medium text-gray-900">
                             <span className="select-text cursor-text">
@@ -785,7 +853,7 @@ export function SalesSettlementPage() {
               {paginatedItems.length > 0 && (
                 <tfoot className="bg-gray-50 border-t border-gray-200">
                   <tr>
-                    <td colSpan={8} className="px-3 py-3 text-right font-medium text-gray-700">
+                    <td colSpan={9} className="px-3 py-3 text-right font-medium text-gray-700">
                       현재 페이지 합계
                       {pageTotals.calculatedCount > 0 && (
                         <span className="ml-1 text-xs font-normal text-gray-500">

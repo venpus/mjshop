@@ -10,11 +10,13 @@ import {
 interface SalesSettlementStatsPanelProps {
   rows: SalesSettlementRow[];
   dateFilterActive: boolean;
+  selectionLabel?: string | null;
 }
 
 export function SalesSettlementStatsPanel({
   rows,
   dateFilterActive,
+  selectionLabel = null,
 }: SalesSettlementStatsPanelProps) {
   const viewMode = dateFilterActive ? 'by-date' : 'total';
   const totalStats = calculateSalesSettlementAggregateStats(rows);
@@ -25,10 +27,12 @@ export function SalesSettlementStatsPanel({
       <div className="mb-3">
         <h3 className="text-sm font-bold text-gray-900">정산 통계</h3>
         <p className="text-xs text-gray-500 mt-0.5">
-          {rows.length.toLocaleString()}건 기준 ·{' '}
+          {selectionLabel ?? `${rows.length.toLocaleString()}건 기준`} ·{' '}
           {viewMode === 'by-date'
             ? '등록일 필터 적용 · 날짜별 집계'
-            : '전체 합계'}
+            : selectionLabel
+              ? '선택 건 집계'
+              : '전체 합계'}
         </p>
       </div>
 
@@ -46,6 +50,13 @@ export function SalesSettlementStatsPanel({
                 </th>
                 <th className="px-3 py-2.5 text-right font-medium text-gray-600 whitespace-nowrap">
                   건수
+                </th>
+                <th className="px-3 py-2.5 text-right font-medium text-gray-600 whitespace-nowrap">
+                  주문 수량
+                  <span className="block text-[10px] font-normal text-gray-400">개</span>
+                </th>
+                <th className="px-3 py-2.5 text-right font-medium text-gray-600 whitespace-nowrap">
+                  주문 박스
                 </th>
                 <th className="px-3 py-2.5 text-right font-medium text-gray-600 whitespace-nowrap">
                   판매 대금
@@ -108,6 +119,12 @@ function StatsTableRow({
       <td className={`px-3 py-2.5 whitespace-nowrap ${labelCellClass} ${rowClass}`}>{label}</td>
       <td className={`px-3 py-2.5 text-right tabular-nums text-gray-700 ${rowClass}`}>
         {stats.rowCount.toLocaleString()}
+      </td>
+      <td className={`px-3 py-2.5 text-right tabular-nums text-gray-900 ${rowClass}`}>
+        {stats.orderQuantityTotal.toLocaleString()}
+      </td>
+      <td className={`px-3 py-2.5 text-right tabular-nums text-gray-700 ${rowClass}`}>
+        {stats.orderBoxCountTotal.toLocaleString()}
       </td>
       <td className={`px-3 py-2.5 text-right tabular-nums text-gray-900 ${rowClass}`}>
         {formatKrwAmount(stats.salesAmountExVat)}
