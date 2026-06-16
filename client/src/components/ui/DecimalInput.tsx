@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { handleNumberInput, formatNumberForInput } from "../../utils/numberInputUtils";
+import { handleNumberInputWheel } from "../../utils/preventNumberInputWheel";
 
 function roundToDecimals(num: number, decimals: number): number {
   if (Number.isNaN(num) || !Number.isFinite(num)) return 0;
@@ -86,8 +87,7 @@ export function DecimalInput({
   const displayValue = displayStr !== "" ? displayStr : formatNumberForInput(value);
 
   const handleWheel = (e: React.WheelEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    e.currentTarget.blur();
+    handleNumberInputWheel(e);
     onWheel?.(e);
   };
 

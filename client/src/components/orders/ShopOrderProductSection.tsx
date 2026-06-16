@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { Package, Image, ExternalLink } from 'lucide-react';
 import { getFullImageUrl } from '../../api/purchaseOrderApi';
+import { handleNumberInputWheel } from '../../utils/preventNumberInputWheel';
 import type { ShopOrderStatus } from '../../api/shopOrderApi';
 import { getShopOrderStatusClass } from '../../api/shopOrderApi';
 
@@ -134,6 +135,7 @@ export function ShopOrderProductSection({
                 onChange={(e) =>
                   onQuantityPerBoxChange?.(parseInt(e.target.value, 10) || 0)
                 }
+                onWheel={handleNumberInputWheel}
                 className={inputClass}
               />
             </InfoField>
@@ -148,6 +150,7 @@ export function ShopOrderProductSection({
                     e.target.value === '' ? null : parseFloat(e.target.value) || 0
                   )
                 }
+                onWheel={handleNumberInputWheel}
                 className={inputClass}
                 placeholder="판매가"
               />

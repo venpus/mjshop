@@ -8,7 +8,9 @@ import type { ShopOrder } from '../../api/shopOrderApi';
 
 import { getLineAmountBreakdown, getLineTotalAmount, type ShopOrderLineForm } from '../../utils/shopOrderCalculations';
 
-import { findMatchingAddressIndex, formatCompanyNameWithKakaoId } from '../../utils/shopBuyerDisplay';
+import { findMatchingAddressIndex } from '../../utils/shopBuyerDisplay';
+import { handleNumberInputWheel } from '../../utils/preventNumberInputWheel';
+import { ShopBuyerCompanyPicker } from '../buyers/ShopBuyerCompanyPicker';
 
 import { ShopOrderFulfillmentPanel } from './ShopOrderFulfillmentPanel';
 
@@ -371,45 +373,14 @@ function ShopOrderLineRow({
       <div className="flex flex-nowrap items-end gap-1 w-full min-w-0 overflow-hidden">
 
           <ProgressField label="상호명" className="flex-[1.4] min-w-[72px]">
-
-            <select
-
-              value={selectedBuyer?.id ?? (hasUnmatchedCompanyName ? '__unmatched__' : '')}
-
-              onChange={(e) => {
-
-                const value = e.target.value;
-
-                if (value === '__unmatched__') return;
-
-                handleCompanyChange(value);
-
-              }}
-
+            <ShopBuyerCompanyPicker
+              buyers={buyers}
+              selectedBuyer={selectedBuyer ?? null}
+              unmatchedCompanyName={hasUnmatchedCompanyName ? line.companyName : undefined}
+              onSelect={handleCompanyChange}
               className={inputClass}
-
-            >
-
-              <option value="">상호명 선택</option>
-
-              {hasUnmatchedCompanyName && (
-
-                <option value="__unmatched__">{line.companyName}</option>
-
-              )}
-
-              {buyers.map((buyer) => (
-
-                <option key={buyer.id} value={buyer.id}>
-
-                  {formatCompanyNameWithKakaoId(buyer.companyName, buyer.kakaoId)}
-
-                </option>
-
-              ))}
-
-            </select>
-
+              disabled={isLineBusy}
+            />
           </ProgressField>
 
 
@@ -430,6 +401,8 @@ function ShopOrderLineRow({
 
               }
 
+              onWheel={handleNumberInputWheel}
+
               className={`${inputClass} text-right`}
 
             />
@@ -446,6 +419,7 @@ function ShopOrderLineRow({
               onChange={(e) =>
                 onLineChange(line.id, 'quantityPerBox', parseInt(e.target.value, 10) || 0)
               }
+              onWheel={handleNumberInputWheel}
               className={`${inputClass} text-right`}
             />
           </ProgressField>
@@ -475,6 +449,8 @@ function ShopOrderLineRow({
                 )
 
               }
+
+              onWheel={handleNumberInputWheel}
 
               className={`${inputClass} text-right`}
 
@@ -509,6 +485,8 @@ function ShopOrderLineRow({
                 )
 
               }
+
+              onWheel={handleNumberInputWheel}
 
               className={`${inputClass} text-right`}
 

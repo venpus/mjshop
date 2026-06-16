@@ -1,5 +1,17 @@
+import type { WheelEvent as ReactWheelEvent } from 'react';
+
 function isNumberInput(element: Element | null): element is HTMLInputElement {
   return element instanceof HTMLInputElement && element.type === 'number';
+}
+
+function resolveNumberInputFromWheelEvent(event: WheelEvent): HTMLInputElement | null {
+  if (isNumberInput(event.target)) {
+    return event.target;
+  }
+  if (isNumberInput(document.activeElement)) {
+    return document.activeElement;
+  }
+  return null;
 }
 
 /**
@@ -12,10 +24,18 @@ export function initPreventNumberInputWheelChange(): void {
   document.addEventListener(
     'wheel',
     (event) => {
-      if (!isNumberInput(document.activeElement)) return;
+      const numberInput = resolveNumberInputFromWheelEvent(event);
+      if (!numberInput) return;
       event.preventDefault();
-      document.activeElement.blur();
+      event.stopPropagation();
+      numberInput.blur();
     },
     { capture: true, passive: false }
   );
+}
+
+export function handleNumberInputWheel(event: ReactWheelEvent<HTMLInputElement>): void {
+  event.preventDefault();
+  event.stopPropagation();
+  event.currentTarget.blur();
 }
