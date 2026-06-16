@@ -333,6 +333,20 @@ export class StockInboundRepository {
     return this.mapRowToItem(rows[0]);
   }
 
+  async updateStockQuantity(id: number, stockQuantity: number): Promise<void> {
+    await pool.execute<ResultSetHeader>(
+      `UPDATE kr_stock_inbound_items SET stock_quantity = ? WHERE id = ?`,
+      [stockQuantity, id]
+    );
+  }
+
+  async updateUnitPrice(id: number, unitPrice: number | null): Promise<void> {
+    await pool.execute<ResultSetHeader>(
+      `UPDATE kr_stock_inbound_items SET unit_price = ? WHERE id = ?`,
+      [unitPrice, id]
+    );
+  }
+
   private mapRowToItem(row: StockInboundItemRow): StockInboundItem {
     return {
       id: row.id,

@@ -124,6 +124,12 @@ export class ShopOrderController {
           req.body.sellingPrice != null ? Number(req.body.sellingPrice) : req.body.sellingPrice,
         quantityPerBox:
           req.body.quantityPerBox != null ? Number(req.body.quantityPerBox) : undefined,
+        warehouseStockQuantity:
+          req.body.warehouseStockQuantity != null
+            ? Number(req.body.warehouseStockQuantity)
+            : undefined,
+        unitPrice:
+          req.body.unitPrice != null ? Number(req.body.unitPrice) : req.body.unitPrice,
         lines: Array.isArray(req.body.lines)
           ? req.body.lines.map((line: Record<string, unknown>) => ({
               id: String(line.id),
@@ -345,9 +351,12 @@ export class ShopOrderController {
 
   createStatement = async (req: Request, res: Response): Promise<void> => {
     try {
+      const statementDate =
+        typeof req.body?.statementDate === 'string' ? req.body.statementDate : undefined;
       const order = await this.service.createOrUpdateStatement(
         req.params.id,
-        req.params.lineId
+        req.params.lineId,
+        { statementDate }
       );
       res.json({ success: true, data: order, message: '명세서가 생성되었습니다.' });
     } catch (error: unknown) {
@@ -378,7 +387,10 @@ export class ShopOrderController {
         return;
       }
 
-      const result = await this.service.createBulkStatements(items);
+      const statementDate =
+        typeof req.body?.statementDate === 'string' ? req.body.statementDate : undefined;
+
+      const result = await this.service.createBulkStatements(items, { statementDate });
       res.json({
         success: true,
         data: result,
@@ -395,18 +407,7 @@ export class ShopOrderController {
 
   cancelBulkStatements = async (req: Request, res: Response): Promise<void> => {
     try {
-      const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
-      const items = rawItems
-        .map((item: unknown) => {
-          if (!item || typeof item !== 'object') return null;
-          const record = item as Record<string, unknown>;
-          const shopOrderId = String(record.shopOrderId ?? '').trim();
-          const lineId = String(record.lineId ?? '').trim();
-          if (!shopOrderId || !lineId) return null;
-          return { shopOrderId, lineId };
-        })
-        .filter(Boolean) as Array<{ shopOrderId: string; lineId: string }>;
-
+      const items = this.parseStatementItems(req.body?.items);
       const result = await this.service.cancelBulkStatements(items);
       res.json({
         success: true,
@@ -420,6 +421,64 @@ export class ShopOrderController {
         error: error instanceof Error ? error.message : '명세서 취소 중 오류가 발생했습니다.',
       });
     }
+  };
+
+  updateStatementDelivery = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const items = this.parseStatementItems(req.body?.items);
+      const delivered = Boolean(req.body?.delivered);
+      const result = await this.service.updateStatementDeliveryStatus(items, delivered);
+      res.json({
+        success: true,
+        data: result,
+        message: delivered
+          ? `명세서 ${result.updatedCount}건을 전달완료로 저장했습니다.`
+          : `명세서 ${result.updatedCount}건의 전달완료를 해제했습니다.`,
+      });
+    } catch (error: unknown) {
+      console.error('명세서 전달완료 저장 오류:', error);
+      res.status(400).json({
+        success: false,
+        error:
+          error instanceof Error ? error.message : '명세서 전달완료 저장 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  updateStatementPayment = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const items = this.parseStatementItems(req.body?.items);
+      const paymentReceived = Boolean(req.body?.paymentReceived);
+      const result = await this.service.updateStatementPaymentStatus(items, paymentReceived);
+      res.json({
+        success: true,
+        data: result,
+        message: paymentReceived
+          ? `명세서 ${result.updatedCount}건을 입금완료로 저장했습니다.`
+          : `명세서 ${result.updatedCount}건의 입금완료를 해제했습니다.`,
+      });
+    } catch (error: unknown) {
+      console.error('명세서 입금완료 저장 오류:', error);
+      res.status(400).json({
+        success: false,
+        error:
+          error instanceof Error ? error.message : '명세서 입금완료 저장 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  private parseStatementItems(rawItems: unknown): Array<{ shopOrderId: string; lineId: string }> {
+    const items = Array.isArray(rawItems) ? rawItems : [];
+    return items
+      .map((item: unknown) => {
+        if (!item || typeof item !== 'object') return null;
+        const record = item as Record<string, unknown>;
+        const shopOrderId = String(record.shopOrderId ?? '').trim();
+        const lineId = String(record.lineId ?? '').trim();
+        if (!shopOrderId || !lineId) return null;
+        return { shopOrderId, lineId };
+      })
+      .filter(Boolean) as Array<{ shopOrderId: string; lineId: string }>;
   };
 
   previewStatementGroup = async (req: Request, res: Response): Promise<void> => {

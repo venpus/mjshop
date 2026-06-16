@@ -10,6 +10,8 @@ router.get('/reservation-transfer-targets', controller.getReservationTransferTar
 router.post('/bulk/statements', controller.createBulkStatements);
 router.post('/statements/preview', controller.previewStatementGroup);
 router.post('/statements/cancel', controller.cancelBulkStatements);
+router.patch('/statements/delivery', controller.updateStatementDelivery);
+router.patch('/statements/payment', controller.updateStatementPayment);
 router.post('/reservations/transfer', controller.transferReservationsToOrder);
 router.post('/from-inbound', controller.createFromInbound);
 router.post('/:id/lines', controller.addOrderLine);

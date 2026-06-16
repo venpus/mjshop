@@ -1,68 +1,105 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Search } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Loader2, Plus, Search, X } from 'lucide-react';
 import { getShopOrders, type ShopOrder } from '../../api/shopOrderApi';
+import {
+  deleteShopShipmentBatch,
+  getShopShipmentAssignedLineIds,
+  getShopShipmentBatches,
+  lookupShopShipmentTracking,
+  updateShopShipmentBatch,
+  type ShopShipmentBatchListItem,
+  type ShopShipmentBatchShipmentItem,
+} from '../../api/shopShipmentApi';
 import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
-import { buildShopOrderLineListRows } from '../../utils/shopOrderListExport';
-import {
-  calculateLogisticsFee,
-  formatKrwAmount,
-} from '../../utils/shopSalesSettlement';
-import {
-  formatLineOrderRef,
-  formatLineQuantity,
-} from '../../utils/shopOrderLineListUtils';
+import { formatLineOrderRef } from '../../utils/shopOrderLineListUtils';
 import { ShopOrderListPagination } from '../orders/ShopOrderListPagination';
+import { ShopShipmentAddModal } from './ShopShipmentAddModal';
+import { ShopShippingBatchCard } from './ShopShippingBatchCard';
 
-function formatOptionalText(value: string | null | undefined): string {
-  return value?.trim() ? value.trim() : '-';
+function parseOptionalNumber(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed.replace(/,/g, ''));
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function ShopShippingManagementPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusLineId = searchParams.get('lineId')?.trim() || null;
+
   const [orders, setOrders] = useState<ShopOrder[]>([]);
+  const [batches, setBatches] = useState<ShopShipmentBatchListItem[]>([]);
+  const [assignedLineIds, setAssignedLineIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [savingBatchId, setSavingBatchId] = useState<string | null>(null);
+  const [refreshingShipmentId, setRefreshingShipmentId] = useState<string | null>(null);
+  const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
+  const [logisticsFeePaidSavingBatchId, setLogisticsFeePaidSavingBatchId] = useState<string | null>(
+    null
+  );
 
-  const loadOrders = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getShopOrders();
-      setOrders(data);
+      const [orderData, batchData, lineIds] = await Promise.all([
+        getShopOrders(),
+        getShopShipmentBatches(),
+        getShopShipmentAssignedLineIds(),
+      ]);
+      setOrders(orderData);
+      setBatches(batchData);
+      setAssignedLineIds(new Set(lineIds));
     } catch (err) {
-      setError(err instanceof Error ? err.message : '주문 목록을 불러오지 못했습니다.');
+      setError(err instanceof Error ? err.message : '배송 데이터를 불러오지 못했습니다.');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadOrders();
-  }, [loadOrders]);
+    void loadData();
+  }, [loadData]);
 
-  const lineRows = useMemo(() => buildShopOrderLineListRows(orders), [orders]);
-
-  const filteredRows = useMemo(() => {
+  const filteredBatches = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    if (!term) return lineRows;
+    let result = batches;
 
-    return lineRows.filter((row) => {
+    if (focusLineId) {
+      result = result.filter((batch) => batch.lineItems.some((line) => line.lineId === focusLineId));
+    }
+
+    if (!term) return result;
+
+    return result.filter((batch) => {
       const haystack = [
-        row.orderNumber,
-        row.productName,
-        row.line.companyName ?? '',
-        row.line.recipientName ?? '',
-        row.line.phoneNumber ?? '',
-        row.line.address ?? '',
-        row.line.trackingNumber ?? '',
-        row.line.lineOrderNumber ?? '',
-        formatLineOrderRef(row.line.lineOrderNumber, row.orderNumber, row.lineIndex),
+        batch.shipmentDate,
+        batch.recipientName ?? '',
+        batch.phoneNumber ?? '',
+        batch.address ?? '',
+        ...batch.shipments.map((shipment) => shipment.trackingNumber),
+        ...batch.lineItems.flatMap((line) => [
+          line.orderNumber,
+          line.productName,
+          line.companyName ?? '',
+          formatLineOrderRef(line.lineOrderNumber, line.orderNumber, line.lineIndex),
+        ]),
       ]
         .join(' ')
         .toLowerCase();
       return haystack.includes(term);
     });
-  }, [lineRows, searchTerm]);
+  }, [batches, searchTerm, focusLineId]);
+
+  const clearLineFocus = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('lineId');
+    setSearchParams(next, { replace: true });
+  };
 
   const {
     paginatedItems,
@@ -72,43 +109,180 @@ export function ShopShippingManagementPage() {
     totalItems,
     startIndex,
     endIndex,
-  } = useShopOrderListPagination(filteredRows, searchTerm);
+  } = useShopOrderListPagination(filteredBatches, searchTerm);
+
+  const patchShipmentInBatches = (
+    shipmentId: string,
+    patch: Partial<Pick<ShopShipmentBatchShipmentItem, 'deliveryStatus' | 'lastTrackingKind' | 'lastTrackingAt'>>
+  ) => {
+    setBatches((prev) =>
+      prev.map((batch) => ({
+        ...batch,
+        shipments: batch.shipments.map((shipment) =>
+          shipment.shipmentId === shipmentId ? { ...shipment, ...patch } : shipment
+        ),
+      }))
+    );
+  };
+
+  const patchBatchFields = (
+    batchId: string,
+    patch: Partial<
+      Pick<
+        ShopShipmentBatchListItem,
+        'shipmentBoxCount' | 'deliveryFee' | 'boxPrice' | 'logisticsFeePaid' | 'logisticsFeePaidAt'
+      >
+    >
+  ) => {
+    setBatches((prev) =>
+      prev.map((batch) => (batch.batchId === batchId ? { ...batch, ...patch } : batch))
+    );
+  };
+
+  const handleBatchFieldSave = async (
+    batchId: string,
+    field: 'shipmentBoxCount' | 'deliveryFee' | 'boxPrice',
+    rawValue: string,
+    current: ShopShipmentBatchListItem
+  ) => {
+    const value = parseOptionalNumber(rawValue);
+    if (current[field] === value) return;
+
+    patchBatchFields(batchId, { [field]: value });
+    setSavingBatchId(batchId);
+    try {
+      await updateShopShipmentBatch(batchId, { [field]: value });
+    } catch (err) {
+      await loadData();
+      alert(err instanceof Error ? err.message : '배송 정보 저장에 실패했습니다.');
+    } finally {
+      setSavingBatchId(null);
+    }
+  };
+
+  const handleLogisticsFeePaidChange = async (
+    batch: ShopShipmentBatchListItem,
+    checked: boolean
+  ) => {
+    if (checked === batch.logisticsFeePaid) return;
+
+    const previousPaid = batch.logisticsFeePaid;
+    const previousPaidAt = batch.logisticsFeePaidAt;
+    const optimisticPaidAt = checked ? new Date().toISOString() : null;
+
+    patchBatchFields(batch.batchId, {
+      logisticsFeePaid: checked,
+      logisticsFeePaidAt: optimisticPaidAt,
+    });
+    setLogisticsFeePaidSavingBatchId(batch.batchId);
+
+    try {
+      await updateShopShipmentBatch(batch.batchId, { logisticsFeePaid: checked });
+      await loadData();
+    } catch (err) {
+      patchBatchFields(batch.batchId, {
+        logisticsFeePaid: previousPaid,
+        logisticsFeePaidAt: previousPaidAt,
+      });
+      alert(err instanceof Error ? err.message : '물류 수수료 지급 상태 저장에 실패했습니다.');
+    } finally {
+      setLogisticsFeePaidSavingBatchId(null);
+    }
+  };
+
+  const handleRefreshTracking = async (shipmentId: string) => {
+    setRefreshingShipmentId(shipmentId);
+    try {
+      const result = await lookupShopShipmentTracking(shipmentId);
+      patchShipmentInBatches(shipmentId, {
+        deliveryStatus: result.deliveryStatus,
+        lastTrackingKind: result.lastTrackingKind,
+        lastTrackingAt: result.lastTrackingAt,
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '배송 조회에 실패했습니다.');
+    } finally {
+      setRefreshingShipmentId(null);
+    }
+  };
+
+  const handleDeleteBatch = async (batch: ShopShipmentBatchListItem) => {
+    const trackingLabel =
+      batch.shipments.length > 0
+        ? batch.shipments.map((shipment) => shipment.trackingNumber).join(', ')
+        : '등록된 송장';
+    const confirmed = window.confirm(
+      `${batch.shipmentDate} 발송 묶음을 삭제하시겠습니까?\n\n송장: ${trackingLabel}\n주문 ${batch.lineItems.length}건이 배송 목록에서 제거됩니다.`
+    );
+    if (!confirmed) return;
+
+    setDeletingBatchId(batch.batchId);
+    try {
+      await deleteShopShipmentBatch(batch.batchId);
+      await loadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '배송 묶음 삭제에 실패했습니다.');
+    } finally {
+      setDeletingBatchId(null);
+    }
+  };
 
   return (
-    <div className="p-8 min-h-[1080px]">
-      <div className="mb-8">
-        <h2 className="text-gray-900 mb-2">배송 관리</h2>
-        <p className="text-gray-600">
-          주문 건별로 택배 발송에 필요한 박스 수, 택배비, 박스비, 송장번호를 확인·관리합니다.
-        </p>
+    <div className="p-6 min-h-[1080px]">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-gray-900 mb-1">배송 관리</h2>
+          <p className="text-sm text-gray-600">
+            발송 묶음을 카드 형태로 확인하고 관리합니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsModalOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700"
+        >
+          <Plus className="w-4 h-4" />
+          송장 추가
+        </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <label htmlFor="shipping-search" className="block text-sm font-medium text-gray-700 mb-1">
-          검색
-        </label>
+      {focusLineId && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-purple-200 bg-purple-50 px-3 py-2 text-sm text-purple-900">
+          <span>선택한 주문건의 배송 묶음만 표시 중입니다.</span>
+          <button
+            type="button"
+            onClick={clearLineFocus}
+            className="inline-flex items-center gap-1 rounded border border-purple-200 bg-white px-2 py-1 text-xs text-purple-700 hover:bg-purple-100"
+          >
+            <X className="w-3 h-3" />
+            전체 보기
+          </button>
+        </div>
+      )}
+
+      <div className="bg-white rounded-md border border-gray-200 p-3 mb-3">
         <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input
             id="shipping-search"
-            type="text"
+            type="search"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="주문번호, 상호, 수령인, 송장번호, 주소"
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+            placeholder="날짜, 주문번호, 수령인, 송장번호, 주소"
+            className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-24 text-gray-500">
-          <Loader2 className="w-6 h-6 animate-spin mr-2" />
-          주문 데이터를 불러오는 중...
+        <div className="flex items-center justify-center py-16 text-gray-500 text-sm">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+          배송 데이터를 불러오는 중...
         </div>
       ) : error ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>
+        <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="space-y-3">
           <ShopOrderListPagination
             currentPage={currentPage}
             totalPages={totalPages}
@@ -116,118 +290,35 @@ export function ShopShippingManagementPage() {
             startIndex={startIndex}
             endIndex={endIndex}
             onPageChange={setCurrentPage}
-            className="px-4 py-3 border-b border-gray-200"
+            className="bg-white rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
           />
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-3 py-3 text-left font-medium text-gray-600 whitespace-nowrap">
-                    주문
-                  </th>
-                  <th className="px-3 py-3 text-left font-medium text-gray-600 whitespace-nowrap">
-                    등록일
-                  </th>
-                  <th className="px-3 py-3 text-left font-medium text-gray-600 whitespace-nowrap">
-                    상호
-                  </th>
-                  <th className="px-3 py-3 text-left font-medium text-gray-600 whitespace-nowrap">
-                    상품
-                  </th>
-                  <th className="px-3 py-3 text-left font-medium text-gray-600 whitespace-nowrap">
-                    수령인
-                  </th>
-                  <th className="px-3 py-3 text-left font-medium text-gray-600 whitespace-nowrap">
-                    전화
-                  </th>
-                  <th className="px-3 py-3 text-left font-medium text-gray-600 whitespace-nowrap">
-                    주소
-                  </th>
-                  <th className="px-3 py-3 text-right font-medium text-gray-600 whitespace-nowrap">
-                    수량
-                  </th>
-                  <th className="px-3 py-3 text-right font-medium text-gray-600 whitespace-nowrap">
-                    택배 박스
-                  </th>
-                  <th className="px-3 py-3 text-right font-medium text-gray-600 whitespace-nowrap">
-                    택배비
-                  </th>
-                  <th className="px-3 py-3 text-right font-medium text-gray-600 whitespace-nowrap">
-                    박스비
-                    <span className="block text-[10px] font-normal text-gray-400">박스×1,200</span>
-                  </th>
-                  <th className="px-3 py-3 text-left font-medium text-gray-600 whitespace-nowrap">
-                    송장번호
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {paginatedItems.length === 0 ? (
-                  <tr>
-                    <td colSpan={12} className="px-3 py-12 text-center text-gray-500">
-                      표시할 주문 건이 없습니다.
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedItems.map((row) => {
-                    const boxFee = calculateLogisticsFee(row.line.orderBoxCount);
-
-                    return (
-                      <tr key={row.rowKey} className="hover:bg-gray-50">
-                        <td className="px-3 py-3 whitespace-nowrap font-medium text-gray-900 select-text cursor-text">
-                          {formatLineOrderRef(
-                            row.line.lineOrderNumber,
-                            row.orderNumber,
-                            row.lineIndex
-                          )}
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-gray-700">
-                          {row.orderDate ?? '-'}
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-gray-700 max-w-[120px] truncate">
-                          {formatOptionalText(row.line.companyName)}
-                        </td>
-                        <td
-                          className="px-3 py-3 text-gray-700 max-w-[140px] truncate"
-                          title={row.productName}
-                        >
-                          {row.productName}
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-gray-700 max-w-[88px] truncate">
-                          {formatOptionalText(row.line.recipientName)}
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-gray-700">
-                          {formatOptionalText(row.line.phoneNumber)}
-                        </td>
-                        <td
-                          className="px-3 py-3 text-gray-700 max-w-[180px] truncate"
-                          title={row.line.address ?? undefined}
-                        >
-                          {formatOptionalText(row.line.address)}
-                        </td>
-                        <td className="px-3 py-3 text-right tabular-nums text-gray-700">
-                          {formatLineQuantity(row.line)}
-                        </td>
-                        <td className="px-3 py-3 text-right tabular-nums text-gray-900">
-                          {row.line.orderBoxCount.toLocaleString()}
-                        </td>
-                        <td className="px-3 py-3 text-right tabular-nums text-gray-700">
-                          {formatKrwAmount(row.line.deliveryFee)}
-                        </td>
-                        <td className="px-3 py-3 text-right tabular-nums text-gray-700">
-                          {formatKrwAmount(boxFee)}
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-gray-900 font-mono text-xs">
-                          {formatOptionalText(row.line.trackingNumber)}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+          {paginatedItems.length === 0 ? (
+            <div className="bg-white rounded-lg border border-gray-200 px-3 py-12 text-center text-sm text-gray-500 shadow-sm">
+              {focusLineId ? '해당 주문건의 배송 묶음이 없습니다.' : '등록된 송장이 없습니다.'}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {paginatedItems.map((batch) => (
+                <ShopShippingBatchCard
+                  key={batch.batchId}
+                  batch={batch}
+                  savingBatchId={savingBatchId}
+                  refreshingShipmentId={refreshingShipmentId}
+                  deletingBatchId={deletingBatchId}
+                  onBatchFieldSave={(batchId, field, rawValue, current) =>
+                    void handleBatchFieldSave(batchId, field, rawValue, current)
+                  }
+                  onLogisticsFeePaidChange={(item, checked) =>
+                    void handleLogisticsFeePaidChange(item, checked)
+                  }
+                  logisticsFeePaidSavingBatchId={logisticsFeePaidSavingBatchId}
+                  onRefreshTracking={(shipmentId) => void handleRefreshTracking(shipmentId)}
+                  onDeleteBatch={(item) => void handleDeleteBatch(item)}
+                />
+              ))}
+            </div>
+          )}
 
           <ShopOrderListPagination
             currentPage={currentPage}
@@ -236,10 +327,18 @@ export function ShopShippingManagementPage() {
             startIndex={startIndex}
             endIndex={endIndex}
             onPageChange={setCurrentPage}
-            className="px-4 py-3 border-t border-gray-200"
+            className="bg-white rounded-lg border border-gray-200 px-3 py-2 text-sm shadow-sm"
           />
         </div>
       )}
+
+      <ShopShipmentAddModal
+        isOpen={isModalOpen}
+        orders={orders}
+        assignedLineIds={assignedLineIds}
+        onClose={() => setIsModalOpen(false)}
+        onCreated={() => void loadData()}
+      />
     </div>
   );
 }

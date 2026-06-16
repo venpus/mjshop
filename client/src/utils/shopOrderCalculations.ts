@@ -68,6 +68,7 @@ export interface ShopOrderLineForm {
   productArrived: boolean;
   taxInvoiceIssued: boolean;
   statementFilePath: string | null;
+  paymentReceived: boolean;
   paymentProofImage: string | null;
 }
 
@@ -107,6 +108,7 @@ export function createEmptyLineForm(
     productArrived: false,
     taxInvoiceIssued: false,
     statementFilePath: null,
+    paymentReceived: false,
     paymentProofImage: null,
   };
 }

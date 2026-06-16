@@ -12,6 +12,8 @@ import { ShopOrderProductSection } from './ShopOrderProductSection';
 
 import { ShopOrderProgressPanel } from './ShopOrderProgressFields';
 
+import { useShopLineShipmentMap } from '../../hooks/useShopLineShipmentMap';
+
 import { ShopOrderReservationTransferModal, type ReservationTransferItem } from './ShopOrderReservationTransferModal';
 
 import {
@@ -34,13 +36,14 @@ import {
 
 } from '../../api/shopOrderApi';
 
-import { getShopBuyers } from '../../api/shopBuyerApi';
+import { getShopBuyers, createShopBuyer, uploadShopBuyerBusinessRegistrationImage } from '../../api/shopBuyerApi';
 
 import { getFullImageUrl } from '../../api/purchaseOrderApi';
 
 import { useShopOrderAutoSave } from '../../hooks/useShopOrderAutoSave';
 
-import type { ShopBuyerListItem } from '../buyers/types';
+import type { ShopBuyerListItem, ShopBuyerFormData, ShopBuyerImageOptions } from '../buyers/types';
+import { BuyerFormModal } from '../buyers/BuyerFormModal';
 
 import type { ShopOrderLineForm } from '../../utils/shopOrderCalculations';
 import {
@@ -70,6 +73,8 @@ interface ShopOrderFormState {
   productName: string;
 
   warehouseStockQuantity: number;
+
+  unitPrice: number | null;
 
   sellingPrice: number | null;
 
@@ -122,6 +127,8 @@ function lineToForm(
 
     statementFilePath: line.statementFilePath,
 
+    paymentReceived: line.paymentReceived,
+
     paymentProofImage: line.paymentProofImage,
 
   };
@@ -137,6 +144,8 @@ function toFormState(order: ShopOrder): ShopOrderFormState {
     productName: order.productName,
 
     warehouseStockQuantity: order.warehouseStockQuantity,
+
+    unitPrice: order.unitPrice,
 
     sellingPrice: order.sellingPrice,
 
@@ -161,6 +170,10 @@ function buildSyncPayload(form: ShopOrderFormState) {
     sellingPrice: form.sellingPrice,
 
     quantityPerBox: form.quantityPerBox,
+
+    warehouseStockQuantity: form.warehouseStockQuantity,
+
+    unitPrice: form.unitPrice,
 
     lines: form.lines.map((line) => ({
 
@@ -228,6 +241,14 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
   const [buyers, setBuyers] = useState<ShopBuyerListItem[]>([]);
 
+  const [isRefreshingBuyers, setIsRefreshingBuyers] = useState(false);
+
+  const [buyerFormModalOpen, setBuyerFormModalOpen] = useState(false);
+
+  const [isSubmittingBuyer, setIsSubmittingBuyer] = useState(false);
+
+  const { lineShipmentMap, reloadLineShipmentMap } = useShopLineShipmentMap();
+
 
 
   const loadOrder = useCallback(async () => {
@@ -248,6 +269,8 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
       setOriginalForm(nextForm);
 
+      await reloadLineShipmentMap();
+
     } catch (err) {
 
       setError(err instanceof Error ? err.message : '주문 정보를 불러오지 못했습니다.');
@@ -258,7 +281,89 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
     }
 
-  }, [orderId]);
+  }, [orderId, reloadLineShipmentMap]);
+
+
+
+  const loadBuyers = useCallback(async () => {
+
+    const data = await getShopBuyers();
+
+    setBuyers(data);
+
+  }, []);
+
+
+
+  useEffect(() => {
+
+    void loadBuyers().catch((err) => {
+
+      console.error('구매자 목록 로드 오류:', err);
+
+    });
+
+  }, [loadBuyers]);
+
+
+
+  const handleRefreshBuyers = useCallback(async () => {
+
+    setIsRefreshingBuyers(true);
+
+    try {
+
+      await loadBuyers();
+
+    } catch (err) {
+
+      alert(err instanceof Error ? err.message : '구매자 목록을 새로고침하지 못했습니다.');
+
+    } finally {
+
+      setIsRefreshingBuyers(false);
+
+    }
+
+  }, [loadBuyers]);
+
+
+
+  const handleBuyerFormSubmit = useCallback(
+
+    async (form: ShopBuyerFormData, imageOptions?: ShopBuyerImageOptions) => {
+
+      setIsSubmittingBuyer(true);
+
+      try {
+
+        const created = await createShopBuyer(form);
+
+        if (imageOptions?.pendingFile) {
+
+          await uploadShopBuyerBusinessRegistrationImage(created.id, imageOptions.pendingFile);
+
+        }
+
+        setBuyerFormModalOpen(false);
+
+        await loadBuyers();
+
+      } catch (err) {
+
+        alert(err instanceof Error ? err.message : '구매자 등록 중 오류가 발생했습니다.');
+
+      } finally {
+
+        setIsSubmittingBuyer(false);
+
+      }
+
+    },
+
+    [loadBuyers]
+
+  );
 
 
 
@@ -267,36 +372,6 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
     loadOrder();
 
   }, [loadOrder]);
-
-
-
-  useEffect(() => {
-
-    let cancelled = false;
-
-    (async () => {
-
-      try {
-
-        const data = await getShopBuyers();
-
-        if (!cancelled) setBuyers(data);
-
-      } catch (err) {
-
-        console.error('구매자 목록 로드 오류:', err);
-
-      }
-
-    })();
-
-    return () => {
-
-      cancelled = true;
-
-    };
-
-  }, []);
 
 
 
@@ -414,7 +489,13 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
   };
 
+  const handleWarehouseStockQuantityChange = (value: number) => {
+    setForm((prev) => (prev ? { ...prev, warehouseStockQuantity: Math.max(0, value) } : prev));
+  };
 
+  const handleUnitPriceChange = (value: number | null) => {
+    setForm((prev) => (prev ? { ...prev, unitPrice: value } : prev));
+  };
 
   const handleLineChange = <K extends keyof ShopOrderLineForm>(
 
@@ -790,15 +871,17 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
         productImage={productImage}
 
-        quantity={displayQuantity}
+        orderQuantity={displayQuantity}
 
-        stockQuantity={displayStockQuantity}
+        warehouseStockQuantity={form.warehouseStockQuantity}
+
+        remainingStockQuantity={displayStockQuantity}
 
         sellingPrice={form.sellingPrice}
 
         quantityPerBox={form.quantityPerBox}
 
-        unitPrice={order.unitPrice}
+        unitPrice={form.unitPrice}
 
         orderDate={form.orderDate}
 
@@ -817,6 +900,10 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
             : undefined
 
         }
+
+        onWarehouseStockQuantityChange={handleWarehouseStockQuantityChange}
+
+        onUnitPriceChange={handleUnitPriceChange}
 
         onSellingPriceChange={handleSellingPriceChange}
 
@@ -860,6 +947,14 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
           onSaveIfNeeded={handleSaveIfNeeded}
 
+          lineShipmentMap={lineShipmentMap}
+
+          onRefreshBuyers={() => void handleRefreshBuyers()}
+
+          onOpenAddBuyer={() => setBuyerFormModalOpen(true)}
+
+          isRefreshingBuyers={isRefreshingBuyers}
+
         />
 
       </div>
@@ -881,6 +976,17 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
           onTransferred={handleReservationTransferred}
         />
       )}
+
+      <BuyerFormModal
+        isOpen={buyerFormModalOpen}
+        buyer={null}
+        isSubmitting={isSubmittingBuyer}
+        onClose={() => {
+          if (isSubmittingBuyer) return;
+          setBuyerFormModalOpen(false);
+        }}
+        onSubmit={handleBuyerFormSubmit}
+      />
 
     </div>
 

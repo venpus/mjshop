@@ -53,6 +53,8 @@ export interface CreateShopOrderFromInboundDTO {
 export interface UpdateShopOrderDTO {
   productName?: string;
   quantity?: number;
+  unitPrice?: number | null;
+  warehouseStockQuantity?: number | null;
   sellingPrice?: number | null;
   status?: ShopOrderStatus;
   orderDate?: string | null;
@@ -79,5 +81,7 @@ export interface UpdateShopOrderLinePayload {
 export interface SyncShopOrderDetailDTO {
   sellingPrice?: number | null;
   quantityPerBox?: number;
+  warehouseStockQuantity?: number;
+  unitPrice?: number | null;
   lines?: UpdateShopOrderLinePayload[];
 }

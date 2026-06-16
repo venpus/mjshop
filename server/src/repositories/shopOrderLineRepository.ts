@@ -8,6 +8,17 @@ import {
 } from '../models/shopOrderLine.js';
 import { generateRandomLineOrderNumber } from '../utils/shopOrderLineNumber.js';
 
+function normalizeDateOnly(value: Date | string): string {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return '';
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return String(value).slice(0, 10);
+}
+
 interface ShopOrderLineRow extends RowDataPacket {
   id: string;
   line_order_number: string | null;
@@ -39,6 +50,9 @@ interface ShopOrderLineRow extends RowDataPacket {
   wk_settlement_paid_at: Date | null;
   inventio_settlement_paid_at: Date | null;
   statement_file_path: string | null;
+  statement_group_id: string | null;
+  statement_issued_at: Date | null;
+  statement_delivered: number;
   payment_proof_image: string | null;
   created_at: Date;
   updated_at: Date;
@@ -48,8 +62,8 @@ const LINE_SELECT = `id, line_order_number, shop_order_id, sort_order, is_reserv
   sale_unit_price, delivery_fee, product_supply_amount, vat_amount, total_amount, address, recipient_name, phone_number,
   tracking_number, statement_issued, payment_received, product_arrived, tax_invoice_issued,
   cny_exchange_rate, wk_settlement_paid, inventio_settlement_paid, shipment_box_count,
-  logistics_fee_paid, logistics_fee_paid_at, wk_settlement_paid_at, inventio_settlement_paid_at,
-  statement_file_path, payment_proof_image, created_at, updated_at`;
+  logistics_fee_paid,   logistics_fee_paid_at, wk_settlement_paid_at, inventio_settlement_paid_at,
+  statement_file_path, statement_group_id, statement_issued_at, statement_delivered, payment_proof_image, created_at, updated_at`;
 
 export class ShopOrderLineRepository {
   async findByShopOrderId(shopOrderId: string): Promise<ShopOrderLine[]> {
@@ -134,14 +148,15 @@ export class ShopOrderLineRepository {
 
     await pool.execute<ResultSetHeader>(
       `INSERT INTO kr_shop_order_lines
-       (id, line_order_number, shop_order_id, sort_order, is_reservation, quantity_per_box, sale_unit_price)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (id, line_order_number, shop_order_id, sort_order, is_reservation, order_box_count, quantity_per_box, sale_unit_price)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         lineOrderNumber,
         data.shopOrderId,
         sortOrder,
         data.isReservation ? 1 : 0,
+        data.orderBoxCount ?? 1,
         data.quantityPerBox ?? 0,
         data.saleUnitPrice ?? null,
       ]
@@ -260,6 +275,18 @@ export class ShopOrderLineRepository {
       fields.push('statement_issued = ?');
       values.push(data.statementFilePath ? 1 : 0);
     }
+    if (data.statementGroupId !== undefined) {
+      fields.push('statement_group_id = ?');
+      values.push(data.statementGroupId);
+    }
+    if (data.statementIssuedAt !== undefined) {
+      fields.push('statement_issued_at = ?');
+      values.push(data.statementIssuedAt);
+    }
+    if (data.statementDelivered !== undefined) {
+      fields.push('statement_delivered = ?');
+      values.push(data.statementDelivered ? 1 : 0);
+    }
     if (data.paymentProofImage !== undefined) {
       fields.push('payment_proof_image = ?');
       values.push(data.paymentProofImage);
@@ -290,6 +317,16 @@ export class ShopOrderLineRepository {
     );
 
     return this.findById(id);
+  }
+
+  async setProductArrivedByIds(lineIds: string[], productArrived: boolean): Promise<void> {
+    if (lineIds.length === 0) return;
+
+    const placeholders = lineIds.map(() => '?').join(', ');
+    await pool.execute<ResultSetHeader>(
+      `UPDATE kr_shop_order_lines SET product_arrived = ? WHERE id IN (${placeholders})`,
+      [productArrived ? 1 : 0, ...lineIds]
+    );
   }
 
   async delete(id: string): Promise<boolean> {
@@ -343,6 +380,12 @@ export class ShopOrderLineRepository {
       wkSettlementPaidAt: row.wk_settlement_paid_at,
       inventioSettlementPaidAt: row.inventio_settlement_paid_at,
       statementFilePath: row.statement_file_path,
+      statementGroupId: row.statement_group_id,
+      statementIssuedAt:
+        row.statement_issued_at != null
+          ? normalizeDateOnly(row.statement_issued_at)
+          : null,
+      statementDelivered: Boolean(row.statement_delivered),
       paymentProofImage: row.payment_proof_image,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

@@ -36,6 +36,7 @@ import {
   resolveCompanyNameDisplay,
 } from '../../utils/shopBuyerDisplay';
 import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
+import { ShopOrderProgressFlagBadge } from './ShopOrderProgressFlagBadge';
 import {
   deriveLineProgressStatus,
   EMPTY_LINE_FULFILLMENT_FILTERS,
@@ -45,6 +46,7 @@ import {
   hasActiveLineFulfillmentFilters,
   lineHasPayment,
   lineHasStatement,
+  lineHasStatementDelivered,
   matchesLineDateRange,
   matchesLineFulfillmentFilters,
   sortShopOrderLineRowsByCompanyAddress,
@@ -54,16 +56,21 @@ import { ShopBuyerInfoModal } from './ShopBuyerInfoModal';
 import { ShopOrderListPagination } from './ShopOrderListPagination';
 import { shopOrderDetailPath } from './shopOrderListNavigation';
 import { ShopOrderReservationTransferModal, type ReservationTransferItem } from './ShopOrderReservationTransferModal';
+import { ShopOrderStatementCreateDialog } from './ShopOrderStatementCreateDialog';
 import {
   ShopOrderStatementModal,
   type ShopOrderStatementGroupPreview,
 } from './ShopOrderStatementModal';
+import { ShopLineDeliveryStatusLink } from '../shipping/ShopLineDeliveryStatusLink';
+import type { LineShipmentInfo } from '../../utils/shopLineShipmentUtils';
+
 import type { ShopOrderListTab } from './ShopOrderListTabs';
 
 interface ShopOrderLineListTabProps {
   orders: ShopOrder[];
   listTab: ShopOrderListTab;
   lineKind: Extract<ShopOrderLineListKind, 'orders' | 'reservations'>;
+  lineShipmentMap: Map<string, LineShipmentInfo>;
   onReload: () => Promise<void>;
 }
 
@@ -81,27 +88,22 @@ const FULFILLMENT_FILTER_OPTIONS: Array<{
 ];
 
 function ProgressFlags({ line }: { line: ShopOrderLine }) {
-  const flags = [
-    { label: '명세서', checked: lineHasStatement(line) },
-    { label: '입금', checked: lineHasPayment(line) },
-    { label: '도착', checked: line.productArrived },
-    { label: '세금', checked: line.taxInvoiceIssued },
+  const flags: Array<{ label: string; display: string; checked: boolean }> = [
+    { label: '명세서', display: '명', checked: lineHasStatement(line) },
+    { label: '명세서 전달', display: '명발', checked: lineHasStatementDelivered(line) },
+    { label: '입금', display: '입', checked: lineHasPayment(line) },
+    { label: '세금', display: '세', checked: line.taxInvoiceIssued },
   ];
 
   return (
     <div className="flex items-center justify-center gap-1.5">
       {flags.map((flag) => (
-        <span
+        <ShopOrderProgressFlagBadge
           key={flag.label}
-          title={`${flag.label} ${flag.checked ? '완료' : '미완료'}`}
-          className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-[10px] font-bold border ${
-            flag.checked
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-              : 'bg-gray-50 text-gray-400 border-gray-200'
-          }`}
-        >
-          {flag.label.slice(0, 1)}
-        </span>
+          label={flag.label}
+          display={flag.display}
+          checked={flag.checked}
+        />
       ))}
     </div>
   );
@@ -111,6 +113,7 @@ export function ShopOrderLineListTab({
   orders,
   listTab,
   lineKind,
+  lineShipmentMap,
   onReload,
 }: ShopOrderLineListTabProps) {
   const isReservationTab = lineKind === 'reservations';
@@ -144,6 +147,10 @@ export function ShopOrderLineListTab({
   const [transferItems, setTransferItems] = useState<ReservationTransferItem[]>([]);
   const [transferProductName, setTransferProductName] = useState('');
   const [statementGroups, setStatementGroups] = useState<ShopOrderStatementGroupPreview[]>([]);
+  const [statementCreateDialogOpen, setStatementCreateDialogOpen] = useState(false);
+  const [pendingStatementItems, setPendingStatementItems] = useState<
+    Array<{ shopOrderId: string; lineId: string }>
+  >([]);
   const [buyers, setBuyers] = useState<ShopBuyerListItem[]>([]);
   const [buyerModalOpen, setBuyerModalOpen] = useState(false);
   const [buyerModalLoading, setBuyerModalLoading] = useState(false);
@@ -268,7 +275,7 @@ export function ShopOrderLineListTab({
     return group.companyName;
   };
 
-  const handleBulkCreateStatements = async () => {
+  const handleBulkCreateStatements = () => {
     const selectedRows = getSelectedRows();
     if (!selectedRows) return;
 
@@ -277,9 +284,17 @@ export function ShopOrderLineListTab({
       lineId: row.line.id,
     }));
 
+    setPendingStatementItems(items);
+    setStatementCreateDialogOpen(true);
+  };
+
+  const handleConfirmCreateStatements = async (statementDate: string) => {
+    if (pendingStatementItems.length === 0) return;
+
+    setStatementCreateDialogOpen(false);
     setBulkBusy(true);
     try {
-      const result = await createShopOrderBulkStatements(items);
+      const result = await createShopOrderBulkStatements(pendingStatementItems, { statementDate });
 
       if (result.groups.length === 0) {
         alert('선택한 주문건에 명세서를 생성할 수 없습니다.');
@@ -290,7 +305,7 @@ export function ShopOrderLineListTab({
 
       setStatementGroups(
         result.groups.map((group) => ({
-          id: group.groupKey,
+          id: group.statementGroupId ?? group.groupKey,
           title: buildStatementGroupTitle(group),
           html: group.html,
         }))
@@ -300,6 +315,7 @@ export function ShopOrderLineListTab({
       alert(err instanceof Error ? err.message : '명세서 생성 중 오류가 발생했습니다.');
     } finally {
       setBulkBusy(false);
+      setPendingStatementItems([]);
     }
   };
 
@@ -447,7 +463,7 @@ export function ShopOrderLineListTab({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="주문번호, 상품명, 상호, 카톡, 수령인, 전화, 주소, 송장으로 검색..."
+              placeholder="주문번호, 상품명, 상호, 카톡, 수령인, 전화, 주소로 검색..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className={`w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${accentRingClass}`}
@@ -576,7 +592,7 @@ export function ShopOrderLineListTab({
           <button
             type="button"
             disabled={bulkBusy || selectedRowKeys.size === 0}
-            onClick={() => void handleBulkCreateStatements()}
+            onClick={handleBulkCreateStatements}
             className={`${bulkActionButtonClass} border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100`}
           >
             {bulkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
@@ -650,7 +666,7 @@ export function ShopOrderLineListTab({
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">수량</th>
                   <th className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">총계(VAT포함)</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">수령인</th>
-                  <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">송장</th>
+                  <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">배송</th>
                   <th className="px-4 py-3 text-center text-gray-600 whitespace-nowrap">진행</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">건별 상태</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">관리</th>
@@ -734,8 +750,12 @@ export function ShopOrderLineListTab({
                       <td className="px-4 py-4 text-gray-600 whitespace-nowrap">
                         {line.recipientName ?? '-'}
                       </td>
-                      <td className="px-4 py-4 text-gray-600 font-mono text-sm whitespace-nowrap">
-                        {line.trackingNumber ?? '-'}
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                        <ShopLineDeliveryStatusLink
+                          lineId={line.id}
+                          lineShipmentMap={lineShipmentMap}
+                          compact
+                        />
                       </td>
                       <td className="px-4 py-4">
                         <ProgressFlags line={line} />
@@ -803,6 +823,17 @@ export function ShopOrderLineListTab({
           }
         />
       )}
+
+      <ShopOrderStatementCreateDialog
+        isOpen={statementCreateDialogOpen}
+        lineCount={pendingStatementItems.length}
+        isReservation={isReservationTab}
+        onConfirm={(statementDate) => void handleConfirmCreateStatements(statementDate)}
+        onCancel={() => {
+          setStatementCreateDialogOpen(false);
+          setPendingStatementItems([]);
+        }}
+      />
 
       <ShopOrderStatementModal
         isOpen={statementModalOpen}

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, Eye, Loader2, Search, XCircle } from 'lucide-react';
+import { ChevronDown, Download, Eye, Loader2, Search, XCircle } from 'lucide-react';
 import {
   cancelShopOrderStatements,
   getShopOrderStatementGroupPreview,
   getShopOrders,
+  updateShopOrderStatementDelivery,
+  updateShopOrderStatementPayment,
   type ShopOrder,
 } from '../../api/shopOrderApi';
 import {
@@ -18,9 +20,12 @@ import {
   buildShopOrderStatementListRows,
   buildStatementGroupPreviewItems,
   groupShopOrderStatementRows,
+  groupShopOrderStatementsByCompany,
   type ShopOrderLineListKind,
+  type ShopOrderStatementCompanyGroup,
   type ShopOrderStatementGroupRow,
 } from '../../utils/shopOrderListExport';
+import { formatLineOrderRef } from '../../utils/shopOrderLineListUtils';
 import { ShopOrderListPagination } from './ShopOrderListPagination';
 import { ShopOrderStatementModal } from './ShopOrderStatementModal';
 
@@ -28,17 +33,19 @@ type StatementTabKind = Extract<ShopOrderLineListKind, 'orders' | 'reservations'
 
 function formatStatementDate(value: string | null | undefined): string {
   if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  const datePart = value.includes('T') ? value.split('T')[0] : value.slice(0, 10);
+  const date = new Date(datePart);
+  if (Number.isNaN(date.getTime())) return datePart;
   return date.toLocaleDateString('ko-KR');
 }
 
 function buildGroupTitle(group: ShopOrderStatementGroupRow): string {
   const kindLabel = group.isReservation ? '예약' : '주문';
+  const dateLabel = formatStatementDate(group.statementIssuedAt);
   if (group.lineCount > 1) {
-    return `${group.companyName} (${kindLabel} 통합 ${group.lineCount}건)`;
+    return `${group.companyName} · ${dateLabel} (${kindLabel} 통합 ${group.lineCount}건)`;
   }
-  return `${group.companyName} (${kindLabel})`;
+  return `${group.companyName} · ${dateLabel} (${kindLabel})`;
 }
 
 function buildStatementGroups(
@@ -46,9 +53,36 @@ function buildStatementGroups(
   kind: StatementTabKind
 ): ShopOrderStatementGroupRow[] {
   const rows = buildShopOrderStatementListRows(orders, kind);
-  return groupShopOrderStatementRows(rows).sort(
-    (a, b) => new Date(b.latestUpdatedAt).getTime() - new Date(a.latestUpdatedAt).getTime()
-  );
+  return groupShopOrderStatementRows(rows).sort((a, b) => {
+    const dateA = a.statementIssuedAt ?? a.latestUpdatedAt;
+    const dateB = b.statementIssuedAt ?? b.latestUpdatedAt;
+    return new Date(dateB).getTime() - new Date(dateA).getTime();
+  });
+}
+
+function filterStatements(
+  statements: ShopOrderStatementGroupRow[],
+  searchTerm: string
+): ShopOrderStatementGroupRow[] {
+  const lower = searchTerm.trim().toLowerCase();
+  if (!lower) return statements;
+
+  return statements.filter((group) => {
+    return (
+      group.companyName.toLowerCase().includes(lower) ||
+      group.address.toLowerCase().includes(lower) ||
+      group.recipientName.toLowerCase().includes(lower) ||
+      group.orderRefsLabel.toLowerCase().includes(lower) ||
+      group.productNamesLabel.toLowerCase().includes(lower) ||
+      String(group.totalBoxCount).includes(lower) ||
+      formatStatementDate(group.statementIssuedAt).includes(lower) ||
+      group.lines.some(
+        (row) =>
+          row.productName.toLowerCase().includes(lower) ||
+          row.orderNumber.toLowerCase().includes(lower)
+      )
+    );
+  });
 }
 
 export function ShopStatementsPage() {
@@ -58,6 +92,8 @@ export function ShopStatementsPage() {
   const [activeTab, setActiveTab] = useState<StatementTabKind>('orders');
   const [searchTerm, setSearchTerm] = useState('');
   const [busyGroupKey, setBusyGroupKey] = useState<string | null>(null);
+  const [deliverySavingGroupKey, setDeliverySavingGroupKey] = useState<string | null>(null);
+  const [paymentSavingGroupKey, setPaymentSavingGroupKey] = useState<string | null>(null);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [selectedGroupKeys, setSelectedGroupKeys] = useState<Set<string>>(new Set());
   const [isBulkDownloading, setIsBulkDownloading] = useState(false);
@@ -67,6 +103,7 @@ export function ShopStatementsPage() {
   const [statementModalOpen, setStatementModalOpen] = useState(false);
   const [statementModalTitle, setStatementModalTitle] = useState('거래명세표');
   const [statementHtml, setStatementHtml] = useState('');
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(new Set());
 
   const loadOrders = useCallback(async () => {
     setIsLoading(true);
@@ -118,33 +155,34 @@ export function ShopStatementsPage() {
     [orders, activeTab]
   );
 
-  const filteredGroups = useMemo(() => {
-    const lower = searchTerm.trim().toLowerCase();
-    if (!lower) return statementGroups;
+  const filteredStatements = useMemo(
+    () => filterStatements(statementGroups, searchTerm),
+    [searchTerm, statementGroups]
+  );
 
-    return statementGroups.filter((group) => {
-      return (
-        group.companyName.toLowerCase().includes(lower) ||
-        group.address.toLowerCase().includes(lower) ||
-        group.recipientName.toLowerCase().includes(lower) ||
-        group.orderRefsLabel.toLowerCase().includes(lower) ||
-        group.lines.some((row) => row.productName.toLowerCase().includes(lower))
-      );
-    });
-  }, [searchTerm, statementGroups]);
+  const filteredCompanyGroups = useMemo(
+    () => groupShopOrderStatementsByCompany(filteredStatements),
+    [filteredStatements]
+  );
 
   const {
-    paginatedItems: paginatedGroups,
+    paginatedItems: paginatedCompanyGroups,
     currentPage,
     setCurrentPage,
     totalPages,
     totalItems,
     startIndex,
     endIndex,
-  } = useShopOrderListPagination(filteredGroups, searchTerm);
+  } = useShopOrderListPagination(filteredCompanyGroups, searchTerm);
+
+  const flatStatements = useMemo(
+    () => filteredCompanyGroups.flatMap((company) => company.statements),
+    [filteredCompanyGroups]
+  );
 
   useEffect(() => {
     setSelectedGroupKeys(new Set());
+    setExpandedGroupKeys(new Set());
     setCurrentPage(1);
   }, [activeTab, setCurrentPage]);
 
@@ -153,9 +191,21 @@ export function ShopStatementsPage() {
     [statementGroups, selectedGroupKeys]
   );
 
+  const paginatedStatementKeys = useMemo(
+    () =>
+      paginatedCompanyGroups.flatMap((company) =>
+        company.statements.map((statement) => statement.groupKey)
+      ),
+    [paginatedCompanyGroups]
+  );
+
+  const companyHeaderClass = isReservationTab
+    ? 'bg-amber-50 border-amber-200 text-amber-950'
+    : 'bg-emerald-50 border-emerald-200 text-emerald-950';
+
   const allPageSelected =
-    paginatedGroups.length > 0 &&
-    paginatedGroups.every((group) => selectedGroupKeys.has(group.groupKey));
+    paginatedStatementKeys.length > 0 &&
+    paginatedStatementKeys.every((key) => selectedGroupKeys.has(key));
 
   const accentCheckboxClass = isReservationTab ? 'accent-amber-600' : 'accent-emerald-600';
   const accentButtonClass = isReservationTab
@@ -164,7 +214,20 @@ export function ShopStatementsPage() {
   const accentBulkDownloadClass = isReservationTab
     ? 'border-amber-200 text-amber-800 bg-amber-50 hover:bg-amber-100'
     : 'border-emerald-200 text-emerald-800 bg-emerald-50 hover:bg-emerald-100';
-  const includedColumnLabel = isReservationTab ? '포함 예약' : '포함 주문';
+  const cardBorderClass = isReservationTab ? 'hover:border-amber-300' : 'hover:border-emerald-300';
+  const includedColumnLabel = isReservationTab ? '예약' : '주문';
+
+  const toggleExpanded = (groupKey: string) => {
+    setExpandedGroupKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
+      } else {
+        next.add(groupKey);
+      }
+      return next;
+    });
+  };
 
   const buildDownloadItems = async (
     groups: ShopOrderStatementGroupRow[]
@@ -177,7 +240,7 @@ export function ShopStatementsPage() {
       );
       items.push({
         html: preview.html,
-        issuedAt: group.latestUpdatedAt,
+        issuedAt: group.statementIssuedAt ?? group.latestUpdatedAt,
         companyName: group.companyName,
         lineCount: group.lineCount,
         isReservation: group.isReservation,
@@ -204,9 +267,9 @@ export function ShopStatementsPage() {
     setSelectedGroupKeys((prev) => {
       const next = new Set(prev);
       if (allPageSelected) {
-        paginatedGroups.forEach((group) => next.delete(group.groupKey));
+        paginatedStatementKeys.forEach((key) => next.delete(key));
       } else {
-        paginatedGroups.forEach((group) => next.add(group.groupKey));
+        paginatedStatementKeys.forEach((key) => next.add(key));
       }
       return next;
     });
@@ -291,7 +354,7 @@ export function ShopStatementsPage() {
       );
       await downloadShopOrderStatementAsPng(
         preview.html,
-        group.latestUpdatedAt,
+        group.statementIssuedAt ?? group.latestUpdatedAt,
         group.companyName,
         group.lineCount,
         group.isReservation
@@ -307,8 +370,8 @@ export function ShopStatementsPage() {
     const kindLabel = group.isReservation ? '예약' : '주문';
     const message =
       group.lineCount > 1
-        ? `「${group.companyName}」 ${kindLabel} 통합 명세서(${group.lineCount}건)를 취소하시겠습니까?\n포함된 모든 ${kindLabel}건에서 명세서 발행이 해제됩니다.`
-        : `「${group.companyName}」 ${kindLabel} 명세서를 취소하시겠습니까?`;
+        ? `「${group.companyName}」 ${formatStatementDate(group.statementIssuedAt)} ${kindLabel} 통합 명세서(${group.lineCount}건)를 취소하시겠습니까?`
+        : `「${group.companyName}」 ${formatStatementDate(group.statementIssuedAt)} ${kindLabel} 명세서를 취소하시겠습니까?`;
 
     if (!window.confirm(message)) return;
 
@@ -355,14 +418,279 @@ export function ShopStatementsPage() {
     }
   };
 
+  const patchOrdersStatementDelivered = (
+    items: Array<{ shopOrderId: string; lineId: string }>,
+    delivered: boolean
+  ) => {
+    const keySet = new Set(items.map((item) => `${item.shopOrderId}:${item.lineId}`));
+    setOrders((prev) =>
+      prev.map((order) => ({
+        ...order,
+        lines: order.lines.map((line) =>
+          keySet.has(`${order.id}:${line.id}`)
+            ? { ...line, statementDelivered: delivered }
+            : line
+        ),
+      }))
+    );
+  };
+
+  const patchOrdersPaymentReceived = (
+    items: Array<{ shopOrderId: string; lineId: string }>,
+    paymentReceived: boolean
+  ) => {
+    const keySet = new Set(items.map((item) => `${item.shopOrderId}:${item.lineId}`));
+    setOrders((prev) =>
+      prev.map((order) => ({
+        ...order,
+        lines: order.lines.map((line) =>
+          keySet.has(`${order.id}:${line.id}`)
+            ? { ...line, paymentReceived }
+            : line
+        ),
+      }))
+    );
+  };
+
+  const handleToggleStatementDelivered = async (
+    statement: ShopOrderStatementGroupRow,
+    delivered: boolean
+  ) => {
+    const items = buildStatementGroupPreviewItems(statement);
+    const previousDelivered = statement.statementDelivered;
+    patchOrdersStatementDelivered(items, delivered);
+    setDeliverySavingGroupKey(statement.groupKey);
+
+    try {
+      await updateShopOrderStatementDelivery(items, delivered);
+    } catch (err) {
+      patchOrdersStatementDelivered(items, previousDelivered);
+      alert(err instanceof Error ? err.message : '명세서 전달완료 저장에 실패했습니다.');
+    } finally {
+      setDeliverySavingGroupKey(null);
+    }
+  };
+
+  const handleTogglePaymentReceived = async (
+    statement: ShopOrderStatementGroupRow,
+    paymentReceived: boolean
+  ) => {
+    const items = buildStatementGroupPreviewItems(statement);
+    const previousByLineId = new Map(
+      statement.lines.map((row) => [row.line.id, row.line.paymentReceived] as const)
+    );
+    patchOrdersPaymentReceived(items, paymentReceived);
+    setPaymentSavingGroupKey(statement.groupKey);
+
+    try {
+      await updateShopOrderStatementPayment(items, paymentReceived);
+    } catch (err) {
+      const keySet = new Set(items.map((item) => `${item.shopOrderId}:${item.lineId}`));
+      setOrders((prev) =>
+        prev.map((order) => ({
+          ...order,
+          lines: order.lines.map((line) => {
+            if (!keySet.has(`${order.id}:${line.id}`)) return line;
+            const previous = previousByLineId.get(line.id);
+            return previous !== undefined ? { ...line, paymentReceived: previous } : line;
+          }),
+        }))
+      );
+      alert(err instanceof Error ? err.message : '명세서 입금완료 저장에 실패했습니다.');
+    } finally {
+      setPaymentSavingGroupKey(null);
+    }
+  };
+
+  const renderStatementCard = (statement: ShopOrderStatementGroupRow) => {
+    const isBusy =
+      busyGroupKey === statement.groupKey ||
+      isDeletingAll ||
+      isBulkDownloading ||
+      deliverySavingGroupKey === statement.groupKey ||
+      paymentSavingGroupKey === statement.groupKey;
+    const isSelected = selectedGroupKeys.has(statement.groupKey);
+    const isExpanded = expandedGroupKeys.has(statement.groupKey);
+    const isSavingDelivery = deliverySavingGroupKey === statement.groupKey;
+    const isSavingPayment = paymentSavingGroupKey === statement.groupKey;
+
+    return (
+      <article
+        key={statement.groupKey}
+        className={`flex flex-col rounded-md border bg-white transition-colors ${
+          statement.statementDelivered
+            ? 'border-gray-300 bg-gray-50/80'
+            : isSelected
+              ? 'border-purple-400 ring-1 ring-purple-200'
+              : 'border-gray-200'
+        } ${cardBorderClass}`}
+      >
+        <div className="px-2 pt-2 pb-1 flex items-start gap-1.5">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => handleToggleSelect(statement.groupKey)}
+            disabled={isBulkDownloading || isDeletingAll}
+            className={`mt-0.5 w-3.5 h-3.5 shrink-0 cursor-pointer ${accentCheckboxClass}`}
+            aria-label={`${statement.companyName} 명세서 선택`}
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-xs font-semibold text-gray-900">
+                {formatStatementDate(statement.statementIssuedAt)}
+              </p>
+              <p className="text-xs font-semibold text-gray-900 tabular-nums shrink-0">
+                {statement.totalAmount > 0 ? `₩${statement.totalAmount.toLocaleString()}` : '-'}
+              </p>
+            </div>
+            <p
+              className="text-[11px] text-gray-700 line-clamp-2 mt-0.5 leading-snug"
+              title={statement.productNamesLabel}
+            >
+              {statement.productNamesLabel}
+            </p>
+            <p className="text-[10px] text-gray-500 mt-0.5">
+              박스 {statement.totalBoxCount.toLocaleString()}개
+              {statement.lineCount > 1 ? ` · ${includedColumnLabel} ${statement.lineCount}건` : ''}
+            </p>
+          </div>
+        </div>
+
+        {isExpanded && (
+          <div className="px-2 pb-1 border-t border-gray-100 pt-1">
+            <ul className="space-y-0.5 max-h-24 overflow-y-auto text-[10px]">
+              {statement.lines.map((row) => (
+                <li key={row.rowKey} className="flex items-baseline justify-between gap-1 text-gray-700">
+                  <span className="font-mono text-gray-800 shrink-0">
+                    {formatLineOrderRef(
+                      row.line.lineOrderNumber,
+                      row.orderNumber,
+                      row.lineIndex,
+                      row.line.isReservation ? '예약' : undefined
+                    )}
+                  </span>
+                  <span className="truncate flex-1 text-gray-500">{row.productName}</span>
+                  <span className="tabular-nums shrink-0 text-gray-600">
+                    {row.line.orderBoxCount}박스
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="mt-auto flex items-center justify-between gap-1 px-2 py-1 border-t border-gray-100 bg-gray-50/60 rounded-b-md">
+          <div className="flex items-center gap-2 min-w-0">
+            <label
+              className={`inline-flex items-center gap-1 text-[10px] cursor-pointer select-none shrink-0 ${
+                statement.statementDelivered ? 'text-emerald-700 font-medium' : 'text-gray-600'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={statement.statementDelivered}
+                disabled={isBusy}
+                onChange={(event) =>
+                  void handleToggleStatementDelivered(statement, event.target.checked)
+                }
+                className={`w-3 h-3 cursor-pointer ${accentCheckboxClass}`}
+              />
+              {isSavingDelivery ? '저장…' : '전달완료'}
+            </label>
+            <label
+              className={`inline-flex items-center gap-1 text-[10px] cursor-pointer select-none shrink-0 ${
+                statement.paymentReceived ? 'text-emerald-700 font-medium' : 'text-gray-600'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={statement.paymentReceived}
+                disabled={isBusy}
+                onChange={(event) =>
+                  void handleTogglePaymentReceived(statement, event.target.checked)
+                }
+                className={`w-3 h-3 cursor-pointer ${accentCheckboxClass}`}
+              />
+              {isSavingPayment ? '저장…' : '입금완료'}
+            </label>
+          </div>
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => toggleExpanded(statement.groupKey)}
+              className="inline-flex items-center p-1 text-gray-500 hover:text-gray-800 rounded"
+              title={isExpanded ? '접기' : '상세 보기'}
+            >
+              <ChevronDown
+                className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              />
+            </button>
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => void handleViewStatement(statement)}
+              title="보기"
+              className={`p-1 rounded border disabled:opacity-50 ${accentButtonClass}`}
+            >
+              {busyGroupKey === statement.groupKey ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Eye className="w-3 h-3" />
+              )}
+            </button>
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => void handleDownloadStatement(statement)}
+              title="다운로드"
+              className="p-1 rounded border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            >
+              <Download className="w-3 h-3" />
+            </button>
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => void handleCancelStatement(statement)}
+              title="명세서 취소"
+              className="p-1 rounded border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+            >
+              {busyGroupKey === statement.groupKey ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <XCircle className="w-3 h-3" />
+              )}
+            </button>
+          </div>
+        </div>
+      </article>
+    );
+  };
+
+  const renderCompanyRow = (company: ShopOrderStatementCompanyGroup) => (
+    <section
+      key={company.companyKey}
+      className="rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm"
+    >
+      <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 border-b ${companyHeaderClass}`}>
+        <h3 className="text-xs font-bold">{company.companyName}</h3>
+        <span className="text-[11px] font-normal opacity-80">
+          명세서 {company.statementCount}장 · {includedColumnLabel}{' '}
+          {company.lineCount.toLocaleString()}건
+        </span>
+      </div>
+      <div className="p-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 bg-gray-50/40">
+        {company.statements.map((statement) => renderStatementCard(statement))}
+      </div>
+    </section>
+  );
+
   return (
     <div className="p-8 min-h-[1080px]">
       <div className="mb-8">
         <h2 className="text-gray-900 mb-2">명세서 모아보기</h2>
         <p className="text-gray-600">
-          주문건과 예약건 명세서를 각각 따로 모아 보여줍니다. 같은 상호·주소·수령인 내에서는
-          주문끼리·예약끼리만 통합됩니다. 미리보기·PNG 다운로드는 해당 유형의 건만 포함합니다.
-          여러 장은 폴더에 저장하거나(HTTPS·localhost), ZIP 파일로 받을 수 있습니다.
+          상호명별로 묶어 보여 주며, 작성 시점이 다른 명세서는 같은 상호라도 각각 구분됩니다.
+          명세서 작성 시 설정한 거래일자가 표시·다운로드에 반영됩니다.
         </p>
       </div>
 
@@ -393,19 +721,23 @@ export function ShopStatementsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-          <p className="text-gray-600 mb-1">{isReservationTab ? '예약' : '주문'} 명세서 (묶음)</p>
-          <p className="text-gray-900">{statementGroups.length.toLocaleString()}장</p>
-        </div>
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-          <p className="text-gray-600 mb-1">포함 {isReservationTab ? '예약' : '주문'}건</p>
-          <p className="text-gray-900">{statementLineCount.toLocaleString()}건</p>
-        </div>
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-          <p className="text-gray-600 mb-1">검색 결과</p>
-          <p className="text-gray-900">{filteredGroups.length.toLocaleString()}장</p>
-        </div>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-6 text-sm">
+        <span className="text-gray-600">
+          {isReservationTab ? '예약' : '주문'} 명세서{' '}
+          <strong className="text-gray-900">{statementGroups.length.toLocaleString()}장</strong>
+        </span>
+        <span className="text-gray-600">
+          포함 {isReservationTab ? '예약' : '주문'}건{' '}
+          <strong className="text-gray-900">{statementLineCount.toLocaleString()}건</strong>
+        </span>
+        <span className="text-gray-600">
+          상호{' '}
+          <strong className="text-gray-900">{filteredCompanyGroups.length.toLocaleString()}곳</strong>
+        </span>
+        <span className="text-gray-600">
+          검색 명세서{' '}
+          <strong className="text-gray-900">{flatStatements.length.toLocaleString()}장</strong>
+        </span>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -416,10 +748,20 @@ export function ShopStatementsPage() {
               type="search"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="상호명, 주소, 수령인, 주문번호, 상품명 검색"
+              placeholder="상호명, 상품명, 박스수, 주문번호, 거래일자 검색"
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
+          <label className="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allPageSelected}
+              onChange={handleToggleSelectAll}
+              disabled={isBulkDownloading || isDeletingAll || paginatedStatementKeys.length === 0}
+              className={`w-4 h-4 cursor-pointer ${accentCheckboxClass}`}
+            />
+            현재 페이지 전체
+          </label>
           <button
             type="button"
             onClick={() => void loadOrders()}
@@ -502,7 +844,7 @@ export function ShopStatementsPage() {
           </div>
         ) : error ? (
           <div className="py-16 text-center text-red-600">{error}</div>
-        ) : filteredGroups.length === 0 ? (
+        ) : filteredCompanyGroups.length === 0 ? (
           <div className="py-16 text-center text-gray-500">
             {statementGroups.length === 0
               ? `발행된 ${isReservationTab ? '예약' : '주문'} 명세서가 없습니다. 주문 관리에서 명세서를 생성해 주세요.`
@@ -519,129 +861,8 @@ export function ShopStatementsPage() {
               onPageChange={setCurrentPage}
               className="border-t-0 border-b border-gray-200 bg-gray-50/50"
             />
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-center w-10">
-                      <input
-                        type="checkbox"
-                        checked={allPageSelected}
-                        onChange={handleToggleSelectAll}
-                        disabled={isBulkDownloading || isDeletingAll}
-                        className={`w-4 h-4 cursor-pointer ${accentCheckboxClass}`}
-                        aria-label="현재 페이지 전체 선택"
-                      />
-                    </th>
-                    <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">상호명</th>
-                    <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">주소</th>
-                    <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">수령인</th>
-                    <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">
-                      {includedColumnLabel}
-                    </th>
-                    <th className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
-                      합계(VAT포함)
-                    </th>
-                    <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">
-                      최근 발행일
-                    </th>
-                    <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">관리</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {paginatedGroups.map((group) => {
-                    const isBusy =
-                      busyGroupKey === group.groupKey || isDeletingAll || isBulkDownloading;
-                    const isSelected = selectedGroupKeys.has(group.groupKey);
-                    const badgeClass = group.isReservation
-                      ? 'text-amber-800 bg-amber-50'
-                      : 'text-emerald-800 bg-emerald-50';
-
-                    return (
-                      <tr key={group.groupKey} className="hover:bg-gray-50">
-                        <td className="px-4 py-4 text-center">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => handleToggleSelect(group.groupKey)}
-                            disabled={isBulkDownloading || isDeletingAll}
-                            className={`w-4 h-4 cursor-pointer ${accentCheckboxClass}`}
-                            aria-label={`${group.companyName} 선택`}
-                          />
-                        </td>
-                        <td className="px-4 py-4 text-gray-900 font-medium whitespace-nowrap">
-                          {group.companyName}
-                          {group.lineCount > 1 && (
-                            <span className={`ml-1.5 text-xs font-normal px-1.5 py-0.5 rounded ${badgeClass}`}>
-                              통합 {group.lineCount}건
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 text-gray-600 max-w-[240px]">
-                          <span className="line-clamp-2" title={group.address}>
-                            {group.address}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-gray-600 whitespace-nowrap">
-                          {group.recipientName}
-                        </td>
-                        <td className="px-4 py-4 text-gray-600">
-                          <span className="line-clamp-2 text-sm" title={group.orderRefsLabel}>
-                            {group.orderRefsLabel}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-gray-900 font-medium text-right whitespace-nowrap">
-                          {group.totalAmount > 0
-                            ? `₩${group.totalAmount.toLocaleString()}`
-                            : '-'}
-                        </td>
-                        <td className="px-4 py-4 text-gray-600 whitespace-nowrap">
-                          {formatStatementDate(group.latestUpdatedAt)}
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              disabled={isBusy}
-                              onClick={() => void handleViewStatement(group)}
-                              className={`inline-flex items-center gap-1 px-2 py-1.5 text-xs rounded-md border disabled:opacity-50 ${accentButtonClass}`}
-                            >
-                              {isBusy ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Eye className="w-3.5 h-3.5" />
-                              )}
-                              보기
-                            </button>
-                            <button
-                              type="button"
-                              disabled={isBusy}
-                              onClick={() => void handleDownloadStatement(group)}
-                              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                              다운로드
-                            </button>
-                            <button
-                              type="button"
-                              disabled={isBusy}
-                              onClick={() => void handleCancelStatement(group)}
-                              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs rounded-md border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50"
-                            >
-                              {isBusy ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <XCircle className="w-3.5 h-3.5" />
-                              )}
-                              명세서 취소
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="p-4 space-y-4">
+              {paginatedCompanyGroups.map((company) => renderCompanyRow(company))}
             </div>
             <ShopOrderListPagination
               currentPage={currentPage}

@@ -33,6 +33,7 @@ import {
 } from '../../utils/shopOrderDeleteUtils';
 import { shopOrderDetailPath } from './shopOrderListNavigation';
 import { ShopOrderListPagination } from './ShopOrderListPagination';
+import { ShopOrderStatementCreateDialog } from './ShopOrderStatementCreateDialog';
 import {
   ShopOrderStatementModal,
   type ShopOrderStatementGroupPreview,
@@ -55,6 +56,11 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
   const [bulkBusy, setBulkBusy] = useState(false);
   const [statementModalOpen, setStatementModalOpen] = useState(false);
   const [statementGroups, setStatementGroups] = useState<ShopOrderStatementGroupPreview[]>([]);
+  const [statementCreateDialogOpen, setStatementCreateDialogOpen] = useState(false);
+  const [pendingStatementLineCount, setPendingStatementLineCount] = useState(0);
+  const [pendingStatementItems, setPendingStatementItems] = useState<
+    Array<{ shopOrderId: string; lineId: string }>
+  >([]);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
 
   const checkboxClass =
@@ -180,7 +186,23 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
         return;
       }
 
-      const result = await createShopOrderBulkStatements(items);
+      setPendingStatementItems(items);
+      setPendingStatementLineCount(items.length);
+      setStatementCreateDialogOpen(true);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '주문 정보를 불러오지 못했습니다.');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleConfirmCreateStatements = async (statementDate: string) => {
+    if (pendingStatementItems.length === 0) return;
+
+    setStatementCreateDialogOpen(false);
+    setBulkBusy(true);
+    try {
+      const result = await createShopOrderBulkStatements(pendingStatementItems, { statementDate });
 
       if (result.groups.length === 0) {
         alert('선택한 주문에 판매 주문이 없습니다.');
@@ -191,7 +213,7 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
 
       setStatementGroups(
         result.groups.map((group) => ({
-          id: group.groupKey,
+          id: group.statementGroupId ?? group.groupKey,
           title: buildStatementGroupTitle(group),
           html: group.html,
         }))
@@ -201,6 +223,8 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
       alert(err instanceof Error ? err.message : '명세서 생성 중 오류가 발생했습니다.');
     } finally {
       setBulkBusy(false);
+      setPendingStatementItems([]);
+      setPendingStatementLineCount(0);
     }
   };
 
@@ -510,6 +534,17 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
           />
         )}
       </div>
+
+      <ShopOrderStatementCreateDialog
+        isOpen={statementCreateDialogOpen}
+        lineCount={pendingStatementLineCount}
+        onConfirm={(statementDate) => void handleConfirmCreateStatements(statementDate)}
+        onCancel={() => {
+          setStatementCreateDialogOpen(false);
+          setPendingStatementItems([]);
+          setPendingStatementLineCount(0);
+        }}
+      />
 
       <ShopOrderStatementModal
         isOpen={statementModalOpen}

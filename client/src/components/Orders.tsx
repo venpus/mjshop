@@ -7,6 +7,7 @@ import {
   type ShopOrderStatus,
 } from '../api/shopOrderApi';
 import { ShopOrderLineListTab } from './orders/ShopOrderLineListTab';
+import { useShopLineShipmentMap } from '../hooks/useShopLineShipmentMap';
 import {
   parseShopOrderListTab,
   SHOP_ORDER_LIST_TAB_PARAM,
@@ -18,6 +19,7 @@ import { ShopOrderProductListTab } from './orders/ShopOrderProductListTab';
 export function Orders() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = parseShopOrderListTab(searchParams.get(SHOP_ORDER_LIST_TAB_PARAM));
+  const { lineShipmentMap, reloadLineShipmentMap } = useShopLineShipmentMap();
   const [orders, setOrders] = useState<ShopOrder[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -35,13 +37,14 @@ export function Orders() {
       const data = await getShopOrders();
       setOrders(data);
       hasLoadedOnceRef.current = true;
+      await reloadLineShipmentMap();
     } catch (err) {
       setError(err instanceof Error ? err.message : '주문 목록을 불러오지 못했습니다.');
     } finally {
       setIsInitialLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [reloadLineShipmentMap]);
 
   useEffect(() => {
     void loadOrders();
@@ -131,6 +134,7 @@ export function Orders() {
               orders={orders}
               listTab={activeTab}
               lineKind={activeTab === 'reservations' ? 'reservations' : 'orders'}
+              lineShipmentMap={lineShipmentMap}
               onReload={loadOrders}
             />
           )}

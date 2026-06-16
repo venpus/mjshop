@@ -56,6 +56,8 @@ export interface ShopOrderStatementContext {
   recipientName: string | null;
   phoneNumber: string | null;
   isReservation?: boolean;
+  /** 명세서 거래일자 (미설정 시 orderDate 사용) */
+  statementDate?: string | Date | null;
 }
 
 const BORDER = '#5a7a42';
@@ -144,6 +146,12 @@ function formatStatementProductLabel(order: ShopOrderStatementContext): string {
     return `[예약] ${order.productName}`;
   }
   return order.productName;
+}
+
+function resolveStatementDocumentDate(
+  context: ShopOrderStatementContext
+): string | Date | null {
+  return context.statementDate ?? context.orderDate;
 }
 
 function buildStatementTitleReservationNote(
@@ -326,7 +334,7 @@ export function buildShopOrderConsolidatedStatementHtml(
 
   const recipient = contexts[0];
   const supplier = SHOP_STATEMENT_SUPPLIER;
-  const date = parseKoreanDate(pickLatestOrderDate(contexts));
+  const date = parseKoreanDate(resolveStatementDocumentDate(recipient));
   const amounts = buildConsolidatedAmounts(contexts);
   const regDigits = renderRegistrationDigits(
     supplier.registrationNumber.replace(/\s/g, '')
@@ -637,17 +645,18 @@ export function buildShopOrderConsolidatedStatementHtml(
 
 export function getConsolidatedShopOrderStatementFileName(
   companyName: string,
-  lineCount: number
+  lineCount: number,
+  statementDate?: string | Date | null
 ): string {
   const safeName = (companyName || '미상').replace(/[^\w가-힣-]+/g, '_').slice(0, 40);
-  const dateSuffix = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const dateSuffix = normalizeDateString(statementDate ?? new Date()).replace(/-/g, '');
   const suffix = lineCount > 1 ? '_통합' : '';
   return `거래명세표_${safeName}_${dateSuffix}${suffix}.html`;
 }
 
 export function buildShopOrderStatementHtml(order: ShopOrderStatementContext): string {
   const supplier = SHOP_STATEMENT_SUPPLIER;
-  const date = parseKoreanDate(order.orderDate);
+  const date = parseKoreanDate(resolveStatementDocumentDate(order));
   const amounts = buildAmounts(order);
   const regDigits = renderRegistrationDigits(
     supplier.registrationNumber.replace(/\s/g, '')

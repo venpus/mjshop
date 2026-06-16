@@ -29,6 +29,9 @@ export interface ShopOrderLine {
   wkSettlementPaidAt: Date | null;
   inventioSettlementPaidAt: Date | null;
   statementFilePath: string | null;
+  statementGroupId: string | null;
+  statementIssuedAt: string | null;
+  statementDelivered: boolean;
   paymentProofImage: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -38,6 +41,7 @@ export interface CreateShopOrderLineDTO {
   shopOrderId: string;
   sortOrder?: number;
   isReservation?: boolean;
+  orderBoxCount?: number;
   saleUnitPrice?: number | null;
   quantityPerBox?: number;
 }
@@ -68,6 +72,9 @@ export interface UpdateShopOrderLineDTO {
   statementIssued?: boolean;
   paymentReceived?: boolean;
   statementFilePath?: string | null;
+  statementGroupId?: string | null;
+  statementIssuedAt?: string | null;
+  statementDelivered?: boolean;
   paymentProofImage?: string | null;
   sortOrder?: number;
   isReservation?: boolean;

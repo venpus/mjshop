@@ -19,6 +19,7 @@ interface ShopOrderRow extends RowDataPacket {
   unit_price: number | null;
   quantity: number;
   stock_quantity: number;
+  warehouse_stock_quantity: number | null;
   selling_price: number | null;
   status: ShopOrderStatus;
   order_date: string | Date | null;
@@ -71,7 +72,7 @@ function normalizeOrderDate(value: string | Date | null | undefined): string | n
 
 const SHOP_ORDER_SELECT = `id, order_number, stock_inbound_item_id, purchase_order_id, product_id,
               product_name, product_main_image, unit_price, quantity, stock_quantity,
-              selling_price, status, order_date, note,
+              warehouse_stock_quantity, selling_price, status, order_date, note,
               company_name, order_box_count, quantity_per_box, sale_unit_price,
               delivery_fee, total_amount, address, recipient_name, phone_number,
               tracking_number, statement_issued, payment_received, product_arrived,
@@ -180,6 +181,14 @@ export class ShopOrderRepository {
     if (data.quantity !== undefined) {
       fields.push('quantity = ?');
       values.push(data.quantity);
+    }
+    if (data.unitPrice !== undefined) {
+      fields.push('unit_price = ?');
+      values.push(data.unitPrice);
+    }
+    if (data.warehouseStockQuantity !== undefined) {
+      fields.push('warehouse_stock_quantity = ?');
+      values.push(data.warehouseStockQuantity);
     }
     if (data.sellingPrice !== undefined) {
       fields.push('selling_price = ?');
@@ -300,6 +309,9 @@ export class ShopOrderRepository {
       wkSettlementPaidAt: null,
       inventioSettlementPaidAt: null,
       statementFilePath: order.statementFilePath,
+      statementGroupId: null,
+      statementIssuedAt: null,
+      statementDelivered: false,
       paymentProofImage: order.paymentProofImage,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
@@ -361,7 +373,8 @@ export class ShopOrderRepository {
       unitPrice: row.unit_price != null ? Number(row.unit_price) : null,
       quantity: Number(row.quantity) || 0,
       stockQuantity: Number(row.stock_quantity) || 0,
-      warehouseStockQuantity: Number(row.stock_quantity) || 0,
+      warehouseStockQuantity:
+        row.warehouse_stock_quantity != null ? Number(row.warehouse_stock_quantity) : 0,
       sellingPrice: row.selling_price != null ? Number(row.selling_price) : null,
       status: row.status,
       orderDate: normalizeOrderDate(row.order_date),

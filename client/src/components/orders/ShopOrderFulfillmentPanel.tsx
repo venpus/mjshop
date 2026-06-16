@@ -1,24 +1,26 @@
-import { useRef, useState } from 'react';
-import { Download, Eye, Pencil, Trash2, Upload } from 'lucide-react';
+import { useState } from 'react';
+import { Download, Eye, Pencil } from 'lucide-react';
 import type { ShopOrder } from '../../api/shopOrderApi';
 import {
   createShopOrderStatement,
-  deleteShopOrderPaymentProof,
   downloadShopOrderStatement,
   getShopOrderStatementPreview,
-  uploadShopOrderPaymentProof,
 } from '../../api/shopOrderApi';
-import { getFullImageUrl } from '../../api/purchaseOrderApi';
-import { GalleryImageModal } from '../GalleryImageModal';
+import { ShopOrderStatementCreateDialog } from './ShopOrderStatementCreateDialog';
 import { ShopOrderStatementModal } from './ShopOrderStatementModal';
+import { ShopLineDeliveryStatusLink } from '../shipping/ShopLineDeliveryStatusLink';
+import { ShopOrderProgressFlagBadge } from './ShopOrderProgressFlagBadge';
 import type { ShopOrderProgressForm } from '../../utils/shopOrderCalculations';
+import type { LineShipmentInfo } from '../../utils/shopLineShipmentUtils';
 
 interface ShopOrderFulfillmentPanelProps {
   orderId: string;
   lineId: string;
   form: ShopOrderProgressForm;
   hasStatement: boolean;
+  paymentReceived: boolean;
   paymentProofImage: string | null;
+  lineShipmentMap: Map<string, LineShipmentInfo>;
   onChange: <K extends keyof ShopOrderProgressForm>(key: K, value: ShopOrderProgressForm[K]) => void;
   onOrderUpdated: (order: ShopOrder) => void;
   onSaveIfNeeded: () => Promise<void>;
@@ -55,25 +57,31 @@ export function ShopOrderFulfillmentPanel({
   lineId,
   form,
   hasStatement,
+  paymentReceived,
   paymentProofImage,
+  lineShipmentMap,
   onChange,
   onOrderUpdated,
   onSaveIfNeeded,
   inputClass,
 }: ShopOrderFulfillmentPanelProps) {
-  const paymentInputRef = useRef<HTMLInputElement>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [statementHtml, setStatementHtml] = useState('');
   const [isStatementModalOpen, setIsStatementModalOpen] = useState(false);
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [statementCreateDialogOpen, setStatementCreateDialogOpen] = useState(false);
 
-  const hasPaymentProof = Boolean(paymentProofImage);
+  const hasPayment = paymentReceived || Boolean(paymentProofImage);
 
-  const handleCreateOrUpdateStatement = async () => {
+  const handleCreateOrUpdateStatement = () => {
+    setStatementCreateDialogOpen(true);
+  };
+
+  const handleConfirmCreateStatement = async (statementDate: string) => {
+    setStatementCreateDialogOpen(false);
     setIsBusy(true);
     try {
       await onSaveIfNeeded();
-      const updated = await createShopOrderStatement(orderId, lineId);
+      const updated = await createShopOrderStatement(orderId, lineId, { statementDate });
       onOrderUpdated(updated);
       alert(hasStatement ? '명세서가 수정되었습니다.' : '명세서가 생성되었습니다.');
     } catch (err) {
@@ -107,49 +115,12 @@ export function ShopOrderFulfillmentPanel({
     }
   };
 
-  const handlePaymentFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsBusy(true);
-    try {
-      const updated = await uploadShopOrderPaymentProof(orderId, lineId, file);
-      onOrderUpdated(updated);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : '입금 내역 업로드 중 오류가 발생했습니다.');
-    } finally {
-      setIsBusy(false);
-      e.target.value = '';
-    }
-  };
-
-  const handleDeletePaymentProof = async () => {
-    if (!window.confirm('입금 내역 캡처 이미지를 삭제하시겠습니까?')) return;
-    setIsBusy(true);
-    try {
-      const updated = await deleteShopOrderPaymentProof(orderId, lineId);
-      onOrderUpdated(updated);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : '입금 내역 삭제 중 오류가 발생했습니다.');
-    } finally {
-      setIsBusy(false);
-    }
-  };
-
   return (
     <>
-      <InlineField label="송장" className="flex-[0.85] min-w-[48px]">
-        <input
-          type="text"
-          inputMode="numeric"
-          value={form.trackingNumber}
-          onChange={(e) => {
-            const value = e.target.value.replace(/\D/g, '').slice(0, 20);
-            onChange('trackingNumber', value);
-          }}
-          className={`${inputClass} font-mono tabular-nums`}
-          placeholder="송장"
-          maxLength={20}
-        />
+      <InlineField label="배송" className="flex-[0.95] min-w-[52px]">
+        <div className="flex items-center min-h-[26px]">
+          <ShopLineDeliveryStatusLink lineId={lineId} lineShipmentMap={lineShipmentMap} />
+        </div>
       </InlineField>
 
       <InlineField label="명세서" className="flex-[1.1] min-w-[56px]">
@@ -203,66 +174,9 @@ export function ShopOrderFulfillmentPanel({
         </div>
       </InlineField>
 
-      <InlineField label="입금" className="flex-[1] min-w-[52px]">
-        <div className="flex flex-nowrap items-center gap-1 min-h-[26px] overflow-hidden">
-          <input
-            type="checkbox"
-            checked={hasPaymentProof}
-            readOnly
-            disabled
-            className={`${checkboxClass} cursor-default`}
-          />
-          <input
-            ref={paymentInputRef}
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-            className="hidden"
-            disabled={isBusy}
-            onChange={handlePaymentFileChange}
-          />
-          {hasPaymentProof && paymentProofImage && (
-            <button
-              type="button"
-              onClick={() => setPreviewImageUrl(getFullImageUrl(paymentProofImage))}
-              className={`${actionBtnClass} text-gray-700 border-gray-200 hover:bg-gray-50 px-1.5`}
-              title="입금 내역 보기"
-            >
-              <Eye className="w-3 h-3" />
-            </button>
-          )}
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={() => paymentInputRef.current?.click()}
-            className={`${actionBtnClass} text-purple-700 border-purple-200 hover:bg-purple-50`}
-          >
-            <span className="inline-flex items-center gap-0.5">
-              <Upload className="w-3 h-3" />
-              {hasPaymentProof ? '변경' : '업로드'}
-            </span>
-          </button>
-          {hasPaymentProof && (
-            <button
-              type="button"
-              disabled={isBusy}
-              onClick={handleDeletePaymentProof}
-              className={`${actionBtnClass} text-red-600 border-red-200 hover:bg-red-50`}
-              title="삭제"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-      </InlineField>
-
-      <InlineField label="도착" className="flex-[0.4] min-w-[32px]">
+      <InlineField label="입금" className="flex-[0.4] min-w-[32px]">
         <div className="flex items-center min-h-[26px]">
-          <input
-            type="checkbox"
-            checked={form.productArrived}
-            onChange={(e) => onChange('productArrived', e.target.checked)}
-            className={checkboxClass}
-          />
+          <ShopOrderProgressFlagBadge label="입금" display="입" checked={hasPayment} />
         </div>
       </InlineField>
 
@@ -278,15 +192,19 @@ export function ShopOrderFulfillmentPanel({
         </div>
       </InlineField>
 
+      <ShopOrderStatementCreateDialog
+        isOpen={statementCreateDialogOpen}
+        lineCount={1}
+        isReservation={form.isReservation}
+        onConfirm={(statementDate) => void handleConfirmCreateStatement(statementDate)}
+        onCancel={() => setStatementCreateDialogOpen(false)}
+      />
+
       <ShopOrderStatementModal
         isOpen={isStatementModalOpen}
         html={statementHtml}
         onClose={() => setIsStatementModalOpen(false)}
       />
-
-      {previewImageUrl && (
-        <GalleryImageModal imageUrl={previewImageUrl} onClose={() => setPreviewImageUrl(null)} />
-      )}
     </>
   );
 }

@@ -9,8 +9,9 @@ interface ShopOrderProductSectionProps {
   productName: string;
   orderNumber: string;
   productImage?: string;
-  quantity: number;
-  stockQuantity: number;
+  orderQuantity: number;
+  warehouseStockQuantity: number;
+  remainingStockQuantity: number;
   sellingPrice: number | null;
   quantityPerBox: number;
   unitPrice: number | null;
@@ -19,6 +20,8 @@ interface ShopOrderProductSectionProps {
   purchaseOrderId?: string | null;
   onImageClick?: () => void;
   onPurchaseOrderClick?: () => void;
+  onWarehouseStockQuantityChange?: (value: number) => void;
+  onUnitPriceChange?: (value: number | null) => void;
   onSellingPriceChange?: (value: number | null) => void;
   onQuantityPerBoxChange?: (value: number) => void;
 }
@@ -47,8 +50,9 @@ export function ShopOrderProductSection({
   productName,
   orderNumber,
   productImage,
-  quantity,
-  stockQuantity,
+  orderQuantity,
+  warehouseStockQuantity,
+  remainingStockQuantity,
   sellingPrice,
   quantityPerBox,
   unitPrice,
@@ -57,6 +61,8 @@ export function ShopOrderProductSection({
   purchaseOrderId,
   onImageClick,
   onPurchaseOrderClick,
+  onWarehouseStockQuantityChange,
+  onUnitPriceChange,
   onSellingPriceChange,
   onQuantityPerBoxChange,
 }: ShopOrderProductSectionProps) {
@@ -111,19 +117,35 @@ export function ShopOrderProductSection({
 
         <div className="flex-1 min-w-0 overflow-x-auto pb-0.5">
           <div className="flex flex-nowrap items-end gap-x-3 gap-y-2 min-w-max">
+            <InfoField label="전체 수량" className="w-[80px]">
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={warehouseStockQuantity}
+                onChange={(e) =>
+                  onWarehouseStockQuantityChange?.(parseInt(e.target.value, 10) || 0)
+                }
+                onWheel={handleNumberInputWheel}
+                className={inputClass}
+                title="창고 보유 전체 수량"
+              />
+            </InfoField>
+
             <InfoField label="주문 수량" className="w-[72px]">
               <span className="text-sm font-semibold text-gray-900 tabular-nums">
-                {quantity.toLocaleString()}개
+                {orderQuantity.toLocaleString()}개
               </span>
             </InfoField>
 
             <InfoField label="재고 수량" className="w-[72px]">
               <span
                 className={`text-sm font-semibold tabular-nums ${
-                  stockQuantity < 0 ? 'text-red-600' : 'text-blue-700'
+                  remainingStockQuantity < 0 ? 'text-red-600' : 'text-blue-700'
                 }`}
+                title="전체 수량 − 주문 수량"
               >
-                {stockQuantity.toLocaleString()}개
+                {remainingStockQuantity.toLocaleString()}개
               </span>
             </InfoField>
 
@@ -156,13 +178,22 @@ export function ShopOrderProductSection({
               />
             </InfoField>
 
-            {unitPrice != null && (
-              <InfoField label="원가 단가" className="w-[72px]">
-                <span className="text-sm text-gray-900 tabular-nums">
-                  ¥{unitPrice.toLocaleString()}
-                </span>
-              </InfoField>
-            )}
+            <InfoField label="원가 단가 (¥)" className="w-[88px]">
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={unitPrice ?? ''}
+                onChange={(e) =>
+                  onUnitPriceChange?.(
+                    e.target.value === '' ? null : parseFloat(e.target.value) || 0
+                  )
+                }
+                onWheel={handleNumberInputWheel}
+                className={inputClass}
+                placeholder="원가"
+              />
+            </InfoField>
 
             <InfoField label="등록일" className="w-[88px]">
               <span className="text-sm text-gray-900 whitespace-nowrap">{orderDate || '-'}</span>

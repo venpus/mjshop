@@ -23,6 +23,10 @@ export function lineHasStatement(line: ShopOrderLine): boolean {
   return line.statementIssued || Boolean(line.statementFilePath);
 }
 
+export function lineHasStatementDelivered(line: ShopOrderLine): boolean {
+  return line.statementDelivered;
+}
+
 export function lineHasPayment(line: ShopOrderLine): boolean {
   return line.paymentReceived || Boolean(line.paymentProofImage);
 }

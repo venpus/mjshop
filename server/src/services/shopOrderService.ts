@@ -32,6 +32,8 @@ import type { ShopOrderLine, UpdateShopOrderLineDTO } from '../models/shopOrderL
 
 export interface BulkStatementGroupResult {
   groupKey: string;
+  statementGroupId: string;
+  statementIssuedAt: string;
   companyName: string;
   lineCount: number;
   html: string;
@@ -108,7 +110,7 @@ export class ShopOrderService {
   }
 
   private async enrichOrderStock(order: ShopOrder): Promise<ShopOrder> {
-    let warehouseStock = order.stockQuantity;
+    let warehouseStock = order.warehouseStockQuantity;
 
     if (order.stockInboundItemId) {
       const inbound = await this.stockInboundRepository.findById(order.stockInboundItemId);
@@ -267,6 +269,27 @@ export class ShopOrderService {
       });
     }
 
+    if (data.unitPrice !== undefined) {
+      const unitPrice =
+        data.unitPrice != null && Number(data.unitPrice) > 0 ? Number(data.unitPrice) : null;
+      await this.repository.update(id, { unitPrice });
+      if (existing.stockInboundItemId) {
+        await this.stockInboundRepository.updateUnitPrice(existing.stockInboundItemId, unitPrice);
+      }
+    }
+
+    if (data.warehouseStockQuantity !== undefined) {
+      const warehouseStockQuantity = Math.max(0, Math.floor(Number(data.warehouseStockQuantity)));
+      if (existing.stockInboundItemId) {
+        await this.stockInboundRepository.updateStockQuantity(
+          existing.stockInboundItemId,
+          warehouseStockQuantity
+        );
+      } else {
+        await this.repository.update(id, { warehouseStockQuantity });
+      }
+    }
+
     if (data.lines) {
       for (const linePayload of data.lines) {
         const line = existing.lines.find((item) => item.id === linePayload.id);
@@ -346,12 +369,30 @@ export class ShopOrderService {
       throw new Error('주문을 찾을 수 없습니다.');
     }
 
-    await this.lineRepository.create({
+    const line = await this.lineRepository.create({
       shopOrderId,
       isReservation,
+      orderBoxCount: 1,
       saleUnitPrice: order.sellingPrice,
       quantityPerBox: order.quantityPerBox,
     });
+
+    const amountBreakdown = calculateShopOrderAmountBreakdown(
+      1,
+      order.quantityPerBox,
+      order.sellingPrice,
+      null
+    );
+
+    if (amountBreakdown) {
+      await this.lineRepository.update(line.id, {
+        productSupplyAmount: amountBreakdown.productSupplyAmount,
+        vatAmount: amountBreakdown.vatAmount,
+        totalAmount: amountBreakdown.totalAmount,
+      });
+    }
+
+    await this.repository.syncQuantityFromLines(shopOrderId);
 
     const refreshed = await this.repository.findById(shopOrderId);
     if (!refreshed) {
@@ -706,7 +747,11 @@ export class ShopOrderService {
     return updated;
   }
 
-  private buildStatementContext(order: ShopOrder, line: ShopOrderLine) {
+  private buildStatementContext(
+    order: ShopOrder,
+    line: ShopOrderLine,
+    statementDate?: string | null
+  ) {
     return {
       orderNumber: this.resolveLineOrderNumber(line, order),
       productName: order.productName,
@@ -720,7 +765,15 @@ export class ShopOrderService {
       recipientName: line.recipientName,
       phoneNumber: line.phoneNumber,
       isReservation: line.isReservation,
+      statementDate: statementDate ?? null,
     };
+  }
+
+  private normalizeStatementDateInput(value?: string | null): string {
+    if (value && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+      return value.trim();
+    }
+    return new Date().toISOString().slice(0, 10);
   }
 
   private async readSavedOrBuildStatementHtml(
@@ -738,7 +791,8 @@ export class ShopOrderService {
   }
 
   async createBulkStatements(
-    items: Array<{ shopOrderId: string; lineId: string }>
+    items: Array<{ shopOrderId: string; lineId: string }>,
+    options?: { statementDate?: string | null }
   ): Promise<BulkStatementResult> {
     if (items.length === 0) {
       throw new Error('선택한 주문건이 없습니다.');
@@ -797,10 +851,12 @@ export class ShopOrderService {
     const groups = groupStatementLines(lineInputs, buyers);
     const results: BulkStatementGroupResult[] = [];
     let statementCount = 0;
+    const statementIssuedAt = this.normalizeStatementDateInput(options?.statementDate);
 
     for (const group of groups) {
+      const statementGroupId = randomUUID();
       const contexts = group.lines.map(({ order, line }) =>
-        this.buildStatementContext(order, line)
+        this.buildStatementContext(order, line, statementIssuedAt)
       );
       const html =
         contexts.length === 1
@@ -813,7 +869,8 @@ export class ShopOrderService {
             )
           : getConsolidatedShopOrderStatementFileName(
               group.companyName,
-              group.lines.length
+              group.lines.length,
+              statementIssuedAt
             );
 
       for (const item of group.lines) {
@@ -824,12 +881,16 @@ export class ShopOrderService {
         );
         await this.lineRepository.update(item.lineId, {
           statementFilePath: relativePath,
+          statementGroupId,
+          statementIssuedAt,
         });
         statementCount += 1;
       }
 
       results.push({
-        groupKey: group.groupKey,
+        groupKey: statementGroupId,
+        statementGroupId,
+        statementIssuedAt,
         companyName: group.companyName,
         lineCount: group.lines.length,
         html,
@@ -887,12 +948,105 @@ export class ShopOrderService {
     await this.lineRepository.update(lineId, {
       statementFilePath: null,
       statementIssued: false,
+      statementGroupId: null,
+      statementIssuedAt: null,
+      statementDelivered: false,
     });
 
     return true;
   }
 
-  async createOrUpdateStatement(shopOrderId: string, lineId: string): Promise<ShopOrder> {
+  async updateStatementDeliveryStatus(
+    items: Array<{ shopOrderId: string; lineId: string }>,
+    delivered: boolean
+  ): Promise<{ updatedCount: number }> {
+    if (items.length === 0) {
+      throw new Error('저장할 명세서가 없습니다.');
+    }
+
+    const uniqueItems = Array.from(
+      new Map(items.map((item) => [`${item.shopOrderId}:${item.lineId}`, item])).values()
+    );
+
+    let updatedCount = 0;
+    for (const item of uniqueItems) {
+      if (item.lineId.endsWith('-legacy-line')) {
+        throw new Error('레거시 주문 건은 전달완료 상태를 저장할 수 없습니다.');
+      }
+
+      const order = await this.repository.findById(item.shopOrderId);
+      if (!order) {
+        throw new Error('주문을 찾을 수 없습니다.');
+      }
+
+      const line = order.lines.find((row) => row.id === item.lineId);
+      if (!line) {
+        throw new Error('주문 건을 찾을 수 없습니다.');
+      }
+
+      if (!line.statementIssued && !line.statementFilePath) {
+        continue;
+      }
+
+      await this.lineRepository.update(item.lineId, { statementDelivered: delivered });
+      updatedCount += 1;
+    }
+
+    if (updatedCount === 0) {
+      throw new Error('저장할 명세서가 없습니다.');
+    }
+
+    return { updatedCount };
+  }
+
+  async updateStatementPaymentStatus(
+    items: Array<{ shopOrderId: string; lineId: string }>,
+    paymentReceived: boolean
+  ): Promise<{ updatedCount: number }> {
+    if (items.length === 0) {
+      throw new Error('저장할 명세서가 없습니다.');
+    }
+
+    const uniqueItems = Array.from(
+      new Map(items.map((item) => [`${item.shopOrderId}:${item.lineId}`, item])).values()
+    );
+
+    let updatedCount = 0;
+    for (const item of uniqueItems) {
+      if (item.lineId.endsWith('-legacy-line')) {
+        throw new Error('레거시 주문 건은 입금완료 상태를 저장할 수 없습니다.');
+      }
+
+      const order = await this.repository.findById(item.shopOrderId);
+      if (!order) {
+        throw new Error('주문을 찾을 수 없습니다.');
+      }
+
+      const line = order.lines.find((row) => row.id === item.lineId);
+      if (!line) {
+        throw new Error('주문 건을 찾을 수 없습니다.');
+      }
+
+      if (!line.statementIssued && !line.statementFilePath) {
+        continue;
+      }
+
+      await this.lineRepository.update(item.lineId, { paymentReceived });
+      updatedCount += 1;
+    }
+
+    if (updatedCount === 0) {
+      throw new Error('저장할 명세서가 없습니다.');
+    }
+
+    return { updatedCount };
+  }
+
+  async createOrUpdateStatement(
+    shopOrderId: string,
+    lineId: string,
+    options?: { statementDate?: string | null }
+  ): Promise<ShopOrder> {
     const order = await this.repository.findById(shopOrderId);
     if (!order) {
       throw new Error('주문을 찾을 수 없습니다.');
@@ -903,10 +1057,16 @@ export class ShopOrderService {
       throw new Error('주문 라인을 찾을 수 없습니다.');
     }
 
-    const html = buildShopOrderStatementHtml(this.buildStatementContext(order, line));
+    const statementIssuedAt = this.normalizeStatementDateInput(options?.statementDate);
+    const statementGroupId = randomUUID();
+    const html = buildShopOrderStatementHtml(
+      this.buildStatementContext(order, line, statementIssuedAt)
+    );
     const relativePath = await saveShopOrderLineStatementHtml(shopOrderId, lineId, html);
     await this.lineRepository.update(lineId, {
       statementFilePath: relativePath,
+      statementGroupId,
+      statementIssuedAt,
     });
 
     const refreshed = await this.repository.findById(shopOrderId);
@@ -953,18 +1113,40 @@ export class ShopOrderService {
       loaded.push({ order, line });
     }
 
-    const contexts = loaded.map(({ order, line }) => this.buildStatementContext(order, line));
+    const first = loaded[0];
+    if (first.line.statementFilePath) {
+      const savedHtml = await readShopOrderLineStatementHtml(first.line.statementFilePath);
+      if (savedHtml) {
+        const companyName = (first.line.companyName ?? '').trim() || '미상';
+        const fileName =
+          loaded.length === 1
+            ? getShopOrderStatementFileName(this.resolveLineOrderNumber(first.line, first.order))
+            : getConsolidatedShopOrderStatementFileName(
+                companyName,
+                loaded.length,
+                first.line.statementIssuedAt
+              );
+        return { html: savedHtml, fileName };
+      }
+    }
+
+    const contexts = loaded.map(({ order, line }) =>
+      this.buildStatementContext(order, line, line.statementIssuedAt)
+    );
     const html =
       contexts.length === 1
         ? buildShopOrderStatementHtml(contexts[0])
         : buildShopOrderConsolidatedStatementHtml(contexts);
 
-    const first = loaded[0];
     const companyName = (first.line.companyName ?? '').trim() || '미상';
     const fileName =
       contexts.length === 1
         ? getShopOrderStatementFileName(this.resolveLineOrderNumber(first.line, first.order))
-        : getConsolidatedShopOrderStatementFileName(companyName, contexts.length);
+        : getConsolidatedShopOrderStatementFileName(
+            companyName,
+            contexts.length,
+            first.line.statementIssuedAt
+          );
 
     return { html, fileName };
   }

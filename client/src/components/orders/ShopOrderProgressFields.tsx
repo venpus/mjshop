@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 
-import { DollarSign, ArrowRightLeft, Bookmark, Plus, ShoppingBag, Trash2 } from 'lucide-react';
+import { DollarSign, ArrowRightLeft, Bookmark, Plus, RefreshCw, ShoppingBag, Trash2, UserPlus } from 'lucide-react';
 
 import type { ShopBuyerListItem } from '../buyers/types';
 
@@ -13,6 +13,7 @@ import { handleNumberInputWheel } from '../../utils/preventNumberInputWheel';
 import { ShopBuyerCompanyPicker } from '../buyers/ShopBuyerCompanyPicker';
 
 import { ShopOrderFulfillmentPanel } from './ShopOrderFulfillmentPanel';
+import type { LineShipmentInfo } from '../../utils/shopLineShipmentUtils';
 
 
 
@@ -27,6 +28,8 @@ interface ShopOrderProgressFieldsProps {
   orderId: string;
 
   isLineBusy: boolean;
+
+  lineShipmentMap: Map<string, LineShipmentInfo>;
 
   onAddLine: () => void;
 
@@ -55,6 +58,12 @@ interface ShopOrderProgressFieldsProps {
   onOrderUpdated: (order: ShopOrder) => void;
 
   onSaveIfNeeded: () => Promise<void>;
+
+  onRefreshBuyers: () => void;
+
+  onOpenAddBuyer: () => void;
+
+  isRefreshingBuyers?: boolean;
 
 }
 
@@ -132,6 +141,8 @@ function ShopOrderLineRow({
 
   onSaveIfNeeded,
 
+  lineShipmentMap,
+
 }: {
 
   line: ShopOrderLineForm;
@@ -159,6 +170,8 @@ function ShopOrderLineRow({
   onOrderUpdated: (order: ShopOrder) => void;
 
   onSaveIfNeeded: () => Promise<void>;
+
+  lineShipmentMap: ShopOrderProgressFieldsProps['lineShipmentMap'];
 
 }) {
 
@@ -624,6 +637,8 @@ function ShopOrderLineRow({
 
             hasStatement={Boolean(line.statementFilePath)}
 
+            paymentReceived={line.paymentReceived}
+
             paymentProofImage={line.paymentProofImage}
 
             onChange={(key, value) => onLineChange(line.id, key, value)}
@@ -631,6 +646,8 @@ function ShopOrderLineRow({
             onOrderUpdated={onOrderUpdated}
 
             onSaveIfNeeded={onSaveIfNeeded}
+
+            lineShipmentMap={lineShipmentMap}
 
             inputClass={inputClass}
 
@@ -676,6 +693,7 @@ export function ShopOrderProgressFields(props: ShopOrderProgressFieldsProps) {
         onLineBatchChange={props.onLineBatchChange}
         onOrderUpdated={props.onOrderUpdated}
         onSaveIfNeeded={props.onSaveIfNeeded}
+        lineShipmentMap={props.lineShipmentMap}
       />
     ));
 
@@ -743,6 +761,25 @@ export function ShopOrderProgressPanel(props: ShopOrderProgressFieldsProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={props.isLineBusy || props.isRefreshingBuyers}
+            onClick={props.onRefreshBuyers}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="상호명 선택 목록 갱신"
+          >
+            <RefreshCw className={`w-4 h-4 ${props.isRefreshingBuyers ? 'animate-spin' : ''}`} />
+            구매자 정보 새로고침
+          </button>
+          <button
+            type="button"
+            disabled={props.isLineBusy}
+            onClick={props.onOpenAddBuyer}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-md border border-purple-300 text-purple-700 bg-purple-50 hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <UserPlus className="w-4 h-4" />
+            신규 구매자 등록
+          </button>
           <button
             type="button"
             disabled={props.isLineBusy}

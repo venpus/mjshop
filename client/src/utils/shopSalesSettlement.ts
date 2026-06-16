@@ -1,4 +1,5 @@
 import type { ShopOrder } from '../api/shopOrderApi';
+import type { ShopShipmentBatchListItem } from '../api/shopShipmentApi';
 import { buildShopOrderLineListRows } from './shopOrderListExport';
 import { formatLineOrderRef } from './shopOrderLineListUtils';
 
@@ -24,13 +25,11 @@ export interface SalesSettlementRow {
   productName: string;
   orderDate: string | null;
   orderBoxCount: number;
-  shipmentBoxCount: number;
   lineQuantity: number;
   unitCostCny: number | null;
   cnyExchangeRate: number | null;
   salesAmountExVat: number | null;
   vatAmount: number | null;
-  deliveryFee: number | null;
   logisticsFee: number;
   costAmountKrw: number | null;
   profitAmount: number | null;
@@ -38,8 +37,6 @@ export interface SalesSettlementRow {
   inventioProfitAmount: number | null;
   wkSettlementPaid: boolean;
   inventioSettlementPaid: boolean;
-  logisticsFeePaid: boolean;
-  logisticsFeePaidAt: string | null;
   wkSettlementPaidAt: string | null;
   inventioSettlementPaidAt: string | null;
 }
@@ -51,42 +48,54 @@ export function parseCnyExchangeRateInput(input: string): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-export function buildShipmentBoxInputsFromOrders(orders: ShopOrder[]): Record<string, string> {
-  const inputs: Record<string, string> = {};
+export function calculateBatchLogisticsFee(
+  shipmentBoxCount: number | null | undefined,
+  deliveryFee: number | null | undefined,
+  boxPrice: number | null | undefined
+): number {
+  const boxes = shipmentBoxCount ?? 0;
+  const fee = deliveryFee ?? 0;
+  const price = boxPrice ?? 0;
+  return boxes * LOGISTICS_FEE_PER_BOX_KRW + fee + price;
+}
 
-  for (const order of orders) {
-    for (const line of order.lines) {
-      const rowKey = `${order.id}:${line.id}`;
-      inputs[rowKey] = line.shipmentBoxCount != null ? String(line.shipmentBoxCount) : '';
+export function buildLineLogisticsFeeMap(
+  batches: ShopShipmentBatchListItem[]
+): Map<string, number> {
+  const map = new Map<string, number>();
+
+  for (const batch of batches) {
+    const lineCount = batch.lineItems.length;
+    if (lineCount === 0) continue;
+
+    const totalFee = calculateBatchLogisticsFee(
+      batch.shipmentBoxCount,
+      batch.deliveryFee,
+      batch.boxPrice
+    );
+    const baseShare = Math.floor(totalFee / lineCount);
+    let remainder = totalFee - baseShare * lineCount;
+
+    for (const line of batch.lineItems) {
+      const share = baseShare + (remainder > 0 ? 1 : 0);
+      if (remainder > 0) remainder -= 1;
+      map.set(line.lineId, (map.get(line.lineId) ?? 0) + share);
     }
   }
 
-  return inputs;
+  return map;
 }
 
-export function parseShipmentBoxCountInput(input: string): number | null {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-  const parsed = parseInt(trimmed, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  return parsed;
-}
-
-export function resolveShipmentBoxCount(
-  rowKey: string,
-  lineShipmentBoxCount: number | null,
-  shipmentBoxCountsByRowKey: Record<string, number | null>
-): number {
-  const fromInput = shipmentBoxCountsByRowKey[rowKey];
-  if (fromInput != null) return fromInput;
-  if (lineShipmentBoxCount != null) return lineShipmentBoxCount;
-  return 0;
-}
-
-export function formatSettlementPaidDate(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const datePart = value.includes('T') ? value.split('T')[0] : value.slice(0, 10);
-  return datePart || null;
+export function buildLineBatchLogisticsPaidMap(
+  batches: ShopShipmentBatchListItem[]
+): Map<string, boolean> {
+  const map = new Map<string, boolean>();
+  for (const batch of batches) {
+    for (const line of batch.lineItems) {
+      map.set(line.lineId, batch.logisticsFeePaid);
+    }
+  }
+  return map;
 }
 
 export function buildExchangeRateInputsFromOrders(orders: ShopOrder[]): Record<string, string> {
@@ -102,12 +111,14 @@ export function buildExchangeRateInputsFromOrders(orders: ShopOrder[]): Record<s
   return inputs;
 }
 
-export function calculateLineQuantity(orderBoxCount: number, quantityPerBox: number): number {
-  return orderBoxCount * quantityPerBox;
+export function formatSettlementPaidDate(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const datePart = value.includes('T') ? value.split('T')[0] : value.slice(0, 10);
+  return datePart || null;
 }
 
-export function calculateLogisticsFee(orderBoxCount: number): number {
-  return orderBoxCount * LOGISTICS_FEE_PER_BOX_KRW;
+export function calculateLineQuantity(orderBoxCount: number, quantityPerBox: number): number {
+  return orderBoxCount * quantityPerBox;
 }
 
 export function calculateCostAmountKrw(
@@ -122,13 +133,12 @@ export function calculateCostAmountKrw(
 
 export function calculateProfitAmount(
   salesAmountExVat: number | null,
-  deliveryFee: number | null,
   logisticsFee: number,
   costAmountKrw: number | null
 ): number | null {
   if (salesAmountExVat == null) return null;
   if (costAmountKrw == null) return null;
-  return salesAmountExVat + (deliveryFee ?? 0) - logisticsFee - costAmountKrw;
+  return salesAmountExVat - logisticsFee - costAmountKrw;
 }
 
 export function calculatePartnerProfitShares(profitAmount: number | null): PartnerProfitShares {
@@ -183,7 +193,7 @@ function buildLineIndexMaps(orders: ShopOrder[]): {
 export function buildSalesSettlementRows(
   orders: ShopOrder[],
   exchangeRatesByRowKey: Record<string, number | null>,
-  shipmentBoxCountsByRowKey: Record<string, number | null>
+  lineLogisticsFeeByLineId: Map<string, number>
 ): SalesSettlementRow[] {
   const lineRows = buildShopOrderLineListRows(orders);
   const orderById = new Map(orders.map((order) => [order.id, order]));
@@ -199,21 +209,10 @@ export function buildSalesSettlementRows(
     const lineQuantity = calculateLineQuantity(row.line.orderBoxCount, row.line.quantityPerBox);
     const salesAmountExVat = row.line.productSupplyAmount;
     const vatAmount = row.line.vatAmount;
-    const deliveryFee = row.line.deliveryFee;
-    const shipmentBoxCount = resolveShipmentBoxCount(
-      row.rowKey,
-      row.line.shipmentBoxCount,
-      shipmentBoxCountsByRowKey
-    );
-    const logisticsFee = calculateLogisticsFee(shipmentBoxCount);
+    const logisticsFee = lineLogisticsFeeByLineId.get(row.line.id) ?? 0;
     const cnyExchangeRate = exchangeRatesByRowKey[row.rowKey] ?? null;
     const costAmountKrw = calculateCostAmountKrw(unitCostCny, lineQuantity, cnyExchangeRate);
-    const profitAmount = calculateProfitAmount(
-      salesAmountExVat,
-      deliveryFee,
-      logisticsFee,
-      costAmountKrw
-    );
+    const profitAmount = calculateProfitAmount(salesAmountExVat, logisticsFee, costAmountKrw);
     const { wkProfitAmount, inventioProfitAmount } = calculatePartnerProfitShares(profitAmount);
 
     return {
@@ -229,13 +228,11 @@ export function buildSalesSettlementRows(
       productName: row.productName,
       orderDate: row.orderDate,
       orderBoxCount: row.line.orderBoxCount,
-      shipmentBoxCount,
       lineQuantity,
       unitCostCny,
       cnyExchangeRate,
       salesAmountExVat,
       vatAmount,
-      deliveryFee,
       logisticsFee,
       costAmountKrw,
       profitAmount,
@@ -243,8 +240,6 @@ export function buildSalesSettlementRows(
       inventioProfitAmount,
       wkSettlementPaid: row.line.wkSettlementPaid,
       inventioSettlementPaid: row.line.inventioSettlementPaid,
-      logisticsFeePaid: row.line.logisticsFeePaid,
-      logisticsFeePaidAt: row.line.logisticsFeePaidAt,
       wkSettlementPaidAt: row.line.wkSettlementPaidAt,
       inventioSettlementPaidAt: row.line.inventioSettlementPaidAt,
     };
@@ -267,12 +262,24 @@ export interface SettlementPaymentTotals {
   unpaidCount: number;
 }
 
+export interface PartnerLedgerSummary {
+  totalAmount: number;
+  entryCount: number;
+}
+
+export interface PartnerLedgerTotals {
+  wk: PartnerLedgerSummary;
+  inventio: PartnerLedgerSummary;
+}
+
 export interface SalesSettlementAggregateStats {
   rowCount: number;
   orderQuantityTotal: number;
   orderBoxCountTotal: number;
   salesAmountExVat: number;
   vatAmount: number;
+  costAmountKrw: number;
+  costCalculatedCount: number;
   profitAmount: number;
   profitCalculatedCount: number;
   logisticsFeeTotal: number;
@@ -286,7 +293,8 @@ export interface SalesSettlementDateGroupStats extends SalesSettlementAggregateS
 }
 
 export function calculateLogisticsPaymentTotals(
-  rows: SalesSettlementRow[]
+  rows: SalesSettlementRow[],
+  lineBatchPaidMap: Map<string, boolean> = new Map()
 ): SettlementPaymentTotals {
   let paidAmount = 0;
   let unpaidAmount = 0;
@@ -295,7 +303,7 @@ export function calculateLogisticsPaymentTotals(
 
   for (const row of rows) {
     const amount = row.logisticsFee;
-    if (row.logisticsFeePaid) {
+    if (lineBatchPaidMap.get(row.lineId)) {
       paidAmount += amount;
       paidCount += 1;
     } else {
@@ -305,6 +313,38 @@ export function calculateLogisticsPaymentTotals(
   }
 
   return { paidAmount, unpaidAmount, paidCount, unpaidCount };
+}
+
+export function calculatePartnerGrossTotal(
+  rows: SalesSettlementRow[],
+  partner: 'wk' | 'inventio'
+): number {
+  return sumAvailableAmounts(
+    rows.map((row) => (partner === 'wk' ? row.wkProfitAmount : row.inventioProfitAmount))
+  );
+}
+
+export function calculatePartnerNetTotal(grossAmount: number, ledgerPaidTotal: number): number {
+  return grossAmount - ledgerPaidTotal;
+}
+
+export function calculatePartnerLedgerPaymentTotals(
+  rows: SalesSettlementRow[],
+  partner: 'wk' | 'inventio',
+  ledgerPaidTotal: number,
+  ledgerEntryCount: number
+): SettlementPaymentTotals {
+  const grossAmount = calculatePartnerGrossTotal(rows, partner);
+  const eligibleCount = rows.filter(
+    (row) => (partner === 'wk' ? row.wkProfitAmount : row.inventioProfitAmount) != null
+  ).length;
+
+  return {
+    paidAmount: ledgerPaidTotal,
+    unpaidAmount: grossAmount - ledgerPaidTotal,
+    paidCount: ledgerEntryCount,
+    unpaidCount: eligibleCount,
+  };
 }
 
 export function calculateSettlementPaymentTotals(
@@ -339,7 +379,12 @@ export function normalizeSettlementOrderDateKey(orderDate: string | null): strin
 }
 
 export function calculateSalesSettlementAggregateStats(
-  rows: SalesSettlementRow[]
+  rows: SalesSettlementRow[],
+  lineBatchPaidMap: Map<string, boolean> = new Map(),
+  ledgerTotals: PartnerLedgerTotals = {
+    wk: { totalAmount: 0, entryCount: 0 },
+    inventio: { totalAmount: 0, entryCount: 0 },
+  }
 ): SalesSettlementAggregateStats {
   return {
     rowCount: rows.length,
@@ -347,17 +392,34 @@ export function calculateSalesSettlementAggregateStats(
     orderBoxCountTotal: rows.reduce((sum, row) => sum + row.orderBoxCount, 0),
     salesAmountExVat: sumAvailableAmounts(rows.map((row) => row.salesAmountExVat)),
     vatAmount: sumAvailableAmounts(rows.map((row) => row.vatAmount)),
+    costAmountKrw: sumAvailableAmounts(rows.map((row) => row.costAmountKrw)),
+    costCalculatedCount: rows.filter((row) => row.costAmountKrw != null).length,
     profitAmount: sumAvailableAmounts(rows.map((row) => row.profitAmount)),
     profitCalculatedCount: rows.filter((row) => row.profitAmount != null).length,
     logisticsFeeTotal: rows.reduce((sum, row) => sum + row.logisticsFee, 0),
-    logisticsPayment: calculateLogisticsPaymentTotals(rows),
-    wkPayment: calculateSettlementPaymentTotals(rows, 'wk'),
-    inventioPayment: calculateSettlementPaymentTotals(rows, 'inventio'),
+    logisticsPayment: calculateLogisticsPaymentTotals(rows, lineBatchPaidMap),
+    wkPayment: calculatePartnerLedgerPaymentTotals(
+      rows,
+      'wk',
+      ledgerTotals.wk.totalAmount,
+      ledgerTotals.wk.entryCount
+    ),
+    inventioPayment: calculatePartnerLedgerPaymentTotals(
+      rows,
+      'inventio',
+      ledgerTotals.inventio.totalAmount,
+      ledgerTotals.inventio.entryCount
+    ),
   };
 }
 
 export function buildSalesSettlementStatsByDate(
-  rows: SalesSettlementRow[]
+  rows: SalesSettlementRow[],
+  lineBatchPaidMap: Map<string, boolean> = new Map(),
+  ledgerTotals: PartnerLedgerTotals = {
+    wk: { totalAmount: 0, entryCount: 0 },
+    inventio: { totalAmount: 0, entryCount: 0 },
+  }
 ): SalesSettlementDateGroupStats[] {
   const groups = new Map<string, SalesSettlementRow[]>();
 
@@ -371,7 +433,7 @@ export function buildSalesSettlementStatsByDate(
   return Array.from(groups.entries())
     .map(([dateKey, groupRows]) => ({
       dateKey,
-      ...calculateSalesSettlementAggregateStats(groupRows),
+      ...calculateSalesSettlementAggregateStats(groupRows, lineBatchPaidMap, ledgerTotals),
     }))
     .sort((a, b) => {
       if (a.dateKey === '미등록') return 1;

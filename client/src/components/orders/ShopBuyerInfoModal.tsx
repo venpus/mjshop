@@ -16,6 +16,7 @@ interface ShopBuyerInfoModalProps {
     recipientName: string | null;
     phoneNumber: string | null;
   };
+  hideBusinessRegistrationImage?: boolean;
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -35,6 +36,7 @@ export function ShopBuyerInfoModal({
   companyName,
   unmatchedMessage,
   orderLineInfo,
+  hideBusinessRegistrationImage = false,
 }: ShopBuyerInfoModalProps) {
   useEffect(() => {
     if (!isOpen) return;
@@ -87,7 +89,7 @@ export function ShopBuyerInfoModal({
                 />
               </dl>
 
-              {imageUrl && (
+              {imageUrl && !hideBusinessRegistrationImage && (
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-2">사업자등록증 이미지</p>
                   <a href={imageUrl} target="_blank" rel="noopener noreferrer">

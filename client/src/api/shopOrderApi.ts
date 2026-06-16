@@ -35,6 +35,9 @@ export interface ShopOrderLine {
   wkSettlementPaidAt: string | null;
   inventioSettlementPaidAt: string | null;
   statementFilePath: string | null;
+  statementGroupId: string | null;
+  statementIssuedAt: string | null;
+  statementDelivered: boolean;
   paymentProofImage: string | null;
   createdAt: string;
   updatedAt: string;
@@ -104,6 +107,10 @@ function mapShopOrderLine(raw: Record<string, unknown>): ShopOrderLine {
     inventioSettlementPaidAt: mapOptionalIsoDate(raw.inventioSettlementPaidAt),
     statementFilePath:
       raw.statementFilePath != null ? String(raw.statementFilePath) : null,
+    statementGroupId:
+      raw.statementGroupId != null ? String(raw.statementGroupId) : null,
+    statementIssuedAt: mapOptionalIsoDate(raw.statementIssuedAt),
+    statementDelivered: Boolean(raw.statementDelivered),
     paymentProofImage:
       raw.paymentProofImage != null ? String(raw.paymentProofImage) : null,
     createdAt: String(raw.createdAt),
@@ -154,6 +161,8 @@ function mapShopOrder(raw: Record<string, unknown>): ShopOrder {
 export interface SyncShopOrderDetailPayload {
   sellingPrice?: number | null;
   quantityPerBox?: number;
+  warehouseStockQuantity?: number;
+  unitPrice?: number | null;
   lines?: Array<{
     id: string;
     companyName?: string | null;
@@ -375,13 +384,16 @@ export async function transferShopOrderReservationsToOrder(
 
 export async function createShopOrderStatement(
   orderId: string,
-  lineId: string
+  lineId: string,
+  options?: { statementDate?: string }
 ): Promise<ShopOrder> {
   const response = await fetch(
     `${API_BASE_URL}/shop-orders/${orderId}/lines/${lineId}/statement`,
     {
       method: 'POST',
       credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options ?? {}),
     }
   );
   const data = await response.json();
@@ -393,6 +405,8 @@ export async function createShopOrderStatement(
 
 export interface ShopOrderBulkStatementGroup {
   groupKey: string;
+  statementGroupId?: string;
+  statementIssuedAt?: string;
   companyName: string;
   lineCount: number;
   html: string;
@@ -405,13 +419,14 @@ export interface ShopOrderBulkStatementResult {
 }
 
 export async function createShopOrderBulkStatements(
-  items: Array<{ shopOrderId: string; lineId: string }>
+  items: Array<{ shopOrderId: string; lineId: string }>,
+  options?: { statementDate?: string }
 ): Promise<ShopOrderBulkStatementResult> {
   const response = await fetch(`${API_BASE_URL}/shop-orders/bulk/statements`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ items, statementDate: options?.statementDate }),
   });
   const data = await response.json();
   if (!response.ok) {
@@ -438,6 +453,48 @@ export async function cancelShopOrderStatements(
     throw new Error(data.error || '명세서 취소에 실패했습니다.');
   }
   return data.data as CancelShopOrderStatementsResult;
+}
+
+export interface UpdateShopOrderStatementDeliveryResult {
+  updatedCount: number;
+}
+
+export async function updateShopOrderStatementDelivery(
+  items: Array<{ shopOrderId: string; lineId: string }>,
+  delivered: boolean
+): Promise<UpdateShopOrderStatementDeliveryResult> {
+  const response = await fetch(`${API_BASE_URL}/shop-orders/statements/delivery`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items, delivered }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || '명세서 전달완료 저장에 실패했습니다.');
+  }
+  return data.data as UpdateShopOrderStatementDeliveryResult;
+}
+
+export interface UpdateShopOrderStatementPaymentResult {
+  updatedCount: number;
+}
+
+export async function updateShopOrderStatementPayment(
+  items: Array<{ shopOrderId: string; lineId: string }>,
+  paymentReceived: boolean
+): Promise<UpdateShopOrderStatementPaymentResult> {
+  const response = await fetch(`${API_BASE_URL}/shop-orders/statements/payment`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items, paymentReceived }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || '명세서 입금완료 저장에 실패했습니다.');
+  }
+  return data.data as UpdateShopOrderStatementPaymentResult;
 }
 
 export async function getShopOrderStatementPreview(

@@ -126,17 +126,64 @@ export function buildStatementDisplayGroupKey(
 
 export interface ShopOrderStatementGroupRow {
   groupKey: string;
+  statementGroupId: string | null;
+  statementIssuedAt: string | null;
   isReservation: boolean;
   companyName: string;
   address: string;
   recipientName: string;
   lineCount: number;
   totalAmount: number;
+  totalBoxCount: number;
+  productNamesLabel: string;
+  statementDelivered: boolean;
+  paymentReceived: boolean;
   latestUpdatedAt: string;
   orderRefsLabel: string;
   previewShopOrderId: string;
   previewLineId: string;
   lines: ShopOrderLineListRow[];
+}
+
+function lineIsPaymentComplete(line: ShopOrderLine): boolean {
+  return line.paymentReceived || Boolean(line.paymentProofImage);
+}
+
+function buildStatementProductSummary(lines: ShopOrderLineListRow[]): {
+  productNamesLabel: string;
+  totalBoxCount: number;
+} {
+  const totalBoxCount = lines.reduce((sum, row) => sum + (row.line.orderBoxCount || 0), 0);
+  const productNames = [...new Set(lines.map((row) => row.productName.trim()).filter(Boolean))];
+  return {
+    productNamesLabel: productNames.join(', ') || '-',
+    totalBoxCount,
+  };
+}
+
+export function buildStatementRowGroupKey(row: ShopOrderLineListRow): string {
+  const line = row.line;
+  if (line.statementGroupId) {
+    return line.statementGroupId;
+  }
+
+  const legacyKey = buildStatementDisplayGroupKey(
+    line.companyName,
+    line.address,
+    line.recipientName,
+    line.isReservation
+  );
+  const issuedAt = line.statementIssuedAt?.slice(0, 10) ?? line.updatedAt.slice(0, 19);
+  return `${legacyKey}|legacy|${issuedAt}`;
+}
+
+export interface ShopOrderStatementCompanyGroup {
+  companyKey: string;
+  companyName: string;
+  isReservation: boolean;
+  statementCount: number;
+  lineCount: number;
+  statements: ShopOrderStatementGroupRow[];
 }
 
 export function buildStatementGroupPreviewItems(
@@ -154,12 +201,7 @@ export function groupShopOrderStatementRows(
   const groups = new Map<string, ShopOrderLineListRow[]>();
 
   for (const row of rows) {
-    const groupKey = buildStatementDisplayGroupKey(
-      row.line.companyName,
-      row.line.address,
-      row.line.recipientName,
-      row.line.isReservation
-    );
+    const groupKey = buildStatementRowGroupKey(row);
     const existing = groups.get(groupKey);
     if (existing) {
       existing.push(row);
@@ -177,16 +219,28 @@ export function groupShopOrderStatementRows(
       (sum, row) => sum + (row.line.totalAmount ?? 0),
       0
     );
+    const statementIssuedAt =
+      representative.line.statementIssuedAt?.slice(0, 10) ??
+      representative.line.updatedAt.slice(0, 10);
+    const { productNamesLabel, totalBoxCount } = buildStatementProductSummary(groupLines);
+    const statementDelivered = groupLines.every((row) => row.line.statementDelivered);
+    const paymentReceived = groupLines.every((row) => lineIsPaymentComplete(row.line));
 
     return {
       groupKey,
+      statementGroupId: representative.line.statementGroupId,
+      statementIssuedAt,
       isReservation: representative.line.isReservation,
       companyName: (representative.line.companyName ?? '').trim() || '미상',
       address: (representative.line.address ?? '').trim() || '-',
       recipientName: (representative.line.recipientName ?? '').trim() || '-',
       lineCount: groupLines.length,
       totalAmount,
-      latestUpdatedAt: representative.line.updatedAt,
+      totalBoxCount,
+      productNamesLabel,
+      statementDelivered,
+      paymentReceived,
+      latestUpdatedAt: representative.line.statementIssuedAt ?? representative.line.updatedAt,
       orderRefsLabel: sortedLines
         .map((row) =>
           formatLineOrderRef(
@@ -202,6 +256,49 @@ export function groupShopOrderStatementRows(
       lines: sortedLines,
     };
   });
+}
+
+export function groupShopOrderStatementsByCompany(
+  statements: ShopOrderStatementGroupRow[]
+): ShopOrderStatementCompanyGroup[] {
+  const companyMap = new Map<string, ShopOrderStatementGroupRow[]>();
+
+  for (const statement of statements) {
+    const companyKey = [
+      statement.isReservation ? 'r' : 'o',
+      normalizeStatementDisplayField(statement.companyName),
+    ].join('|');
+    const existing = companyMap.get(companyKey);
+    if (existing) {
+      existing.push(statement);
+    } else {
+      companyMap.set(companyKey, [statement]);
+    }
+  }
+
+  return Array.from(companyMap.entries())
+    .map(([companyKey, companyStatements]) => {
+      const sortedStatements = [...companyStatements].sort((a, b) => {
+        const dateA = a.statementIssuedAt ?? a.latestUpdatedAt;
+        const dateB = b.statementIssuedAt ?? b.latestUpdatedAt;
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+      });
+      const representative = sortedStatements[0];
+
+      return {
+        companyKey,
+        companyName: representative.companyName,
+        isReservation: representative.isReservation,
+        statementCount: sortedStatements.length,
+        lineCount: sortedStatements.reduce((sum, item) => sum + item.lineCount, 0),
+        statements: sortedStatements,
+      };
+    })
+    .sort((a, b) => {
+      const latestA = a.statements[0]?.statementIssuedAt ?? a.statements[0]?.latestUpdatedAt ?? '';
+      const latestB = b.statements[0]?.statementIssuedAt ?? b.statements[0]?.latestUpdatedAt ?? '';
+      return new Date(latestB).getTime() - new Date(latestA).getTime();
+    });
 }
 
 async function downloadWorkbook(workbook: ExcelJS.Workbook, fileName: string): Promise<void> {
