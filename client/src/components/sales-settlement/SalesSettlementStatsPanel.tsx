@@ -159,6 +159,39 @@ export function SalesSettlementStatsPanel({
   );
 }
 
+function SalesAmountBreakdownCell({
+  stats,
+  rowClass = '',
+}: {
+  stats: SalesSettlementAggregateStats;
+  rowClass?: string;
+}) {
+  const showRegular = stats.regularOrderSalesAmountExVat > 0;
+  const showReservation = stats.reservationOrderSalesAmountExVat > 0;
+
+  return (
+    <div className={`flex flex-col items-end gap-0.5 ${rowClass}`}>
+      <span className="tabular-nums font-medium text-gray-900">
+        {formatKrwAmount(stats.salesAmountExVat)}
+      </span>
+      {(showRegular || showReservation) && (
+        <>
+          {showRegular && (
+            <span className="text-[10px] tabular-nums font-normal text-emerald-700">
+              일반 {formatKrwAmount(stats.regularOrderSalesAmountExVat)}
+            </span>
+          )}
+          {showReservation && (
+            <span className="text-[10px] tabular-nums font-normal text-amber-700">
+              예약 {formatKrwAmount(stats.reservationOrderSalesAmountExVat)}
+            </span>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function StatsTableRow({
   label,
   stats,
@@ -184,8 +217,8 @@ function StatsTableRow({
         <span className="text-base font-bold">{stats.orderQuantityTotal.toLocaleString()}</span>
         <span className="text-xs font-medium text-gray-500 ml-0.5">개</span>
       </td>
-      <td className={`px-3 py-2.5 text-right tabular-nums text-gray-900 ${rowClass}`}>
-        {formatKrwAmount(stats.salesAmountExVat)}
+      <td className={`px-3 py-2.5 text-right ${rowClass}`}>
+        <SalesAmountBreakdownCell stats={stats} />
       </td>
       <td className={`px-3 py-2.5 text-right tabular-nums text-orange-800 ${rowClass}`}>
         {stats.costCalculatedCount > 0 ? formatKrwAmount(stats.costAmountKrw) : '-'}

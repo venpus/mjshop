@@ -277,6 +277,8 @@ export interface SalesSettlementAggregateStats {
   orderQuantityTotal: number;
   orderBoxCountTotal: number;
   salesAmountExVat: number;
+  regularOrderSalesAmountExVat: number;
+  reservationOrderSalesAmountExVat: number;
   vatAmount: number;
   costAmountKrw: number;
   costCalculatedCount: number;
@@ -391,6 +393,12 @@ export function calculateSalesSettlementAggregateStats(
     orderQuantityTotal: rows.reduce((sum, row) => sum + row.lineQuantity, 0),
     orderBoxCountTotal: rows.reduce((sum, row) => sum + row.orderBoxCount, 0),
     salesAmountExVat: sumAvailableAmounts(rows.map((row) => row.salesAmountExVat)),
+    regularOrderSalesAmountExVat: sumAvailableAmounts(
+      rows.filter((row) => !row.isReservation).map((row) => row.salesAmountExVat)
+    ),
+    reservationOrderSalesAmountExVat: sumAvailableAmounts(
+      rows.filter((row) => row.isReservation).map((row) => row.salesAmountExVat)
+    ),
     vatAmount: sumAvailableAmounts(rows.map((row) => row.vatAmount)),
     costAmountKrw: sumAvailableAmounts(rows.map((row) => row.costAmountKrw)),
     costCalculatedCount: rows.filter((row) => row.costAmountKrw != null).length,
