@@ -195,8 +195,21 @@ export function SalesSettlementPage() {
   );
 
   const statsRows = selectedRows.length > 0 ? selectedRows : filteredRows;
+  const selectedQuantityTotal = useMemo(
+    () => selectedRows.reduce((sum, row) => sum + row.lineQuantity, 0),
+    [selectedRows]
+  );
   const statsSelectionLabel =
-    selectedRows.length > 0 ? `선택 ${selectedRows.length.toLocaleString()}건 기준` : null;
+    selectedRows.length > 0 ? (
+      <>
+        선택 {selectedRows.length.toLocaleString()}건
+        <span className="mx-1.5 text-gray-300">·</span>
+        <span className="font-semibold text-gray-800">
+          {selectedQuantityTotal.toLocaleString()}개
+        </span>{' '}
+        기준
+      </>
+    ) : null;
 
   const allPageSelected =
     paginatedItems.length > 0 &&

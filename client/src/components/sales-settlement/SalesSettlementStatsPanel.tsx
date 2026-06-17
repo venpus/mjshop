@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   buildSalesSettlementStatsByDate,
   calculatePartnerNetTotal,
@@ -22,7 +22,7 @@ interface SalesSettlementStatsPanelProps {
   lineBatchPaidMap: Map<string, boolean>;
   ledgerTotals: PartnerLedgerTotals;
   dateFilterActive: boolean;
-  selectionLabel?: string | null;
+  selectionLabel?: ReactNode | null;
   onLedgerChanged: () => void;
 }
 
@@ -50,7 +50,16 @@ export function SalesSettlementStatsPanel({
       <div className="mb-3">
         <h3 className="text-sm font-bold text-gray-900">정산 통계</h3>
         <p className="text-xs text-gray-500 mt-0.5">
-          {selectionLabel ?? `${rows.length.toLocaleString()}건 기준`} ·{' '}
+          {selectionLabel ?? (
+            <>
+              <span>판매 {totalStats.rowCount.toLocaleString()}건</span>
+              <span className="mx-1.5 text-gray-300">·</span>
+              <span className="font-semibold text-gray-800">
+                {totalStats.orderQuantityTotal.toLocaleString()}개
+              </span>
+            </>
+          )}{' '}
+          ·{' '}
           {viewMode === 'by-date'
             ? '등록일 필터 적용 · 날짜별 집계'
             : selectionLabel
@@ -76,6 +85,9 @@ export function SalesSettlementStatsPanel({
                   </th>
                   <th className="px-3 py-2.5 text-right font-medium text-gray-600 whitespace-nowrap">
                     건수
+                  </th>
+                  <th className="px-3 py-2.5 text-right font-medium text-gray-600 whitespace-nowrap">
+                    판매 수량
                   </th>
                   <th className="px-3 py-2.5 text-right font-medium text-gray-600 whitespace-nowrap">
                     판매 대금
@@ -164,6 +176,8 @@ function FormulaSummaryBar({
     <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-3">
       <p className="text-[11px] font-medium text-gray-500 mb-2">계산 흐름</p>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm">
+        <AggregateSummaryChip rowCount={stats.rowCount} orderQuantityTotal={stats.orderQuantityTotal} />
+        <span className="text-gray-300 hidden sm:inline">|</span>
         <AmountChip label="판매 대금" value={formatKrwAmount(stats.salesAmountExVat)} tone="neutral" />
         <OperatorChip symbol="−" />
         <AmountChip
@@ -258,6 +272,32 @@ function FormulaSummaryBar({
   );
 }
 
+function AggregateSummaryChip({
+  rowCount,
+  orderQuantityTotal,
+}: {
+  rowCount: number;
+  orderQuantityTotal: number;
+}) {
+  return (
+    <div className="inline-flex items-stretch rounded-md border border-gray-200 bg-white overflow-hidden shrink-0">
+      <div className="px-3 py-2 text-left border-r border-gray-100">
+        <p className="text-[10px] font-medium text-gray-500">판매 건수</p>
+        <p className="tabular-nums text-sm font-semibold text-gray-800">
+          {rowCount.toLocaleString()}건
+        </p>
+      </div>
+      <div className="px-4 py-2 text-left min-w-[96px]">
+        <p className="text-[10px] font-medium text-gray-500">판매 수량</p>
+        <p className="tabular-nums text-xl font-bold text-gray-900 leading-tight">
+          {orderQuantityTotal.toLocaleString()}
+          <span className="text-sm font-semibold text-gray-500 ml-0.5">개</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function AmountChip({
   label,
   value,
@@ -332,7 +372,11 @@ function StatsTableRow({
     <tr className={isFooter ? 'bg-gray-50' : 'hover:bg-gray-50/60'}>
       <td className={`px-3 py-2.5 whitespace-nowrap ${labelCellClass} ${rowClass}`}>{label}</td>
       <td className={`px-3 py-2.5 text-right tabular-nums text-gray-700 ${rowClass}`}>
-        {stats.rowCount.toLocaleString()}
+        {stats.rowCount.toLocaleString()}건
+      </td>
+      <td className={`px-3 py-2.5 text-right tabular-nums text-gray-900 ${rowClass}`}>
+        <span className="text-base font-bold">{stats.orderQuantityTotal.toLocaleString()}</span>
+        <span className="text-xs font-medium text-gray-500 ml-0.5">개</span>
       </td>
       <td className={`px-3 py-2.5 text-right tabular-nums text-gray-900 ${rowClass}`}>
         {formatKrwAmount(stats.salesAmountExVat)}
