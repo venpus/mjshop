@@ -7,6 +7,7 @@ import {
   UpdateShopOrderLineDTO,
 } from '../models/shopOrderLine.js';
 import { generateRandomLineOrderNumber } from '../utils/shopOrderLineNumber.js';
+import { normalizeShopBuyerCompanyName } from '../utils/shopBuyerOrderLineSync.js';
 
 function normalizeDateOnly(value: Date | string): string {
   if (value instanceof Date) {
@@ -343,6 +344,87 @@ export class ShopOrderLineRepository {
       [shopOrderId]
     );
     return Number(rows[0]?.cnt) || 0;
+  }
+
+  async findContactRowsMatchingCompanyName(companyName: string): Promise<
+    Array<{
+      id: string;
+      companyName: string | null;
+      address: string | null;
+      recipientName: string | null;
+      phoneNumber: string | null;
+    }>
+  > {
+    const targetKey = normalizeShopBuyerCompanyName(companyName);
+    if (!targetKey) return [];
+
+    const [rows] = await pool.execute<
+      Array<
+        RowDataPacket & {
+          id: string;
+          company_name: string | null;
+          address: string | null;
+          recipient_name: string | null;
+          phone_number: string | null;
+        }
+      >
+    >(
+      `SELECT id, company_name, address, recipient_name, phone_number
+       FROM kr_shop_order_lines
+       WHERE company_name IS NOT NULL AND TRIM(company_name) <> ''`
+    );
+
+    return rows
+      .filter((row) => normalizeShopBuyerCompanyName(row.company_name) === targetKey)
+      .map((row) => ({
+        id: row.id,
+        companyName: row.company_name,
+        address: row.address,
+        recipientName: row.recipient_name,
+        phoneNumber: row.phone_number,
+      }));
+  }
+
+  async applyBuyerContactUpdates(
+    updates: Map<
+      string,
+      {
+        companyName: string;
+        address?: string | null;
+        recipientName?: string | null;
+        phoneNumber?: string | null;
+      }
+    >
+  ): Promise<number> {
+    if (updates.size === 0) return 0;
+
+    let affected = 0;
+    for (const [lineId, patch] of updates.entries()) {
+      const fields = ['company_name = ?'];
+      const values: unknown[] = [patch.companyName];
+
+      if (patch.address !== undefined) {
+        fields.push('address = ?');
+        values.push(patch.address);
+      }
+      if (patch.recipientName !== undefined) {
+        fields.push('recipient_name = ?');
+        values.push(patch.recipientName);
+      }
+      if (patch.phoneNumber !== undefined) {
+        fields.push('phone_number = ?');
+        values.push(patch.phoneNumber);
+      }
+
+      values.push(lineId);
+      const [result] = await pool.execute<ResultSetHeader>(
+        `UPDATE kr_shop_order_lines SET ${fields.join(', ')} WHERE id = ?`,
+        values
+      );
+      affected += result.affectedRows;
+    }
+
+    return affected;
   }
 
   private mapRow(row: ShopOrderLineRow): ShopOrderLine {

@@ -1,4 +1,5 @@
 import { ShopBuyerRepository } from '../repositories/shopBuyerRepository.js';
+import { ShopOrderLineRepository } from '../repositories/shopOrderLineRepository.js';
 import {
   ShopBuyer,
   ShopBuyerListItem,
@@ -7,6 +8,9 @@ import {
   UpdateShopBuyerDTO,
   MAX_BUYER_ADDRESSES,
 } from '../models/shopBuyer.js';
+import {
+  buildOrderLineBuyerContactUpdates,
+} from '../utils/shopBuyerOrderLineSync.js';
 import {
   deleteShopBuyerBusinessRegistrationImage,
   deleteShopBuyerImageDir,
@@ -43,9 +47,11 @@ function validateAddresses(addresses: ShopBuyerAddress[]): void {
 
 export class ShopBuyerService {
   private repository: ShopBuyerRepository;
+  private orderLineRepository: ShopOrderLineRepository;
 
   constructor() {
     this.repository = new ShopBuyerRepository();
+    this.orderLineRepository = new ShopOrderLineRepository();
   }
 
   async getAllBuyers(): Promise<ShopBuyerListItem[]> {
@@ -95,7 +101,25 @@ export class ShopBuyerService {
     if (!updated) {
       throw new Error('구매자 수정에 실패했습니다.');
     }
+
+    await this.syncRelatedOrderLines(existing, updated);
     return updated;
+  }
+
+  private async syncRelatedOrderLines(before: ShopBuyer, after: ShopBuyer): Promise<void> {
+    const candidateLines = await this.orderLineRepository.findContactRowsMatchingCompanyName(
+      before.companyName
+    );
+
+    const updates = buildOrderLineBuyerContactUpdates(
+      candidateLines,
+      before.companyName,
+      after.companyName,
+      before.addresses,
+      after.addresses
+    );
+
+    await this.orderLineRepository.applyBuyerContactUpdates(updates);
   }
 
   async deleteBuyer(id: number): Promise<void> {
