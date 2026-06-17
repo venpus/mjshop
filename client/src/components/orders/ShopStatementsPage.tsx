@@ -215,6 +215,18 @@ export function ShopStatementsPage() {
     [paginatedCompanyGroups]
   );
 
+  const filteredStatementKeys = useMemo(
+    () => flatStatements.map((statement) => statement.groupKey),
+    [flatStatements]
+  );
+
+  const allFilteredSelected =
+    filteredStatementKeys.length > 0 &&
+    filteredStatementKeys.every((key) => selectedGroupKeys.has(key));
+
+  const someFilteredSelected =
+    filteredStatementKeys.some((key) => selectedGroupKeys.has(key)) && !allFilteredSelected;
+
   const companyHeaderClass = isReservationTab
     ? 'bg-amber-50 border-amber-200 text-amber-950'
     : 'bg-emerald-50 border-emerald-200 text-emerald-950';
@@ -222,6 +234,9 @@ export function ShopStatementsPage() {
   const allPageSelected =
     paginatedStatementKeys.length > 0 &&
     paginatedStatementKeys.every((key) => selectedGroupKeys.has(key));
+
+  const somePageSelected =
+    paginatedStatementKeys.some((key) => selectedGroupKeys.has(key)) && !allPageSelected;
 
   const accentFilterActiveClass = isReservationTab
     ? 'bg-amber-600 text-white border-amber-600'
@@ -292,6 +307,22 @@ export function ShopStatementsPage() {
       }
       return next;
     });
+  };
+
+  const handleToggleSelectAllFiltered = () => {
+    setSelectedGroupKeys((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        filteredStatementKeys.forEach((key) => next.delete(key));
+      } else {
+        filteredStatementKeys.forEach((key) => next.add(key));
+      }
+      return next;
+    });
+  };
+
+  const handleClearSelection = () => {
+    setSelectedGroupKeys(new Set());
   };
 
   const handleToggleSelect = (groupKey: string) => {
@@ -794,12 +825,31 @@ export function ShopStatementsPage() {
           <label className="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
             <input
               type="checkbox"
+              checked={allFilteredSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = someFilteredSelected;
+              }}
+              onChange={handleToggleSelectAllFiltered}
+              disabled={isBulkDownloading || isDeletingAll || filteredStatementKeys.length === 0}
+              className={`w-4 h-4 cursor-pointer ${accentCheckboxClass}`}
+            />
+            전체 선택
+            {filteredStatementKeys.length > 0 && (
+              <span className="text-gray-400">({filteredStatementKeys.length.toLocaleString()}장)</span>
+            )}
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
               checked={allPageSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = somePageSelected;
+              }}
               onChange={handleToggleSelectAll}
               disabled={isBulkDownloading || isDeletingAll || paginatedStatementKeys.length === 0}
               className={`w-4 h-4 cursor-pointer ${accentCheckboxClass}`}
             />
-            현재 페이지 전체
+            현재 페이지
           </label>
           <button
             type="button"
@@ -810,7 +860,19 @@ export function ShopStatementsPage() {
             새로고침
           </button>
           {selectedGroupKeys.size > 0 && (
-            <span className="text-sm text-gray-600">선택 {selectedGroupKeys.size}장</span>
+            <>
+              <span className="text-sm text-gray-600">
+                선택 {selectedGroupKeys.size.toLocaleString()}장
+              </span>
+              <button
+                type="button"
+                onClick={handleClearSelection}
+                disabled={isBulkDownloading || isDeletingAll}
+                className="px-2 py-1 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50"
+              >
+                선택 해제
+              </button>
+            </>
           )}
           {downloadProgress && (
             <span className="text-sm text-purple-700">
