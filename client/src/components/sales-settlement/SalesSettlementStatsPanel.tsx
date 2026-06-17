@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import {
   buildSalesSettlementStatsByDate,
-  calculatePartnerNetTotal,
   calculateSalesSettlementAggregateStats,
   formatKrwAmount,
   type PartnerLedgerTotals,
@@ -74,9 +73,7 @@ export function SalesSettlementStatsPanel({
         </p>
       ) : (
         <>
-          <FormulaSummaryBar stats={totalStats} onOpenLedger={openLedgerModal} />
-
-          <div className="overflow-x-auto border border-gray-200 rounded-lg mt-3">
+          <div className="overflow-x-auto border border-gray-200 rounded-lg">
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -159,197 +156,6 @@ export function SalesSettlementStatsPanel({
         </>
       )}
     </div>
-  );
-}
-
-function FormulaSummaryBar({
-  stats,
-  onOpenLedger,
-}: {
-  stats: SalesSettlementAggregateStats;
-  onOpenLedger: (partner: SalesSettlementLedgerPartner) => void;
-}) {
-  const navigate = useNavigate();
-  const hasProfit = stats.profitCalculatedCount > 0;
-
-  return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-3">
-      <p className="text-[11px] font-medium text-gray-500 mb-2">계산 흐름</p>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm">
-        <AggregateSummaryChip rowCount={stats.rowCount} orderQuantityTotal={stats.orderQuantityTotal} />
-        <span className="text-gray-300 hidden sm:inline">|</span>
-        <AmountChip label="판매 대금" value={formatKrwAmount(stats.salesAmountExVat)} tone="neutral" />
-        <OperatorChip symbol="−" />
-        <AmountChip
-          label="판매 원가"
-          value={
-            stats.costCalculatedCount > 0
-              ? formatKrwAmount(stats.costAmountKrw)
-              : '-'
-          }
-          tone="cost"
-          sub={
-            stats.costCalculatedCount > 0 && stats.costCalculatedCount < stats.rowCount
-              ? `${stats.costCalculatedCount}건 산출`
-              : undefined
-          }
-        />
-        <OperatorChip symbol="−" />
-        <AmountChip
-          label="물류 수수료"
-          value={formatKrwAmount(stats.logisticsFeeTotal)}
-          tone="logistics"
-          onClick={() => navigate(shopShippingManagementPath())}
-          title="배송관리에서 물류 수수료 확인"
-        />
-        <OperatorChip symbol="=" />
-        <AmountChip
-          label="최종 판매 이익"
-          value={hasProfit ? formatKrwAmount(stats.profitAmount) : '-'}
-          tone="profit"
-          sub={
-            hasProfit && stats.profitCalculatedCount < stats.rowCount
-              ? `${stats.profitCalculatedCount}건 산출`
-              : undefined
-          }
-        />
-        <span className="text-gray-300 hidden sm:inline">|</span>
-        <div className="flex items-center gap-0.5">
-          <AmountChip
-            label="WK 60%"
-            value={
-              hasProfit
-                ? formatKrwAmount(
-                    calculatePartnerNetTotal(
-                      stats.wkPayment.paidAmount + stats.wkPayment.unpaidAmount,
-                      stats.wkPayment.paidAmount
-                    )
-                  )
-                : '-'
-            }
-            tone="wk"
-            sub={
-              hasProfit && stats.wkPayment.paidAmount > 0
-                ? `장부 ${formatKrwAmount(stats.wkPayment.paidAmount)}`
-                : undefined
-            }
-          />
-          <SalesSettlementLedgerIconButton
-            tone="wk"
-            title="WK 정산 장부"
-            onClick={() => onOpenLedger('wk')}
-          />
-        </div>
-        <OperatorChip symbol="+" />
-        <div className="flex items-center gap-0.5">
-          <AmountChip
-            label="인벤티오 40%"
-            value={
-              hasProfit
-                ? formatKrwAmount(
-                    calculatePartnerNetTotal(
-                      stats.inventioPayment.paidAmount + stats.inventioPayment.unpaidAmount,
-                      stats.inventioPayment.paidAmount
-                    )
-                  )
-                : '-'
-            }
-            tone="inventio"
-            sub={
-              hasProfit && stats.inventioPayment.paidAmount > 0
-                ? `장부 ${formatKrwAmount(stats.inventioPayment.paidAmount)}`
-                : undefined
-            }
-          />
-          <SalesSettlementLedgerIconButton
-            tone="inventio"
-            title="인벤티오 정산 장부"
-            onClick={() => onOpenLedger('inventio')}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AggregateSummaryChip({
-  rowCount,
-  orderQuantityTotal,
-}: {
-  rowCount: number;
-  orderQuantityTotal: number;
-}) {
-  return (
-    <div className="inline-flex items-stretch rounded-md border border-gray-200 bg-white overflow-hidden shrink-0">
-      <div className="px-3 py-2 text-left border-r border-gray-100">
-        <p className="text-[10px] font-medium text-gray-500">판매 건수</p>
-        <p className="tabular-nums text-sm font-semibold text-gray-800">
-          {rowCount.toLocaleString()}건
-        </p>
-      </div>
-      <div className="px-4 py-2 text-left min-w-[96px]">
-        <p className="text-[10px] font-medium text-gray-500">판매 수량</p>
-        <p className="tabular-nums text-xl font-bold text-gray-900 leading-tight">
-          {orderQuantityTotal.toLocaleString()}
-          <span className="text-sm font-semibold text-gray-500 ml-0.5">개</span>
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function AmountChip({
-  label,
-  value,
-  tone,
-  sub,
-  onClick,
-  title,
-}: {
-  label: string;
-  value: string;
-  tone: 'neutral' | 'cost' | 'logistics' | 'profit' | 'wk' | 'inventio';
-  sub?: string;
-  onClick?: () => void;
-  title?: string;
-}) {
-  const toneClass: Record<typeof tone, string> = {
-    neutral: 'border-gray-200 bg-white text-gray-900',
-    cost: 'border-orange-200 bg-orange-50 text-orange-900',
-    logistics: 'border-sky-200 bg-sky-50 text-sky-900 hover:bg-sky-100 hover:border-sky-300',
-    profit: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-    wk: 'border-blue-200 bg-blue-50 text-blue-800',
-    inventio: 'border-violet-200 bg-violet-50 text-violet-800',
-  };
-
-  const className = `rounded-md border px-2.5 py-1.5 min-w-[88px] text-left transition-colors ${toneClass[tone]} ${
-    onClick ? 'cursor-pointer' : ''
-  }`;
-
-  const content = (
-    <>
-      <p className="text-[10px] font-medium text-gray-500">{label}</p>
-      <p className="tabular-nums font-semibold">{value}</p>
-      {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
-    </>
-  );
-
-  if (onClick) {
-    return (
-      <button type="button" className={className} onClick={onClick} title={title}>
-        {content}
-      </button>
-    );
-  }
-
-  return <div className={className}>{content}</div>;
-}
-
-function OperatorChip({ symbol }: { symbol: string }) {
-  return (
-    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 text-gray-600 text-xs font-bold shrink-0">
-      {symbol}
-    </span>
   );
 }
 

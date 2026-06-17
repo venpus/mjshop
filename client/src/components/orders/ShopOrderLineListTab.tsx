@@ -302,6 +302,7 @@ export function ShopOrderLineListTab({
       }
 
       await onReload();
+      setSelectedRowKeys(new Set());
 
       setStatementGroups(
         result.groups.map((group) => ({
