@@ -34,6 +34,7 @@ import {
   Activity,
   Calendar,
   Search,
+  Wallet,
 } from "lucide-react";
 import { SidebarExternalLink } from "./sidebar/SidebarExternalLink";
 
@@ -42,6 +43,7 @@ type PageType =
   | "products"
   | "orders"
   | "shop-statements"
+  | "shop-payment"
   | "sales-settlement"
   | "shop-buyers"
   | "shipping"
@@ -461,6 +463,18 @@ export function Sidebar({
                 >
                   <FileText className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
                   {!isCollapsed && <span>{t('menu.shopStatements')}</span>}
+                </button>
+                <button
+                  onClick={() => onPageChange("shop-payment")}
+                  className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
+                    currentPage === "shop-payment"
+                      ? "bg-purple-50 text-purple-600"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                  title={isCollapsed ? t('menu.shopPayment') : undefined}
+                >
+                  <Wallet className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
+                  {!isCollapsed && <span>{t('menu.shopPayment')}</span>}
                 </button>
                 <button
                   onClick={() => onPageChange("sales-settlement")}

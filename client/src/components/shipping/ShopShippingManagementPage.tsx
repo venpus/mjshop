@@ -228,7 +228,7 @@ export function ShopShippingManagementPage() {
   };
 
   return (
-    <div className="p-6 min-h-[1080px]">
+    <div className="p-4 min-h-[1080px]">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-gray-900 mb-1">배송 관리</h2>
@@ -298,7 +298,7 @@ export function ShopShippingManagementPage() {
               {focusLineId ? '해당 주문건의 배송 묶음이 없습니다.' : '등록된 송장이 없습니다.'}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1.5">
               {paginatedItems.map((batch) => (
                 <ShopShippingBatchCard
                   key={batch.batchId}

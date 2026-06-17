@@ -16,7 +16,7 @@ export function ShopShippingStatusBadge({ status, compact = false }: ShopShippin
   return (
     <span
       title={getShopShipmentDeliveryStatusLabel(status)}
-      className={`inline-flex items-center justify-center rounded border whitespace-nowrap font-semibold ${compact ? 'min-w-[3.25rem] px-1 h-4 text-[9px]' : 'min-w-[4.5rem] px-1.5 h-6 text-[10px]'} ${STATUS_CLASS[status]}`}
+      className={`inline-flex items-center justify-center rounded border whitespace-nowrap font-semibold ${compact ? 'min-w-0 max-w-full px-0.5 h-4 text-[8px] leading-none' : 'min-w-[4.5rem] px-1.5 h-6 text-[10px]'} ${STATUS_CLASS[status]}`}
     >
       {getShopShipmentDeliveryStatusLabel(status)}
     </span>

@@ -7,6 +7,7 @@ import { Dashboard } from './components/Dashboard';
 import { Products } from './components/Products';
 import { Orders } from './components/Orders';
 import { ShopStatementsPage } from './components/orders/ShopStatementsPage';
+import { ShopPaymentManagementPage } from './components/orders/ShopPaymentManagementPage';
 import { SalesSettlementPage } from './components/sales-settlement/SalesSettlementPage';
 import { ShopOrderDetail } from './components/orders/ShopOrderDetail';
 import {
@@ -336,6 +337,7 @@ function AdminLayout() {
               <Route path="/orders" element={<Orders />} />
               <Route path="/orders/:id" element={<ShopOrderDetailWrapper />} />
               <Route path="/shop-statements" element={<ShopStatementsPage />} />
+              <Route path="/shop-payment" element={<ShopPaymentManagementPage />} />
               <Route path="/sales-settlement" element={<SalesSettlementPage />} />
               <Route path="/shop-buyers" element={<BuyerRegistrationPage />} />
               <Route path="/shipping" element={<ShopShippingManagementPage />} />
