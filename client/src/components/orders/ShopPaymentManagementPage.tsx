@@ -16,8 +16,10 @@ import {
   buildShopOrderStatementListRows,
   buildStatementGroupPreviewItems,
   groupShopOrderStatementRows,
+  mergeStatementAmountBreakdowns,
   type ShopOrderLineListRow,
   type ShopOrderStatementGroupRow,
+  type StatementAmountBreakdown,
 } from '../../utils/shopOrderListExport';
 import { formatLineOrderRef, matchesLineDateRange } from '../../utils/shopOrderLineListUtils';
 import type { ShopBuyer, ShopBuyerListItem } from '../buyers/types';
@@ -90,14 +92,48 @@ function filterScopeStatements(
   );
 }
 
+function statementToBreakdown(statement: ShopOrderStatementGroupRow): StatementAmountBreakdown {
+  return {
+    productSupplyAmount: statement.productSupplyAmount,
+    vatAmount: statement.vatAmount,
+    deliveryFee: statement.deliveryFee,
+    totalAmount: statement.totalAmount,
+  };
+}
+
+function PaymentAmountBreakdownCell({ breakdown }: { breakdown: StatementAmountBreakdown }) {
+  if (breakdown.totalAmount <= 0) {
+    return <span className="text-gray-400">-</span>;
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <span className="tabular-nums font-semibold text-gray-900">
+        {formatKrwAmount(breakdown.totalAmount)}
+      </span>
+      <span className="text-[10px] tabular-nums text-gray-500">
+        공급가 {formatKrwAmount(breakdown.productSupplyAmount)}
+      </span>
+      <span className="text-[10px] tabular-nums text-gray-500">
+        VAT {formatKrwAmount(breakdown.vatAmount)}
+      </span>
+      {breakdown.deliveryFee > 0 && (
+        <span className="text-[10px] tabular-nums text-gray-500">
+          택배비 {formatKrwAmount(breakdown.deliveryFee)}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function SummaryCard({
   label,
-  amount,
+  breakdown,
   count,
   tone,
 }: {
   label: string;
-  amount: number;
+  breakdown: StatementAmountBreakdown;
   count: number;
   tone: 'neutral' | 'paid' | 'unpaid';
 }) {
@@ -119,9 +155,16 @@ function SummaryCard({
     <div className={`rounded-lg border px-4 py-3 ${toneClass}`}>
       <p className="text-xs font-medium text-gray-500">{label}</p>
       <p className={`mt-1 text-xl font-bold tabular-nums ${amountClass}`}>
-        {formatKrwAmount(amount)}
+        {formatKrwAmount(breakdown.totalAmount)}
       </p>
-      <p className="mt-0.5 text-xs text-gray-500">{count.toLocaleString()}장</p>
+      {breakdown.totalAmount > 0 && (
+        <div className="mt-1 space-y-0.5 text-[10px] tabular-nums text-gray-500">
+          <p>공급가 {formatKrwAmount(breakdown.productSupplyAmount)}</p>
+          <p>VAT {formatKrwAmount(breakdown.vatAmount)}</p>
+          {breakdown.deliveryFee > 0 && <p>택배비 {formatKrwAmount(breakdown.deliveryFee)}</p>}
+        </div>
+      )}
+      <p className="mt-1 text-xs text-gray-500">{count.toLocaleString()}장</p>
     </div>
   );
 }
@@ -197,10 +240,20 @@ export function ShopPaymentManagementPage() {
     const paidStatements = scopeStatements.filter((statement) => statement.paymentReceived);
     const unpaidStatements = scopeStatements.filter((statement) => !statement.paymentReceived);
 
+    const totalBreakdown = mergeStatementAmountBreakdowns(
+      scopeStatements.map(statementToBreakdown)
+    );
+    const paidBreakdown = mergeStatementAmountBreakdowns(
+      paidStatements.map(statementToBreakdown)
+    );
+    const unpaidBreakdown = mergeStatementAmountBreakdowns(
+      unpaidStatements.map(statementToBreakdown)
+    );
+
     return {
-      totalAmount: scopeStatements.reduce((sum, statement) => sum + statement.totalAmount, 0),
-      paidAmount: paidStatements.reduce((sum, statement) => sum + statement.totalAmount, 0),
-      unpaidAmount: unpaidStatements.reduce((sum, statement) => sum + statement.totalAmount, 0),
+      totalBreakdown,
+      paidBreakdown,
+      unpaidBreakdown,
       totalCount: scopeStatements.length,
       paidCount: paidStatements.length,
       unpaidCount: unpaidStatements.length,
@@ -342,25 +395,27 @@ export function ShopPaymentManagementPage() {
         </div>
         <p className="text-gray-600">
           발행된 명세서 기준으로 입금 예정 금액을 확인하고, 입금 완료 여부를 관리합니다.
+          총금액은 <span className="font-medium text-gray-800">공급가 + VAT(10%) + 택배비</span>로
+          구성됩니다.
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <SummaryCard
           label="명세서 총 금액"
-          amount={summary.totalAmount}
+          breakdown={summary.totalBreakdown}
           count={summary.totalCount}
           tone="neutral"
         />
         <SummaryCard
           label="입금 금액"
-          amount={summary.paidAmount}
+          breakdown={summary.paidBreakdown}
           count={summary.paidCount}
           tone="paid"
         />
         <SummaryCard
           label="미입금 금액"
-          amount={summary.unpaidAmount}
+          breakdown={summary.unpaidBreakdown}
           count={summary.unpaidCount}
           tone="unpaid"
         />
@@ -475,6 +530,9 @@ export function ShopPaymentManagementPage() {
                     </th>
                     <th className="px-4 py-3 text-right font-medium text-gray-600 whitespace-nowrap">
                       입금 예정 금액
+                      <span className="block text-[10px] font-normal text-gray-400">
+                        공급가+VAT+택배비
+                      </span>
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap min-w-[180px]">
                       상품
@@ -558,10 +616,8 @@ export function ShopPaymentManagementPage() {
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums font-semibold text-gray-900">
-                          {statement.totalAmount > 0
-                            ? formatKrwAmount(statement.totalAmount)
-                            : '-'}
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <PaymentAmountBreakdownCell breakdown={statementToBreakdown(statement)} />
                         </td>
                         <td className="px-4 py-3 text-gray-600 max-w-[240px]">
                           <div className="flex flex-col gap-0.5">

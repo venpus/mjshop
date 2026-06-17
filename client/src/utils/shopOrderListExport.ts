@@ -134,6 +134,9 @@ export interface ShopOrderStatementGroupRow {
   recipientName: string;
   lineCount: number;
   totalAmount: number;
+  productSupplyAmount: number;
+  vatAmount: number;
+  deliveryFee: number;
   totalBoxCount: number;
   productNamesLabel: string;
   statementDelivered: boolean;
@@ -143,6 +146,49 @@ export interface ShopOrderStatementGroupRow {
   previewShopOrderId: string;
   previewLineId: string;
   lines: ShopOrderLineListRow[];
+}
+
+export interface StatementAmountBreakdown {
+  productSupplyAmount: number;
+  vatAmount: number;
+  deliveryFee: number;
+  totalAmount: number;
+}
+
+export function summarizeStatementLinesAmountBreakdown(
+  lines: ShopOrderLineListRow[]
+): StatementAmountBreakdown {
+  return lines.reduce(
+    (acc, row) => {
+      const line = row.line;
+      const supply = line.productSupplyAmount ?? 0;
+      const vat = line.vatAmount ?? (supply > 0 ? Math.round(supply * 0.1) : 0);
+      const delivery = line.deliveryFee ?? 0;
+      const total = line.totalAmount ?? 0;
+
+      return {
+        productSupplyAmount: acc.productSupplyAmount + supply,
+        vatAmount: acc.vatAmount + vat,
+        deliveryFee: acc.deliveryFee + delivery,
+        totalAmount: acc.totalAmount + total,
+      };
+    },
+    { productSupplyAmount: 0, vatAmount: 0, deliveryFee: 0, totalAmount: 0 }
+  );
+}
+
+export function mergeStatementAmountBreakdowns(
+  breakdowns: StatementAmountBreakdown[]
+): StatementAmountBreakdown {
+  return breakdowns.reduce(
+    (acc, breakdown) => ({
+      productSupplyAmount: acc.productSupplyAmount + breakdown.productSupplyAmount,
+      vatAmount: acc.vatAmount + breakdown.vatAmount,
+      deliveryFee: acc.deliveryFee + breakdown.deliveryFee,
+      totalAmount: acc.totalAmount + breakdown.totalAmount,
+    }),
+    { productSupplyAmount: 0, vatAmount: 0, deliveryFee: 0, totalAmount: 0 }
+  );
 }
 
 function lineIsPaymentComplete(line: ShopOrderLine): boolean {
@@ -215,16 +261,14 @@ export function groupShopOrderStatementRows(
       (a, b) => new Date(b.line.updatedAt).getTime() - new Date(a.line.updatedAt).getTime()
     );
     const representative = sortedLines[0];
-    const totalAmount = groupLines.reduce(
-      (sum, row) => sum + (row.line.totalAmount ?? 0),
-      0
-    );
-    const statementIssuedAt =
-      representative.line.statementIssuedAt?.slice(0, 10) ??
-      representative.line.updatedAt.slice(0, 10);
+    const amountBreakdown = summarizeStatementLinesAmountBreakdown(groupLines);
     const { productNamesLabel, totalBoxCount } = buildStatementProductSummary(groupLines);
     const statementDelivered = groupLines.every((row) => row.line.statementDelivered);
     const paymentReceived = groupLines.every((row) => lineIsPaymentComplete(row.line));
+
+    const statementIssuedAt =
+      representative.line.statementIssuedAt?.slice(0, 10) ??
+      representative.line.updatedAt.slice(0, 10);
 
     return {
       groupKey,
@@ -235,7 +279,10 @@ export function groupShopOrderStatementRows(
       address: (representative.line.address ?? '').trim() || '-',
       recipientName: (representative.line.recipientName ?? '').trim() || '-',
       lineCount: groupLines.length,
-      totalAmount,
+      totalAmount: amountBreakdown.totalAmount,
+      productSupplyAmount: amountBreakdown.productSupplyAmount,
+      vatAmount: amountBreakdown.vatAmount,
+      deliveryFee: amountBreakdown.deliveryFee,
       totalBoxCount,
       productNamesLabel,
       statementDelivered,
