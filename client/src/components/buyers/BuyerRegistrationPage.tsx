@@ -9,6 +9,8 @@ import {
   updateShopBuyer,
   uploadShopBuyerBusinessRegistrationImage,
 } from '../../api/shopBuyerApi';
+import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
+import { ShopOrderListPagination } from '../orders/ShopOrderListPagination';
 import { BuyerFormModal } from './BuyerFormModal';
 import { BuyerAddressListDisplay } from './BuyerAddressListDisplay';
 import type { ShopBuyer, ShopBuyerFormData, ShopBuyerImageOptions, ShopBuyerListItem } from './types';
@@ -58,6 +60,16 @@ export function BuyerRegistrationPage() {
         )
     );
   }, [buyers, searchTerm]);
+
+  const {
+    paginatedItems: paginatedBuyers,
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    totalItems,
+    startIndex,
+    endIndex,
+  } = useShopOrderListPagination(filteredBuyers, searchTerm);
 
   const handleAdd = () => {
     setEditingBuyer(null);
@@ -157,6 +169,15 @@ export function BuyerRegistrationPage() {
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <ShopOrderListPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            onPageChange={setCurrentPage}
+            className="border-b border-gray-200 bg-gray-50/50 px-4 py-2"
+          />
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
@@ -170,7 +191,7 @@ export function BuyerRegistrationPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredBuyers.map((buyer) => (
+                {paginatedBuyers.map((buyer) => (
                   <tr key={buyer.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-gray-900 font-medium">{buyer.companyName}</td>
                     <td className="px-6 py-4 text-gray-600">{buyer.kakaoId || '-'}</td>
@@ -213,6 +234,15 @@ export function BuyerRegistrationPage() {
               </tbody>
             </table>
           </div>
+          <ShopOrderListPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            onPageChange={setCurrentPage}
+            className="border-t border-gray-200 bg-gray-50/50 px-4 py-2"
+          />
         </div>
       )}
 
