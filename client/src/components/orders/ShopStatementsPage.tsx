@@ -62,12 +62,18 @@ function buildStatementGroups(
 
 function filterStatements(
   statements: ShopOrderStatementGroupRow[],
-  searchTerm: string
+  searchTerm: string,
+  onlyUndelivered: boolean
 ): ShopOrderStatementGroupRow[] {
-  const lower = searchTerm.trim().toLowerCase();
-  if (!lower) return statements;
+  let result = statements;
+  if (onlyUndelivered) {
+    result = result.filter((group) => !group.statementDelivered);
+  }
 
-  return statements.filter((group) => {
+  const lower = searchTerm.trim().toLowerCase();
+  if (!lower) return result;
+
+  return result.filter((group) => {
     return (
       group.companyName.toLowerCase().includes(lower) ||
       group.address.toLowerCase().includes(lower) ||
@@ -91,6 +97,7 @@ export function ShopStatementsPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<StatementTabKind>('orders');
   const [searchTerm, setSearchTerm] = useState('');
+  const [onlyUndelivered, setOnlyUndelivered] = useState(false);
   const [busyGroupKey, setBusyGroupKey] = useState<string | null>(null);
   const [deliverySavingGroupKey, setDeliverySavingGroupKey] = useState<string | null>(null);
   const [paymentSavingGroupKey, setPaymentSavingGroupKey] = useState<string | null>(null);
@@ -155,9 +162,14 @@ export function ShopStatementsPage() {
     [orders, activeTab]
   );
 
+  const undeliveredStatementCount = useMemo(
+    () => statementGroups.filter((group) => !group.statementDelivered).length,
+    [statementGroups]
+  );
+
   const filteredStatements = useMemo(
-    () => filterStatements(statementGroups, searchTerm),
-    [searchTerm, statementGroups]
+    () => filterStatements(statementGroups, searchTerm, onlyUndelivered),
+    [searchTerm, statementGroups, onlyUndelivered]
   );
 
   const filteredCompanyGroups = useMemo(
@@ -173,7 +185,10 @@ export function ShopStatementsPage() {
     totalItems,
     startIndex,
     endIndex,
-  } = useShopOrderListPagination(filteredCompanyGroups, searchTerm);
+  } = useShopOrderListPagination(
+    filteredCompanyGroups,
+    `${activeTab}|${searchTerm}|${onlyUndelivered ? 'undelivered' : 'all'}`
+  );
 
   const flatStatements = useMemo(
     () => filteredCompanyGroups.flatMap((company) => company.statements),
@@ -183,6 +198,7 @@ export function ShopStatementsPage() {
   useEffect(() => {
     setSelectedGroupKeys(new Set());
     setExpandedGroupKeys(new Set());
+    setOnlyUndelivered(false);
     setCurrentPage(1);
   }, [activeTab, setCurrentPage]);
 
@@ -207,6 +223,9 @@ export function ShopStatementsPage() {
     paginatedStatementKeys.length > 0 &&
     paginatedStatementKeys.every((key) => selectedGroupKeys.has(key));
 
+  const accentFilterActiveClass = isReservationTab
+    ? 'bg-amber-600 text-white border-amber-600'
+    : 'bg-emerald-600 text-white border-emerald-600';
   const accentCheckboxClass = isReservationTab ? 'accent-amber-600' : 'accent-emerald-600';
   const accentButtonClass = isReservationTab
     ? 'border-amber-200 text-amber-800 bg-amber-50 hover:bg-amber-100'
@@ -738,6 +757,12 @@ export function ShopStatementsPage() {
           검색 명세서{' '}
           <strong className="text-gray-900">{flatStatements.length.toLocaleString()}장</strong>
         </span>
+        <span className="text-gray-600">
+          미전달{' '}
+          <strong className={undeliveredStatementCount > 0 ? 'text-amber-700' : 'text-gray-900'}>
+            {undeliveredStatementCount.toLocaleString()}장
+          </strong>
+        </span>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -752,6 +777,20 @@ export function ShopStatementsPage() {
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
+          <button
+            type="button"
+            onClick={() => setOnlyUndelivered((prev) => !prev)}
+            className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+              onlyUndelivered
+                ? accentFilterActiveClass
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            미전달만
+            {undeliveredStatementCount > 0 && (
+              <span className="ml-1 opacity-80">({undeliveredStatementCount.toLocaleString()})</span>
+            )}
+          </button>
           <label className="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
             <input
               type="checkbox"
@@ -848,7 +887,9 @@ export function ShopStatementsPage() {
           <div className="py-16 text-center text-gray-500">
             {statementGroups.length === 0
               ? `발행된 ${isReservationTab ? '예약' : '주문'} 명세서가 없습니다. 주문 관리에서 명세서를 생성해 주세요.`
-              : '검색 결과가 없습니다.'}
+              : onlyUndelivered
+                ? '전달되지 않은 명세서가 없습니다.'
+                : '검색 결과가 없습니다.'}
           </div>
         ) : (
           <>
