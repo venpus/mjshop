@@ -168,6 +168,7 @@ export function ShopOrderLineListTab({
     phoneNumber: string | null;
   } | null>(null);
   const [deliveryFeeSavingRowKey, setDeliveryFeeSavingRowKey] = useState<string | null>(null);
+  const [vatExemptSavingRowKey, setVatExemptSavingRowKey] = useState<string | null>(null);
 
   const checkboxClass = accentCheckboxClass;
 
@@ -416,6 +417,25 @@ export function ShopOrderLineListTab({
       alert(err instanceof Error ? err.message : '배송비 저장에 실패했습니다.');
     } finally {
       setDeliveryFeeSavingRowKey(null);
+    }
+  };
+
+  const handleToggleVatExempt = async (row: ShopOrderLineListRow, enabled: boolean) => {
+    setVatExemptSavingRowKey(row.rowKey);
+    try {
+      await syncShopOrderDetail(row.shopOrderId, {
+        lines: [
+          {
+            id: row.line.id,
+            vatExempt: enabled,
+          },
+        ],
+      });
+      await onReload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '부가세 없음 저장에 실패했습니다.');
+    } finally {
+      setVatExemptSavingRowKey(null);
     }
   };
 
@@ -698,7 +718,8 @@ export function ShopOrderLineListTab({
                       </span>
                     </th>
                   )}
-                  <th className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">총계(VAT포함)</th>
+                  <th className="px-3 py-3 text-center text-gray-600 whitespace-nowrap">부가세없음</th>
+                  <th className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">총계</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">수령인</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">배송</th>
                   <th className="px-4 py-3 text-center text-gray-600 whitespace-nowrap">진행</th>
@@ -808,6 +829,34 @@ export function ShopOrderLineListTab({
                           </label>
                         </td>
                       )}
+                      <td className="px-3 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <label
+                          className={`inline-flex flex-col items-center gap-0.5 ${
+                            vatExemptSavingRowKey === row.rowKey
+                              ? 'cursor-wait opacity-60'
+                              : 'cursor-pointer'
+                          }`}
+                          title="부가세 없음 거래"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={line.vatExempt}
+                            disabled={vatExemptSavingRowKey === row.rowKey || bulkBusy}
+                            onChange={(event) =>
+                              void handleToggleVatExempt(row, event.target.checked)
+                            }
+                            className={checkboxClass}
+                            aria-label={`${formatLineOrderRef(row.line.lineOrderNumber, row.orderNumber, row.lineIndex, orderRefPrefix)} 부가세 없음`}
+                          />
+                          {vatExemptSavingRowKey === row.rowKey ? (
+                            <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
+                          ) : line.vatExempt ? (
+                            <span className="text-[10px] text-purple-700">적용</span>
+                          ) : (
+                            <span className="text-[10px] text-gray-400">미적용</span>
+                          )}
+                        </label>
+                      </td>
                       <td className="px-4 py-4 text-gray-900 font-medium text-right whitespace-nowrap">
                         {line.totalAmount != null && line.totalAmount > 0
                           ? `₩${line.totalAmount.toLocaleString()}`
