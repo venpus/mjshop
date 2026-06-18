@@ -1,3 +1,11 @@
+export const SHOP_ORDER_DEFAULT_DELIVERY_FEE = 3500;
+
+export function lineHasDefaultDeliveryFee(
+  deliveryFee: number | null | undefined
+): boolean {
+  return deliveryFee === SHOP_ORDER_DEFAULT_DELIVERY_FEE;
+}
+
 export function calculateTotalOrderQuantity(
   lines: Array<{ orderBoxCount: number; quantityPerBox: number }>
 ): number {
@@ -21,13 +29,16 @@ export function calculateShopOrderAmountBreakdown(
   orderBoxCount: number,
   quantityPerBox: number,
   saleUnitPrice: number | null,
-  deliveryFee: number | null
+  deliveryFee: number | null,
+  vatExempt = false
 ): ShopOrderAmountBreakdown | null {
   if (saleUnitPrice == null && deliveryFee == null) return null;
 
   const productSupplyAmount = orderBoxCount * quantityPerBox * (saleUnitPrice ?? 0);
-  const vatAmount = Math.round(productSupplyAmount * 0.1);
-  const totalAmount = Math.round(productSupplyAmount * 1.1) + (deliveryFee ?? 0);
+  const vatAmount = vatExempt ? 0 : Math.round(productSupplyAmount * 0.1);
+  const totalAmount =
+    (vatExempt ? productSupplyAmount : Math.round(productSupplyAmount * 1.1)) +
+    (deliveryFee ?? 0);
 
   return {
     productSupplyAmount,
@@ -40,14 +51,16 @@ export function calculateShopOrderTotalAmount(
   orderBoxCount: number,
   quantityPerBox: number,
   saleUnitPrice: number | null,
-  deliveryFee: number | null
+  deliveryFee: number | null,
+  vatExempt = false
 ): number | null {
   return (
     calculateShopOrderAmountBreakdown(
       orderBoxCount,
       quantityPerBox,
       saleUnitPrice,
-      deliveryFee
+      deliveryFee,
+      vatExempt
     )?.totalAmount ?? null
   );
 }
@@ -67,6 +80,7 @@ export interface ShopOrderLineForm {
   trackingNumber: string;
   productArrived: boolean;
   taxInvoiceIssued: boolean;
+  vatExempt: boolean;
   statementFilePath: string | null;
   paymentReceived: boolean;
   paymentProofImage: string | null;
@@ -80,7 +94,8 @@ export function getLineAmountBreakdown(line: ShopOrderLineForm): ShopOrderAmount
     line.orderBoxCount,
     line.quantityPerBox,
     line.saleUnitPrice,
-    line.deliveryFee
+    line.deliveryFee,
+    line.vatExempt
   );
 }
 
@@ -107,6 +122,7 @@ export function createEmptyLineForm(
     trackingNumber: '',
     productArrived: false,
     taxInvoiceIssued: false,
+    vatExempt: false,
     statementFilePath: null,
     paymentReceived: false,
     paymentProofImage: null,

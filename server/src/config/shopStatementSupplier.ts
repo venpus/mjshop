@@ -20,3 +20,13 @@ export const SHOP_STATEMENT_SUPPLIER = {
     process.env.SHOP_SUPPLIER_BANK_NOTICE?.trim() ||
     '입금 후 입금자명을 김부장에게 반드시 확인해 주세요.',
 };
+
+/** 부가세 없음 거래 명세서 입금 안내 */
+export const SHOP_STATEMENT_VAT_EXEMPT_BANK = {
+  bankDepositInfo:
+    process.env.SHOP_SUPPLIER_VAT_EXEMPT_BANK?.trim() ||
+    '국민은행 성수현 279601-04-075401',
+  bankDepositNotice:
+    process.env.SHOP_SUPPLIER_VAT_EXEMPT_BANK_NOTICE?.trim() ||
+    '입금 후 입금자명을 김부장에게 반드시 확인해 주세요.',
+};

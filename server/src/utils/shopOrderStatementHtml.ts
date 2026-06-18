@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { SHOP_STATEMENT_SUPPLIER } from '../config/shopStatementSupplier.js';
+import { SHOP_STATEMENT_SUPPLIER, SHOP_STATEMENT_VAT_EXEMPT_BANK } from '../config/shopStatementSupplier.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -56,6 +56,7 @@ export interface ShopOrderStatementContext {
   recipientName: string | null;
   phoneNumber: string | null;
   isReservation?: boolean;
+  vatExempt?: boolean;
   /** 명세서 거래일자 (미설정 시 orderDate 사용) */
   statementDate?: string | Date | null;
 }
@@ -126,9 +127,11 @@ function buildAmounts(order: ShopOrderStatementContext) {
   const quantity = order.orderBoxCount * order.quantityPerBox;
   const productSupply = quantity * (order.saleUnitPrice ?? 0);
   const deliverySupply = order.deliveryFee ?? 0;
-  const vatAmount = Math.round(productSupply * 0.1);
+  const vatExempt = Boolean(order.vatExempt);
+  const vatAmount = vatExempt ? 0 : Math.round(productSupply * 0.1);
   const supplyTotal = productSupply + deliverySupply;
-  const grandTotal = Math.round(productSupply * 1.1) + deliverySupply;
+  const grandTotal =
+    (vatExempt ? productSupply : Math.round(productSupply * 1.1)) + deliverySupply;
 
   return {
     quantity,
@@ -138,6 +141,20 @@ function buildAmounts(order: ShopOrderStatementContext) {
     vatAmount,
     grandTotal,
     unitPrice: order.saleUnitPrice ?? 0,
+    vatExempt,
+  };
+}
+
+function resolveStatementBankInfo(
+  contexts: ShopOrderStatementContext | ShopOrderStatementContext[]
+): { bankDepositInfo: string; bankDepositNotice: string } {
+  const list = Array.isArray(contexts) ? contexts : [contexts];
+  if (list.length > 0 && list.every((context) => context.vatExempt)) {
+    return SHOP_STATEMENT_VAT_EXEMPT_BANK;
+  }
+  return {
+    bankDepositInfo: SHOP_STATEMENT_SUPPLIER.bankDepositInfo,
+    bankDepositNotice: SHOP_STATEMENT_SUPPLIER.bankDepositNotice,
   };
 }
 
@@ -199,7 +216,8 @@ function buildItemRows(
       <td></td>
     </tr>`);
 
-  rows.push(`
+  if (!amounts.vatExempt) {
+    rows.push(`
     <tr class="item-row vat-row">
       <td class="center">${date.month}</td>
       <td class="center">${date.day}</td>
@@ -210,6 +228,7 @@ function buildItemRows(
       <td class="right">${formatAmount(amounts.vatAmount)}</td>
       <td></td>
     </tr>`);
+  }
 
   for (let i = 0; i < EMPTY_ITEM_ROWS; i += 1) {
     rows.push(`
@@ -260,6 +279,7 @@ function buildConsolidatedAmounts(contexts: ShopOrderStatementContext[]) {
     supplyTotal: productSupply + deliverySupply,
     vatAmount,
     grandTotal,
+    vatExempt: contexts.every((context) => context.vatExempt),
   };
 }
 
@@ -299,7 +319,8 @@ function buildConsolidatedItemRows(
       <td></td>
     </tr>`);
 
-  rows.push(`
+  if (!consolidated.vatExempt) {
+    rows.push(`
     <tr class="item-row vat-row">
       <td class="center">${headerDate.month}</td>
       <td class="center">${headerDate.day}</td>
@@ -310,6 +331,7 @@ function buildConsolidatedItemRows(
       <td class="right">${formatAmount(consolidated.vatAmount)}</td>
       <td></td>
     </tr>`);
+  }
 
   for (let i = 0; i < EMPTY_ITEM_ROWS; i += 1) {
     rows.push(`
@@ -346,6 +368,7 @@ export function buildShopOrderConsolidatedStatementHtml(
     : '';
   const titleLabel = `${recipient.companyName || '거래명세표'} (통합 ${contexts.length}건)`;
   const reservationNote = buildStatementTitleReservationNote(contexts);
+  const bankInfo = resolveStatementBankInfo(contexts);
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -635,8 +658,8 @@ export function buildShopOrderConsolidatedStatementHtml(
     </div>
 
     <div class="bank-notice">
-      <p>${escapeHtml(supplier.bankDepositInfo)}</p>
-      <p>${escapeHtml(supplier.bankDepositNotice)}</p>
+      <p>${escapeHtml(bankInfo.bankDepositInfo)}</p>
+      <p>${escapeHtml(bankInfo.bankDepositNotice)}</p>
     </div>
   </div>
 </body>
@@ -667,6 +690,7 @@ export function buildShopOrderStatementHtml(order: ShopOrderStatementContext): s
     ? `<img class="statement-seal" src="${sealDataUri}" alt="" aria-hidden="true" />`
     : '';
   const reservationNote = buildStatementTitleReservationNote(order);
+  const bankInfo = resolveStatementBankInfo(order);
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -971,8 +995,8 @@ export function buildShopOrderStatementHtml(order: ShopOrderStatementContext): s
     </div>
 
     <div class="bank-notice">
-      <p>${escapeHtml(supplier.bankDepositInfo)}</p>
-      <p>${escapeHtml(supplier.bankDepositNotice)}</p>
+      <p>${escapeHtml(bankInfo.bankDepositInfo)}</p>
+      <p>${escapeHtml(bankInfo.bankDepositNotice)}</p>
     </div>
   </div>
 </body>

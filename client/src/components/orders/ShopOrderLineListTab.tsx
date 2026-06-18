@@ -17,6 +17,7 @@ import { getShopBuyerById, getShopBuyers } from '../../api/shopBuyerApi';
 import {
   createShopOrderBulkStatements,
   SHOP_ORDER_STATUS_OPTIONS,
+  syncShopOrderDetail,
   type ShopOrder,
   type ShopOrderBulkStatementGroup,
   type ShopOrderLine,
@@ -63,6 +64,10 @@ import {
 } from './ShopOrderStatementModal';
 import { ShopLineDeliveryStatusLink } from '../shipping/ShopLineDeliveryStatusLink';
 import type { LineShipmentInfo } from '../../utils/shopLineShipmentUtils';
+import {
+  lineHasDefaultDeliveryFee,
+  SHOP_ORDER_DEFAULT_DELIVERY_FEE,
+} from '../../utils/shopOrderCalculations';
 
 import type { ShopOrderListTab } from './ShopOrderListTabs';
 
@@ -162,6 +167,7 @@ export function ShopOrderLineListTab({
     recipientName: string | null;
     phoneNumber: string | null;
   } | null>(null);
+  const [deliveryFeeSavingRowKey, setDeliveryFeeSavingRowKey] = useState<string | null>(null);
 
   const checkboxClass = accentCheckboxClass;
 
@@ -392,6 +398,25 @@ export function ShopOrderLineListTab({
 
   const handleViewDetail = (shopOrderId: string) => {
     navigate(shopOrderDetailPath(shopOrderId, listTab));
+  };
+
+  const handleToggleDeliveryFee = async (row: ShopOrderLineListRow, enabled: boolean) => {
+    setDeliveryFeeSavingRowKey(row.rowKey);
+    try {
+      await syncShopOrderDetail(row.shopOrderId, {
+        lines: [
+          {
+            id: row.line.id,
+            deliveryFee: enabled ? SHOP_ORDER_DEFAULT_DELIVERY_FEE : null,
+          },
+        ],
+      });
+      await onReload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '배송비 저장에 실패했습니다.');
+    } finally {
+      setDeliveryFeeSavingRowKey(null);
+    }
   };
 
   const handleCompanyNameClick = async (line: ShopOrderLine, event: React.MouseEvent) => {
@@ -665,6 +690,14 @@ export function ShopOrderLineListTab({
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">상호명</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">상품명</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">수량</th>
+                  {!isReservationTab && (
+                    <th className="px-3 py-3 text-center text-gray-600 whitespace-nowrap">
+                      배송비
+                      <span className="block text-[10px] font-normal text-gray-400">
+                        {SHOP_ORDER_DEFAULT_DELIVERY_FEE.toLocaleString()}원
+                      </span>
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">총계(VAT포함)</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">수령인</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">배송</th>
@@ -743,6 +776,38 @@ export function ShopOrderLineListTab({
                       <td className="px-4 py-4 text-gray-600 whitespace-nowrap">
                         {formatLineQuantity(line)}
                       </td>
+                      {!isReservationTab && (
+                        <td className="px-3 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                          <label
+                            className={`inline-flex flex-col items-center gap-0.5 ${
+                              deliveryFeeSavingRowKey === row.rowKey
+                                ? 'cursor-wait opacity-60'
+                                : 'cursor-pointer'
+                            }`}
+                            title={`택배비 ${SHOP_ORDER_DEFAULT_DELIVERY_FEE.toLocaleString()}원 추가`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={lineHasDefaultDeliveryFee(line.deliveryFee)}
+                              disabled={deliveryFeeSavingRowKey === row.rowKey || bulkBusy}
+                              onChange={(event) =>
+                                void handleToggleDeliveryFee(row, event.target.checked)
+                              }
+                              className={checkboxClass}
+                              aria-label={`${formatLineOrderRef(row.line.lineOrderNumber, row.orderNumber, row.lineIndex)} 배송비 추가`}
+                            />
+                            {deliveryFeeSavingRowKey === row.rowKey ? (
+                              <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
+                            ) : lineHasDefaultDeliveryFee(line.deliveryFee) ? (
+                              <span className="text-[10px] tabular-nums text-emerald-700">
+                                ₩{SHOP_ORDER_DEFAULT_DELIVERY_FEE.toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-gray-400">미적용</span>
+                            )}
+                          </label>
+                        </td>
+                      )}
                       <td className="px-4 py-4 text-gray-900 font-medium text-right whitespace-nowrap">
                         {line.totalAmount != null && line.totalAmount > 0
                           ? `₩${line.totalAmount.toLocaleString()}`

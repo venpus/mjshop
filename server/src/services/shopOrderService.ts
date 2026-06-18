@@ -308,6 +308,8 @@ export class ShopOrderService {
             : line.saleUnitPrice;
         const deliveryFee =
           linePayload.deliveryFee !== undefined ? linePayload.deliveryFee : line.deliveryFee;
+        const vatExempt =
+          linePayload.vatExempt !== undefined ? linePayload.vatExempt : line.vatExempt;
 
         if (orderBoxCount < 0 || lineQuantityPerBox < 0) {
           throw new Error('박스 수와 한박스 입수량은 0 이상이어야 합니다.');
@@ -317,7 +319,8 @@ export class ShopOrderService {
           orderBoxCount,
           lineQuantityPerBox,
           saleUnitPrice,
-          deliveryFee
+          deliveryFee,
+          vatExempt
         );
 
         await this.lineRepository.update(linePayload.id, {
@@ -350,6 +353,7 @@ export class ShopOrderService {
               : undefined,
           productArrived: linePayload.productArrived,
           taxInvoiceIssued: linePayload.taxInvoiceIssued,
+          vatExempt,
         });
       }
 
@@ -369,9 +373,15 @@ export class ShopOrderService {
       throw new Error('주문을 찾을 수 없습니다.');
     }
 
+    const sortOrder = await this.lineRepository.prepareSortOrderForInsertAtTop(
+      shopOrderId,
+      isReservation
+    );
+
     const line = await this.lineRepository.create({
       shopOrderId,
       isReservation,
+      sortOrder,
       orderBoxCount: 1,
       saleUnitPrice: order.sellingPrice,
       quantityPerBox: order.quantityPerBox,
@@ -571,7 +581,8 @@ export class ShopOrderService {
       line.orderBoxCount,
       quantityPerBox,
       saleUnitPrice,
-      line.deliveryFee
+      line.deliveryFee,
+      line.vatExempt
     );
 
     const nextSort = await this.lineRepository.getNextSortOrder(targetOrderId);
@@ -765,6 +776,7 @@ export class ShopOrderService {
       recipientName: line.recipientName,
       phoneNumber: line.phoneNumber,
       isReservation: line.isReservation,
+      vatExempt: line.vatExempt,
       statementDate: statementDate ?? null,
     };
   }
@@ -835,6 +847,7 @@ export class ShopOrderService {
         recipientName: line.recipientName,
         phoneNumber: line.phoneNumber,
         isReservation: line.isReservation,
+        vatExempt: line.vatExempt,
         order,
         line,
       });

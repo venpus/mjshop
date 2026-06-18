@@ -20,6 +20,7 @@ export interface ShopOrderLine {
   paymentReceived: boolean;
   productArrived: boolean;
   taxInvoiceIssued: boolean;
+  vatExempt: boolean;
   cnyExchangeRate: number | null;
   wkSettlementPaid: boolean;
   inventioSettlementPaid: boolean;
@@ -61,6 +62,7 @@ export interface UpdateShopOrderLineDTO {
   trackingNumber?: string | null;
   productArrived?: boolean;
   taxInvoiceIssued?: boolean;
+  vatExempt?: boolean;
   cnyExchangeRate?: number | null;
   wkSettlementPaid?: boolean;
   inventioSettlementPaid?: boolean;

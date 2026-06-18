@@ -42,6 +42,7 @@ interface ShopOrderLineRow extends RowDataPacket {
   payment_received: number;
   product_arrived: number;
   tax_invoice_issued: number;
+  vat_exempt: number;
   cny_exchange_rate: number | null;
   wk_settlement_paid: number;
   inventio_settlement_paid: number;
@@ -61,7 +62,7 @@ interface ShopOrderLineRow extends RowDataPacket {
 
 const LINE_SELECT = `id, line_order_number, shop_order_id, sort_order, is_reservation, company_name, order_box_count, quantity_per_box,
   sale_unit_price, delivery_fee, product_supply_amount, vat_amount, total_amount, address, recipient_name, phone_number,
-  tracking_number, statement_issued, payment_received, product_arrived, tax_invoice_issued,
+  tracking_number, statement_issued, payment_received, product_arrived, tax_invoice_issued, vat_exempt,
   cny_exchange_rate, wk_settlement_paid, inventio_settlement_paid, shipment_box_count,
   logistics_fee_paid,   logistics_fee_paid_at, wk_settlement_paid_at, inventio_settlement_paid_at,
   statement_file_path, statement_group_id, statement_issued_at, statement_delivered, payment_proof_image, created_at, updated_at`;
@@ -107,6 +108,27 @@ export class ShopOrderLineRepository {
       [shopOrderId]
     );
     return Number(rows[0]?.next_sort) || 0;
+  }
+
+  /** 동일 유형(주문/예약) 목록 맨 위에 삽입할 sort_order를 반환하고, 기존 항목 sort_order를 +1 합니다. */
+  async prepareSortOrderForInsertAtTop(
+    shopOrderId: string,
+    isReservation: boolean
+  ): Promise<number> {
+    const lines = await this.findByShopOrderId(shopOrderId);
+    const sameTypeLines = lines.filter((line) => line.isReservation === isReservation);
+
+    if (sameTypeLines.length === 0) {
+      return 0;
+    }
+
+    const minSort = Math.min(...sameTypeLines.map((line) => line.sortOrder));
+
+    for (const line of sameTypeLines) {
+      await this.update(line.id, { sortOrder: line.sortOrder + 1 });
+    }
+
+    return minSort;
   }
 
   async generateUniqueLineOrderNumber(maxAttempts = 30): Promise<string> {
@@ -229,6 +251,10 @@ export class ShopOrderLineRepository {
     if (data.taxInvoiceIssued !== undefined) {
       fields.push('tax_invoice_issued = ?');
       values.push(data.taxInvoiceIssued ? 1 : 0);
+    }
+    if (data.vatExempt !== undefined) {
+      fields.push('vat_exempt = ?');
+      values.push(data.vatExempt ? 1 : 0);
     }
     if (data.cnyExchangeRate !== undefined) {
       fields.push('cny_exchange_rate = ?');
@@ -451,6 +477,7 @@ export class ShopOrderLineRepository {
       paymentReceived: Boolean(row.payment_received) || Boolean(row.payment_proof_image),
       productArrived: Boolean(row.product_arrived),
       taxInvoiceIssued: Boolean(row.tax_invoice_issued),
+      vatExempt: Boolean(row.vat_exempt),
       cnyExchangeRate:
         row.cny_exchange_rate != null ? Number(row.cny_exchange_rate) : null,
       wkSettlementPaid: Boolean(row.wk_settlement_paid),

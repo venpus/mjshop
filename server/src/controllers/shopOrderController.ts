@@ -150,6 +150,8 @@ export class ShopOrderController {
                 line.productArrived !== undefined ? Boolean(line.productArrived) : undefined,
               taxInvoiceIssued:
                 line.taxInvoiceIssued !== undefined ? Boolean(line.taxInvoiceIssued) : undefined,
+              vatExempt:
+                line.vatExempt !== undefined ? Boolean(line.vatExempt) : undefined,
             }))
           : undefined,
       };

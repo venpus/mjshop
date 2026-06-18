@@ -26,6 +26,7 @@ export interface ShopOrderLine {
   paymentReceived: boolean;
   productArrived: boolean;
   taxInvoiceIssued: boolean;
+  vatExempt: boolean;
   cnyExchangeRate: number | null;
   wkSettlementPaid: boolean;
   inventioSettlementPaid: boolean;
@@ -97,6 +98,7 @@ function mapShopOrderLine(raw: Record<string, unknown>): ShopOrderLine {
     paymentReceived: Boolean(raw.paymentReceived),
     productArrived: Boolean(raw.productArrived),
     taxInvoiceIssued: Boolean(raw.taxInvoiceIssued),
+    vatExempt: Boolean(raw.vatExempt),
     cnyExchangeRate: raw.cnyExchangeRate != null ? Number(raw.cnyExchangeRate) : null,
     wkSettlementPaid: Boolean(raw.wkSettlementPaid),
     inventioSettlementPaid: Boolean(raw.inventioSettlementPaid),
@@ -176,6 +178,7 @@ export interface SyncShopOrderDetailPayload {
     trackingNumber?: string | null;
     productArrived?: boolean;
     taxInvoiceIssued?: boolean;
+    vatExempt?: boolean;
   }>;
 }
 

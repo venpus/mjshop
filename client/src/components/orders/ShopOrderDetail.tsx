@@ -125,6 +125,8 @@ function lineToForm(
 
     taxInvoiceIssued: line.taxInvoiceIssued,
 
+    vatExempt: line.vatExempt,
+
     statementFilePath: line.statementFilePath,
 
     paymentReceived: line.paymentReceived,
@@ -200,6 +202,8 @@ function buildSyncPayload(form: ShopOrderFormState) {
       productArrived: line.productArrived,
 
       taxInvoiceIssued: line.taxInvoiceIssued,
+
+      vatExempt: line.vatExempt,
 
     })),
 

@@ -525,11 +525,37 @@ function ShopOrderLineRow({
 
 
 
-          <ProgressField label="총계(VAT)" className="flex-[0.8] min-w-[52px]">
+          <ProgressField label={line.vatExempt ? '총계' : '총계(VAT)'} className="flex-[0.8] min-w-[52px]">
 
             <div className={`${inputClass} bg-gray-50 text-gray-900 font-semibold text-right truncate`}>
 
               {totalAmount != null ? `₩${totalAmount.toLocaleString()}` : '-'}
+
+            </div>
+
+          </ProgressField>
+
+
+
+          <ProgressField label="부가세없음" className="flex-[0.65] min-w-[44px]">
+
+            <div className="flex items-center min-h-[26px]">
+
+              <input
+
+                type="checkbox"
+
+                checked={line.vatExempt}
+
+                onChange={(e) => onLineChange(line.id, 'vatExempt', e.target.checked)}
+
+                disabled={isLineBusy}
+
+                className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer shrink-0"
+
+                title="부가세 없음 거래"
+
+              />
 
             </div>
 

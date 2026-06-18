@@ -8,13 +8,16 @@ export function calculateShopOrderAmountBreakdown(
   orderBoxCount: number,
   quantityPerBox: number,
   saleUnitPrice: number | null,
-  deliveryFee: number | null
+  deliveryFee: number | null,
+  vatExempt = false
 ): ShopOrderAmountBreakdown | null {
   if (saleUnitPrice == null && deliveryFee == null) return null;
 
   const productSupplyAmount = orderBoxCount * quantityPerBox * (saleUnitPrice ?? 0);
-  const vatAmount = Math.round(productSupplyAmount * 0.1);
-  const totalAmount = Math.round(productSupplyAmount * 1.1) + (deliveryFee ?? 0);
+  const vatAmount = vatExempt ? 0 : Math.round(productSupplyAmount * 0.1);
+  const totalAmount =
+    (vatExempt ? productSupplyAmount : Math.round(productSupplyAmount * 1.1)) +
+    (deliveryFee ?? 0);
 
   return {
     productSupplyAmount,
@@ -27,14 +30,16 @@ export function calculateShopOrderTotalAmount(
   orderBoxCount: number,
   quantityPerBox: number,
   saleUnitPrice: number | null,
-  deliveryFee: number | null
+  deliveryFee: number | null,
+  vatExempt = false
 ): number | null {
   return (
     calculateShopOrderAmountBreakdown(
       orderBoxCount,
       quantityPerBox,
       saleUnitPrice,
-      deliveryFee
+      deliveryFee,
+      vatExempt
     )?.totalAmount ?? null
   );
 }

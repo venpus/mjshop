@@ -7,6 +7,7 @@ export interface StatementGroupLineInput {
   recipientName: string | null;
   phoneNumber: string | null;
   isReservation: boolean;
+  vatExempt?: boolean;
 }
 
 export interface ShopBuyerLookup {
@@ -34,7 +35,7 @@ export function resolveBuyerIdByCompanyName(
 export function buildStatementGroupKey(
   line: Pick<
     StatementGroupLineInput,
-    'companyName' | 'address' | 'recipientName' | 'phoneNumber' | 'isReservation'
+    'companyName' | 'address' | 'recipientName' | 'phoneNumber' | 'isReservation' | 'vatExempt'
   >,
   buyerId: number | null
 ): string {
@@ -45,6 +46,7 @@ export function buildStatementGroupKey(
 
   return [
     line.isReservation ? 'r' : 'o',
+    line.vatExempt ? 'nv' : 'v',
     buyerPart,
     normalizeStatementGroupField(line.address),
     normalizeStatementGroupField(line.recipientName),
