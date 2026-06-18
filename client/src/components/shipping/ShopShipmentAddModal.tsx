@@ -8,6 +8,7 @@ import {
   getDeliveryMismatchMessage,
   isSameDeliveryTarget,
 } from '../../utils/shopShipmentDelivery';
+import { generateUuid } from '../../utils/generateUuid';
 
 interface TrackingDraft {
   id: string;
@@ -32,7 +33,7 @@ function todayDateInputValue(): string {
 
 function createTrackingDraft(): TrackingDraft {
   return {
-    id: crypto.randomUUID(),
+    id: generateUuid(),
     trackingNumber: '',
   };
 }
