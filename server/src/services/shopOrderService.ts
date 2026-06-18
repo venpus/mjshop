@@ -315,6 +315,18 @@ export class ShopOrderService {
           throw new Error('박스 수와 한박스 입수량은 0 이상이어야 합니다.');
         }
 
+        const effectiveTrackingNumber =
+          linePayload.trackingNumber !== undefined
+            ? linePayload.trackingNumber?.replace(/\D/g, '').slice(0, 20) || null
+            : line.trackingNumber;
+
+        if (
+          linePayload.shippingReady !== undefined &&
+          Boolean(effectiveTrackingNumber?.trim())
+        ) {
+          throw new Error('송장이 등록된 주문 건은 출고준비 상태를 변경할 수 없습니다.');
+        }
+
         const amountBreakdown = calculateShopOrderAmountBreakdown(
           orderBoxCount,
           lineQuantityPerBox,

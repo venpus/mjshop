@@ -51,6 +51,8 @@ import {
   matchesLineDateRange,
   matchesLineFulfillmentFilters,
   sortShopOrderLineRowsByCompanyAddress,
+  lineInPreShipmentPhase,
+  lineHasTracking,
   type ShopOrderLineFulfillmentFilters,
 } from '../../utils/shopOrderLineListUtils';
 import { ShopBuyerInfoModal } from './ShopBuyerInfoModal';
@@ -442,6 +444,8 @@ export function ShopOrderLineListTab({
   };
 
   const handleToggleShippingReady = async (row: ShopOrderLineListRow, enabled: boolean) => {
+    if (lineHasTracking(row.line)) return;
+
     setShippingReadySavingRowKey(row.rowKey);
     try {
       await syncShopOrderDetail(row.shopOrderId, {
@@ -880,32 +884,38 @@ export function ShopOrderLineListTab({
                         </label>
                       </td>
                       <td className="px-3 py-4 text-center" onClick={(e) => e.stopPropagation()}>
-                        <label
-                          className={`inline-flex flex-col items-center gap-0.5 ${
-                            shippingReadySavingRowKey === row.rowKey
-                              ? 'cursor-wait opacity-60'
-                              : 'cursor-pointer'
-                          }`}
-                          title="출고준비 완료"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={line.shippingReady}
-                            disabled={shippingReadySavingRowKey === row.rowKey || bulkBusy}
-                            onChange={(event) =>
-                              void handleToggleShippingReady(row, event.target.checked)
-                            }
-                            className={checkboxClass}
-                            aria-label={`${formatLineOrderRef(row.line.lineOrderNumber, row.orderNumber, row.lineIndex, orderRefPrefix)} 출고준비`}
-                          />
-                          {shippingReadySavingRowKey === row.rowKey ? (
-                            <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
-                          ) : line.shippingReady ? (
-                            <span className="text-[10px] text-sky-700">완료</span>
-                          ) : (
-                            <span className="text-[10px] text-gray-400">대기</span>
-                          )}
-                        </label>
+                        {lineInPreShipmentPhase(line) ? (
+                          <label
+                            className={`inline-flex flex-col items-center gap-0.5 ${
+                              shippingReadySavingRowKey === row.rowKey
+                                ? 'cursor-wait opacity-60'
+                                : 'cursor-pointer'
+                            }`}
+                            title="출고준비 완료"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={line.shippingReady}
+                              disabled={shippingReadySavingRowKey === row.rowKey || bulkBusy}
+                              onChange={(event) =>
+                                void handleToggleShippingReady(row, event.target.checked)
+                              }
+                              className={checkboxClass}
+                              aria-label={`${formatLineOrderRef(row.line.lineOrderNumber, row.orderNumber, row.lineIndex, orderRefPrefix)} 출고준비`}
+                            />
+                            {shippingReadySavingRowKey === row.rowKey ? (
+                              <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
+                            ) : line.shippingReady ? (
+                              <span className="text-[10px] text-sky-700">완료</span>
+                            ) : (
+                              <span className="text-[10px] text-gray-400">대기</span>
+                            )}
+                          </label>
+                        ) : (
+                          <span className="text-[10px] text-gray-400" title="송장 등록됨">
+                            —
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-4 text-gray-900 font-medium text-right whitespace-nowrap">
                         {line.totalAmount != null && line.totalAmount > 0

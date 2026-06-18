@@ -37,6 +37,16 @@ export function lineHasTracking(line: ShopOrderLine): boolean {
   return Boolean(line.trackingNumber?.trim());
 }
 
+/** 송장 입력 전 출고준비 단계인지 (체크박스 표시·편집 대상) */
+export function lineInPreShipmentPhase(line: ShopOrderLine): boolean {
+  return !lineHasTracking(line);
+}
+
+/** 출고준비 필터: 송장 없음 + 출고준비 체크된 건만 */
+export function lineMatchesShippingReadyFilter(line: ShopOrderLine): boolean {
+  return lineInPreShipmentPhase(line) && line.shippingReady;
+}
+
 export function deriveLineProgressStatus(line: ShopOrderLine): ShopOrderLineProgressStatus {
   const arrived = line.productArrived;
   const paid = lineHasPayment(line);
@@ -107,7 +117,7 @@ export function matchesLineFulfillmentFilters(
   if (filters.notArrived && line.productArrived) return false;
   if (filters.noTaxInvoice && line.taxInvoiceIssued) return false;
   if (filters.noTracking && lineHasTracking(line)) return false;
-  if (filters.shippingReady && !line.shippingReady) return false;
+  if (filters.shippingReady && !lineMatchesShippingReadyFilter(line)) return false;
 
   return true;
 }
