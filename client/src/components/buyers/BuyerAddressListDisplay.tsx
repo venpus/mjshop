@@ -2,16 +2,23 @@ import type { ShopBuyerAddress } from './types';
 
 interface BuyerAddressListDisplayProps {
   addresses: ShopBuyerAddress[];
+  includePhone?: boolean;
 }
 
-function formatAddressLine(addr: ShopBuyerAddress): string {
-  return [addr.address, addr.recipientName, addr.phoneNumber]
+function formatAddressLine(addr: ShopBuyerAddress, includePhone: boolean): string {
+  const parts = includePhone
+    ? [addr.address, addr.recipientName, addr.phoneNumber]
+    : [addr.address, addr.recipientName];
+  return parts
     .map((part) => part.trim())
     .filter(Boolean)
     .join(' · ');
 }
 
-export function BuyerAddressListDisplay({ addresses }: BuyerAddressListDisplayProps) {
+export function BuyerAddressListDisplay({
+  addresses,
+  includePhone = true,
+}: BuyerAddressListDisplayProps) {
   if (addresses.length === 0) {
     return <span className="text-gray-400 text-sm">-</span>;
   }
@@ -19,7 +26,7 @@ export function BuyerAddressListDisplay({ addresses }: BuyerAddressListDisplayPr
   return (
     <div className="space-y-1.5 min-w-[280px]">
       {addresses.map((addr, index) => {
-        const line = formatAddressLine(addr);
+        const line = formatAddressLine(addr, includePhone);
         return (
           <div
             key={addr.id ?? `addr-${index}`}

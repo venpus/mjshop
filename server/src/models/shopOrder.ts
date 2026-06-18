@@ -77,6 +77,7 @@ export interface UpdateShopOrderLinePayload {
   productArrived?: boolean;
   taxInvoiceIssued?: boolean;
   vatExempt?: boolean;
+  shippingReady?: boolean;
 }
 
 export interface SyncShopOrderDetailDTO {

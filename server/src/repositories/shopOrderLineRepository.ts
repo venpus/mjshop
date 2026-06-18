@@ -43,6 +43,7 @@ interface ShopOrderLineRow extends RowDataPacket {
   product_arrived: number;
   tax_invoice_issued: number;
   vat_exempt: number;
+  shipping_ready: number;
   cny_exchange_rate: number | null;
   wk_settlement_paid: number;
   inventio_settlement_paid: number;
@@ -62,7 +63,7 @@ interface ShopOrderLineRow extends RowDataPacket {
 
 const LINE_SELECT = `id, line_order_number, shop_order_id, sort_order, is_reservation, company_name, order_box_count, quantity_per_box,
   sale_unit_price, delivery_fee, product_supply_amount, vat_amount, total_amount, address, recipient_name, phone_number,
-  tracking_number, statement_issued, payment_received, product_arrived, tax_invoice_issued, vat_exempt,
+  tracking_number, statement_issued, payment_received, product_arrived, tax_invoice_issued, vat_exempt, shipping_ready,
   cny_exchange_rate, wk_settlement_paid, inventio_settlement_paid, shipment_box_count,
   logistics_fee_paid,   logistics_fee_paid_at, wk_settlement_paid_at, inventio_settlement_paid_at,
   statement_file_path, statement_group_id, statement_issued_at, statement_delivered, payment_proof_image, created_at, updated_at`;
@@ -255,6 +256,10 @@ export class ShopOrderLineRepository {
     if (data.vatExempt !== undefined) {
       fields.push('vat_exempt = ?');
       values.push(data.vatExempt ? 1 : 0);
+    }
+    if (data.shippingReady !== undefined) {
+      fields.push('shipping_ready = ?');
+      values.push(data.shippingReady ? 1 : 0);
     }
     if (data.cnyExchangeRate !== undefined) {
       fields.push('cny_exchange_rate = ?');
@@ -478,6 +483,7 @@ export class ShopOrderLineRepository {
       productArrived: Boolean(row.product_arrived),
       taxInvoiceIssued: Boolean(row.tax_invoice_issued),
       vatExempt: Boolean(row.vat_exempt),
+      shippingReady: Boolean(row.shipping_ready),
       cnyExchangeRate:
         row.cny_exchange_rate != null ? Number(row.cny_exchange_rate) : null,
       wkSettlementPaid: Boolean(row.wk_settlement_paid),

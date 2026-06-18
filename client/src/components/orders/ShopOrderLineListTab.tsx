@@ -90,6 +90,7 @@ const FULFILLMENT_FILTER_OPTIONS: Array<{
   { key: 'notArrived', label: '미도착' },
   { key: 'noTaxInvoice', label: '세금계산서 미발행' },
   { key: 'noTracking', label: '송장 미등록' },
+  { key: 'shippingReady', label: '출고준비' },
 ];
 
 function ProgressFlags({ line }: { line: ShopOrderLine }) {
@@ -169,6 +170,7 @@ export function ShopOrderLineListTab({
   } | null>(null);
   const [deliveryFeeSavingRowKey, setDeliveryFeeSavingRowKey] = useState<string | null>(null);
   const [vatExemptSavingRowKey, setVatExemptSavingRowKey] = useState<string | null>(null);
+  const [shippingReadySavingRowKey, setShippingReadySavingRowKey] = useState<string | null>(null);
 
   const checkboxClass = accentCheckboxClass;
 
@@ -436,6 +438,25 @@ export function ShopOrderLineListTab({
       alert(err instanceof Error ? err.message : '부가세 없음 저장에 실패했습니다.');
     } finally {
       setVatExemptSavingRowKey(null);
+    }
+  };
+
+  const handleToggleShippingReady = async (row: ShopOrderLineListRow, enabled: boolean) => {
+    setShippingReadySavingRowKey(row.rowKey);
+    try {
+      await syncShopOrderDetail(row.shopOrderId, {
+        lines: [
+          {
+            id: row.line.id,
+            shippingReady: enabled,
+          },
+        ],
+      });
+      await onReload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '출고준비 저장에 실패했습니다.');
+    } finally {
+      setShippingReadySavingRowKey(null);
     }
   };
 
@@ -719,6 +740,7 @@ export function ShopOrderLineListTab({
                     </th>
                   )}
                   <th className="px-3 py-3 text-center text-gray-600 whitespace-nowrap">부가세없음</th>
+                  <th className="px-3 py-3 text-center text-gray-600 whitespace-nowrap">출고준비</th>
                   <th className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">총계</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">수령인</th>
                   <th className="px-4 py-3 text-left text-gray-600 whitespace-nowrap">배송</th>
@@ -854,6 +876,34 @@ export function ShopOrderLineListTab({
                             <span className="text-[10px] text-purple-700">적용</span>
                           ) : (
                             <span className="text-[10px] text-gray-400">미적용</span>
+                          )}
+                        </label>
+                      </td>
+                      <td className="px-3 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <label
+                          className={`inline-flex flex-col items-center gap-0.5 ${
+                            shippingReadySavingRowKey === row.rowKey
+                              ? 'cursor-wait opacity-60'
+                              : 'cursor-pointer'
+                          }`}
+                          title="출고준비 완료"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={line.shippingReady}
+                            disabled={shippingReadySavingRowKey === row.rowKey || bulkBusy}
+                            onChange={(event) =>
+                              void handleToggleShippingReady(row, event.target.checked)
+                            }
+                            className={checkboxClass}
+                            aria-label={`${formatLineOrderRef(row.line.lineOrderNumber, row.orderNumber, row.lineIndex, orderRefPrefix)} 출고준비`}
+                          />
+                          {shippingReadySavingRowKey === row.rowKey ? (
+                            <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
+                          ) : line.shippingReady ? (
+                            <span className="text-[10px] text-sky-700">완료</span>
+                          ) : (
+                            <span className="text-[10px] text-gray-400">대기</span>
                           )}
                         </label>
                       </td>

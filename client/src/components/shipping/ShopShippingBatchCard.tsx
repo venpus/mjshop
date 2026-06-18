@@ -19,7 +19,7 @@ interface ShopShippingBatchCardProps {
   deletingBatchId: string | null;
   onBatchFieldSave: (
     batchId: string,
-    field: 'shipmentBoxCount' | 'deliveryFee' | 'boxPrice',
+    field: 'deliveryFee' | 'boxPrice',
     rawValue: string,
     current: ShopShipmentBatchListItem
   ) => void;
@@ -43,8 +43,9 @@ export function ShopShippingBatchCard({
   const isSaving = savingBatchId === batch.batchId;
   const isDeleting = deletingBatchId === batch.batchId;
   const isLogisticsSaving = logisticsFeePaidSavingBatchId === batch.batchId;
+  const shipmentBoxCount = batch.shipments.length;
   const logisticsFee = calculateBatchLogisticsFee(
-    batch.shipmentBoxCount,
+    shipmentBoxCount,
     batch.deliveryFee,
     batch.boxPrice
   );
@@ -95,15 +96,12 @@ export function ShopShippingBatchCard({
       <div className="px-2 py-1 grid grid-cols-3 gap-1 border-b border-gray-100 bg-gray-50/60">
         <label className="block min-w-0">
           <span className="block text-[9px] text-gray-500 mb-0.5">박스수</span>
-          <input
-            type="number"
-            min={0}
-            defaultValue={batch.shipmentBoxCount ?? ''}
-            key={`${batch.batchId}-box-${batch.shipmentBoxCount ?? ''}`}
-            disabled={isSaving || isDeleting}
-            onBlur={(e) => onBatchFieldSave(batch.batchId, 'shipmentBoxCount', e.target.value, batch)}
-            className="w-full min-w-0 px-1 py-0.5 text-[11px] text-right border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 bg-white"
-          />
+          <div
+            className="w-full min-w-0 px-1 py-0.5 text-[11px] text-right border border-gray-200 rounded bg-gray-50 text-gray-900 tabular-nums"
+            title="송장 수에 따라 자동 설정됩니다"
+          >
+            {shipmentBoxCount > 0 ? shipmentBoxCount : '-'}
+          </div>
         </label>
         <label className="block min-w-0">
           <span className="block text-[9px] text-gray-500 mb-0.5">택배비</span>

@@ -9,6 +9,7 @@ export interface ShopOrderLineFulfillmentFilters {
   notArrived: boolean;
   noTaxInvoice: boolean;
   noTracking: boolean;
+  shippingReady: boolean;
 }
 
 export const EMPTY_LINE_FULFILLMENT_FILTERS: ShopOrderLineFulfillmentFilters = {
@@ -17,6 +18,7 @@ export const EMPTY_LINE_FULFILLMENT_FILTERS: ShopOrderLineFulfillmentFilters = {
   notArrived: false,
   noTaxInvoice: false,
   noTracking: false,
+  shippingReady: false,
 };
 
 export function lineHasStatement(line: ShopOrderLine): boolean {
@@ -105,6 +107,7 @@ export function matchesLineFulfillmentFilters(
   if (filters.notArrived && line.productArrived) return false;
   if (filters.noTaxInvoice && line.taxInvoiceIssued) return false;
   if (filters.noTracking && lineHasTracking(line)) return false;
+  if (filters.shippingReady && !line.shippingReady) return false;
 
   return true;
 }

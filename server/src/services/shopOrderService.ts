@@ -354,6 +354,7 @@ export class ShopOrderService {
           productArrived: linePayload.productArrived,
           taxInvoiceIssued: linePayload.taxInvoiceIssued,
           vatExempt,
+          shippingReady: linePayload.shippingReady,
         });
       }
 

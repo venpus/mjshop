@@ -297,20 +297,21 @@ export class ShopShipmentRepository {
     return batchRows.map((batch) => {
       const delivery = deliveryByBatch.get(batch.id);
       const costs = costsByBatch.get(batch.id);
+      const shipments = shipmentsByBatch.get(batch.id) ?? [];
       return {
         batchId: batch.id,
         shipmentDate: normalizeDateOnly(batch.shipment_date),
         recipientName: delivery?.recipientName ?? null,
         phoneNumber: delivery?.phoneNumber ?? null,
         address: delivery?.address ?? null,
-        shipmentBoxCount: costs?.shipmentBoxCount ?? null,
+        shipmentBoxCount: shipments.length > 0 ? shipments.length : costs?.shipmentBoxCount ?? null,
         deliveryFee: costs?.deliveryFee ?? null,
         boxPrice: costs?.boxPrice ?? null,
         logisticsFeePaid: Boolean(batch.logistics_fee_paid),
         logisticsFeePaidAt: batch.logistics_fee_paid_at
           ? batch.logistics_fee_paid_at.toISOString()
           : null,
-        shipments: shipmentsByBatch.get(batch.id) ?? [],
+        shipments,
         lineItems: linesByBatch.get(batch.id) ?? [],
       };
     });
@@ -385,7 +386,7 @@ export class ShopShipmentRepository {
         .filter(Boolean);
       const trackingNumberLabel = trackingNumbers.join(', ').slice(0, 255);
 
-      const batchBoxCount = data.shipments[0]?.shipmentBoxCount ?? null;
+      const batchBoxCount = data.shipments.length;
       const batchDeliveryFee = data.shipments[0]?.deliveryFee ?? null;
       const batchBoxPrice = data.shipments[0]?.boxPrice ?? null;
 

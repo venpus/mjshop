@@ -15,6 +15,26 @@ import { BuyerFormModal } from './BuyerFormModal';
 import { BuyerAddressListDisplay } from './BuyerAddressListDisplay';
 import type { ShopBuyer, ShopBuyerFormData, ShopBuyerImageOptions, ShopBuyerListItem } from './types';
 
+function BuyerPhoneListDisplay({ addresses }: { addresses: ShopBuyerListItem['addresses'] }) {
+  const phoneNumbers = addresses
+    .map((address) => address.phoneNumber.trim())
+    .filter(Boolean);
+
+  if (phoneNumbers.length === 0) {
+    return <span className="text-gray-400">-</span>;
+  }
+
+  return (
+    <div className="space-y-1">
+      {phoneNumbers.map((phoneNumber, index) => (
+        <div key={`${phoneNumber}-${index}`} className="text-gray-600 whitespace-nowrap">
+          {phoneNumber}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function BuyerRegistrationPage() {
   const [buyers, setBuyers] = useState<ShopBuyerListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -185,6 +205,7 @@ export function BuyerRegistrationPage() {
                   <th className="px-6 py-3 text-left text-gray-600">상호명</th>
                   <th className="px-6 py-3 text-left text-gray-600">카톡 아이디</th>
                   <th className="px-6 py-3 text-left text-gray-600">이메일</th>
+                  <th className="px-6 py-3 text-left text-gray-600 whitespace-nowrap">전화번호</th>
                   <th className="px-6 py-3 text-left text-gray-600">사업자등록증</th>
                   <th className="px-6 py-3 text-left text-gray-600 min-w-[320px]">택배 주소지</th>
                   <th className="px-6 py-3 text-left text-gray-600">관리</th>
@@ -196,6 +217,9 @@ export function BuyerRegistrationPage() {
                     <td className="px-6 py-4 text-gray-900 font-medium">{buyer.companyName}</td>
                     <td className="px-6 py-4 text-gray-600">{buyer.kakaoId || '-'}</td>
                     <td className="px-6 py-4 text-gray-600">{buyer.email || '-'}</td>
+                    <td className="px-6 py-4 align-top">
+                      <BuyerPhoneListDisplay addresses={buyer.addresses} />
+                    </td>
                     <td className="px-6 py-4 text-gray-600">
                       <div className="space-y-1">
                         <div>{buyer.businessRegistrationNumber || '-'}</div>
@@ -207,7 +231,7 @@ export function BuyerRegistrationPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 align-top">
-                      <BuyerAddressListDisplay addresses={buyer.addresses} />
+                      <BuyerAddressListDisplay addresses={buyer.addresses} includePhone={false} />
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">

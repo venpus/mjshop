@@ -175,18 +175,25 @@ export function ShopShipmentAddModal({
         const [shopOrderId, lineId] = key.split(':');
         return { shopOrderId, lineId };
       });
-      const rows = lineItems
-        .map((item) =>
-          allLineRows.find((row) => row.shopOrderId === item.shopOrderId && row.line.id === item.lineId)
-        )
-        .filter(Boolean) as ShopOrderLineListRow[];
-      const shipmentBoxCount = rows.reduce((sum, row) => sum + row.line.orderBoxCount, 0);
+
+      const validShipments = trackingNumbers
+        .map((tracking) => ({
+          trackingNumber: tracking.trackingNumber.replace(/\D/g, '').slice(0, 32),
+          lineItems,
+        }))
+        .filter((shipment) => shipment.trackingNumber.length > 0);
+
+      if (validShipments.length === 0) {
+        alert('송장번호를 입력해 주세요.');
+        return;
+      }
+
+      const shipmentBoxCount = validShipments.length;
 
       const payload = {
         shipmentDate,
-        shipments: trackingNumbers.map((tracking) => ({
-          trackingNumber: tracking.trackingNumber,
-          lineItems,
+        shipments: validShipments.map((shipment) => ({
+          ...shipment,
           shipmentBoxCount,
         })),
       };

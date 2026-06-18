@@ -301,6 +301,7 @@ export class ShopOrderRepository {
       productArrived: order.productArrived,
       taxInvoiceIssued: false,
       vatExempt: false,
+      shippingReady: false,
       cnyExchangeRate: null,
       wkSettlementPaid: false,
       inventioSettlementPaid: false,

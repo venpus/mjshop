@@ -141,7 +141,7 @@ export function ShopShippingManagementPage() {
 
   const handleBatchFieldSave = async (
     batchId: string,
-    field: 'shipmentBoxCount' | 'deliveryFee' | 'boxPrice',
+    field: 'deliveryFee' | 'boxPrice',
     rawValue: string,
     current: ShopShipmentBatchListItem
   ) => {
