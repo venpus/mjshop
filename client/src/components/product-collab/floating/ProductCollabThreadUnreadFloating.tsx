@@ -35,13 +35,10 @@ export function ProductCollabThreadUnreadFloating() {
       style={drag.positionStyle}
       onClick={handleClick}
       onPointerDown={drag.onPointerDown}
-      onPointerMove={drag.onPointerMove}
-      onPointerUp={drag.onPointerUp}
-      onPointerCancel={drag.onPointerCancel}
       aria-disabled={total <= 0}
       className={`fixed z-30 flex select-none touch-none items-center gap-2 rounded-full border border-[#C7D2FE] bg-white px-3 py-2 shadow-lg shadow-indigo-900/10 ${
         drag.positionClass
-      } ${total > 0 ? 'cursor-grab active:cursor-grabbing hover:bg-[#EEF2FF]' : 'cursor-default opacity-80'}`}
+      } ${total > 0 ? 'cursor-pointer hover:bg-[#EEF2FF]' : 'cursor-default opacity-80'}`}
       aria-label={`${t('productCollab.threadUnreadFloatingAria')}: ${total}`}
       title={t('productCollab.threadUnreadFloatingTitle')}
     >

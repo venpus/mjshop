@@ -54,6 +54,7 @@ import {
   calculateRemainingStock,
   calculateTotalOrderQuantity,
 } from '../../utils/shopOrderCalculations';
+import { notifyStatementReissueAfterFormSave } from '../../utils/shopOrderStatementReissueNotice';
 import { shopOrderDetailPath, parseShopOrderListTab } from './shopOrderListNavigation';
 
 
@@ -81,6 +82,14 @@ interface ShopOrderFormState {
   status: ShopOrder['status'];
 
   orderDate: string;
+
+  chinaInboundDate: string;
+
+  chinaOutboundDate: string;
+
+  koreaArrivalDate: string;
+
+  actualArrivalDate: string;
 
   quantityPerBox: number;
 
@@ -155,6 +164,14 @@ function toFormState(order: ShopOrder): ShopOrderFormState {
 
     orderDate: order.orderDate ?? '',
 
+    chinaInboundDate: order.chinaInboundDate ?? '',
+
+    chinaOutboundDate: order.chinaOutboundDate ?? '',
+
+    koreaArrivalDate: order.koreaArrivalDate ?? '',
+
+    actualArrivalDate: order.actualArrivalDate ?? '',
+
     quantityPerBox: order.quantityPerBox,
 
     lines: order.lines.map((line) => lineToForm(line, order.quantityPerBox)),
@@ -176,6 +193,14 @@ function buildSyncPayload(form: ShopOrderFormState) {
     warehouseStockQuantity: form.warehouseStockQuantity,
 
     unitPrice: form.unitPrice,
+
+    chinaInboundDate: form.chinaInboundDate.trim() || null,
+
+    chinaOutboundDate: form.chinaOutboundDate.trim() || null,
+
+    koreaArrivalDate: form.koreaArrivalDate.trim() || null,
+
+    actualArrivalDate: form.actualArrivalDate.trim() || null,
 
     lines: form.lines.map((line) => ({
 
@@ -431,7 +456,10 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
   const handleSave = useCallback(async () => {
 
-    if (!form || !order || isSaving) return;
+    if (!form || !order || isSaving || !originalForm) return;
+
+    const snapshotBeforeSave = originalForm;
+    const snapshotAfterSave = form;
 
     setIsSaving(true);
 
@@ -443,6 +471,13 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
       setLastSavedAt(new Date());
 
+      notifyStatementReissueAfterFormSave(
+        snapshotBeforeSave.lines,
+        snapshotAfterSave.lines,
+        snapshotBeforeSave.quantityPerBox,
+        snapshotAfterSave.quantityPerBox
+      );
+
     } catch (err) {
 
       console.error('주문 자동 저장 오류:', err);
@@ -453,7 +488,7 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
     }
 
-  }, [form, order, isSaving, syncOrderState]);
+  }, [form, order, originalForm, isSaving, syncOrderState]);
 
 
 
@@ -499,6 +534,13 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
   const handleUnitPriceChange = (value: number | null) => {
     setForm((prev) => (prev ? { ...prev, unitPrice: value } : prev));
+  };
+
+  const handleLogisticsDateChange = (
+    key: 'chinaInboundDate' | 'chinaOutboundDate' | 'koreaArrivalDate' | 'actualArrivalDate',
+    value: string
+  ) => {
+    setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
   const handleLineChange = <K extends keyof ShopOrderLineForm>(
@@ -563,9 +605,12 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
   const handleSaveIfNeeded = useCallback(async () => {
 
-    if (!form || !order || isSaving) return;
+    if (!form || !order || isSaving || !originalForm) return;
 
     if (JSON.stringify(form) === JSON.stringify(originalForm)) return;
+
+    const snapshotBeforeSave = originalForm;
+    const snapshotAfterSave = form;
 
     setIsSaving(true);
 
@@ -576,6 +621,13 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
       syncOrderState(updated);
 
       setLastSavedAt(new Date());
+
+      notifyStatementReissueAfterFormSave(
+        snapshotBeforeSave.lines,
+        snapshotAfterSave.lines,
+        snapshotBeforeSave.quantityPerBox,
+        snapshotAfterSave.quantityPerBox
+      );
 
     } finally {
 
@@ -889,6 +941,20 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
         orderDate={form.orderDate}
 
+        chinaInboundDate={form.chinaInboundDate}
+
+        chinaOutboundDate={form.chinaOutboundDate}
+
+        koreaArrivalDate={form.koreaArrivalDate}
+
+        actualArrivalDate={form.actualArrivalDate}
+
+        purchaseOrderProductSize={order.purchaseOrderProductSize}
+
+        purchaseOrderProductWeight={order.purchaseOrderProductWeight}
+
+        purchaseOrderProductPackagingSize={order.purchaseOrderProductPackagingSize}
+
         status={form.status}
 
         purchaseOrderId={order.purchaseOrderId}
@@ -912,6 +978,8 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
         onSellingPriceChange={handleSellingPriceChange}
 
         onQuantityPerBoxChange={handleQuantityPerBoxChange}
+
+        onLogisticsDateChange={handleLogisticsDateChange}
 
       />
 

@@ -5,6 +5,12 @@ import { handleNumberInputWheel } from '../../utils/preventNumberInputWheel';
 import type { ShopOrderStatus } from '../../api/shopOrderApi';
 import { getShopOrderStatusClass } from '../../api/shopOrderApi';
 
+export type ShopOrderLogisticsDateField =
+  | 'chinaInboundDate'
+  | 'chinaOutboundDate'
+  | 'koreaArrivalDate'
+  | 'actualArrivalDate';
+
 interface ShopOrderProductSectionProps {
   productName: string;
   orderNumber: string;
@@ -16,6 +22,13 @@ interface ShopOrderProductSectionProps {
   quantityPerBox: number;
   unitPrice: number | null;
   orderDate: string;
+  chinaInboundDate: string;
+  chinaOutboundDate: string;
+  koreaArrivalDate: string;
+  actualArrivalDate: string;
+  purchaseOrderProductSize: string | null;
+  purchaseOrderProductWeight: string | null;
+  purchaseOrderProductPackagingSize: string | null;
   status: ShopOrderStatus;
   purchaseOrderId?: string | null;
   onImageClick?: () => void;
@@ -24,10 +37,29 @@ interface ShopOrderProductSectionProps {
   onUnitPriceChange?: (value: number | null) => void;
   onSellingPriceChange?: (value: number | null) => void;
   onQuantityPerBoxChange?: (value: number) => void;
+  onLogisticsDateChange?: (field: ShopOrderLogisticsDateField, value: string) => void;
 }
 
 const inputClass =
   'w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-right';
+
+const dateInputClass =
+  'w-full px-1.5 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500';
+
+function formatWeightDisplay(value: string | null | undefined): string {
+  if (!value?.trim()) return '-';
+  const trimmed = value.trim();
+  if (/g|kg/i.test(trimmed)) return trimmed;
+  return `${trimmed}g`;
+}
+
+function ReadOnlyValue({ value }: { value: string }) {
+  return (
+    <span className="text-sm text-gray-900 truncate block" title={value}>
+      {value}
+    </span>
+  );
+}
 
 function InfoField({
   label,
@@ -57,6 +89,13 @@ export function ShopOrderProductSection({
   quantityPerBox,
   unitPrice,
   orderDate,
+  chinaInboundDate,
+  chinaOutboundDate,
+  koreaArrivalDate,
+  actualArrivalDate,
+  purchaseOrderProductSize,
+  purchaseOrderProductWeight,
+  purchaseOrderProductPackagingSize,
   status,
   purchaseOrderId,
   onImageClick,
@@ -65,6 +104,7 @@ export function ShopOrderProductSection({
   onUnitPriceChange,
   onSellingPriceChange,
   onQuantityPerBoxChange,
+  onLogisticsDateChange,
 }: ShopOrderProductSectionProps) {
   const imageUrl = useMemo(() => {
     if (!productImage) return '';
@@ -205,6 +245,56 @@ export function ShopOrderProductSection({
               >
                 {status}
               </span>
+            </InfoField>
+          </div>
+
+          <div className="flex flex-nowrap items-end gap-x-2 gap-y-2 min-w-max mt-2 pt-2 border-t border-gray-100">
+            <InfoField label="사이즈" className="w-[64px]">
+              <ReadOnlyValue value={purchaseOrderProductSize?.trim() || '-'} />
+            </InfoField>
+
+            <InfoField label="무게" className="w-[64px]">
+              <ReadOnlyValue value={formatWeightDisplay(purchaseOrderProductWeight)} />
+            </InfoField>
+
+            <InfoField label="박스" className="w-[80px]">
+              <ReadOnlyValue value={purchaseOrderProductPackagingSize?.trim() || '-'} />
+            </InfoField>
+
+            <InfoField label="중국입고" className="w-[118px]">
+              <input
+                type="date"
+                value={chinaInboundDate}
+                onChange={(e) => onLogisticsDateChange?.('chinaInboundDate', e.target.value)}
+                className={dateInputClass}
+              />
+            </InfoField>
+
+            <InfoField label="중국출고" className="w-[118px]">
+              <input
+                type="date"
+                value={chinaOutboundDate}
+                onChange={(e) => onLogisticsDateChange?.('chinaOutboundDate', e.target.value)}
+                className={dateInputClass}
+              />
+            </InfoField>
+
+            <InfoField label="한국도착(예상)" className="w-[118px]">
+              <input
+                type="date"
+                value={koreaArrivalDate}
+                onChange={(e) => onLogisticsDateChange?.('koreaArrivalDate', e.target.value)}
+                className={dateInputClass}
+              />
+            </InfoField>
+
+            <InfoField label="한국도착(실제)" className="w-[118px]">
+              <input
+                type="date"
+                value={actualArrivalDate}
+                onChange={(e) => onLogisticsDateChange?.('actualArrivalDate', e.target.value)}
+                className={dateInputClass}
+              />
             </InfoField>
           </div>
         </div>

@@ -290,6 +290,23 @@ export class ShopOrderService {
       }
     }
 
+    const dateUpdates: Partial<UpdateShopOrderDTO> = {};
+    if (data.chinaInboundDate !== undefined) {
+      dateUpdates.chinaInboundDate = data.chinaInboundDate;
+    }
+    if (data.chinaOutboundDate !== undefined) {
+      dateUpdates.chinaOutboundDate = data.chinaOutboundDate;
+    }
+    if (data.koreaArrivalDate !== undefined) {
+      dateUpdates.koreaArrivalDate = data.koreaArrivalDate;
+    }
+    if (data.actualArrivalDate !== undefined) {
+      dateUpdates.actualArrivalDate = data.actualArrivalDate;
+    }
+    if (Object.keys(dateUpdates).length > 0) {
+      await this.repository.update(id, dateUpdates);
+    }
+
     if (data.lines) {
       for (const linePayload of data.lines) {
         const line = existing.lines.find((item) => item.id === linePayload.id);

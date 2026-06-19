@@ -23,6 +23,10 @@ interface ShopOrderRow extends RowDataPacket {
   selling_price: number | null;
   status: ShopOrderStatus;
   order_date: string | Date | null;
+  china_inbound_date: string | Date | null;
+  china_outbound_date: string | Date | null;
+  korea_arrival_date: string | Date | null;
+  actual_arrival_date: string | Date | null;
   note: string | null;
   company_name: string | null;
   order_box_count: number;
@@ -72,7 +76,9 @@ function normalizeOrderDate(value: string | Date | null | undefined): string | n
 
 const SHOP_ORDER_SELECT = `id, order_number, stock_inbound_item_id, purchase_order_id, product_id,
               product_name, product_main_image, unit_price, quantity, stock_quantity,
-              warehouse_stock_quantity, selling_price, status, order_date, note,
+              warehouse_stock_quantity, selling_price, status, order_date,
+              china_inbound_date, china_outbound_date, korea_arrival_date, actual_arrival_date,
+              note,
               company_name, order_box_count, quantity_per_box, sale_unit_price,
               delivery_fee, total_amount, address, recipient_name, phone_number,
               tracking_number, statement_issued, payment_received, product_arrived,
@@ -100,7 +106,7 @@ export class ShopOrderRepository {
       [id]
     );
     if (rows.length === 0) return null;
-    const order = this.mapRow(rows[0]);
+    const order = await this.attachPurchaseOrderProductInfo(this.mapRow(rows[0]));
     order.lines = await this.lineRepository.findByShopOrderId(id);
     order.lineCount = order.lines.length;
     return order;
@@ -114,7 +120,7 @@ export class ShopOrderRepository {
       [stockInboundItemId]
     );
     if (rows.length === 0) return null;
-    const order = this.mapRow(rows[0]);
+    const order = await this.attachPurchaseOrderProductInfo(this.mapRow(rows[0]));
     order.lines = await this.lineRepository.findByShopOrderId(order.id);
     order.lineCount = order.lines.length;
     return order;
@@ -201,6 +207,22 @@ export class ShopOrderRepository {
     if (data.orderDate !== undefined) {
       fields.push('order_date = ?');
       values.push(data.orderDate);
+    }
+    if (data.chinaInboundDate !== undefined) {
+      fields.push('china_inbound_date = ?');
+      values.push(data.chinaInboundDate);
+    }
+    if (data.chinaOutboundDate !== undefined) {
+      fields.push('china_outbound_date = ?');
+      values.push(data.chinaOutboundDate);
+    }
+    if (data.koreaArrivalDate !== undefined) {
+      fields.push('korea_arrival_date = ?');
+      values.push(data.koreaArrivalDate);
+    }
+    if (data.actualArrivalDate !== undefined) {
+      fields.push('actual_arrival_date = ?');
+      values.push(data.actualArrivalDate);
     }
     if (data.note !== undefined) {
       fields.push('note = ?');
@@ -380,8 +402,15 @@ export class ShopOrderRepository {
       sellingPrice: row.selling_price != null ? Number(row.selling_price) : null,
       status: row.status,
       orderDate: normalizeOrderDate(row.order_date),
+      chinaInboundDate: normalizeOrderDate(row.china_inbound_date),
+      chinaOutboundDate: normalizeOrderDate(row.china_outbound_date),
+      koreaArrivalDate: normalizeOrderDate(row.korea_arrival_date),
+      actualArrivalDate: normalizeOrderDate(row.actual_arrival_date),
       note: row.note,
       quantityPerBox: Number(row.quantity_per_box) || 0,
+      purchaseOrderProductSize: null,
+      purchaseOrderProductWeight: null,
+      purchaseOrderProductPackagingSize: null,
       companyName: row.company_name,
       orderBoxCount: Number(row.order_box_count) || 0,
       saleUnitPrice: row.sale_unit_price != null ? Number(row.sale_unit_price) : null,
@@ -403,6 +432,34 @@ export class ShopOrderRepository {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       createdBy: row.created_by,
+    };
+  }
+
+  private async attachPurchaseOrderProductInfo(order: ShopOrder): Promise<ShopOrder> {
+    if (!order.purchaseOrderId) {
+      return order;
+    }
+
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT product_size, product_weight, product_packaging_size
+       FROM purchase_orders
+       WHERE id = ?`,
+      [order.purchaseOrderId]
+    );
+
+    if (rows.length === 0) {
+      return order;
+    }
+
+    const row = rows[0];
+    return {
+      ...order,
+      purchaseOrderProductSize:
+        row.product_size != null ? String(row.product_size) : null,
+      purchaseOrderProductWeight:
+        row.product_weight != null ? String(row.product_weight) : null,
+      purchaseOrderProductPackagingSize:
+        row.product_packaging_size != null ? String(row.product_packaging_size) : null,
     };
   }
 }

@@ -15,6 +15,12 @@ function setAttachmentFilename(res: Response, fileName: string): void {
   );
 }
 
+function parseOptionalDateField(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value == null || value === '') return null;
+  return String(value).slice(0, 10);
+}
+
 export class ShopOrderController {
   private service: ShopOrderService;
 
@@ -130,6 +136,10 @@ export class ShopOrderController {
             : undefined,
         unitPrice:
           req.body.unitPrice != null ? Number(req.body.unitPrice) : req.body.unitPrice,
+        chinaInboundDate: parseOptionalDateField(req.body.chinaInboundDate),
+        chinaOutboundDate: parseOptionalDateField(req.body.chinaOutboundDate),
+        koreaArrivalDate: parseOptionalDateField(req.body.koreaArrivalDate),
+        actualArrivalDate: parseOptionalDateField(req.body.actualArrivalDate),
         lines: Array.isArray(req.body.lines)
           ? req.body.lines.map((line: Record<string, unknown>) => ({
               id: String(line.id),

@@ -76,6 +76,10 @@ import {
   lineHasDefaultDeliveryFee,
   SHOP_ORDER_DEFAULT_DELIVERY_FEE,
 } from '../../utils/shopOrderCalculations';
+import {
+  shouldNotifyStatementReissueForLineSync,
+  showStatementReissueNotice,
+} from '../../utils/shopOrderStatementReissueNotice';
 
 import type { ShopOrderListTab } from './ShopOrderListTabs';
 
@@ -456,17 +460,25 @@ export function ShopOrderLineListTab({
   };
 
   const handleToggleDeliveryFee = async (row: ShopOrderLineListRow, enabled: boolean) => {
+    const nextDeliveryFee = enabled ? SHOP_ORDER_DEFAULT_DELIVERY_FEE : null;
+    const shouldNotify = shouldNotifyStatementReissueForLineSync(row.line, {
+      deliveryFee: nextDeliveryFee,
+    });
+
     setDeliveryFeeSavingRowKey(row.rowKey);
     try {
       await syncShopOrderDetail(row.shopOrderId, {
         lines: [
           {
             id: row.line.id,
-            deliveryFee: enabled ? SHOP_ORDER_DEFAULT_DELIVERY_FEE : null,
+            deliveryFee: nextDeliveryFee,
           },
         ],
       });
       await onReload();
+      if (shouldNotify) {
+        showStatementReissueNotice(1);
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : '배송비 저장에 실패했습니다.');
     } finally {
@@ -475,6 +487,10 @@ export function ShopOrderLineListTab({
   };
 
   const handleToggleVatExempt = async (row: ShopOrderLineListRow, enabled: boolean) => {
+    const shouldNotify = shouldNotifyStatementReissueForLineSync(row.line, {
+      vatExempt: enabled,
+    });
+
     setVatExemptSavingRowKey(row.rowKey);
     try {
       await syncShopOrderDetail(row.shopOrderId, {
@@ -486,6 +502,9 @@ export function ShopOrderLineListTab({
         ],
       });
       await onReload();
+      if (shouldNotify) {
+        showStatementReissueNotice(1);
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : '부가세 없음 저장에 실패했습니다.');
     } finally {

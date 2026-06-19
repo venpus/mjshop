@@ -17,8 +17,16 @@ export interface ShopOrder {
   sellingPrice: number | null;
   status: ShopOrderStatus;
   orderDate: string | null;
+  chinaInboundDate: string | null;
+  chinaOutboundDate: string | null;
+  koreaArrivalDate: string | null;
+  actualArrivalDate: string | null;
   note: string | null;
   quantityPerBox: number;
+  /** 연결 발주(purchase_orders) 제품 정보 — 조회 전용 */
+  purchaseOrderProductSize: string | null;
+  purchaseOrderProductWeight: string | null;
+  purchaseOrderProductPackagingSize: string | null;
   /** @deprecated 주문 라인(kr_shop_order_lines)으로 이전됨. 목록 호환용 */
   companyName: string | null;
   orderBoxCount: number;
@@ -58,6 +66,10 @@ export interface UpdateShopOrderDTO {
   sellingPrice?: number | null;
   status?: ShopOrderStatus;
   orderDate?: string | null;
+  chinaInboundDate?: string | null;
+  chinaOutboundDate?: string | null;
+  koreaArrivalDate?: string | null;
+  actualArrivalDate?: string | null;
   note?: string | null;
   quantityPerBox?: number;
   updatedBy?: string;
@@ -85,5 +97,9 @@ export interface SyncShopOrderDetailDTO {
   quantityPerBox?: number;
   warehouseStockQuantity?: number;
   unitPrice?: number | null;
+  chinaInboundDate?: string | null;
+  chinaOutboundDate?: string | null;
+  koreaArrivalDate?: string | null;
+  actualArrivalDate?: string | null;
   lines?: UpdateShopOrderLinePayload[];
 }

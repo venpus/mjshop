@@ -56,6 +56,8 @@ import { useLanguage, Language } from './contexts/LanguageContext';
 import { PackingListUnsavedProvider, usePackingListUnsaved } from './contexts/PackingListUnsavedContext';
 import { ProductCollabThreadUnreadProvider } from './contexts/ProductCollabThreadUnreadContext';
 import { ProductCollabThreadUnreadFloating } from './components/product-collab/floating/ProductCollabThreadUnreadFloating';
+import { ShopManagementToolsFloating } from './components/shop-tools/ShopManagementToolsFloating';
+import { isShopManagementPath } from './utils/isShopManagementPath';
 import { useForceMobileLayout } from './hooks/useForceMobileLayout';
 import { useDocumentTitle } from './hooks/useDocumentTitle';
 
@@ -142,6 +144,9 @@ function AdminLayout() {
 
   const useMobileLayout = useForceMobileLayout();
   const collabThreadUnreadEnabled = user?.level === 'A-SuperAdmin';
+  const shopToolsEnabled =
+    (user?.level === 'A-SuperAdmin' || user?.level === 'C0: 한국Admin') &&
+    isShopManagementPath(location.pathname);
 
   // 경로가 변경될 때 패킹리스트 또는 발주관리면 사이드바 접기, 아니면 펼치기
   useEffect(() => {
@@ -486,6 +491,7 @@ function AdminLayout() {
         </div>
       </main>
       {collabThreadUnreadEnabled ? <ProductCollabThreadUnreadFloating /> : null}
+      {shopToolsEnabled ? <ShopManagementToolsFloating /> : null}
     </div>
     </ProductCollabThreadUnreadProvider>
   );

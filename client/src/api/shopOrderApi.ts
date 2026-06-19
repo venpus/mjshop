@@ -60,8 +60,15 @@ export interface ShopOrder {
   sellingPrice: number | null;
   status: ShopOrderStatus;
   orderDate: string | null;
+  chinaInboundDate: string | null;
+  chinaOutboundDate: string | null;
+  koreaArrivalDate: string | null;
+  actualArrivalDate: string | null;
   note: string | null;
   quantityPerBox: number;
+  purchaseOrderProductSize: string | null;
+  purchaseOrderProductWeight: string | null;
+  purchaseOrderProductPackagingSize: string | null;
   lines: ShopOrderLine[];
   lineCount: number;
   totalSalesAmount: number;
@@ -145,8 +152,24 @@ function mapShopOrder(raw: Record<string, unknown>): ShopOrder {
     sellingPrice: raw.sellingPrice != null ? Number(raw.sellingPrice) : null,
     status: raw.status as ShopOrderStatus,
     orderDate: raw.orderDate != null ? String(raw.orderDate).split('T')[0] : null,
+    chinaInboundDate:
+      raw.chinaInboundDate != null ? String(raw.chinaInboundDate).split('T')[0] : null,
+    chinaOutboundDate:
+      raw.chinaOutboundDate != null ? String(raw.chinaOutboundDate).split('T')[0] : null,
+    koreaArrivalDate:
+      raw.koreaArrivalDate != null ? String(raw.koreaArrivalDate).split('T')[0] : null,
+    actualArrivalDate:
+      raw.actualArrivalDate != null ? String(raw.actualArrivalDate).split('T')[0] : null,
     note: raw.note != null ? String(raw.note) : null,
     quantityPerBox: Number(raw.quantityPerBox) || 0,
+    purchaseOrderProductSize:
+      raw.purchaseOrderProductSize != null ? String(raw.purchaseOrderProductSize) : null,
+    purchaseOrderProductWeight:
+      raw.purchaseOrderProductWeight != null ? String(raw.purchaseOrderProductWeight) : null,
+    purchaseOrderProductPackagingSize:
+      raw.purchaseOrderProductPackagingSize != null
+        ? String(raw.purchaseOrderProductPackagingSize)
+        : null,
     lines,
     lineCount: lines.length > 0 ? lines.length : Number(raw.lineCount) || 0,
     totalSalesAmount:
@@ -167,6 +190,10 @@ export interface SyncShopOrderDetailPayload {
   quantityPerBox?: number;
   warehouseStockQuantity?: number;
   unitPrice?: number | null;
+  chinaInboundDate?: string | null;
+  chinaOutboundDate?: string | null;
+  koreaArrivalDate?: string | null;
+  actualArrivalDate?: string | null;
   lines?: Array<{
     id: string;
     companyName?: string | null;
