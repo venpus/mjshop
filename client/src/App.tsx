@@ -56,6 +56,7 @@ import { PackingListUnsavedProvider, usePackingListUnsaved } from './contexts/Pa
 import { ProductCollabThreadUnreadProvider } from './contexts/ProductCollabThreadUnreadContext';
 import { ProductCollabThreadUnreadFloating } from './components/product-collab/floating/ProductCollabThreadUnreadFloating';
 import { useForceMobileLayout } from './hooks/useForceMobileLayout';
+import { useDocumentTitle } from './hooks/useDocumentTitle';
 
 /** 권한 체크 래퍼 — 반드시 모듈 레벨에 두어 매 렌더마다 새 참조가 되지 않게 함. 그렇지 않으면 Route 자식(ShippingHistory 등)이 매번 리마운트되어 state가 초기화됨. */
 function PermissionCheckWrapper({
@@ -135,6 +136,8 @@ function AdminLayout() {
 
   const currentPage = getCurrentPage();
   const { hasUnsavedChanges: packingListHasUnsaved } = usePackingListUnsaved();
+
+  useDocumentTitle(location.pathname, location.search);
 
   const useMobileLayout = useForceMobileLayout();
   const collabThreadUnreadEnabled = user?.level === 'A-SuperAdmin';
@@ -625,10 +628,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppContent() {
   const { isAuthenticated, isLoading, login } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const location = useLocation();
+
+  useEffect(() => {
+    if (location.pathname === '/login') {
+      document.title = `${t('login.title')} | ${t('menu.adminTitle')}`;
+    }
+  }, [location.pathname, t, language]);
 
   const handleLogin = async (
     id: string,

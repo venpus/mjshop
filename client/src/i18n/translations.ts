@@ -56,6 +56,19 @@ export const translations: Record<Language, Record<string, string>> = {
     'menu.schedule': '일정관리',
     'menu.sweetTrackerTest': '택배 조회',
 
+    'pageTitle.orderDetail': '주문 상세',
+    'pageTitle.orderLinesTab': '주문 건별 관리',
+    'pageTitle.orderReservationsTab': '예약 건 관리',
+    'pageTitle.purchaseOrderDetail': '발주 상세',
+    'pageTitle.stockDetail': '재고 상세',
+    'pageTitle.materialDetail': '악세사리 상세',
+    'pageTitle.projectDetail': '프로젝트 상세',
+    'pageTitle.manufacturingDetail': '제조 상세',
+    'pageTitle.manufacturingNew': '제조 등록',
+    'pageTitle.manufacturingPurchaseOrder': '제조 발주',
+    'pageTitle.thread': '스레드',
+    'pageTitle.dashboardSection': '대시보드 상세',
+
     'sweetTracker.pageTitle': '스위트트래커 배송 조회',
 
     'sweetTracker.bulk.title': '대량 조회',
@@ -798,6 +811,19 @@ export const translations: Record<Language, Record<string, string>> = {
     'menu.manufacturing': '制造管理',
     'menu.schedule': '日程管理',
     'menu.sweetTrackerTest': '快递查询',
+
+    'pageTitle.orderDetail': '订单详情',
+    'pageTitle.orderLinesTab': '按订单项管理',
+    'pageTitle.orderReservationsTab': '预约项管理',
+    'pageTitle.purchaseOrderDetail': '订单详情',
+    'pageTitle.stockDetail': '库存详情',
+    'pageTitle.materialDetail': '配件详情',
+    'pageTitle.projectDetail': '项目详情',
+    'pageTitle.manufacturingDetail': '制造详情',
+    'pageTitle.manufacturingNew': '新建制造',
+    'pageTitle.manufacturingPurchaseOrder': '制造订单',
+    'pageTitle.thread': '讨论串',
+    'pageTitle.dashboardSection': '仪表板详情',
 
     'sweetTracker.pageTitle': 'Sweet Tracker 配送查询',
 
