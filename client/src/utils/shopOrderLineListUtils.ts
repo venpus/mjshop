@@ -1,4 +1,4 @@
-import type { ShopOrderLine } from '../api/shopOrderApi';
+import type { ShopOrder, ShopOrderLine } from '../api/shopOrderApi';
 import type { ShopOrderLineListRow } from './shopOrderListExport';
 
 export type ShopOrderLineProgressStatus = '출고대기' | '배송중' | '정산중' | '완료';
@@ -35,6 +35,87 @@ export function lineHasPayment(line: ShopOrderLine): boolean {
 
 export function lineHasTracking(line: ShopOrderLine): boolean {
   return Boolean(line.trackingNumber?.trim());
+}
+
+export interface LineRemovalStatementPolicy {
+  blocked: boolean;
+  blockReason: string | null;
+  groupSize: number;
+  remainingCount: number;
+  willRegenerateGroup: boolean;
+}
+
+export function getLinesInStatementGroup(
+  orders: ShopOrder[],
+  groupId: string | null | undefined
+): ShopOrderLine[] {
+  if (!groupId) {
+    return [];
+  }
+
+  const lines: ShopOrderLine[] = [];
+  for (const order of orders) {
+    for (const line of order.lines) {
+      if (line.statementGroupId === groupId) {
+        lines.push(line);
+      }
+    }
+  }
+  return lines;
+}
+
+function lineBlocksGroupStatementRemoval(line: ShopOrderLine): boolean {
+  return line.statementDelivered || lineHasPayment(line);
+}
+
+export function analyzeLineRemovalStatementPolicy(
+  line: ShopOrderLine,
+  orders: ShopOrder[]
+): LineRemovalStatementPolicy {
+  const groupId = line.statementGroupId;
+  const hasStatement = lineHasStatement(line);
+
+  if (!groupId || !hasStatement) {
+    return {
+      blocked: false,
+      blockReason: null,
+      groupSize: 1,
+      remainingCount: 0,
+      willRegenerateGroup: false,
+    };
+  }
+
+  const groupLines = getLinesInStatementGroup(orders, groupId);
+  const groupSize = groupLines.length;
+
+  if (groupSize <= 1) {
+    return {
+      blocked: false,
+      blockReason: null,
+      groupSize,
+      remainingCount: 0,
+      willRegenerateGroup: false,
+    };
+  }
+
+  if (groupLines.some(lineBlocksGroupStatementRemoval)) {
+    return {
+      blocked: true,
+      blockReason:
+        '입금 또는 명세서 전달이 완료된 통합 명세서에 포함된 주문 건은 단독 제거할 수 없습니다.',
+      groupSize,
+      remainingCount: groupSize - 1,
+      willRegenerateGroup: false,
+    };
+  }
+
+  return {
+    blocked: false,
+    blockReason: null,
+    groupSize,
+    remainingCount: groupSize - 1,
+    willRegenerateGroup: true,
+  };
 }
 
 /** 송장 입력 전 출고준비 단계인지 (체크박스 표시·편집 대상) */

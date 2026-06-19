@@ -102,6 +102,17 @@ export class ShopOrderLineRepository {
     return rows.length > 0 ? this.mapRow(rows[0]) : null;
   }
 
+  async findByStatementGroupId(statementGroupId: string): Promise<ShopOrderLine[]> {
+    const [rows] = await pool.execute<ShopOrderLineRow[]>(
+      `SELECT ${LINE_SELECT}
+       FROM kr_shop_order_lines
+       WHERE statement_group_id = ?
+       ORDER BY sort_order ASC, created_at ASC`,
+      [statementGroupId]
+    );
+    return rows.map(this.mapRow);
+  }
+
   async getNextSortOrder(shopOrderId: string): Promise<number> {
     const [rows] = await pool.execute<RowDataPacket[]>(
       `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_sort

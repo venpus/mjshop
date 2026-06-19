@@ -424,6 +424,66 @@ export class ShopOrderService {
     return this.enrichOrderStock(refreshed);
   }
 
+  private lineBlocksGroupedStatementRemoval(line: ShopOrderLine): boolean {
+    return (
+      line.statementDelivered ||
+      line.paymentReceived ||
+      Boolean(line.paymentProofImage)
+    );
+  }
+
+  private async regenerateStatementGroupHtml(statementGroupId: string): Promise<void> {
+    const groupLines = await this.lineRepository.findByStatementGroupId(statementGroupId);
+    if (groupLines.length === 0) {
+      return;
+    }
+
+    const statementIssuedAt =
+      groupLines[0].statementIssuedAt ?? new Date().toISOString().slice(0, 10);
+
+    type LoadedLine = { order: ShopOrder; line: ShopOrderLine };
+    const loaded: LoadedLine[] = [];
+    const orderCache = new Map<string, ShopOrder>();
+
+    for (const groupLine of groupLines) {
+      let order = orderCache.get(groupLine.shopOrderId);
+      if (!order) {
+        const fetched = await this.repository.findById(groupLine.shopOrderId);
+        if (!fetched) {
+          continue;
+        }
+        orderCache.set(groupLine.shopOrderId, fetched);
+        order = fetched;
+      }
+
+      const currentLine = order.lines.find((entry) => entry.id === groupLine.id);
+      if (currentLine) {
+        loaded.push({ order, line: currentLine });
+      }
+    }
+
+    if (loaded.length === 0) {
+      return;
+    }
+
+    const contexts = loaded.map(({ order, line }) =>
+      this.buildStatementContext(order, line, statementIssuedAt)
+    );
+    const html =
+      contexts.length === 1
+        ? buildShopOrderStatementHtml(contexts[0])
+        : buildShopOrderConsolidatedStatementHtml(contexts);
+
+    for (const { order, line } of loaded) {
+      const relativePath = await saveShopOrderLineStatementHtml(order.id, line.id, html);
+      await this.lineRepository.update(line.id, {
+        statementFilePath: relativePath,
+        statementGroupId,
+        statementIssuedAt,
+      });
+    }
+  }
+
   async deleteOrderLine(shopOrderId: string, lineId: string): Promise<ShopOrder> {
     const order = await this.repository.findById(shopOrderId);
     if (!order) {
@@ -435,10 +495,30 @@ export class ShopOrderService {
       throw new Error('주문 라인을 찾을 수 없습니다.');
     }
 
+    const groupId = line.statementGroupId;
+    let shouldRegenerateGroup = false;
+
+    if (groupId && (line.statementIssued || line.statementFilePath)) {
+      const groupLines = await this.lineRepository.findByStatementGroupId(groupId);
+      if (groupLines.length > 1) {
+        const blocked = groupLines.some((item) => this.lineBlocksGroupedStatementRemoval(item));
+        if (blocked) {
+          throw new Error(
+            '입금 또는 명세서 전달이 완료된 통합 명세서에 포함된 주문 건은 단독 제거할 수 없습니다.'
+          );
+        }
+        shouldRegenerateGroup = true;
+      }
+    }
+
     await deleteShopOrderLineFilesDir(shopOrderId, lineId);
     const deleted = await this.lineRepository.delete(lineId);
     if (!deleted) {
       throw new Error('주문 라인 삭제에 실패했습니다.');
+    }
+
+    if (shouldRegenerateGroup && groupId) {
+      await this.regenerateStatementGroupHtml(groupId);
     }
 
     await this.repository.syncQuantityFromLines(shopOrderId);

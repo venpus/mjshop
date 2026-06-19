@@ -11,11 +11,13 @@ import {
   Package,
   Search,
   Truck,
+  X,
 } from 'lucide-react';
 import { getFullImageUrl } from '../../api/purchaseOrderApi';
 import { getShopBuyerById, getShopBuyers } from '../../api/shopBuyerApi';
 import {
   createShopOrderBulkStatements,
+  deleteShopOrderLine,
   SHOP_ORDER_STATUS_OPTIONS,
   syncShopOrderDetail,
   type ShopOrder,
@@ -53,6 +55,8 @@ import {
   sortShopOrderLineRowsByCompanyAddress,
   lineInPreShipmentPhase,
   lineHasTracking,
+  analyzeLineRemovalStatementPolicy,
+  type LineRemovalStatementPolicy,
   type ShopOrderLineFulfillmentFilters,
 } from '../../utils/shopOrderLineListUtils';
 import { ShopBuyerInfoModal } from './ShopBuyerInfoModal';
@@ -94,6 +98,43 @@ const FULFILLMENT_FILTER_OPTIONS: Array<{
   { key: 'noTracking', label: '송장 미등록' },
   { key: 'shippingReady', label: '출고준비' },
 ];
+
+function buildRemoveLineConfirmMessage(
+  line: ShopOrderLine,
+  orderRef: string,
+  policy: LineRemovalStatementPolicy
+): string {
+  if (policy.blocked) {
+    return policy.blockReason ?? '제거할 수 없습니다.';
+  }
+
+  const notices: string[] = [];
+
+  if (policy.willRegenerateGroup) {
+    notices.push(
+      `· 통합 명세서 ${policy.groupSize}건 중 1건을 제거합니다. 남은 ${policy.remainingCount}건으로 명세서가 다시 생성됩니다.`
+    );
+  }
+
+  if (lineHasStatement(line)) {
+    notices.push(
+      line.statementDelivered
+        ? '· 발행·전달된 명세서 파일이 삭제됩니다.'
+        : '· 발행된 명세서 파일이 삭제됩니다.'
+    );
+  }
+  if (lineHasPayment(line)) {
+    notices.push('· 입금 확인 및 입금증 파일이 함께 삭제됩니다.');
+  }
+  if (lineHasTracking(line)) {
+    notices.push('· 등록된 송장·배송 연결 정보가 해제됩니다.');
+  }
+
+  const noticeBlock =
+    notices.length > 0 ? `\n\n${notices.join('\n')}\n\n이 작업은 되돌릴 수 없습니다.` : '';
+
+  return `「${orderRef}」 주문 건을 제거하시겠습니까?${noticeBlock}`;
+}
 
 function ProgressFlags({ line }: { line: ShopOrderLine }) {
   const flags: Array<{ label: string; display: string; checked: boolean }> = [
@@ -173,6 +214,7 @@ export function ShopOrderLineListTab({
   const [deliveryFeeSavingRowKey, setDeliveryFeeSavingRowKey] = useState<string | null>(null);
   const [vatExemptSavingRowKey, setVatExemptSavingRowKey] = useState<string | null>(null);
   const [shippingReadySavingRowKey, setShippingReadySavingRowKey] = useState<string | null>(null);
+  const [removingLineRowKey, setRemovingLineRowKey] = useState<string | null>(null);
 
   const checkboxClass = accentCheckboxClass;
 
@@ -461,6 +503,41 @@ export function ShopOrderLineListTab({
       alert(err instanceof Error ? err.message : '출고준비 저장에 실패했습니다.');
     } finally {
       setShippingReadySavingRowKey(null);
+    }
+  };
+
+  const handleRemoveLine = async (row: ShopOrderLineListRow) => {
+    const orderRef = formatLineOrderRef(
+      row.line.lineOrderNumber,
+      row.orderNumber,
+      row.lineIndex,
+      orderRefPrefix
+    );
+
+    const policy = analyzeLineRemovalStatementPolicy(row.line, orders);
+
+    if (policy.blocked) {
+      alert(policy.blockReason ?? '제거할 수 없습니다.');
+      return;
+    }
+
+    if (!window.confirm(buildRemoveLineConfirmMessage(row.line, orderRef, policy))) {
+      return;
+    }
+
+    setRemovingLineRowKey(row.rowKey);
+    try {
+      await deleteShopOrderLine(row.shopOrderId, row.line.id);
+      setSelectedRowKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(row.rowKey);
+        return next;
+      });
+      await onReload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '주문 건 제거에 실패했습니다.');
+    } finally {
+      setRemovingLineRowKey(null);
     }
   };
 
@@ -942,18 +1019,34 @@ export function ShopOrderLineListTab({
                           {progressStatus}
                         </span>
                       </td>
-                      <td className="px-4 py-4">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewDetail(row.shopOrderId);
-                          }}
-                          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                          title="제품 상세 보기"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleViewDetail(row.shopOrderId)}
+                            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="제품 상세 보기"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={
+                              removingLineRowKey === row.rowKey ||
+                              bulkBusy ||
+                              removingLineRowKey != null
+                            }
+                            onClick={() => void handleRemoveLine(row)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="주문 건 제거"
+                          >
+                            {removingLineRowKey === row.rowKey ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <X className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
