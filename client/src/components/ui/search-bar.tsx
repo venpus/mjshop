@@ -13,6 +13,8 @@ export interface SearchBarProps {
   className?: string;
   /** 비활성화 여부 */
   disabled?: boolean;
+  /** X 클릭 시 호출 (미지정 시 입력값만 비움) */
+  onClear?: () => void;
 }
 
 /**
@@ -25,6 +27,7 @@ export function SearchBar({
   placeholder = '검색...',
   className = '',
   disabled = false,
+  onClear,
 }: SearchBarProps) {
   return (
     <div className={`relative flex-1 ${className}`}>
@@ -41,7 +44,7 @@ export function SearchBar({
       {value && (
         <button
           type="button"
-          onClick={() => onChange('')}
+          onClick={() => (onClear ? onClear() : onChange(''))}
           disabled={disabled}
           className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title="검색어 지우기"

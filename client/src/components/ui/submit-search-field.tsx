@@ -8,6 +8,8 @@ export interface SubmitSearchFieldProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  /** X 클릭 시 입력·적용 검색어 모두 초기화 */
+  onClear?: () => void;
 }
 
 /** 검색어 입력 + 검색 버튼 (엔터 또는 버튼 클릭 시 onSubmit) */
@@ -18,6 +20,7 @@ export function SubmitSearchField({
   placeholder,
   className = '',
   disabled = false,
+  onClear,
 }: SubmitSearchFieldProps) {
   const { t } = useLanguage();
 
@@ -36,6 +39,7 @@ export function SubmitSearchField({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={disabled}
+        onClear={onClear}
         className="[&_input]:border-[#E5E7EB] [&_input]:rounded-lg [&_input]:text-sm [&_input]:py-2 [&_input]:focus:ring-[#2563EB]"
       />
       <button

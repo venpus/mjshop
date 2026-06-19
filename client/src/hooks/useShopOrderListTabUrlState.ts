@@ -55,7 +55,7 @@ export function useShopOrderProductListUrlState() {
 
   return {
     searchTerm: state.search,
-    setSearchTerm: (value: string) => patch({ search: value }, true),
+    applySearchTerm: (value: string) => patch({ search: value }, true),
     statusFilter: state.status,
     setStatusFilter: (value: string) => patch({ status: value }, true),
     currentPage: state.page,
@@ -115,7 +115,7 @@ export function useShopOrderLineListUrlState(
 
   return {
     searchTerm: state.search,
-    setSearchTerm: (value: string) => patch({ search: value }, true),
+    applySearchTerm: (value: string) => patch({ search: value }, true),
     statusFilter: state.status,
     setStatusFilter: (value: string) => patch({ status: value }, true),
     dateFrom: state.dateFrom,

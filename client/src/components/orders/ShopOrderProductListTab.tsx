@@ -6,7 +6,6 @@ import {
   FileSpreadsheet,
   FileText,
   Loader2,
-  Search,
   Trash2,
   Truck,
 } from 'lucide-react';
@@ -21,7 +20,9 @@ import {
 } from '../../api/shopOrderApi';
 import { getFullImageUrl } from '../../api/purchaseOrderApi';
 import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
+import { useShopOrderListDeferredSearch } from '../../hooks/useShopOrderListDeferredSearch';
 import { useShopOrderProductListUrlState } from '../../hooks/useShopOrderListTabUrlState';
+import { SubmitSearchField } from '../ui/submit-search-field';
 import {
   exportShopOrderFormExcel,
   exportShopOrderTaxInvoiceExcel,
@@ -55,12 +56,16 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
   const location = useLocation();
   const {
     searchTerm,
-    setSearchTerm,
+    applySearchTerm,
     statusFilter,
     setStatusFilter,
     currentPage,
     setCurrentPage,
   } = useShopOrderProductListUrlState();
+  const { searchInput, setSearchInput, submitSearch, clearSearch } = useShopOrderListDeferredSearch(
+    searchTerm,
+    applySearchTerm
+  );
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [statementModalOpen, setStatementModalOpen] = useState(false);
@@ -320,16 +325,14 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
   return (
     <>
       <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="주문번호, 상품명으로 검색..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-          />
-        </div>
+        <SubmitSearchField
+          className="flex-1"
+          value={searchInput}
+          onChange={setSearchInput}
+          onSubmit={submitSearch}
+          onClear={clearSearch}
+          placeholder="주문번호, 상품명으로 검색..."
+        />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}

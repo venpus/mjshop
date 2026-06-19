@@ -9,7 +9,6 @@ import {
   FileText,
   Loader2,
   Package,
-  Search,
   Truck,
   X,
 } from 'lucide-react';
@@ -39,7 +38,9 @@ import {
   resolveCompanyNameDisplay,
 } from '../../utils/shopBuyerDisplay';
 import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
+import { useShopOrderListDeferredSearch } from '../../hooks/useShopOrderListDeferredSearch';
 import { useShopOrderLineListUrlState } from '../../hooks/useShopOrderListTabUrlState';
+import { SubmitSearchField } from '../ui/submit-search-field';
 import { ShopOrderProgressFlagBadge } from './ShopOrderProgressFlagBadge';
 import {
   deriveLineProgressStatus,
@@ -182,7 +183,7 @@ export function ShopOrderLineListTab({
   const location = useLocation();
   const {
     searchTerm,
-    setSearchTerm,
+    applySearchTerm,
     statusFilter,
     setStatusFilter,
     dateFrom,
@@ -197,6 +198,10 @@ export function ShopOrderLineListTab({
     currentPage,
     setCurrentPage,
   } = useShopOrderLineListUrlState(lineKind);
+  const { searchInput, setSearchInput, submitSearch, clearSearch } = useShopOrderListDeferredSearch(
+    searchTerm,
+    applySearchTerm
+  );
   const [selectedRowKeys, setSelectedRowKeys] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [statementModalOpen, setStatementModalOpen] = useState(false);
@@ -610,16 +615,14 @@ export function ShopOrderLineListTab({
     <>
       <div className="space-y-4 mb-6">
         <div className="flex flex-col lg:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="주문번호, 상품명, 상호, 카톡, 수령인, 전화, 주소로 검색..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${accentRingClass}`}
-            />
-          </div>
+          <SubmitSearchField
+            className="flex-1"
+            value={searchInput}
+            onChange={setSearchInput}
+            onSubmit={submitSearch}
+            onClear={clearSearch}
+            placeholder="주문번호, 상품명, 상호, 카톡, 수령인, 전화, 주소로 검색..."
+          />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
