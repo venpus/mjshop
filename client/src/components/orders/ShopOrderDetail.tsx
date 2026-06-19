@@ -54,7 +54,6 @@ import {
   calculateRemainingStock,
   calculateTotalOrderQuantity,
 } from '../../utils/shopOrderCalculations';
-import { notifyStatementReissueAfterFormSave } from '../../utils/shopOrderStatementReissueNotice';
 import { shopOrderDetailPath, parseShopOrderListTab } from './shopOrderListNavigation';
 
 
@@ -458,9 +457,6 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
     if (!form || !order || isSaving || !originalForm) return;
 
-    const snapshotBeforeSave = originalForm;
-    const snapshotAfterSave = form;
-
     setIsSaving(true);
 
     try {
@@ -470,13 +466,6 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
       syncOrderState(updated);
 
       setLastSavedAt(new Date());
-
-      notifyStatementReissueAfterFormSave(
-        snapshotBeforeSave.lines,
-        snapshotAfterSave.lines,
-        snapshotBeforeSave.quantityPerBox,
-        snapshotAfterSave.quantityPerBox
-      );
 
     } catch (err) {
 
@@ -609,9 +598,6 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
     if (JSON.stringify(form) === JSON.stringify(originalForm)) return;
 
-    const snapshotBeforeSave = originalForm;
-    const snapshotAfterSave = form;
-
     setIsSaving(true);
 
     try {
@@ -621,13 +607,6 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
       syncOrderState(updated);
 
       setLastSavedAt(new Date());
-
-      notifyStatementReissueAfterFormSave(
-        snapshotBeforeSave.lines,
-        snapshotAfterSave.lines,
-        snapshotBeforeSave.quantityPerBox,
-        snapshotAfterSave.quantityPerBox
-      );
 
     } finally {
 

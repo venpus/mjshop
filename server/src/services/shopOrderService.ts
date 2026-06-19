@@ -5,6 +5,11 @@ import { StockInboundRepository } from '../repositories/stockInboundRepository.j
 import { calculateShopOrderAmountBreakdown } from '../utils/shopOrderCalculations.js';
 import { deriveShopOrderStatus } from '../utils/shopOrderStatus.js';
 import {
+  buildLinePriceSnapshot,
+  lineHasIssuedStatement,
+  linePriceSnapshotChanged,
+} from '../utils/shopOrderStatementPriceInvalidation.js';
+import {
   buildShopOrderConsolidatedStatementHtml,
   buildShopOrderStatementHtml,
   getConsolidatedShopOrderStatementFileName,
@@ -307,6 +312,8 @@ export class ShopOrderService {
       await this.repository.update(id, dateUpdates);
     }
 
+    await this.invalidateStatementsForPriceChanges(existing, data, quantityPerBox);
+
     if (data.lines) {
       for (const linePayload of data.lines) {
         const line = existing.lines.find((item) => item.id === linePayload.id);
@@ -443,6 +450,116 @@ export class ShopOrderService {
 
   private lineHasPaymentComplete(line: ShopOrderLine): boolean {
     return line.paymentReceived || Boolean(line.paymentProofImage);
+  }
+
+  private async resetLineStatementState(shopOrderId: string, lineId: string): Promise<void> {
+    if (lineId.endsWith('-legacy-line')) {
+      return;
+    }
+
+    await deleteShopOrderLineStatementHtml(shopOrderId, lineId);
+    await this.lineRepository.update(lineId, {
+      statementFilePath: null,
+      statementIssued: false,
+      statementGroupId: null,
+      statementIssuedAt: null,
+      statementDelivered: false,
+    });
+  }
+
+  private async invalidateStatementGroup(statementGroupId: string): Promise<void> {
+    const groupLines = await this.lineRepository.findByStatementGroupId(statementGroupId);
+    for (const groupLine of groupLines) {
+      await this.resetLineStatementState(groupLine.shopOrderId, groupLine.id);
+    }
+  }
+
+  private scheduleStatementInvalidation(
+    line: ShopOrderLine,
+    groupsToInvalidate: Set<string>,
+    standaloneLineKeys: Set<string>
+  ): void {
+    if (line.statementGroupId) {
+      groupsToInvalidate.add(line.statementGroupId);
+      return;
+    }
+    standaloneLineKeys.add(`${line.shopOrderId}:${line.id}`);
+  }
+
+  private async invalidateStatementsForPriceChanges(
+    existing: ShopOrder,
+    data: SyncShopOrderDetailDTO,
+    quantityPerBox: number
+  ): Promise<void> {
+    const groupsToInvalidate = new Set<string>();
+    const standaloneLineKeys = new Set<string>();
+
+    if (
+      data.quantityPerBox !== undefined &&
+      data.quantityPerBox !== existing.quantityPerBox
+    ) {
+      for (const line of existing.lines) {
+        if (!lineHasIssuedStatement(line) || line.quantityPerBox > 0) {
+          continue;
+        }
+        const before = buildLinePriceSnapshot(line, existing.quantityPerBox);
+        const after = buildLinePriceSnapshot(line, quantityPerBox);
+        if (linePriceSnapshotChanged(before, after)) {
+          this.scheduleStatementInvalidation(line, groupsToInvalidate, standaloneLineKeys);
+        }
+      }
+    }
+
+    if (data.lines) {
+      for (const linePayload of data.lines) {
+        const line = existing.lines.find((item) => item.id === linePayload.id);
+        if (!line || line.shopOrderId !== existing.id || !lineHasIssuedStatement(line)) {
+          continue;
+        }
+
+        const orderBoxCount = linePayload.orderBoxCount ?? line.orderBoxCount;
+        const lineQuantityPerBox =
+          linePayload.quantityPerBox !== undefined
+            ? linePayload.quantityPerBox
+            : line.quantityPerBox || quantityPerBox;
+        const saleUnitPrice =
+          linePayload.saleUnitPrice !== undefined
+            ? linePayload.saleUnitPrice
+            : line.saleUnitPrice;
+        const deliveryFee =
+          linePayload.deliveryFee !== undefined ? linePayload.deliveryFee : line.deliveryFee;
+        const vatExempt =
+          linePayload.vatExempt !== undefined ? linePayload.vatExempt : line.vatExempt;
+
+        const before = buildLinePriceSnapshot(line, existing.quantityPerBox);
+        const after = buildLinePriceSnapshot(
+          {
+            orderBoxCount,
+            quantityPerBox: lineQuantityPerBox,
+            saleUnitPrice,
+            deliveryFee,
+            vatExempt,
+          },
+          quantityPerBox
+        );
+
+        if (linePriceSnapshotChanged(before, after)) {
+          this.scheduleStatementInvalidation(line, groupsToInvalidate, standaloneLineKeys);
+        }
+      }
+    }
+
+    for (const groupId of groupsToInvalidate) {
+      await this.invalidateStatementGroup(groupId);
+    }
+
+    for (const key of standaloneLineKeys) {
+      const separatorIndex = key.indexOf(':');
+      if (separatorIndex <= 0) continue;
+      const shopOrderId = key.slice(0, separatorIndex);
+      const lineId = key.slice(separatorIndex + 1);
+      await this.resetLineStatementState(shopOrderId, lineId);
+    }
   }
 
   private async regenerateStatementGroupHtml(statementGroupId: string): Promise<void> {
@@ -1061,14 +1178,7 @@ export class ShopOrderService {
       return false;
     }
 
-    await deleteShopOrderLineStatementHtml(shopOrderId, lineId);
-    await this.lineRepository.update(lineId, {
-      statementFilePath: null,
-      statementIssued: false,
-      statementGroupId: null,
-      statementIssuedAt: null,
-      statementDelivered: false,
-    });
+    await this.resetLineStatementState(shopOrderId, lineId);
 
     return true;
   }
