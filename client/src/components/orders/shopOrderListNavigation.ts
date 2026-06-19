@@ -1,12 +1,12 @@
 import type { ShopOrderListTab } from './ShopOrderListTabs';
+import {
+  parseShopOrderListTab,
+  sanitizeShopOrdersListReturnTo,
+  SHOP_ORDER_LIST_TAB_PARAM,
+  SHOP_ORDERS_LIST_PATH,
+} from './shopOrderListUrlParams';
 
-export const SHOP_ORDER_LIST_TAB_PARAM = 'tab';
-
-export function parseShopOrderListTab(value: string | null | undefined): ShopOrderListTab {
-  if (value === 'lines') return 'lines';
-  if (value === 'reservations') return 'reservations';
-  return 'products';
-}
+export { parseShopOrderListTab, sanitizeShopOrdersListReturnTo, SHOP_ORDER_LIST_TAB_PARAM, SHOP_ORDERS_LIST_PATH };
 
 export function shopOrdersListPath(tab: ShopOrderListTab = 'products'): string {
   if (tab === 'lines') return '/admin/orders?tab=lines';
@@ -31,4 +31,8 @@ export function shopOrderDetailPath(
 export function shopOrderListSearchParams(tab: ShopOrderListTab): Record<string, string> | null {
   if (tab === 'products') return null;
   return { [SHOP_ORDER_LIST_TAB_PARAM]: tab };
+}
+
+export function shopOrderListReturnPath(pathname: string, search: string): string {
+  return `${pathname}${search}`;
 }

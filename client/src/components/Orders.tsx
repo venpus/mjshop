@@ -11,8 +11,7 @@ import { useShopLineShipmentMap } from '../hooks/useShopLineShipmentMap';
 import {
   parseShopOrderListTab,
   SHOP_ORDER_LIST_TAB_PARAM,
-  shopOrderListSearchParams,
-} from './orders/shopOrderListNavigation';
+} from './orders/shopOrderListUrlParams';
 import { ShopOrderListTabs, type ShopOrderListTab } from './orders/ShopOrderListTabs';
 import { ShopOrderProductListTab } from './orders/ShopOrderProductListTab';
 
@@ -82,8 +81,18 @@ export function Orders() {
   );
 
   const handleTabChange = (tab: ShopOrderListTab) => {
-    const nextParams = shopOrderListSearchParams(tab);
-    setSearchParams(nextParams ?? {}, { replace: true });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (tab === 'products') {
+          next.delete(SHOP_ORDER_LIST_TAB_PARAM);
+        } else {
+          next.set(SHOP_ORDER_LIST_TAB_PARAM, tab);
+        }
+        return next;
+      },
+      { replace: true }
+    );
   };
 
   return (

@@ -12,6 +12,7 @@ import { SalesSettlementPage } from './components/sales-settlement/SalesSettleme
 import { ShopOrderDetail } from './components/orders/ShopOrderDetail';
 import {
   parseShopOrderListTab,
+  sanitizeShopOrdersListReturnTo,
   shopOrdersListPath,
 } from './components/orders/shopOrderListNavigation';
 import { BuyerRegistrationPage } from './components/buyers/BuyerRegistrationPage';
@@ -554,7 +555,7 @@ function ShopOrderDetailWrapper() {
 
   const handleBack = () => {
     if (returnPath) {
-      navigate(decodeURIComponent(returnPath));
+      navigate(sanitizeShopOrdersListReturnTo(decodeURIComponent(returnPath)));
       return;
     }
     navigate(shopOrdersListPath(listTab));

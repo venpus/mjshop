@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowRightLeft,
   ArrowUpDown,
@@ -39,10 +39,10 @@ import {
   resolveCompanyNameDisplay,
 } from '../../utils/shopBuyerDisplay';
 import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
+import { useShopOrderLineListUrlState } from '../../hooks/useShopOrderListTabUrlState';
 import { ShopOrderProgressFlagBadge } from './ShopOrderProgressFlagBadge';
 import {
   deriveLineProgressStatus,
-  EMPTY_LINE_FULFILLMENT_FILTERS,
   formatLineOrderRef,
   formatLineQuantity,
   getLineProgressStatusClass,
@@ -61,7 +61,8 @@ import {
 } from '../../utils/shopOrderLineListUtils';
 import { ShopBuyerInfoModal } from './ShopBuyerInfoModal';
 import { ShopOrderListPagination } from './ShopOrderListPagination';
-import { shopOrderDetailPath } from './shopOrderListNavigation';
+import { shopOrderDetailPath, shopOrderListReturnPath } from './shopOrderListNavigation';
+import { SHOP_ORDER_LIST_ALL_STATUS } from './shopOrderListUrlParams';
 import { ShopOrderReservationTransferModal, type ReservationTransferItem } from './ShopOrderReservationTransferModal';
 import { ShopOrderStatementCreateDialog } from './ShopOrderStatementCreateDialog';
 import {
@@ -85,7 +86,7 @@ interface ShopOrderLineListTabProps {
   onReload: () => Promise<void>;
 }
 
-const ALL_STATUS = '전체';
+const ALL_STATUS = SHOP_ORDER_LIST_ALL_STATUS;
 
 const FULFILLMENT_FILTER_OPTIONS: Array<{
   key: keyof ShopOrderLineFulfillmentFilters;
@@ -122,9 +123,6 @@ function buildRemoveLineConfirmMessage(
         ? '· 발행·전달된 명세서 파일이 삭제됩니다.'
         : '· 발행된 명세서 파일이 삭제됩니다.'
     );
-  }
-  if (lineHasPayment(line)) {
-    notices.push('· 입금 확인 및 입금증 파일이 함께 삭제됩니다.');
   }
   if (lineHasTracking(line)) {
     notices.push('· 등록된 송장·배송 연결 정보가 해제됩니다.');
@@ -181,14 +179,24 @@ export function ShopOrderLineListTab({
     : '등록된 판매 주문이 없습니다. 제품 상세에서 「주문 추가」로 등록하세요.';
   const orderRefPrefix = isReservationTab ? '예약' : undefined;
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>(ALL_STATUS);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [fulfillmentFilters, setFulfillmentFilters] = useState<ShopOrderLineFulfillmentFilters>(
-    EMPTY_LINE_FULFILLMENT_FILTERS
-  );
-  const [sortByCompanyAddress, setSortByCompanyAddress] = useState(false);
+  const location = useLocation();
+  const {
+    searchTerm,
+    setSearchTerm,
+    statusFilter,
+    setStatusFilter,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    sortByCompanyAddress,
+    toggleSortByCompanyAddress,
+    fulfillmentFilters,
+    toggleFulfillmentFilter,
+    clearFulfillmentFilters,
+    currentPage,
+    setCurrentPage,
+  } = useShopOrderLineListUrlState(lineKind);
   const [selectedRowKeys, setSelectedRowKeys] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [statementModalOpen, setStatementModalOpen] = useState(false);
@@ -269,25 +277,20 @@ export function ShopOrderLineListTab({
   const paginationResetKey = `${lineKind}|${searchTerm}|${statusFilter}|${dateFrom}|${dateTo}|${sortByCompanyAddress}|${JSON.stringify(fulfillmentFilters)}`;
   const {
     paginatedItems: paginatedRows,
-    currentPage,
-    setCurrentPage,
     totalPages,
     totalItems,
     startIndex,
     endIndex,
-  } = useShopOrderListPagination(displayRows, paginationResetKey);
+  } = useShopOrderListPagination(displayRows, paginationResetKey, {
+    page: currentPage,
+    onPageChange: setCurrentPage,
+  });
 
   const allPageSelected =
     paginatedRows.length > 0 && paginatedRows.every((row) => selectedRowKeys.has(row.rowKey));
   const somePageSelected = paginatedRows.some((row) => selectedRowKeys.has(row.rowKey));
 
-  const toggleFulfillmentFilter = (key: keyof ShopOrderLineFulfillmentFilters) => {
-    setFulfillmentFilters((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const clearFulfillmentFilters = () => {
-    setFulfillmentFilters(EMPTY_LINE_FULFILLMENT_FILTERS);
-  };
+  const listReturnPath = shopOrderListReturnPath(location.pathname, location.search);
 
   const handleToggleSelectAll = () => {
     setSelectedRowKeys((prev) => {
@@ -440,11 +443,11 @@ export function ShopOrderLineListTab({
     setTransferProductName('');
     await onReload();
     alert(`${transferredCount.toLocaleString()}건의 예약을 선택한 주문으로 이동했습니다.`);
-    navigate(shopOrderDetailPath(targetOrderId, listTab));
+    navigate(shopOrderDetailPath(targetOrderId, listTab, listReturnPath));
   };
 
   const handleViewDetail = (shopOrderId: string) => {
-    navigate(shopOrderDetailPath(shopOrderId, listTab));
+    navigate(shopOrderDetailPath(shopOrderId, listTab, listReturnPath));
   };
 
   const handleToggleDeliveryFee = async (row: ShopOrderLineListRow, enabled: boolean) => {
@@ -666,7 +669,7 @@ export function ShopOrderLineListTab({
           <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
             <button
               type="button"
-              onClick={() => setSortByCompanyAddress((prev) => !prev)}
+              onClick={() => toggleSortByCompanyAddress()}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full border transition-colors ${
                 sortByCompanyAddress
                   ? accentFilterActiveClass

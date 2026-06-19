@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ClipboardList,
   Eye,
@@ -21,6 +21,7 @@ import {
 } from '../../api/shopOrderApi';
 import { getFullImageUrl } from '../../api/purchaseOrderApi';
 import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
+import { useShopOrderProductListUrlState } from '../../hooks/useShopOrderListTabUrlState';
 import {
   exportShopOrderFormExcel,
   exportShopOrderTaxInvoiceExcel,
@@ -31,7 +32,8 @@ import {
   canDeleteShopOrder,
   SHOP_ORDER_DELETE_BLOCKED_MESSAGE,
 } from '../../utils/shopOrderDeleteUtils';
-import { shopOrderDetailPath } from './shopOrderListNavigation';
+import { shopOrderDetailPath, shopOrderListReturnPath } from './shopOrderListNavigation';
+import { SHOP_ORDER_LIST_ALL_STATUS } from './shopOrderListUrlParams';
 import { ShopOrderListPagination } from './ShopOrderListPagination';
 import { ShopOrderStatementCreateDialog } from './ShopOrderStatementCreateDialog';
 import {
@@ -40,7 +42,7 @@ import {
 } from './ShopOrderStatementModal';
 import type { ShopOrderListTab } from './ShopOrderListTabs';
 
-const ALL_STATUS = '전체';
+const ALL_STATUS = SHOP_ORDER_LIST_ALL_STATUS;
 
 interface ShopOrderProductListTabProps {
   orders: ShopOrder[];
@@ -50,8 +52,15 @@ interface ShopOrderProductListTabProps {
 
 export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrderProductListTabProps) {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>(ALL_STATUS);
+  const location = useLocation();
+  const {
+    searchTerm,
+    setSearchTerm,
+    statusFilter,
+    setStatusFilter,
+    currentPage,
+    setCurrentPage,
+  } = useShopOrderProductListUrlState();
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [statementModalOpen, setStatementModalOpen] = useState(false);
@@ -81,13 +90,16 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
   const paginationResetKey = `${searchTerm}|${statusFilter}`;
   const {
     paginatedItems: paginatedOrders,
-    currentPage,
-    setCurrentPage,
     totalPages,
     totalItems,
     startIndex,
     endIndex,
-  } = useShopOrderListPagination(filteredOrders, paginationResetKey);
+  } = useShopOrderListPagination(filteredOrders, paginationResetKey, {
+    page: currentPage,
+    onPageChange: setCurrentPage,
+  });
+
+  const listReturnPath = shopOrderListReturnPath(location.pathname, location.search);
 
   const allPageSelected =
     paginatedOrders.length > 0 && paginatedOrders.every((order) => selectedOrderIds.has(order.id));
@@ -118,7 +130,7 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
   };
 
   const handleViewDetail = (orderId: string) => {
-    navigate(shopOrderDetailPath(orderId, listTab));
+    navigate(shopOrderDetailPath(orderId, listTab, listReturnPath));
   };
 
   const handleDeleteProductOrder = async (order: ShopOrder, event: React.MouseEvent) => {

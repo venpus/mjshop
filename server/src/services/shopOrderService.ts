@@ -424,12 +424,8 @@ export class ShopOrderService {
     return this.enrichOrderStock(refreshed);
   }
 
-  private lineBlocksGroupedStatementRemoval(line: ShopOrderLine): boolean {
-    return (
-      line.statementDelivered ||
-      line.paymentReceived ||
-      Boolean(line.paymentProofImage)
-    );
+  private lineHasPaymentComplete(line: ShopOrderLine): boolean {
+    return line.paymentReceived || Boolean(line.paymentProofImage);
   }
 
   private async regenerateStatementGroupHtml(statementGroupId: string): Promise<void> {
@@ -495,18 +491,16 @@ export class ShopOrderService {
       throw new Error('주문 라인을 찾을 수 없습니다.');
     }
 
+    if (this.lineHasPaymentComplete(line)) {
+      throw new Error('입금이 완료된 주문 건은 제거할 수 없습니다.');
+    }
+
     const groupId = line.statementGroupId;
     let shouldRegenerateGroup = false;
 
     if (groupId && (line.statementIssued || line.statementFilePath)) {
       const groupLines = await this.lineRepository.findByStatementGroupId(groupId);
       if (groupLines.length > 1) {
-        const blocked = groupLines.some((item) => this.lineBlocksGroupedStatementRemoval(item));
-        if (blocked) {
-          throw new Error(
-            '입금 또는 명세서 전달이 완료된 통합 명세서에 포함된 주문 건은 단독 제거할 수 없습니다.'
-          );
-        }
         shouldRegenerateGroup = true;
       }
     }

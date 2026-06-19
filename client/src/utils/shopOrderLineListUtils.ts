@@ -64,14 +64,24 @@ export function getLinesInStatementGroup(
   return lines;
 }
 
-function lineBlocksGroupStatementRemoval(line: ShopOrderLine): boolean {
-  return line.statementDelivered || lineHasPayment(line);
+function lineBlocksOrderLineRemoval(line: ShopOrderLine): boolean {
+  return lineHasPayment(line);
 }
 
 export function analyzeLineRemovalStatementPolicy(
   line: ShopOrderLine,
   orders: ShopOrder[]
 ): LineRemovalStatementPolicy {
+  if (lineBlocksOrderLineRemoval(line)) {
+    return {
+      blocked: true,
+      blockReason: '입금이 완료된 주문 건은 제거할 수 없습니다.',
+      groupSize: 1,
+      remainingCount: 0,
+      willRegenerateGroup: false,
+    };
+  }
+
   const groupId = line.statementGroupId;
   const hasStatement = lineHasStatement(line);
 
@@ -94,17 +104,6 @@ export function analyzeLineRemovalStatementPolicy(
       blockReason: null,
       groupSize,
       remainingCount: 0,
-      willRegenerateGroup: false,
-    };
-  }
-
-  if (groupLines.some(lineBlocksGroupStatementRemoval)) {
-    return {
-      blocked: true,
-      blockReason:
-        '입금 또는 명세서 전달이 완료된 통합 명세서에 포함된 주문 건은 단독 제거할 수 없습니다.',
-      groupSize,
-      remainingCount: groupSize - 1,
       willRegenerateGroup: false,
     };
   }
