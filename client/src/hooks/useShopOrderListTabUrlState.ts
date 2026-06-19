@@ -22,7 +22,11 @@ function usePatchShopOrderListUrlState() {
       setSearchParams(
         (prev) => {
           const current = parseShopOrderListUrlState(prev);
-          return buildShopOrderListSearchParams(updater(current));
+          const next = updater(current);
+          if (next === current) {
+            return prev;
+          }
+          return buildShopOrderListSearchParams(next);
         },
         { replace: true }
       );
@@ -53,19 +57,62 @@ export function useShopOrderProductListUrlState() {
     [patchList]
   );
 
+  const persistSearchTerm = useCallback(
+    (value: string) => {
+      patchList((current) => {
+        if (current.products.search === value) {
+          return current;
+        }
+        return {
+          ...current,
+          products: {
+            ...current.products,
+            search: value,
+            page: 1,
+          },
+        };
+      });
+    },
+    [patchList]
+  );
+
+  const setStatusFilter = useCallback(
+    (value: string) => patch({ status: value }, true),
+    [patch]
+  );
+  const setCurrentPage = useCallback(
+    (page: number) => {
+      patchList((current) => {
+        if (current.products.page === page) {
+          return current;
+        }
+        return {
+          ...current,
+          products: {
+            ...current.products,
+            page,
+          },
+        };
+      });
+    },
+    [patchList]
+  );
+
   return {
-    searchTerm: state.search,
-    applySearchTerm: (value: string) => patch({ search: value }, true),
+    urlSearchTerm: state.search,
+    persistSearchTerm,
     statusFilter: state.status,
-    setStatusFilter: (value: string) => patch({ status: value }, true),
+    setStatusFilter,
     currentPage: state.page,
-    setCurrentPage: (page: number) => patch({ page }),
+    setCurrentPage,
   };
 }
 
 type LineListSection = 'lines' | 'reservations';
 
-function lineKindToSection(lineKind: Extract<ShopOrderLineListKind, 'orders' | 'reservations'>): LineListSection {
+function lineKindToSection(
+  lineKind: Extract<ShopOrderLineListKind, 'orders' | 'reservations'>
+): LineListSection {
   return lineKind === 'reservations' ? 'reservations' : 'lines';
 }
 
@@ -94,6 +141,45 @@ export function useShopOrderLineListUrlState(
     [patchList, section]
   );
 
+  const persistSearchTerm = useCallback(
+    (value: string) => {
+      patchList((current) => {
+        if (current[section].search === value) {
+          return current;
+        }
+        return {
+          ...current,
+          [section]: {
+            ...current[section],
+            search: value,
+            page: 1,
+          },
+        };
+      });
+    },
+    [patchList, section]
+  );
+
+  const setStatusFilter = useCallback(
+    (value: string) => patch({ status: value }, true),
+    [patch]
+  );
+  const setDateFrom = useCallback(
+    (value: string) => patch({ dateFrom: value }, true),
+    [patch]
+  );
+  const setDateTo = useCallback(
+    (value: string) => patch({ dateTo: value }, true),
+    [patch]
+  );
+  const setSortByCompanyAddress = useCallback(
+    (value: boolean) => patch({ sortByCompanyAddress: value }, true),
+    [patch]
+  );
+  const toggleSortByCompanyAddress = useCallback(
+    () => patch({ sortByCompanyAddress: !state.sortByCompanyAddress }, true),
+    [patch, state.sortByCompanyAddress]
+  );
   const toggleFulfillmentFilter = useCallback(
     (key: keyof ShopOrderLineFulfillmentFilters) => {
       patch(
@@ -108,27 +194,43 @@ export function useShopOrderLineListUrlState(
     },
     [patch, state.fulfillmentFilters]
   );
-
   const clearFulfillmentFilters = useCallback(() => {
     patch({ fulfillmentFilters: { ...EMPTY_LINE_FULFILLMENT_FILTERS } }, true);
   }, [patch]);
+  const setCurrentPage = useCallback(
+    (page: number) => {
+      patchList((current) => {
+        if (current[section].page === page) {
+          return current;
+        }
+        return {
+          ...current,
+          [section]: {
+            ...current[section],
+            page,
+          },
+        };
+      });
+    },
+    [patchList, section]
+  );
 
   return {
-    searchTerm: state.search,
-    applySearchTerm: (value: string) => patch({ search: value }, true),
+    urlSearchTerm: state.search,
+    persistSearchTerm,
     statusFilter: state.status,
-    setStatusFilter: (value: string) => patch({ status: value }, true),
+    setStatusFilter,
     dateFrom: state.dateFrom,
-    setDateFrom: (value: string) => patch({ dateFrom: value }, true),
+    setDateFrom,
     dateTo: state.dateTo,
-    setDateTo: (value: string) => patch({ dateTo: value }, true),
+    setDateTo,
     sortByCompanyAddress: state.sortByCompanyAddress,
-    setSortByCompanyAddress: (value: boolean) => patch({ sortByCompanyAddress: value }, true),
-    toggleSortByCompanyAddress: () => patch({ sortByCompanyAddress: !state.sortByCompanyAddress }, true),
+    setSortByCompanyAddress,
+    toggleSortByCompanyAddress,
     fulfillmentFilters: state.fulfillmentFilters,
     toggleFulfillmentFilter,
     clearFulfillmentFilters,
     currentPage: state.page,
-    setCurrentPage: (page: number) => patch({ page }),
+    setCurrentPage,
   };
 }

@@ -11,6 +11,8 @@ export interface SearchBarProps {
   placeholder?: string;
   /** 추가 클래스명 */
   className?: string;
+  /** focus ring 색상 클래스 (tailwind) */
+  focusRingClass?: string;
   /** 비활성화 여부 */
   disabled?: boolean;
   /** X 클릭 시 호출 (미지정 시 입력값만 비움) */
@@ -26,6 +28,7 @@ export function SearchBar({
   onKeyDown,
   placeholder = '검색...',
   className = '',
+  focusRingClass = 'focus:ring-purple-500',
   disabled = false,
   onClear,
 }: SearchBarProps) {
@@ -39,7 +42,7 @@ export function SearchBar({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         disabled={disabled}
-        className={`w-full pl-10 ${value ? 'pr-10' : 'pr-4'} py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
+        className={`w-full pl-10 ${value ? 'pr-10' : 'pr-4'} py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${focusRingClass} disabled:bg-gray-100 disabled:cursor-not-allowed`}
       />
       {value && (
         <button

@@ -20,9 +20,9 @@ import {
 } from '../../api/shopOrderApi';
 import { getFullImageUrl } from '../../api/purchaseOrderApi';
 import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
-import { useShopOrderListDeferredSearch } from '../../hooks/useShopOrderListDeferredSearch';
+import { useShopOrderListSearch } from '../../hooks/useShopOrderListSearch';
 import { useShopOrderProductListUrlState } from '../../hooks/useShopOrderListTabUrlState';
-import { SubmitSearchField } from '../ui/submit-search-field';
+import { SearchBar } from '../ui/search-bar';
 import {
   exportShopOrderFormExcel,
   exportShopOrderTaxInvoiceExcel,
@@ -55,16 +55,16 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
   const navigate = useNavigate();
   const location = useLocation();
   const {
-    searchTerm,
-    applySearchTerm,
+    urlSearchTerm,
+    persistSearchTerm,
     statusFilter,
     setStatusFilter,
     currentPage,
     setCurrentPage,
   } = useShopOrderProductListUrlState();
-  const { searchInput, setSearchInput, submitSearch, clearSearch } = useShopOrderListDeferredSearch(
-    searchTerm,
-    applySearchTerm
+  const { searchTerm, setSearchTerm, clearSearch } = useShopOrderListSearch(
+    urlSearchTerm,
+    persistSearchTerm
   );
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -325,11 +325,9 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
   return (
     <>
       <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <SubmitSearchField
-          className="flex-1"
-          value={searchInput}
-          onChange={setSearchInput}
-          onSubmit={submitSearch}
+        <SearchBar
+          value={searchTerm}
+          onChange={setSearchTerm}
           onClear={clearSearch}
           placeholder="주문번호, 상품명으로 검색..."
         />

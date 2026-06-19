@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export const SHOP_ORDER_LIST_PAGE_SIZE = 20;
 
@@ -11,10 +11,24 @@ export function useShopOrderListPagination<T>(
   const [uncontrolledPage, setUncontrolledPage] = useState(1);
   const currentPage = isControlled ? options!.page! : uncontrolledPage;
   const setCurrentPage = isControlled ? options!.onPageChange! : setUncontrolledPage;
+  const onPageChangeRef = useRef(setCurrentPage);
+  const prevResetKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [resetKey, setCurrentPage]);
+    onPageChangeRef.current = setCurrentPage;
+  }, [setCurrentPage]);
+
+  useEffect(() => {
+    if (prevResetKeyRef.current === null) {
+      prevResetKeyRef.current = resetKey;
+      return;
+    }
+    if (prevResetKeyRef.current === resetKey) {
+      return;
+    }
+    prevResetKeyRef.current = resetKey;
+    onPageChangeRef.current(1);
+  }, [resetKey]);
 
   const totalItems = items.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / SHOP_ORDER_LIST_PAGE_SIZE));

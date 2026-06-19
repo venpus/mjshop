@@ -38,9 +38,9 @@ import {
   resolveCompanyNameDisplay,
 } from '../../utils/shopBuyerDisplay';
 import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
-import { useShopOrderListDeferredSearch } from '../../hooks/useShopOrderListDeferredSearch';
+import { useShopOrderListSearch } from '../../hooks/useShopOrderListSearch';
 import { useShopOrderLineListUrlState } from '../../hooks/useShopOrderListTabUrlState';
-import { SubmitSearchField } from '../ui/submit-search-field';
+import { SearchBar } from '../ui/search-bar';
 import { ShopOrderProgressFlagBadge } from './ShopOrderProgressFlagBadge';
 import {
   deriveLineProgressStatus,
@@ -182,8 +182,8 @@ export function ShopOrderLineListTab({
   const navigate = useNavigate();
   const location = useLocation();
   const {
-    searchTerm,
-    applySearchTerm,
+    urlSearchTerm,
+    persistSearchTerm,
     statusFilter,
     setStatusFilter,
     dateFrom,
@@ -198,9 +198,9 @@ export function ShopOrderLineListTab({
     currentPage,
     setCurrentPage,
   } = useShopOrderLineListUrlState(lineKind);
-  const { searchInput, setSearchInput, submitSearch, clearSearch } = useShopOrderListDeferredSearch(
-    searchTerm,
-    applySearchTerm
+  const { searchTerm, setSearchTerm, clearSearch } = useShopOrderListSearch(
+    urlSearchTerm,
+    persistSearchTerm
   );
   const [selectedRowKeys, setSelectedRowKeys] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -615,13 +615,12 @@ export function ShopOrderLineListTab({
     <>
       <div className="space-y-4 mb-6">
         <div className="flex flex-col lg:flex-row gap-4">
-          <SubmitSearchField
-            className="flex-1"
-            value={searchInput}
-            onChange={setSearchInput}
-            onSubmit={submitSearch}
+          <SearchBar
+            value={searchTerm}
+            onChange={setSearchTerm}
             onClear={clearSearch}
             placeholder="주문번호, 상품명, 상호, 카톡, 수령인, 전화, 주소로 검색..."
+            focusRingClass={accentRingClass}
           />
           <select
             value={statusFilter}
