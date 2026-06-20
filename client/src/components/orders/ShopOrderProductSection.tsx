@@ -249,53 +249,55 @@ export function ShopOrderProductSection({
           </div>
 
           <div className="flex flex-nowrap items-end gap-x-2 gap-y-2 min-w-max mt-2 pt-2 border-t border-gray-100">
-            <InfoField label="사이즈" className="w-[64px]">
+            <InfoField label="사이즈" className="w-[72px]">
               <ReadOnlyValue value={purchaseOrderProductSize?.trim() || '-'} />
             </InfoField>
 
-            <InfoField label="무게" className="w-[64px]">
+            <InfoField label="무게" className="w-[72px]">
               <ReadOnlyValue value={formatWeightDisplay(purchaseOrderProductWeight)} />
             </InfoField>
 
-            <InfoField label="박스" className="w-[80px]">
+            <InfoField label="박스" className="min-w-[110px] max-w-[160px]">
               <ReadOnlyValue value={purchaseOrderProductPackagingSize?.trim() || '-'} />
             </InfoField>
 
-            <InfoField label="중국입고" className="w-[118px]">
-              <input
-                type="date"
-                value={chinaInboundDate}
-                onChange={(e) => onLogisticsDateChange?.('chinaInboundDate', e.target.value)}
-                className={dateInputClass}
-              />
-            </InfoField>
+            <div className="flex flex-nowrap items-end gap-x-2 ml-8 shrink-0">
+              <InfoField label="중국입고" className="w-[118px]">
+                <input
+                  type="date"
+                  value={chinaInboundDate}
+                  onChange={(e) => onLogisticsDateChange?.('chinaInboundDate', e.target.value)}
+                  className={dateInputClass}
+                />
+              </InfoField>
 
-            <InfoField label="중국출고" className="w-[118px]">
-              <input
-                type="date"
-                value={chinaOutboundDate}
-                onChange={(e) => onLogisticsDateChange?.('chinaOutboundDate', e.target.value)}
-                className={dateInputClass}
-              />
-            </InfoField>
+              <InfoField label="중국출고" className="w-[118px]">
+                <input
+                  type="date"
+                  value={chinaOutboundDate}
+                  onChange={(e) => onLogisticsDateChange?.('chinaOutboundDate', e.target.value)}
+                  className={dateInputClass}
+                />
+              </InfoField>
 
-            <InfoField label="한국도착(예상)" className="w-[118px]">
-              <input
-                type="date"
-                value={koreaArrivalDate}
-                onChange={(e) => onLogisticsDateChange?.('koreaArrivalDate', e.target.value)}
-                className={dateInputClass}
-              />
-            </InfoField>
+              <InfoField label="한국도착(예상)" className="w-[118px]">
+                <input
+                  type="date"
+                  value={koreaArrivalDate}
+                  onChange={(e) => onLogisticsDateChange?.('koreaArrivalDate', e.target.value)}
+                  className={dateInputClass}
+                />
+              </InfoField>
 
-            <InfoField label="한국도착(실제)" className="w-[118px]">
-              <input
-                type="date"
-                value={actualArrivalDate}
-                onChange={(e) => onLogisticsDateChange?.('actualArrivalDate', e.target.value)}
-                className={dateInputClass}
-              />
-            </InfoField>
+              <InfoField label="한국도착(실제)" className="w-[118px]">
+                <input
+                  type="date"
+                  value={actualArrivalDate}
+                  onChange={(e) => onLogisticsDateChange?.('actualArrivalDate', e.target.value)}
+                  className={dateInputClass}
+                />
+              </InfoField>
+            </div>
           </div>
         </div>
       </div>
