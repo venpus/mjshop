@@ -1,6 +1,8 @@
 import type { ShopOrderLine } from '../api/shopOrderApi';
 import type { ShopOrderLineForm } from './shopOrderCalculations';
 import { lineHasStatement } from './shopOrderLineListUtils';
+import { buildStatementRowGroupKey, type ShopOrderLineListRow } from './shopOrderListExport';
+import { formatLineOrderRef } from './shopOrderLineListUtils';
 
 const STATEMENT_AFFECTING_LINE_FIELDS = [
   'orderBoxCount',
@@ -61,6 +63,79 @@ export function getLinesWithStatementAndAffectingChanges(
   }
 
   return changed;
+}
+
+export interface RelatedStatementRef {
+  groupKey: string;
+  isReservation: boolean;
+  title: string;
+  orderRefsLabel: string;
+}
+
+function formatStatementDateLabel(value: string | null | undefined): string {
+  if (!value) return '-';
+  return value.includes('T') ? value.split('T')[0] : value.slice(0, 10);
+}
+
+export function buildRelatedStatementTitle(
+  row: ShopOrderLineListRow,
+  lineCount: number
+): string {
+  const line = row.line;
+  const companyName = (line.companyName ?? '').trim() || '미상';
+  const dateLabel = formatStatementDateLabel(line.statementIssuedAt ?? row.orderDate);
+  const kindLabel = line.isReservation ? '예약' : '주문';
+  if (lineCount > 1) {
+    return `${companyName} · ${dateLabel} (${kindLabel} 통합 ${lineCount}건)`;
+  }
+  return `${companyName} · ${dateLabel} (${kindLabel})`;
+}
+
+export function collectRelatedStatementRefsForLineSync(
+  row: ShopOrderLineListRow,
+  allRows: ShopOrderLineListRow[],
+  updates: Partial<Pick<ShopOrderLine, 'deliveryFee' | 'vatExempt'>>
+): RelatedStatementRef[] {
+  if (!shouldNotifyStatementReissueForLineSync(row.line, updates)) {
+    return [];
+  }
+
+  const groupKey = buildStatementRowGroupKey(row);
+  const groupRows = allRows.filter((candidate) => buildStatementRowGroupKey(candidate) === groupKey);
+  const representative = groupRows[0] ?? row;
+  const orderRefsLabel = groupRows
+    .map((groupRow) =>
+      formatLineOrderRef(
+        groupRow.line.lineOrderNumber,
+        groupRow.orderNumber,
+        groupRow.lineIndex,
+        groupRow.line.isReservation ? '예약' : undefined
+      )
+    )
+    .join(', ');
+
+  return [
+    {
+      groupKey,
+      isReservation: representative.line.isReservation,
+      title: buildRelatedStatementTitle(representative, groupRows.length),
+      orderRefsLabel: orderRefsLabel || '-',
+    },
+  ];
+}
+
+export function buildStatementChangeNoticeMessage(statementCount: number): string {
+  const headline =
+    statementCount > 1
+      ? `${statementCount}건의 관련 명세서가 있습니다.`
+      : '관련 명세서가 있습니다.';
+
+  return [
+    headline,
+    '',
+    '이 변경을 저장하면 관련 명세서가 자동으로 삭제됩니다.',
+    '저장 전 아래 링크에서 명세서를 확인한 뒤, 변경 내용으로 다시 발급해 주세요.',
+  ].join('\n');
 }
 
 export interface StatementReissueNoticeContext {

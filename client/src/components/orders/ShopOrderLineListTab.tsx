@@ -70,12 +70,18 @@ import {
   ShopOrderStatementModal,
   type ShopOrderStatementGroupPreview,
 } from './ShopOrderStatementModal';
+import { ShopOrderStatementChangeNoticeDialog } from './ShopOrderStatementChangeNoticeDialog';
 import { ShopLineDeliveryStatusLink } from '../shipping/ShopLineDeliveryStatusLink';
 import type { LineShipmentInfo } from '../../utils/shopLineShipmentUtils';
 import {
   lineHasDefaultDeliveryFee,
   SHOP_ORDER_DEFAULT_DELIVERY_FEE,
 } from '../../utils/shopOrderCalculations';
+import {
+  collectRelatedStatementRefsForLineSync,
+  type RelatedStatementRef,
+} from '../../utils/shopOrderStatementReissueNotice';
+import { buildShopStatementsFocusPath } from '../../utils/shopStatementNavigation';
 
 import type { ShopOrderListTab } from './ShopOrderListTabs';
 
@@ -231,6 +237,10 @@ export function ShopOrderLineListTab({
   const [vatExemptSavingRowKey, setVatExemptSavingRowKey] = useState<string | null>(null);
   const [shippingReadySavingRowKey, setShippingReadySavingRowKey] = useState<string | null>(null);
   const [removingLineRowKey, setRemovingLineRowKey] = useState<string | null>(null);
+  const [statementChangeNotice, setStatementChangeNotice] = useState<{
+    statements: RelatedStatementRef[];
+    onConfirm: () => Promise<void>;
+  } | null>(null);
 
   const checkboxClass = accentCheckboxClass;
 
@@ -459,44 +469,76 @@ export function ShopOrderLineListTab({
     navigate(shopOrderDetailPath(shopOrderId, listTab, listReturnPath));
   };
 
+  const requestLineChangeWithStatementCheck = (
+    row: ShopOrderLineListRow,
+    updates: Partial<Pick<ShopOrderLine, 'deliveryFee' | 'vatExempt'>>,
+    performSave: () => Promise<void>
+  ) => {
+    const relatedStatements = collectRelatedStatementRefsForLineSync(row, lineRows, updates);
+    if (relatedStatements.length === 0) {
+      void performSave();
+      return;
+    }
+
+    setStatementChangeNotice({
+      statements: relatedStatements,
+      onConfirm: performSave,
+    });
+  };
+
+  const handleViewRelatedStatement = (statement: RelatedStatementRef) => {
+    setStatementChangeNotice(null);
+    navigate(
+      buildShopStatementsFocusPath({
+        tab: statement.isReservation ? 'reservations' : 'orders',
+        groupKeys: [statement.groupKey],
+        preview: true,
+      })
+    );
+  };
+
   const handleToggleDeliveryFee = async (row: ShopOrderLineListRow, enabled: boolean) => {
     const nextDeliveryFee = enabled ? SHOP_ORDER_DEFAULT_DELIVERY_FEE : null;
 
-    setDeliveryFeeSavingRowKey(row.rowKey);
-    try {
-      await syncShopOrderDetail(row.shopOrderId, {
-        lines: [
-          {
-            id: row.line.id,
-            deliveryFee: nextDeliveryFee,
-          },
-        ],
-      });
-      await onReload();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : '배송비 저장에 실패했습니다.');
-    } finally {
-      setDeliveryFeeSavingRowKey(null);
-    }
+    requestLineChangeWithStatementCheck(row, { deliveryFee: nextDeliveryFee }, async () => {
+      setDeliveryFeeSavingRowKey(row.rowKey);
+      try {
+        await syncShopOrderDetail(row.shopOrderId, {
+          lines: [
+            {
+              id: row.line.id,
+              deliveryFee: nextDeliveryFee,
+            },
+          ],
+        });
+        await onReload();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : '배송비 저장에 실패했습니다.');
+      } finally {
+        setDeliveryFeeSavingRowKey(null);
+      }
+    });
   };
 
   const handleToggleVatExempt = async (row: ShopOrderLineListRow, enabled: boolean) => {
-    setVatExemptSavingRowKey(row.rowKey);
-    try {
-      await syncShopOrderDetail(row.shopOrderId, {
-        lines: [
-          {
-            id: row.line.id,
-            vatExempt: enabled,
-          },
-        ],
-      });
-      await onReload();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : '부가세 없음 저장에 실패했습니다.');
-    } finally {
-      setVatExemptSavingRowKey(null);
-    }
+    requestLineChangeWithStatementCheck(row, { vatExempt: enabled }, async () => {
+      setVatExemptSavingRowKey(row.rowKey);
+      try {
+        await syncShopOrderDetail(row.shopOrderId, {
+          lines: [
+            {
+              id: row.line.id,
+              vatExempt: enabled,
+            },
+          ],
+        });
+        await onReload();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : '부가세 없음 저장에 실패했습니다.');
+      } finally {
+        setVatExemptSavingRowKey(null);
+      }
+    });
   };
 
   const handleToggleShippingReady = async (row: ShopOrderLineListRow, enabled: boolean) => {
@@ -1131,6 +1173,19 @@ export function ShopOrderLineListTab({
         groups={statementGroups}
         title="거래명세표 미리보기"
         onClose={() => setStatementModalOpen(false)}
+      />
+
+      <ShopOrderStatementChangeNoticeDialog
+        isOpen={statementChangeNotice != null}
+        statements={statementChangeNotice?.statements ?? []}
+        onConfirm={() => {
+          const pending = statementChangeNotice;
+          if (!pending) return;
+          void pending.onConfirm();
+          setStatementChangeNotice(null);
+        }}
+        onCancel={() => setStatementChangeNotice(null)}
+        onViewStatement={handleViewRelatedStatement}
       />
     </>
   );

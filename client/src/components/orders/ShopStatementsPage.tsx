@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Download, Eye, Loader2, Search, XCircle } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   cancelShopOrderStatements,
   getShopOrderStatementGroupPreview,
@@ -26,6 +27,10 @@ import {
   type ShopOrderStatementGroupRow,
 } from '../../utils/shopOrderListExport';
 import { formatLineOrderRef } from '../../utils/shopOrderLineListUtils';
+import {
+  parseShopStatementFocusGroupKeys,
+  SHOP_STATEMENTS_PATH,
+} from '../../utils/shopStatementNavigation';
 import { ShopOrderListPagination } from './ShopOrderListPagination';
 import { ShopOrderStatementModal } from './ShopOrderStatementModal';
 
@@ -92,10 +97,21 @@ function filterStatements(
 }
 
 export function ShopStatementsPage() {
+  const [searchParams] = useSearchParams();
+  const focusGroupKeys = useMemo(
+    () => parseShopStatementFocusGroupKeys(searchParams.get('g')),
+    [searchParams]
+  );
+  const focusFilterActive = focusGroupKeys != null && focusGroupKeys.size > 0;
+  const autoPreviewRequested = searchParams.get('preview') === '1';
+  const autoPreviewDoneRef = useRef(false);
+
   const [orders, setOrders] = useState<ShopOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<StatementTabKind>('orders');
+  const [activeTab, setActiveTab] = useState<StatementTabKind>(() =>
+    searchParams.get('tab') === 'reservations' ? 'reservations' : 'orders'
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [onlyUndelivered, setOnlyUndelivered] = useState(false);
   const [busyGroupKey, setBusyGroupKey] = useState<string | null>(null);
@@ -128,6 +144,19 @@ export function ShopStatementsPage() {
   useEffect(() => {
     void loadOrders();
   }, [loadOrders]);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'reservations') {
+      setActiveTab('reservations');
+    } else if (tabParam === 'orders') {
+      setActiveTab('orders');
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    autoPreviewDoneRef.current = false;
+  }, [searchParams]);
 
   const orderStatementGroups = useMemo(
     () => buildStatementGroups(orders, 'orders'),
@@ -167,10 +196,13 @@ export function ShopStatementsPage() {
     [statementGroups]
   );
 
-  const filteredStatements = useMemo(
-    () => filterStatements(statementGroups, searchTerm, onlyUndelivered),
-    [searchTerm, statementGroups, onlyUndelivered]
-  );
+  const filteredStatements = useMemo(() => {
+    let result = filterStatements(statementGroups, searchTerm, onlyUndelivered);
+    if (focusGroupKeys && focusGroupKeys.size > 0) {
+      result = result.filter((group) => focusGroupKeys.has(group.groupKey));
+    }
+    return result;
+  }, [searchTerm, statementGroups, onlyUndelivered, focusGroupKeys]);
 
   const filteredCompanyGroups = useMemo(
     () => groupShopOrderStatementsByCompany(filteredStatements),
@@ -197,10 +229,17 @@ export function ShopStatementsPage() {
 
   useEffect(() => {
     setSelectedGroupKeys(new Set());
-    setExpandedGroupKeys(new Set());
+    if (!focusFilterActive) {
+      setExpandedGroupKeys(new Set());
+    }
     setOnlyUndelivered(false);
     setCurrentPage(1);
-  }, [activeTab, setCurrentPage]);
+  }, [activeTab, focusFilterActive, setCurrentPage]);
+
+  useEffect(() => {
+    if (!focusGroupKeys || focusGroupKeys.size === 0) return;
+    setExpandedGroupKeys(new Set(focusGroupKeys));
+  }, [focusGroupKeys]);
 
   const selectedGroups = useMemo(
     () => statementGroups.filter((group) => selectedGroupKeys.has(group.groupKey)),
@@ -395,6 +434,13 @@ export function ShopStatementsPage() {
       setBusyGroupKey(null);
     }
   };
+
+  useEffect(() => {
+    if (isLoading || autoPreviewDoneRef.current || !autoPreviewRequested) return;
+    if (filteredStatements.length !== 1) return;
+    autoPreviewDoneRef.current = true;
+    void handleViewStatement(filteredStatements[0]);
+  }, [isLoading, autoPreviewRequested, filteredStatements]);
 
   const handleDownloadStatement = async (group: ShopOrderStatementGroupRow) => {
     setBusyGroupKey(group.groupKey);
@@ -770,6 +816,20 @@ export function ShopStatementsPage() {
           <span className="ml-1.5 opacity-80">({reservationStatementGroups.length})</span>
         </button>
       </div>
+
+      {focusFilterActive && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-950">
+          <span>
+            관련 명세서 <strong>{filteredStatements.length.toLocaleString()}장</strong>만 표시 중입니다.
+          </span>
+          <Link
+            to={SHOP_STATEMENTS_PATH}
+            className="inline-flex items-center gap-1 font-medium text-purple-800 hover:text-purple-950 hover:underline"
+          >
+            전체 명세서 보기
+          </Link>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-6 text-sm">
         <span className="text-gray-600">
