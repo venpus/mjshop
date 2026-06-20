@@ -1,6 +1,6 @@
-export const SHOP_COST_EXCHANGE_RATE = 255;
-export const SHOP_COST_LOGISTICS_EXCHANGE_RATE = 225;
-export const SHOP_COST_INDEPENDENT_PACKING_CNY = 0.2;export const SHOP_COST_BAG_FILLER_CNY = 0.1;
+export const SHOP_COST_EXCHANGE_RATE = 225;
+export const SHOP_COST_INDEPENDENT_PACKING_CNY = 0.2;
+export const SHOP_COST_BAG_FILLER_CNY = 0.1;
 export const SHOP_COST_WEIGHT_RATE_KRW = 0.031;
 
 export interface ShopCostCalculatorInput {
@@ -40,7 +40,8 @@ export function calculateShopCost(input: ShopCostCalculatorInput): ShopCostCalcu
   const logisticsFeeKrw =
     parseWeight(input.weightGrams) *
     SHOP_COST_WEIGHT_RATE_KRW *
-    SHOP_COST_LOGISTICS_EXCHANGE_RATE;  const totalKrw = cnyToKrw + logisticsFeeKrw;
+    SHOP_COST_EXCHANGE_RATE;
+  const totalKrw = cnyToKrw + logisticsFeeKrw;
 
   return {
     unitCostsSumCny,

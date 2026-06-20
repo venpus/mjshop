@@ -8,7 +8,6 @@ import {
   SHOP_COST_BAG_FILLER_CNY,
   SHOP_COST_EXCHANGE_RATE,
   SHOP_COST_INDEPENDENT_PACKING_CNY,
-  SHOP_COST_LOGISTICS_EXCHANGE_RATE,
   SHOP_COST_WEIGHT_RATE_KRW,
 } from './shopCostCalculator';
 
@@ -147,7 +146,7 @@ export function CostCalculatorTool({ onBack }: CostCalculatorToolProps) {
 
         <div className="rounded border border-gray-200 bg-gray-50 px-2 py-1.5">
           <ResultRow
-            label={`물류비 (×${SHOP_COST_WEIGHT_RATE_KRW}×${SHOP_COST_LOGISTICS_EXCHANGE_RATE})`}
+            label={`물류비 (×${SHOP_COST_WEIGHT_RATE_KRW}×${SHOP_COST_EXCHANGE_RATE})`}
             value={formatShopCostKrw(result.logisticsFeeKrw)}
           />
         </div>
