@@ -54,6 +54,36 @@ export function resolveCompanyNameDisplay(
   return name;
 }
 
+export function resolveKakaoIdDisplay(
+  companyName: string | null | undefined,
+  buyers: ShopBuyerListItem[]
+): string {
+  const match = findShopBuyerByCompanyName(companyName, buyers);
+  if (match && match !== 'ambiguous' && match.kakaoId?.trim()) {
+    return match.kakaoId.trim();
+  }
+  return '-';
+}
+
+export function companyNameMatchesKakaoSearch(
+  companyName: string | null | undefined,
+  searchTerm: string,
+  buyers: ShopBuyerListItem[]
+): boolean {
+  const lower = searchTerm.trim().toLowerCase();
+  if (!lower) return false;
+
+  const normalizedCompany = normalizeShopBuyerCompanyName(companyName);
+  if (!normalizedCompany) return false;
+
+  return buyers.some(
+    (buyer) =>
+      Boolean(buyer.kakaoId?.trim()) &&
+      buyer.kakaoId!.toLowerCase().includes(lower) &&
+      normalizeShopBuyerCompanyName(buyer.companyName) === normalizedCompany
+  );
+}
+
 export function findMatchingAddressIndex(
   addresses: ShopBuyerAddress[],
   address: string,

@@ -9,8 +9,9 @@ import {
 } from '../../api/shopOrderApi';
 import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
 import {
+  companyNameMatchesKakaoSearch,
   findShopBuyerByCompanyName,
-  resolveCompanyNameDisplay,
+  resolveKakaoIdDisplay,
 } from '../../utils/shopBuyerDisplay';
 import {
   buildShopOrderStatementListRows,
@@ -61,7 +62,8 @@ function filterScopeStatements(
   statements: ShopOrderStatementGroupRow[],
   searchTerm: string,
   dateFrom: string,
-  dateTo: string
+  dateTo: string,
+  buyers: ShopBuyerListItem[]
 ): ShopOrderStatementGroupRow[] {
   let result = statements;
 
@@ -81,6 +83,7 @@ function filterScopeStatements(
   return result.filter(
     (statement) =>
       statement.companyName.toLowerCase().includes(lower) ||
+      companyNameMatchesKakaoSearch(statement.companyName, lower, buyers) ||
       statement.orderRefsLabel.toLowerCase().includes(lower) ||
       statement.productNamesLabel.toLowerCase().includes(lower) ||
       statement.lines.some(
@@ -227,8 +230,8 @@ export function ShopPaymentManagementPage() {
   const allStatements = useMemo(() => buildAllStatementGroups(orders), [orders]);
 
   const scopeStatements = useMemo(
-    () => filterScopeStatements(allStatements, searchTerm, dateFrom, dateTo),
-    [allStatements, searchTerm, dateFrom, dateTo]
+    () => filterScopeStatements(allStatements, searchTerm, dateFrom, dateTo, buyers),
+    [allStatements, searchTerm, dateFrom, dateTo, buyers]
   );
 
   const displayStatements = useMemo(
@@ -429,7 +432,7 @@ export function ShopPaymentManagementPage() {
               type="search"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="주문번호, 상호명, 상품명 검색"
+              placeholder="주문번호, 상호명, 카톡, 상품명 검색"
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
@@ -522,6 +525,9 @@ export function ShopPaymentManagementPage() {
                     <th className="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">
                       상호명
                     </th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">
+                      카톡 아이디
+                    </th>
                     <th className="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap min-w-[140px]">
                       주문번호
                     </th>
@@ -577,8 +583,11 @@ export function ShopPaymentManagementPage() {
                             className={`font-medium truncate max-w-[140px] block ${linkButtonClass}`}
                             title="구매자 정보 보기"
                           >
-                            {resolveCompanyNameDisplay(statement.companyName, buyers)}
+                            {(statement.companyName ?? '').trim() || '-'}
                           </button>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-600 max-w-[120px] truncate">
+                          {resolveKakaoIdDisplay(statement.companyName, buyers)}
                         </td>
                         <td className="px-4 py-3 text-gray-700">
                           <div className="flex flex-col gap-0.5">
