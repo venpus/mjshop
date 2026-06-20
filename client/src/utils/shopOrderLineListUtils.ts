@@ -1,5 +1,6 @@
 import type { ShopOrder, ShopOrderLine } from '../api/shopOrderApi';
 import type { ShopOrderLineListRow } from './shopOrderListExport';
+import type { ShopOrderLineDateField } from '../components/orders/shopOrderListUrlParams';
 
 export type ShopOrderLineProgressStatus = '출고대기' | '배송중' | '정산중' | '완료';
 
@@ -202,6 +203,24 @@ export function matchesLineFulfillmentFilters(
   return true;
 }
 
+export function getLineDateFieldValue(
+  row: ShopOrderLineListRow,
+  field: ShopOrderLineDateField
+): string | null {
+  switch (field) {
+    case 'orderDate':
+      return row.orderDate;
+    case 'chinaInboundDate':
+      return row.chinaInboundDate;
+    case 'chinaOutboundDate':
+      return row.chinaOutboundDate;
+    case 'koreaArrivalDate':
+      return row.koreaArrivalDate;
+    case 'actualArrivalDate':
+      return row.actualArrivalDate;
+  }
+}
+
 export function matchesLineDateRange(
   orderDate: string | null,
   dateFrom: string,
@@ -214,6 +233,15 @@ export function matchesLineDateRange(
   if (dateFrom && normalized < dateFrom) return false;
   if (dateTo && normalized > dateTo) return false;
   return true;
+}
+
+export function matchesLineRowDateRange(
+  row: ShopOrderLineListRow,
+  dateField: ShopOrderLineDateField,
+  dateFrom: string,
+  dateTo: string
+): boolean {
+  return matchesLineDateRange(getLineDateFieldValue(row, dateField), dateFrom, dateTo);
 }
 
 export function hasActiveLineFulfillmentFilters(filters: ShopOrderLineFulfillmentFilters): boolean {

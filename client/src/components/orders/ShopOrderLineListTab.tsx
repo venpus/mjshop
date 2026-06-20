@@ -51,7 +51,7 @@ import {
   lineHasPayment,
   lineHasStatement,
   lineHasStatementDelivered,
-  matchesLineDateRange,
+  matchesLineRowDateRange,
   matchesLineFulfillmentFilters,
   sortShopOrderLineRowsByCompanyAddress,
   lineInPreShipmentPhase,
@@ -63,7 +63,7 @@ import {
 import { ShopBuyerInfoModal } from './ShopBuyerInfoModal';
 import { ShopOrderListPagination } from './ShopOrderListPagination';
 import { shopOrderDetailPath, shopOrderListReturnPath } from './shopOrderListNavigation';
-import { SHOP_ORDER_LIST_ALL_STATUS } from './shopOrderListUrlParams';
+import { SHOP_ORDER_LINE_DATE_FIELD_OPTIONS, SHOP_ORDER_LIST_ALL_STATUS } from './shopOrderListUrlParams';
 import { ShopOrderReservationTransferModal, type ReservationTransferItem } from './ShopOrderReservationTransferModal';
 import { ShopOrderStatementCreateDialog } from './ShopOrderStatementCreateDialog';
 import {
@@ -190,6 +190,9 @@ export function ShopOrderLineListTab({
     setDateFrom,
     dateTo,
     setDateTo,
+    dateField,
+    setDateField,
+    clearDateFilter,
     sortByCompanyAddress,
     toggleSortByCompanyAddress,
     fulfillmentFilters,
@@ -268,18 +271,19 @@ export function ShopOrderLineListTab({
         (row.line.address ?? '').toLowerCase().includes(lower) ||
         (row.line.trackingNumber ?? '').toLowerCase().includes(lower);
       const matchesStatus = statusFilter === ALL_STATUS || row.orderStatus === statusFilter;
-      const matchesDate = matchesLineDateRange(row.orderDate, dateFrom, dateTo);
+      const matchesDate = matchesLineRowDateRange(row, dateField, dateFrom, dateTo);
       const matchesFulfillment = matchesLineFulfillmentFilters(row, fulfillmentFilters);
       return matchesSearch && matchesStatus && matchesDate && matchesFulfillment;
     });
-  }, [lineRows, searchTerm, statusFilter, dateFrom, dateTo, fulfillmentFilters, buyers]);
+  }, [lineRows, searchTerm, statusFilter, dateField, dateFrom, dateTo, fulfillmentFilters, buyers]);
 
   const displayRows = useMemo(() => {
     if (!sortByCompanyAddress) return filteredRows;
     return sortShopOrderLineRowsByCompanyAddress(filteredRows);
   }, [filteredRows, sortByCompanyAddress]);
 
-  const paginationResetKey = `${lineKind}|${searchTerm}|${statusFilter}|${dateFrom}|${dateTo}|${sortByCompanyAddress}|${JSON.stringify(fulfillmentFilters)}`;
+  const dateFilterActive = Boolean(dateFrom || dateTo);
+  const paginationResetKey = `${lineKind}|${searchTerm}|${statusFilter}|${dateField}|${dateFrom}|${dateTo}|${sortByCompanyAddress}|${JSON.stringify(fulfillmentFilters)}`;
   const {
     paginatedItems: paginatedRows,
     totalPages,
@@ -637,6 +641,44 @@ export function ShopOrderLineListTab({
               </option>
             ))}
           </select>
+          <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+            <select
+              value={dateField}
+              onChange={(e) => setDateField(e.target.value as typeof dateField)}
+              className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${accentRingClass} appearance-none bg-white text-sm`}
+              title="날짜 필터 기준"
+            >
+              {SHOP_ORDER_LINE_DATE_FIELD_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${accentRingClass} text-sm`}
+              title="시작일"
+            />
+            <span className="text-gray-400">~</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${accentRingClass} text-sm`}
+              title="종료일"
+            />
+            {dateFilterActive && (
+              <button
+                type="button"
+                onClick={clearDateFilter}
+                className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap"
+              >
+                날짜 초기화
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-col xl:flex-row xl:items-end gap-3">
@@ -688,39 +730,13 @@ export function ShopOrderLineListTab({
               <ArrowUpDown className="w-4 h-4" />
               업체별 정렬
             </button>
-            <span className="text-sm font-medium text-gray-600">등록일</span>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${accentRingClass}`}
-            />
-            <span className="text-gray-400">~</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 ${accentRingClass}`}
-            />
-            {(dateFrom || dateTo) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setDateFrom('');
-                  setDateTo('');
-                }}
-                className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700"
-              >
-                날짜 초기화
-              </button>
-            )}
           </div>
         </div>
 
         <p className="text-sm text-gray-500">
           {displayRows.length.toLocaleString()}건 표시
           {sortByCompanyAddress ? ' · 업체별 정렬' : ''}
-          {fulfillmentFilterActive || dateFrom || dateTo || statusFilter !== ALL_STATUS || searchTerm
+          {fulfillmentFilterActive || dateFilterActive || statusFilter !== ALL_STATUS || searchTerm
             ? ' (필터 적용됨)'
             : ''}
         </p>

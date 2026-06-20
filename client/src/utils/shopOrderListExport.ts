@@ -27,6 +27,10 @@ export interface ShopOrderLineExportRow {
   orderNumber: string;
   productName: string;
   orderDate: string | null;
+  chinaInboundDate: string | null;
+  chinaOutboundDate: string | null;
+  koreaArrivalDate: string | null;
+  actualArrivalDate: string | null;
   lineIndex: number;
   line: ShopOrderLine;
   productMainImage?: string | null;
@@ -62,6 +66,10 @@ export function flattenShopOrderLines(
         orderNumber: order.orderNumber,
         productName: order.productName,
         orderDate: order.orderDate,
+        chinaInboundDate: order.chinaInboundDate,
+        chinaOutboundDate: order.chinaOutboundDate,
+        koreaArrivalDate: order.koreaArrivalDate,
+        actualArrivalDate: order.actualArrivalDate,
         lineIndex: index + 1,
         line,
       });
@@ -84,6 +92,10 @@ export function buildShopOrderLineListRows(
         orderNumber: order.orderNumber,
         productName: order.productName,
         orderDate: order.orderDate,
+        chinaInboundDate: order.chinaInboundDate,
+        chinaOutboundDate: order.chinaOutboundDate,
+        koreaArrivalDate: order.koreaArrivalDate,
+        actualArrivalDate: order.actualArrivalDate,
         lineIndex: index + 1,
         line,
         shopOrderId: order.id,

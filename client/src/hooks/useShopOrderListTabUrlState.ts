@@ -6,6 +6,7 @@ import type { ShopOrderLineListKind } from '../utils/shopOrderListExport';
 import {
   buildShopOrderListSearchParams,
   parseShopOrderListUrlState,
+  type ShopOrderLineDateField,
   type ShopOrderLineListUrlState,
   type ShopOrderProductListUrlState,
 } from '../components/orders/shopOrderListUrlParams';
@@ -172,6 +173,14 @@ export function useShopOrderLineListUrlState(
     (value: string) => patch({ dateTo: value }, true),
     [patch]
   );
+  const setDateField = useCallback(
+    (value: ShopOrderLineDateField) => patch({ dateField: value }, true),
+    [patch]
+  );
+  const clearDateFilter = useCallback(
+    () => patch({ dateFrom: '', dateTo: '' }, true),
+    [patch]
+  );
   const setSortByCompanyAddress = useCallback(
     (value: boolean) => patch({ sortByCompanyAddress: value }, true),
     [patch]
@@ -224,6 +233,9 @@ export function useShopOrderLineListUrlState(
     setDateFrom,
     dateTo: state.dateTo,
     setDateTo,
+    dateField: state.dateField,
+    setDateField,
+    clearDateFilter,
     sortByCompanyAddress: state.sortByCompanyAddress,
     setSortByCompanyAddress,
     toggleSortByCompanyAddress,

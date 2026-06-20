@@ -29,9 +29,30 @@ export interface ShopOrderProductListUrlState {
   page: number;
 }
 
+export type ShopOrderLineDateField =
+  | 'orderDate'
+  | 'chinaInboundDate'
+  | 'chinaOutboundDate'
+  | 'koreaArrivalDate'
+  | 'actualArrivalDate';
+
+export const SHOP_ORDER_LINE_DATE_FIELD_OPTIONS: Array<{
+  value: ShopOrderLineDateField;
+  label: string;
+}> = [
+  { value: 'orderDate', label: '등록일' },
+  { value: 'chinaInboundDate', label: '중국입고' },
+  { value: 'chinaOutboundDate', label: '중국출고' },
+  { value: 'koreaArrivalDate', label: '한국도착(예상)' },
+  { value: 'actualArrivalDate', label: '한국도착(실제)' },
+];
+
+export const DEFAULT_SHOP_ORDER_LINE_DATE_FIELD: ShopOrderLineDateField = 'orderDate';
+
 export interface ShopOrderLineListUrlState {
   search: string;
   status: string;
+  dateField: ShopOrderLineDateField;
   dateFrom: string;
   dateTo: string;
   sortByCompanyAddress: boolean;
@@ -55,6 +76,7 @@ const DEFAULT_PRODUCT_LIST_STATE: ShopOrderProductListUrlState = {
 const DEFAULT_LINE_LIST_STATE: ShopOrderLineListUrlState = {
   search: '',
   status: SHOP_ORDER_LIST_ALL_STATUS,
+  dateField: DEFAULT_SHOP_ORDER_LINE_DATE_FIELD,
   dateFrom: '',
   dateTo: '',
   sortByCompanyAddress: false,
@@ -90,6 +112,11 @@ function serializeFulfillmentFilters(filters: ShopOrderLineFulfillmentFilters): 
   return FULFILLMENT_FILTER_KEYS.filter((key) => filters[key]).join(',');
 }
 
+function parseDateField(value: string | null): ShopOrderLineDateField {
+  const valid = SHOP_ORDER_LINE_DATE_FIELD_OPTIONS.some((option) => option.value === value);
+  return valid ? (value as ShopOrderLineDateField) : DEFAULT_SHOP_ORDER_LINE_DATE_FIELD;
+}
+
 function parseProductListState(params: URLSearchParams): ShopOrderProductListUrlState {
   return {
     search: params.get('pq') ?? '',
@@ -105,6 +132,7 @@ function parseLineListState(
   return {
     search: params.get(`${prefix}q`) ?? '',
     status: parseStatus(params.get(`${prefix}st`)),
+    dateField: parseDateField(params.get(`${prefix}dk`)),
     dateFrom: params.get(`${prefix}f`) ?? '',
     dateTo: params.get(`${prefix}t`) ?? '',
     sortByCompanyAddress: params.get(`${prefix}sort`) === '1',
@@ -138,6 +166,9 @@ function writeLineListState(
   }
   if (state.status !== SHOP_ORDER_LIST_ALL_STATUS) {
     params.set(`${prefix}st`, state.status);
+  }
+  if (state.dateField !== DEFAULT_SHOP_ORDER_LINE_DATE_FIELD) {
+    params.set(`${prefix}dk`, state.dateField);
   }
   if (state.dateFrom) {
     params.set(`${prefix}f`, state.dateFrom);
