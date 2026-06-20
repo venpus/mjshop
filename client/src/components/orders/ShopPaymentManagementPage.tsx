@@ -45,6 +45,30 @@ function formatKrwAmount(value: number): string {
   return `₩${value.toLocaleString()}`;
 }
 
+function isAmountLikeSearchTerm(value: string): boolean {
+  const normalized = value.trim().replace(/[₩원,\s]/g, '');
+  return normalized.length > 0 && /^\d+$/.test(normalized);
+}
+
+function statementMatchesAmountSearch(
+  statement: ShopOrderStatementGroupRow,
+  searchTerm: string
+): boolean {
+  if (!isAmountLikeSearchTerm(searchTerm)) return false;
+
+  const queryDigits = searchTerm.trim().replace(/\D/g, '');
+  if (!queryDigits) return false;
+
+  const amounts = [
+    statement.totalAmount,
+    statement.productSupplyAmount,
+    statement.vatAmount,
+    statement.deliveryFee,
+  ];
+
+  return amounts.some((amount) => amount > 0 && String(amount).includes(queryDigits));
+}
+
 function buildAllStatementGroups(orders: ShopOrder[]): ShopOrderStatementGroupRow[] {
   const rows = [
     ...buildShopOrderStatementListRows(orders, 'orders'),
@@ -84,6 +108,7 @@ function filterScopeStatements(
     (statement) =>
       statement.companyName.toLowerCase().includes(lower) ||
       companyNameMatchesKakaoSearch(statement.companyName, lower, buyers) ||
+      statementMatchesAmountSearch(statement, searchTerm.trim()) ||
       statement.orderRefsLabel.toLowerCase().includes(lower) ||
       statement.productNamesLabel.toLowerCase().includes(lower) ||
       statement.lines.some(
@@ -432,7 +457,7 @@ export function ShopPaymentManagementPage() {
               type="search"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="주문번호, 상호명, 카톡, 상품명 검색"
+              placeholder="주문번호, 상호명, 카톡, 상품명, 입금금액 검색"
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
