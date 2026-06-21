@@ -3,6 +3,7 @@ import { Image, Package, X } from 'lucide-react';
 import type { ShopOrder } from '../../api/shopOrderApi';
 import { getShopOrderStatusClass } from '../../api/shopOrderApi';
 import { getFullImageUrl } from '../../api/purchaseOrderApi';
+import { SHOP_COST_EXCHANGE_RATE } from '../shop-tools/shopCostCalculator';
 
 interface ShopOrderProductInfoModalProps {
   isOpen: boolean;
@@ -106,28 +107,43 @@ export function ShopOrderProductInfoModal({ isOpen, order, onClose }: ShopOrderP
               label="판매가"
               value={order.sellingPrice != null ? `₩${order.sellingPrice.toLocaleString()}` : '-'}
             />
-            <InfoRow
-              label="최초 입력 예상단가"
-              value={
-                order.initialExpectedUnitPrice != null
-                  ? `¥${order.initialExpectedUnitPrice.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}`
-                  : '-'
-              }
-            />
-            <InfoRow
-              label="원가 단가"
-              value={
-                order.unitPrice != null
-                  ? `¥${order.unitPrice.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}`
-                  : '-'
-              }
-            />
+            <div className="py-2 border-b border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                원가 정보
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="rounded-md bg-white border border-gray-200 px-3 py-2">
+                  <p className="text-xs text-gray-500 mb-1">최초 입력 예상단가</p>
+                  <p className="text-sm text-gray-800 tabular-nums">
+                    {order.initialExpectedUnitPrice != null
+                      ? `¥${order.initialExpectedUnitPrice.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
+                      : '-'}
+                  </p>
+                </div>
+                <div className="rounded-md bg-white border border-gray-200 px-3 py-2">
+                  <p className="text-xs text-gray-500 mb-1">원가 단가</p>
+                  <p className="text-sm font-medium text-gray-900 tabular-nums">
+                    {order.unitPrice != null
+                      ? `¥${order.unitPrice.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
+                      : '-'}
+                  </p>
+                  {order.unitPrice != null && order.unitPrice > 0 && (
+                    <p className="text-xs text-indigo-700 tabular-nums mt-1">
+                      ₩{Math.round(order.unitPrice * SHOP_COST_EXCHANGE_RATE).toLocaleString()}
+                      <span className="text-gray-400 font-normal ml-1">
+                        (×{SHOP_COST_EXCHANGE_RATE})
+                      </span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
             <InfoRow label="등록일" value={order.orderDate ?? '-'} />
             <InfoRow label="연결 발주 ID" value={order.purchaseOrderId ?? '-'} />
             <InfoRow label="메모" value={order.note ?? '-'} />

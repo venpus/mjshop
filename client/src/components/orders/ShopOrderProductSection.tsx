@@ -4,6 +4,7 @@ import { getFullImageUrl } from '../../api/purchaseOrderApi';
 import { handleNumberInputWheel } from '../../utils/preventNumberInputWheel';
 import type { ShopOrderStatus } from '../../api/shopOrderApi';
 import { getShopOrderStatusClass } from '../../api/shopOrderApi';
+import { SHOP_COST_EXCHANGE_RATE } from '../shop-tools/shopCostCalculator';
 
 export type ShopOrderLogisticsDateField =
   | 'chinaInboundDate'
@@ -52,6 +53,45 @@ function formatWeightDisplay(value: string | null | undefined): string {
   const trimmed = value.trim();
   if (/g|kg/i.test(trimmed)) return trimmed;
   return `${trimmed}g`;
+}
+
+function formatCnyAmount(value: number | null | undefined): string {
+  if (value == null) return '-';
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatCnyAsKrw(value: number | null | undefined): string | null {
+  if (value == null || value <= 0) return null;
+  return Math.round(value * SHOP_COST_EXCHANGE_RATE).toLocaleString();
+}
+
+function UnitPriceWithKrw({
+  cny,
+  title,
+}: {
+  cny: number | null;
+  title?: string;
+}) {
+  const krw = formatCnyAsKrw(cny);
+
+  return (
+    <div className="text-right min-h-[2.25rem] flex flex-col justify-center" title={title}>
+      <span className="text-sm font-medium text-gray-900 tabular-nums leading-tight">
+        ¥{formatCnyAmount(cny)}
+      </span>
+      {krw != null ? (
+        <span className="text-xs text-indigo-700 tabular-nums leading-tight mt-0.5">
+          ₩{krw}
+          <span className="text-gray-400 font-normal ml-1">(×{SHOP_COST_EXCHANGE_RATE})</span>
+        </span>
+      ) : (
+        <span className="text-xs text-gray-400 mt-0.5">-</span>
+      )}
+    </div>
+  );
 }
 
 function ReadOnlyValue({ value }: { value: string }) {
@@ -220,51 +260,6 @@ export function ShopOrderProductSection({
               />
             </InfoField>
 
-            <InfoField label="최초 입력 예상단가 (¥)" className="w-[108px]">
-              <span
-                className="text-sm text-gray-700 tabular-nums text-right block"
-                title="주문 등록 시점의 예상단가"
-              >
-                {initialExpectedUnitPrice != null
-                  ? initialExpectedUnitPrice.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })
-                  : '-'}
-              </span>
-            </InfoField>
-
-            <InfoField label="원가 단가 (¥)" className="w-[88px]">
-              {purchaseOrderId ? (
-                <span
-                  className="text-sm font-medium text-gray-900 tabular-nums text-right block"
-                  title="발주 최종 예상단가와 자동 동기화"
-                >
-                  {unitPrice != null
-                    ? unitPrice.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })
-                    : '-'}
-                </span>
-              ) : (
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={unitPrice ?? ''}
-                  onChange={(e) =>
-                    onUnitPriceChange?.(
-                      e.target.value === '' ? null : parseFloat(e.target.value) || 0
-                    )
-                  }
-                  onWheel={handleNumberInputWheel}
-                  className={inputClass}
-                  placeholder="원가"
-                />
-              )}
-            </InfoField>
-
             <InfoField label="등록일" className="w-[88px]">
               <span className="text-sm text-gray-900 whitespace-nowrap">{orderDate || '-'}</span>
             </InfoField>
@@ -276,6 +271,58 @@ export function ShopOrderProductSection({
                 {status}
               </span>
             </InfoField>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-2 mt-2.5 pt-2.5 border-t border-gray-100">
+            <div
+              className="flex flex-nowrap items-end gap-x-6 px-3.5 py-2 rounded-lg bg-slate-50 border border-slate-200/90 shrink-0"
+              aria-label="원가 정보"
+            >
+              <InfoField label="최초 입력 예상단가 (¥)" className="w-[120px]">
+                <span
+                  className="text-sm text-gray-600 tabular-nums text-right block leading-tight"
+                  title="주문 등록 시점의 예상단가 (변경되지 않음)"
+                >
+                  ¥{formatCnyAmount(initialExpectedUnitPrice)}
+                </span>
+              </InfoField>
+
+              <div className="w-px self-stretch bg-slate-200 shrink-0" aria-hidden />
+
+              <InfoField label="원가 단가 (¥)" className="min-w-[108px]">
+                {purchaseOrderId ? (
+                  <UnitPriceWithKrw
+                    cny={unitPrice}
+                    title="발주 최종 예상단가와 자동 동기화"
+                  />
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={unitPrice ?? ''}
+                      onChange={(e) =>
+                        onUnitPriceChange?.(
+                          e.target.value === '' ? null : parseFloat(e.target.value) || 0
+                        )
+                      }
+                      onWheel={handleNumberInputWheel}
+                      className={inputClass}
+                      placeholder="원가"
+                    />
+                    {formatCnyAsKrw(unitPrice) != null && (
+                      <span className="text-xs text-indigo-700 tabular-nums text-right pr-0.5">
+                        ₩{formatCnyAsKrw(unitPrice)}
+                        <span className="text-gray-400 font-normal ml-1">
+                          (×{SHOP_COST_EXCHANGE_RATE})
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </InfoField>
+            </div>
           </div>
 
           <div className="flex flex-nowrap items-end gap-x-2 gap-y-2 min-w-max mt-2 pt-2 border-t border-gray-100">
