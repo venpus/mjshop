@@ -107,8 +107,26 @@ export function ShopOrderProductInfoModal({ isOpen, order, onClose }: ShopOrderP
               value={order.sellingPrice != null ? `₩${order.sellingPrice.toLocaleString()}` : '-'}
             />
             <InfoRow
+              label="최초 입력 예상단가"
+              value={
+                order.initialExpectedUnitPrice != null
+                  ? `¥${order.initialExpectedUnitPrice.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`
+                  : '-'
+              }
+            />
+            <InfoRow
               label="원가 단가"
-              value={order.unitPrice != null ? `¥${order.unitPrice.toLocaleString()}` : '-'}
+              value={
+                order.unitPrice != null
+                  ? `¥${order.unitPrice.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`
+                  : '-'
+              }
             />
             <InfoRow label="등록일" value={order.orderDate ?? '-'} />
             <InfoRow label="연결 발주 ID" value={order.purchaseOrderId ?? '-'} />

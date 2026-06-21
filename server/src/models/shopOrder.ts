@@ -11,6 +11,8 @@ export interface ShopOrder {
   productName: string;
   productMainImage: string | null;
   unitPrice: number | null;
+  /** 주문 등록 시점의 예상단가 스냅샷 (CNY) — 이후 자동 동기화 대상 아님 */
+  initialExpectedUnitPrice: number | null;
   quantity: number;
   stockQuantity: number;
   warehouseStockQuantity: number;

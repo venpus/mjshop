@@ -17,6 +17,7 @@ interface ShopOrderRow extends RowDataPacket {
   product_name: string;
   product_main_image: string | null;
   unit_price: number | null;
+  initial_expected_unit_price: number | null;
   quantity: number;
   stock_quantity: number;
   warehouse_stock_quantity: number | null;
@@ -57,6 +58,7 @@ export interface CreateShopOrderData {
   productName: string;
   productMainImage: string | null;
   unitPrice: number | null;
+  initialExpectedUnitPrice?: number | null;
   quantity: number;
   stockQuantity: number;
   sellingPrice: number | null;
@@ -75,7 +77,7 @@ function normalizeOrderDate(value: string | Date | null | undefined): string | n
 }
 
 const SHOP_ORDER_SELECT = `id, order_number, stock_inbound_item_id, purchase_order_id, product_id,
-              product_name, product_main_image, unit_price, quantity, stock_quantity,
+              product_name, product_main_image, unit_price, initial_expected_unit_price, quantity, stock_quantity,
               warehouse_stock_quantity, selling_price, status, order_date,
               china_inbound_date, china_outbound_date, korea_arrival_date, actual_arrival_date,
               note,
@@ -148,9 +150,9 @@ export class ShopOrderRepository {
     await pool.execute<ResultSetHeader>(
       `INSERT INTO kr_shop_orders
        (id, order_number, stock_inbound_item_id, purchase_order_id, product_id,
-        product_name, product_main_image, unit_price, quantity, stock_quantity,
+        product_name, product_main_image, unit_price, initial_expected_unit_price, quantity, stock_quantity,
         selling_price, status, order_date, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.id,
         data.orderNumber,
@@ -160,6 +162,7 @@ export class ShopOrderRepository {
         data.productName,
         data.productMainImage,
         data.unitPrice,
+        data.initialExpectedUnitPrice ?? data.unitPrice ?? null,
         data.quantity,
         data.stockQuantity,
         data.sellingPrice,
@@ -252,6 +255,16 @@ export class ShopOrderRepository {
       [id]
     );
     return result.affectedRows > 0;
+  }
+
+  async updateUnitPriceByPurchaseOrderId(
+    purchaseOrderId: string,
+    unitPrice: number
+  ): Promise<void> {
+    await pool.execute<ResultSetHeader>(
+      `UPDATE kr_shop_orders SET unit_price = ? WHERE purchase_order_id = ?`,
+      [unitPrice, purchaseOrderId]
+    );
   }
 
   async syncStockQuantityFromInbound(stockInboundItemId: number, stockQuantity: number): Promise<void> {
@@ -395,6 +408,10 @@ export class ShopOrderRepository {
       productName: row.product_name,
       productMainImage: row.product_main_image,
       unitPrice: row.unit_price != null ? Number(row.unit_price) : null,
+      initialExpectedUnitPrice:
+        row.initial_expected_unit_price != null
+          ? Number(row.initial_expected_unit_price)
+          : null,
       quantity: Number(row.quantity) || 0,
       stockQuantity: Number(row.stock_quantity) || 0,
       warehouseStockQuantity:

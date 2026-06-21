@@ -618,17 +618,14 @@ export function PurchaseOrderDetail({
         getShippingCostByPurchaseOrder(orderId)
           .then((shippingCostData) => {
             if (shippingCostData) {
-              // 발주 수량 × 단위당 배송비로 총 배송비 계산
               const packingListCost = calculatePackingListShippingCost(
                 shippingCostData.unit_shipping_cost,
                 shippingCostData.ordered_quantity
               );
               setPackingListShippingCost(packingListCost);
-    } else {
-      setPackingListShippingCost(0);
-      setShippingQuantity(undefined);
-      setKoreaArrivedQuantity(undefined);
-    }
+            } else {
+              setPackingListShippingCost(0);
+            }
           })
           .catch((error) => {
             console.error('패킹리스트 배송비 조회 오류:', error);
@@ -1442,6 +1439,7 @@ export function PurchaseOrderDetail({
         finalUnitPrice={expectedFinalUnitPrice}
         shippingQuantity={shippingQuantity}
         koreaArrivedQuantity={koreaArrivedQuantity}
+        packingListShippingCost={packingListShippingCost}
         orderDate={orderDate}
         deliveryDate={deliveryDate}
         isOrderConfirmed={isOrderConfirmed}

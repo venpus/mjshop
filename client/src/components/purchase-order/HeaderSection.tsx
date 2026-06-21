@@ -20,6 +20,9 @@ interface HeaderSectionProps {
   packagingSize?: string;
   packaging: number;
   finalUnitPrice?: number;
+  shippingQuantity?: number;
+  koreaArrivedQuantity?: number;
+  packingListShippingCost?: number;
   orderDate: string;
   deliveryDate: string;
   isOrderConfirmed: boolean;
@@ -61,6 +64,9 @@ export function HeaderSection({
   packagingSize,
   packaging,
   finalUnitPrice,
+  shippingQuantity,
+  koreaArrivedQuantity,
+  packingListShippingCost,
   orderDate,
   deliveryDate,
   isOrderConfirmed,
@@ -111,6 +117,9 @@ export function HeaderSection({
             packagingSize={packagingSize}
             packaging={packaging}
             finalUnitPrice={finalUnitPrice}
+            shippingQuantity={shippingQuantity}
+            koreaArrivedQuantity={koreaArrivedQuantity}
+            packingListShippingCost={packingListShippingCost}
             orderDate={orderDate}
             deliveryDate={deliveryDate}
             isOrderConfirmed={isOrderConfirmed}

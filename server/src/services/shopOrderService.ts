@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { ShopOrderRepository } from '../repositories/shopOrderRepository.js';
 import { ShopBuyerRepository } from '../repositories/shopBuyerRepository.js';
 import { StockInboundRepository } from '../repositories/stockInboundRepository.js';
+import { resolvePurchaseOrderUnitPrice } from '../utils/purchaseOrderUnitPrice.js';
 import { calculateShopOrderAmountBreakdown } from '../utils/shopOrderCalculations.js';
 import { deriveShopOrderStatus } from '../utils/shopOrderStatus.js';
 import {
@@ -176,6 +177,12 @@ export class ShopOrderService {
 
     const existing = await this.repository.findByStockInboundItemId(stockInboundItemId);
     if (existing) {
+      if (existing.purchaseOrderId) {
+        const { syncShopOrderUnitPriceFromPurchaseOrder } = await import(
+          './shopOrderUnitPriceSync.js'
+        );
+        await syncShopOrderUnitPriceFromPurchaseOrder(existing.purchaseOrderId);
+      }
       const refreshed = await this.getOrderById(existing.id);
       return { order: refreshed!, created: false };
     }
@@ -183,6 +190,18 @@ export class ShopOrderService {
     const inbound = await this.stockInboundRepository.findById(stockInboundItemId);
     if (!inbound) {
       throw new Error('입고 항목을 찾을 수 없습니다.');
+    }
+
+    let unitPrice = inbound.unitPrice;
+    if (inbound.purchaseOrderId) {
+      const po = await this.stockInboundRepository.findPurchaseOrderForSync(inbound.purchaseOrderId);
+      if (po) {
+        unitPrice = resolvePurchaseOrderUnitPrice({
+          expectedFinalUnitPrice: po.expectedFinalUnitPrice,
+          orderUnitPrice: po.orderUnitPrice,
+          unitPrice: po.unitPrice,
+        }) ?? unitPrice;
+      }
     }
 
     const orderNumber = await this.repository.getNextOrderNumber();
@@ -196,7 +215,8 @@ export class ShopOrderService {
       productId: inbound.productId,
       productName: inbound.productName,
       productMainImage: inbound.productMainImage,
-      unitPrice: inbound.unitPrice,
+      unitPrice,
+      initialExpectedUnitPrice: unitPrice,
       quantity: inbound.inboundQuantity,
       stockQuantity: inbound.stockQuantity,
       sellingPrice: inbound.sellingPrice,
@@ -274,7 +294,7 @@ export class ShopOrderService {
       });
     }
 
-    if (data.unitPrice !== undefined) {
+    if (data.unitPrice !== undefined && !existing.purchaseOrderId) {
       const unitPrice =
         data.unitPrice != null && Number(data.unitPrice) > 0 ? Number(data.unitPrice) : null;
       await this.repository.update(id, { unitPrice });

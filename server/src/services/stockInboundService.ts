@@ -5,18 +5,14 @@ import {
   CreateStockInboundBatchDTO,
   BatchCreateStockInboundResult,
 } from '../models/stockInbound.js';
+import { resolvePurchaseOrderUnitPrice } from '../utils/purchaseOrderUnitPrice.js';
 
 function resolveUnitPrice(po: AvailablePurchaseOrderForInbound): number | null {
-  if (po.expectedFinalUnitPrice != null && po.expectedFinalUnitPrice > 0) {
-    return po.expectedFinalUnitPrice;
-  }
-  if (po.orderUnitPrice != null && po.orderUnitPrice > 0) {
-    return po.orderUnitPrice;
-  }
-  if (po.unitPrice != null && po.unitPrice > 0) {
-    return po.unitPrice;
-  }
-  return null;
+  return resolvePurchaseOrderUnitPrice({
+    expectedFinalUnitPrice: po.expectedFinalUnitPrice,
+    orderUnitPrice: po.orderUnitPrice,
+    unitPrice: po.unitPrice,
+  });
 }
 
 function resolveInboundQuantity(po: AvailablePurchaseOrderForInbound): number {
@@ -151,7 +147,7 @@ export class StockInboundService {
     if (existing) {
       const delta = arrivedQuantity - existing.inboundQuantity;
       const nextStock = Math.max(0, existing.stockQuantity + delta);
-      return this.repository.updateQuantities(existing.id, {
+      const updated = await this.repository.updateQuantities(existing.id, {
         inboundQuantity: arrivedQuantity,
         stockQuantity: nextStock,
         unitPrice,
@@ -161,9 +157,11 @@ export class StockInboundService {
         poNumber: po.poNumber,
         productId: po.productId,
       });
+      await this.syncShopOrdersUnitPrice(purchaseOrderId, unitPrice);
+      return updated;
     }
 
-    return this.repository.create({
+    const created = await this.repository.create({
       purchaseOrderId: po.id,
       groupKey: buildGroupKey(po.id, po.productName),
       productId: po.productId,
@@ -175,6 +173,18 @@ export class StockInboundService {
       sellingPrice: po.sellingPrice,
       stockQuantity: arrivedQuantity,
     });
+    await this.syncShopOrdersUnitPrice(purchaseOrderId, unitPrice);
+    return created;
+  }
+
+  private async syncShopOrdersUnitPrice(
+    purchaseOrderId: string,
+    unitPrice: number | null
+  ): Promise<void> {
+    if (unitPrice == null) return;
+    const { ShopOrderRepository } = await import('../repositories/shopOrderRepository.js');
+    const shopOrderRepository = new ShopOrderRepository();
+    await shopOrderRepository.updateUnitPriceByPurchaseOrderId(purchaseOrderId, unitPrice);
   }
 
   async syncFromPackingListItem(packingListItemId: number): Promise<void> {

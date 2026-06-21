@@ -726,6 +726,12 @@ export class PurchaseOrderService {
       await this.repository.update(purchaseOrderId, {
         expected_final_unit_price: expectedFinalUnitPrice > 0 ? expectedFinalUnitPrice : undefined,
       });
+
+      // 연결된 입고·주문관리 원가 단가 동기화
+      const { syncShopOrderUnitPriceFromPurchaseOrder } = await import(
+        './shopOrderUnitPriceSync.js'
+      );
+      await syncShopOrderUnitPriceFromPurchaseOrder(purchaseOrderId);
     } catch (error) {
       console.error(`expected_final_unit_price 계산 오류 (발주 ID: ${purchaseOrderId}):`, error);
       // 계산 실패해도 발주 생성/수정은 계속 진행

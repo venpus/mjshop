@@ -181,7 +181,7 @@ function toFormState(order: ShopOrder): ShopOrderFormState {
 
 
 
-function buildSyncPayload(form: ShopOrderFormState) {
+function buildSyncPayload(form: ShopOrderFormState, purchaseOrderId: string | null | undefined) {
 
   return {
 
@@ -191,7 +191,7 @@ function buildSyncPayload(form: ShopOrderFormState) {
 
     warehouseStockQuantity: form.warehouseStockQuantity,
 
-    unitPrice: form.unitPrice,
+    ...(purchaseOrderId ? {} : { unitPrice: form.unitPrice }),
 
     chinaInboundDate: form.chinaInboundDate.trim() || null,
 
@@ -461,7 +461,7 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
     try {
 
-      const updated = await syncShopOrderDetail(order.id, buildSyncPayload(form));
+      const updated = await syncShopOrderDetail(order.id, buildSyncPayload(form, order.purchaseOrderId));
 
       syncOrderState(updated);
 
@@ -602,7 +602,7 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
     try {
 
-      const updated = await syncShopOrderDetail(order.id, buildSyncPayload(form));
+      const updated = await syncShopOrderDetail(order.id, buildSyncPayload(form, order.purchaseOrderId));
 
       syncOrderState(updated);
 
@@ -917,6 +917,8 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
         quantityPerBox={form.quantityPerBox}
 
         unitPrice={form.unitPrice}
+
+        initialExpectedUnitPrice={order.initialExpectedUnitPrice}
 
         orderDate={form.orderDate}
 

@@ -54,6 +54,7 @@ export interface ShopOrder {
   productName: string;
   productMainImage: string | null;
   unitPrice: number | null;
+  initialExpectedUnitPrice: number | null;
   quantity: number;
   stockQuantity: number;
   warehouseStockQuantity: number;
@@ -143,6 +144,8 @@ function mapShopOrder(raw: Record<string, unknown>): ShopOrder {
     productName: String(raw.productName),
     productMainImage: raw.productMainImage != null ? String(raw.productMainImage) : null,
     unitPrice: raw.unitPrice != null ? Number(raw.unitPrice) : null,
+    initialExpectedUnitPrice:
+      raw.initialExpectedUnitPrice != null ? Number(raw.initialExpectedUnitPrice) : null,
     quantity: Number(raw.quantity) || 0,
     stockQuantity: Number(raw.stockQuantity) || 0,
     warehouseStockQuantity:

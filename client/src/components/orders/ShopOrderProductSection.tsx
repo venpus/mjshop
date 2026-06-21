@@ -21,6 +21,7 @@ interface ShopOrderProductSectionProps {
   sellingPrice: number | null;
   quantityPerBox: number;
   unitPrice: number | null;
+  initialExpectedUnitPrice: number | null;
   orderDate: string;
   chinaInboundDate: string;
   chinaOutboundDate: string;
@@ -88,6 +89,7 @@ export function ShopOrderProductSection({
   sellingPrice,
   quantityPerBox,
   unitPrice,
+  initialExpectedUnitPrice,
   orderDate,
   chinaInboundDate,
   chinaOutboundDate,
@@ -218,21 +220,49 @@ export function ShopOrderProductSection({
               />
             </InfoField>
 
+            <InfoField label="최초 입력 예상단가 (¥)" className="w-[108px]">
+              <span
+                className="text-sm text-gray-700 tabular-nums text-right block"
+                title="주문 등록 시점의 예상단가"
+              >
+                {initialExpectedUnitPrice != null
+                  ? initialExpectedUnitPrice.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  : '-'}
+              </span>
+            </InfoField>
+
             <InfoField label="원가 단가 (¥)" className="w-[88px]">
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={unitPrice ?? ''}
-                onChange={(e) =>
-                  onUnitPriceChange?.(
-                    e.target.value === '' ? null : parseFloat(e.target.value) || 0
-                  )
-                }
-                onWheel={handleNumberInputWheel}
-                className={inputClass}
-                placeholder="원가"
-              />
+              {purchaseOrderId ? (
+                <span
+                  className="text-sm font-medium text-gray-900 tabular-nums text-right block"
+                  title="발주 최종 예상단가와 자동 동기화"
+                >
+                  {unitPrice != null
+                    ? unitPrice.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    : '-'}
+                </span>
+              ) : (
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={unitPrice ?? ''}
+                  onChange={(e) =>
+                    onUnitPriceChange?.(
+                      e.target.value === '' ? null : parseFloat(e.target.value) || 0
+                    )
+                  }
+                  onWheel={handleNumberInputWheel}
+                  className={inputClass}
+                  placeholder="원가"
+                />
+              )}
             </InfoField>
 
             <InfoField label="등록일" className="w-[88px]">
