@@ -37,6 +37,7 @@ import {
   normalizeShopBuyerCompanyName,
   resolveCompanyNameDisplay,
 } from '../../utils/shopBuyerDisplay';
+import { buildBuyerModalOrderLineGroups } from '../../utils/shopBuyerModalOrderLines';
 import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
 import { useShopOrderListSearch } from '../../hooks/useShopOrderListSearch';
 import { useShopOrderLineListUrlState } from '../../hooks/useShopOrderListTabUrlState';
@@ -310,6 +311,11 @@ export function ShopOrderLineListTab({
   const somePageSelected = paginatedRows.some((row) => selectedRowKeys.has(row.rowKey));
 
   const listReturnPath = shopOrderListReturnPath(location.pathname, location.search);
+
+  const buyerModalOrderLineGroups = useMemo(() => {
+    if (!buyerModalCompanyName.trim()) return null;
+    return buildBuyerModalOrderLineGroups(orders, lineShipmentMap, buyerModalCompanyName);
+  }, [orders, lineShipmentMap, buyerModalCompanyName]);
 
   const handleToggleSelectAll = () => {
     setSelectedRowKeys((prev) => {
@@ -649,6 +655,17 @@ export function ShopOrderLineListTab({
     setBuyerUnmatchedMessage(null);
     setBuyerOrderLineInfo(null);
   };
+
+  const handleBuyerModalProductClick = useCallback(
+    (shopOrderId: string) => {
+      setBuyerModalOpen(false);
+      setSelectedBuyer(null);
+      setBuyerUnmatchedMessage(null);
+      setBuyerOrderLineInfo(null);
+      navigate(shopOrderDetailPath(shopOrderId, listTab, listReturnPath));
+    },
+    [listTab, listReturnPath, navigate]
+  );
 
   const bulkActionButtonClass =
     'inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
@@ -1140,6 +1157,8 @@ export function ShopOrderLineListTab({
         companyName={buyerModalCompanyName}
         unmatchedMessage={buyerUnmatchedMessage}
         orderLineInfo={buyerOrderLineInfo ?? undefined}
+        companyOrderLineGroups={buyerModalOrderLineGroups}
+        onProductClick={handleBuyerModalProductClick}
       />
 
       {transferModalOpen && (

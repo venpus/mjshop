@@ -3,6 +3,8 @@ import { X } from 'lucide-react';
 import { getShopBuyerImageUrl } from '../../api/shopBuyerApi';
 import { BuyerAddressListDisplay } from '../buyers/BuyerAddressListDisplay';
 import type { ShopBuyer } from '../buyers/types';
+import type { BuyerModalOrderLineGroups } from '../../utils/shopBuyerModalOrderLines';
+import { ShopBuyerOrderLinesPanel } from './ShopBuyerOrderLinesPanel';
 
 interface ShopBuyerInfoModalProps {
   isOpen: boolean;
@@ -17,6 +19,8 @@ interface ShopBuyerInfoModalProps {
     phoneNumber: string | null;
   };
   hideBusinessRegistrationImage?: boolean;
+  companyOrderLineGroups?: BuyerModalOrderLineGroups | null;
+  onProductClick?: (shopOrderId: string) => void;
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -37,6 +41,8 @@ export function ShopBuyerInfoModal({
   unmatchedMessage,
   orderLineInfo,
   hideBusinessRegistrationImage = false,
+  companyOrderLineGroups,
+  onProductClick,
 }: ShopBuyerInfoModalProps) {
   useEffect(() => {
     if (!isOpen) return;
@@ -56,7 +62,7 @@ export function ShopBuyerInfoModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="shop-buyer-info-title"
@@ -76,7 +82,7 @@ export function ShopBuyerInfoModal({
 
         <div className="flex-1 overflow-auto px-5 py-4">
           {isLoading ? (
-            <div className="py-12 text-center text-gray-500">구매자 정보를 불러오는 중...</div>
+            <div className="py-8 text-center text-gray-500">구매자 정보를 불러오는 중...</div>
           ) : buyer ? (
             <div className="space-y-5">
               <dl>
@@ -127,6 +133,13 @@ export function ShopBuyerInfoModal({
                 </div>
               )}
             </div>
+          )}
+
+          {companyOrderLineGroups && onProductClick && (
+            <ShopBuyerOrderLinesPanel
+              groups={companyOrderLineGroups}
+              onProductClick={onProductClick}
+            />
           )}
         </div>
 
