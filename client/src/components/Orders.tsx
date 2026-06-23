@@ -80,6 +80,10 @@ export function Orders() {
     [orders]
   );
 
+  const patchOrder = useCallback((updated: ShopOrder) => {
+    setOrders((prev) => prev.map((order) => (order.id === updated.id ? updated : order)));
+  }, []);
+
   const handleTabChange = (tab: ShopOrderListTab) => {
     setSearchParams(
       (prev) => {
@@ -145,6 +149,7 @@ export function Orders() {
               lineKind={activeTab === 'reservations' ? 'reservations' : 'orders'}
               lineShipmentMap={lineShipmentMap}
               onReload={loadOrders}
+              onOrderPatched={patchOrder}
             />
           )}
         </>

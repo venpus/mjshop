@@ -92,6 +92,7 @@ interface ShopOrderLineListTabProps {
   lineKind: Extract<ShopOrderLineListKind, 'orders' | 'reservations'>;
   lineShipmentMap: Map<string, LineShipmentInfo>;
   onReload: () => Promise<void>;
+  onOrderPatched: (order: ShopOrder) => void;
 }
 
 const ALL_STATUS = SHOP_ORDER_LIST_ALL_STATUS;
@@ -170,6 +171,7 @@ export function ShopOrderLineListTab({
   lineKind,
   lineShipmentMap,
   onReload,
+  onOrderPatched,
 }: ShopOrderLineListTabProps) {
   const isReservationTab = lineKind === 'reservations';
   const accentRingClass = isReservationTab ? 'focus:ring-amber-500' : 'focus:ring-emerald-500';
@@ -509,7 +511,7 @@ export function ShopOrderLineListTab({
     requestLineChangeWithStatementCheck(row, { deliveryFee: nextDeliveryFee }, async () => {
       setDeliveryFeeSavingRowKey(row.rowKey);
       try {
-        await syncShopOrderDetail(row.shopOrderId, {
+        const updated = await syncShopOrderDetail(row.shopOrderId, {
           lines: [
             {
               id: row.line.id,
@@ -517,7 +519,7 @@ export function ShopOrderLineListTab({
             },
           ],
         });
-        await onReload();
+        onOrderPatched(updated);
       } catch (err) {
         alert(err instanceof Error ? err.message : '배송비 저장에 실패했습니다.');
       } finally {
@@ -530,7 +532,7 @@ export function ShopOrderLineListTab({
     requestLineChangeWithStatementCheck(row, { vatExempt: enabled }, async () => {
       setVatExemptSavingRowKey(row.rowKey);
       try {
-        await syncShopOrderDetail(row.shopOrderId, {
+        const updated = await syncShopOrderDetail(row.shopOrderId, {
           lines: [
             {
               id: row.line.id,
@@ -538,7 +540,7 @@ export function ShopOrderLineListTab({
             },
           ],
         });
-        await onReload();
+        onOrderPatched(updated);
       } catch (err) {
         alert(err instanceof Error ? err.message : '부가세 없음 저장에 실패했습니다.');
       } finally {
@@ -552,7 +554,7 @@ export function ShopOrderLineListTab({
 
     setShippingReadySavingRowKey(row.rowKey);
     try {
-      await syncShopOrderDetail(row.shopOrderId, {
+      const updated = await syncShopOrderDetail(row.shopOrderId, {
         lines: [
           {
             id: row.line.id,
@@ -560,7 +562,7 @@ export function ShopOrderLineListTab({
           },
         ],
       });
-      await onReload();
+      onOrderPatched(updated);
     } catch (err) {
       alert(err instanceof Error ? err.message : '출고준비 저장에 실패했습니다.');
     } finally {
@@ -589,13 +591,13 @@ export function ShopOrderLineListTab({
 
     setRemovingLineRowKey(row.rowKey);
     try {
-      await deleteShopOrderLine(row.shopOrderId, row.line.id);
+      const updated = await deleteShopOrderLine(row.shopOrderId, row.line.id);
       setSelectedRowKeys((prev) => {
         const next = new Set(prev);
         next.delete(row.rowKey);
         return next;
       });
-      await onReload();
+      onOrderPatched(updated);
     } catch (err) {
       alert(err instanceof Error ? err.message : '주문 건 제거에 실패했습니다.');
     } finally {
