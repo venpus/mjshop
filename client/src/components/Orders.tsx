@@ -141,7 +141,12 @@ export function Orders() {
             </div>
           )}
           {activeTab === 'products' ? (
-            <ShopOrderProductListTab orders={orders} listTab={activeTab} onReload={loadOrders} />
+            <ShopOrderProductListTab
+              orders={orders}
+              listTab={activeTab}
+              onReload={loadOrders}
+              onOrderPatched={patchOrder}
+            />
           ) : (
             <ShopOrderLineListTab
               orders={orders}

@@ -15,6 +15,7 @@ import {
   getShopOrderById,
   getShopOrderStatusClass,
   SHOP_ORDER_STATUS_OPTIONS,
+  syncShopOrderDetail,
   type ShopOrder,
   type ShopOrderBulkStatementGroup,
 } from '../../api/shopOrderApi';
@@ -49,9 +50,18 @@ interface ShopOrderProductListTabProps {
   orders: ShopOrder[];
   listTab: ShopOrderListTab;
   onReload: () => Promise<void>;
+  onOrderPatched: (order: ShopOrder) => void;
 }
 
-export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrderProductListTabProps) {
+const dateInputClass =
+  'w-[118px] px-1.5 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500';
+
+export function ShopOrderProductListTab({
+  orders,
+  listTab,
+  onReload,
+  onOrderPatched,
+}: ShopOrderProductListTabProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const {
@@ -76,6 +86,7 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
     Array<{ shopOrderId: string; lineId: string }>
   >([]);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
+  const [savingKoreaArrivalOrderId, setSavingKoreaArrivalOrderId] = useState<string | null>(null);
 
   const checkboxClass =
     'w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer';
@@ -136,6 +147,24 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
 
   const handleViewDetail = (orderId: string) => {
     navigate(shopOrderDetailPath(orderId, listTab, listReturnPath));
+  };
+
+  const handleKoreaArrivalDateChange = async (order: ShopOrder, value: string) => {
+    const nextValue = value.trim() || null;
+    const currentValue = order.koreaArrivalDate?.slice(0, 10) ?? null;
+    if (nextValue === currentValue) return;
+
+    setSavingKoreaArrivalOrderId(order.id);
+    try {
+      const updated = await syncShopOrderDetail(order.id, {
+        koreaArrivalDate: nextValue,
+      });
+      onOrderPatched(updated);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '한국도착(예상)일 저장에 실패했습니다.');
+    } finally {
+      setSavingKoreaArrivalOrderId(null);
+    }
   };
 
   const handleDeleteProductOrder = async (order: ShopOrder, event: React.MouseEvent) => {
@@ -417,8 +446,8 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
                       aria-label="현재 페이지 전체 선택"
                     />
                   </th>
-                  <th className="px-6 py-3 text-left text-gray-600">주문번호</th>
-                  <th className="px-6 py-3 text-left text-gray-600">등록일</th>
+                  <th className="px-6 py-3 text-left text-gray-600 whitespace-nowrap">등록일</th>
+                  <th className="px-6 py-3 text-left text-gray-600 whitespace-nowrap">한국도착(예상)</th>
                   <th className="px-6 py-3 text-left text-gray-600">사진</th>
                   <th className="px-6 py-3 text-left text-gray-600">상품명</th>
                   <th className="px-6 py-3 text-left text-gray-600">판매 주문</th>
@@ -454,13 +483,30 @@ export function ShopOrderProductListTab({ orders, listTab, onReload }: ShopOrder
                         />
                       </td>
                       <td
-                        className="px-6 py-4 text-gray-900 select-text cursor-text"
+                        className="px-6 py-4 whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
                       >
-                        {order.orderNumber}
+                        <div className="text-gray-600">{order.orderDate ?? '-'}</div>
+                        <div className="mt-0.5 text-xs text-gray-500 select-text cursor-text">
+                          {order.orderNumber}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-gray-600">{order.orderDate ?? '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="date"
+                            value={order.koreaArrivalDate?.slice(0, 10) ?? ''}
+                            onChange={(e) => void handleKoreaArrivalDateChange(order, e.target.value)}
+                            disabled={savingKoreaArrivalOrderId === order.id}
+                            className={dateInputClass}
+                            title="한국도착(예상)일"
+                          />
+                          {savingKoreaArrivalOrderId === order.id && (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400 shrink-0" />
+                          )}
+                        </div>
+                      </td>
                       <td className="px-6 py-4">
                         {imageUrl ? (
                           <img
