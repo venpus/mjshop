@@ -15,6 +15,198 @@ import {
 import { pool } from '../config/database.js';
 import path from 'path';
 import fs from 'fs';
+import { computeProductFinalUnitCost } from '../utils/productCostCalculations.js';
+
+function parseOptionalFloat(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const parsed = parseFloat(String(value));
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseOptionalInt(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const parsed = parseInt(String(value), 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseNullableInt(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = parseInt(String(value), 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseBool(value: unknown): boolean {
+  if (value === true || value === 'true' || value === '1' || value === 1) return true;
+  return false;
+}
+
+function buildProductCostFields(formData: Record<string, unknown>) {
+  const price = parseOptionalFloat(formData.price) ?? 0;
+  const logistics_cost = parseOptionalFloat(formData.logisticsCost) ?? 0;
+  const tag_addon_enabled = parseBool(formData.tagAddonEnabled);
+  const tag_addon_price = tag_addon_enabled
+    ? parseOptionalFloat(formData.tagAddonPrice) ?? 0
+    : null;
+  const packaging_addon_enabled = parseBool(formData.packagingAddonEnabled);
+  const packaging_addon_price = packaging_addon_enabled
+    ? parseOptionalFloat(formData.packagingAddonPrice) ?? 0
+    : null;
+  const labor_cost = parseOptionalFloat(formData.laborCost) ?? 0;
+
+  const final_unit_cost = computeProductFinalUnitCost({
+    price,
+    logistics_cost,
+    tag_addon_enabled,
+    tag_addon_price,
+    packaging_addon_enabled,
+    packaging_addon_price,
+    labor_cost,
+  });
+
+  return {
+    price,
+    logistics_cost,
+    final_unit_cost,
+    has_tag: parseBool(formData.hasTag),
+    tag_addon_enabled,
+    tag_addon_price,
+    packaging_addon_enabled,
+    packaging_addon_price,
+    labor_cost,
+  };
+}
+
+function applyProductIdentityFields(
+  target: CreateProductDTO | UpdateProductDTO,
+  formData: Record<string, unknown>
+): void {
+  const nameChinese =
+    typeof formData.nameChinese === 'string' ? formData.nameChinese.trim() : '';
+  const name = typeof formData.name === 'string' ? formData.name.trim() : '';
+
+  if (!name && !nameChinese) {
+    return;
+  }
+
+  target.name = nameChinese || name;
+  target.name_chinese = nameChinese || undefined;
+}
+
+function collectUploadedImageFiles(
+  files: { [fieldname: string]: Express.Multer.File[] } | undefined
+): Express.Multer.File[] {
+  if (!files) return [];
+  const unified = files.images || [];
+  if (unified.length > 0) return unified;
+  return [...(files.mainImage || []), ...(files.infoImages || [])];
+}
+
+function parseStringArrayField(value: unknown): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean).map(String);
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.filter(Boolean).map(String) : [value];
+    } catch {
+      return value ? [value] : [];
+    }
+  }
+  return [];
+}
+
+function parseExistingImageUrls(formData: Record<string, unknown>): string[] {
+  const unified = parseStringArrayField(formData.existingImageUrls);
+  if (unified.length > 0) return unified;
+
+  const legacy: string[] = [];
+  if (formData.existingMainImageUrl) {
+    legacy.push(String(formData.existingMainImageUrl));
+  }
+  for (const url of parseStringArrayField(formData.existingInfoImageUrls)) {
+    if (!legacy.some((item) => urlMatches(item, url))) {
+      legacy.push(url);
+    }
+  }
+  return legacy;
+}
+
+function urlMatches(a: string, b: string): boolean {
+  return a === b || a.endsWith(b) || b.endsWith(a);
+}
+
+function isUrlKept(img: string, keepUrls: string[]): boolean {
+  return keepUrls.some((keep) => urlMatches(img, keep));
+}
+
+function resolveStoredUrl(clientUrl: string, storedUrls: string[]): string | null {
+  const match = storedUrls.find((stored) => urlMatches(stored, clientUrl));
+  return match ?? null;
+}
+
+async function saveUploadedProductImages(
+  productId: string,
+  imageFiles: Express.Multer.File[]
+): Promise<string[]> {
+  if (imageFiles.length === 0) return [];
+
+  await createProductImageDir(productId);
+  let currentImageNumber = await getNextImageNumber(productId);
+  const imageUrls: string[] = [];
+  const movedFiles: string[] = [];
+
+  try {
+    for (const file of imageFiles) {
+      const ext = path.extname(file.originalname);
+      const relativePath = await moveImageToProductFolder(
+        file.path,
+        productId,
+        currentImageNumber,
+        ext
+      );
+
+      const productDir = getProductImageDir(productId);
+      const movedFilePath = path.join(
+        productDir,
+        `${String(currentImageNumber).padStart(3, '0')}${ext}`
+      );
+      movedFiles.push(movedFilePath);
+
+      imageUrls.push(getImageUrl(relativePath));
+      currentImageNumber++;
+    }
+  } catch (error) {
+    for (const filePath of movedFiles) {
+      try {
+        if (fs.existsSync(filePath)) {
+          await fs.promises.unlink(filePath);
+        }
+      } catch (unlinkError) {
+        console.error(`파일 삭제 실패: ${filePath}`, unlinkError);
+      }
+    }
+    throw error;
+  }
+
+  return imageUrls;
+}
+
+function cleanupTempUploadFiles(
+  files: { [fieldname: string]: Express.Multer.File[] } | undefined
+): void {
+  if (!files) return;
+  Object.values(files)
+    .flat()
+    .forEach((file) => {
+      try {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      } catch (unlinkError) {
+        console.error(`임시 파일 삭제 실패: ${file.path}`, unlinkError);
+      }
+    });
+}
 
 export class ProductController {
   private service: ProductService;
@@ -111,8 +303,7 @@ export class ProductController {
       // multer 미들웨어를 사용하여 파일 업로드 처리
       // upload.fields()를 사용하면 req.files는 객체 형태로 반환됨
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-      const mainImageFile = files.mainImage?.[0]; // mainImage 필드의 첫 번째 파일
-      const infoImageFiles = files.infoImages || []; // infoImages 필드의 모든 파일
+      const imageFiles = collectUploadedImageFiles(files);
 
       // 폼 데이터 파싱
       const formData = req.body;
@@ -142,19 +333,22 @@ export class ProductController {
       }
       
       const productData: CreateProductDTO = {
-        name: formData.name,
-        name_chinese: formData.nameChinese || undefined,
-        category: formData.category,
-        price: parseFloat(formData.price),
+        name: '',
+        category: formData.category || '잡화',
+        ...buildProductCostFields(formData),
+        stock: parseOptionalInt(formData.stock) ?? 0,
         size: formData.size || undefined,
         packaging_size: formData.packagingSize || undefined,
         weight: formData.weight || undefined,
         set_count: formData.setCount ? parseInt(formData.setCount) : undefined,
         small_pack_count: formData.smallPackCount ? parseInt(formData.smallPackCount) : undefined,
         box_count: formData.boxCount ? parseInt(formData.boxCount) : undefined,
+        reorder_moq: parseNullableInt(formData.reorderMoq),
+        delivery_days: parseNullableInt(formData.deliveryDays),
         supplier_id: supplierId,
         created_by: formData.createdBy || undefined,
       };
+      applyProductIdentityFields(productData, formData);
 
       // 1. 상품 생성 (상품 ID 획득)
       const product = await this.service.createProduct(productData);
@@ -162,74 +356,17 @@ export class ProductController {
       // 2. 상품코드 폴더 생성
       await createProductImageDir(product.id);
 
-      // 3. 다음 이미지 번호 조회 (빈 번호 허용, 재정렬 안 함)
-      let currentImageNumber = await getNextImageNumber(product.id);
-
-      // 4. 이미지 파일 처리
-      const imageUrls: string[] = [];
-      const movedFiles: string[] = []; // 이동된 파일 경로 (에러 발생 시 정리용)
-
+      // 3. 이미지 파일 처리 (첫 번째 이미지를 목록 썸네일용 main_image로 사용)
       try {
-        // 메인 이미지 저장
-        if (mainImageFile) {
-          const ext = path.extname(mainImageFile.originalname);
-          const relativePath = await moveImageToProductFolder(
-            mainImageFile.path,
-            product.id,
-            currentImageNumber,
-            ext
-          );
-          
-          // 이동된 파일의 실제 경로 저장 (에러 발생 시 정리용)
-          const productDir = getProductImageDir(product.id);
-          const movedFilePath = path.join(productDir, `${String(currentImageNumber).padStart(3, '0')}${ext}`);
-          movedFiles.push(movedFilePath);
-          
-          const mainImageUrl = getImageUrl(relativePath);
-          imageUrls.push(mainImageUrl);
-          currentImageNumber++;
-          
-          // 메인 이미지를 products 테이블에 저장
-          await this.service.updateProduct(product.id, {
-            main_image: mainImageUrl,
-          });
-        }
+        const imageUrls = await saveUploadedProductImages(product.id, imageFiles);
 
-        // 추가 이미지 저장 (순차적으로 번호 증가)
-        for (const file of infoImageFiles) {
-          const ext = path.extname(file.originalname);
-          const relativePath = await moveImageToProductFolder(
-            file.path,
-            product.id,
-            currentImageNumber,
-            ext
-          );
-          
-          // 이동된 파일의 실제 경로 저장 (에러 발생 시 정리용)
-          const productDir = getProductImageDir(product.id);
-          const movedFilePath = path.join(productDir, `${String(currentImageNumber).padStart(3, '0')}${ext}`);
-          movedFiles.push(movedFilePath);
-          
-          const imageUrl = getImageUrl(relativePath);
-          imageUrls.push(imageUrl);
-          currentImageNumber++;
-        }
-
-        // 5. 모든 이미지를 product_images 테이블에 저장
         if (imageUrls.length > 0) {
+          await this.service.updateProduct(product.id, {
+            main_image: imageUrls[0],
+          });
           await this.service.saveProductImages(product.id, imageUrls);
         }
       } catch (error) {
-        // 에러 발생 시 이동된 파일들 정리
-        for (const filePath of movedFiles) {
-          try {
-            if (fs.existsSync(filePath)) {
-              await fs.promises.unlink(filePath);
-            }
-          } catch (unlinkError) {
-            console.error(`파일 삭제 실패: ${filePath}`, unlinkError);
-          }
-        }
         throw error;
       }
 
@@ -242,22 +379,7 @@ export class ProductController {
       });
     } catch (error: any) {
       console.error('상품 생성 오류:', error);
-      
-      // 임시 파일 정리 (파일 이동이 실패한 경우)
-      const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
-      if (files) {
-        // 모든 필드의 파일들을 평탄화하여 처리
-        Object.values(files).flat().forEach((file) => {
-          try {
-            // 파일이 아직 임시 위치에 있을 수 있음
-            if (fs.existsSync(file.path)) {
-              fs.unlinkSync(file.path);
-            }
-          } catch (unlinkError) {
-            console.error(`임시 파일 삭제 실패: ${file.path}`, unlinkError);
-          }
-        });
-      }
+      cleanupTempUploadFiles(req.files as { [fieldname: string]: Express.Multer.File[] } | undefined);
 
       res.status(500).json({
         success: false,
@@ -274,8 +396,7 @@ export class ProductController {
     try {
       const { id } = req.params;
       const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
-      const mainImageFile = files?.mainImage?.[0];
-      const infoImageFiles = files?.infoImages || [];
+      const imageFiles = collectUploadedImageFiles(files);
       const formData = req.body;
 
       // 공급상 정보 처리
@@ -301,19 +422,20 @@ export class ProductController {
 
       // 상품 기본 정보 업데이트
       const productData: UpdateProductDTO = {
-        name: formData.name,
-        name_chinese: formData.nameChinese || undefined,
-        category: formData.category,
-        price: formData.price ? parseFloat(formData.price) : undefined,
+        ...buildProductCostFields(formData),
+        stock: parseOptionalInt(formData.stock),
         size: formData.size || undefined,
         packaging_size: formData.packagingSize || undefined,
         weight: formData.weight || undefined,
         set_count: formData.setCount ? parseInt(formData.setCount) : undefined,
         small_pack_count: formData.smallPackCount ? parseInt(formData.smallPackCount) : undefined,
         box_count: formData.boxCount ? parseInt(formData.boxCount) : undefined,
+        reorder_moq: parseNullableInt(formData.reorderMoq),
+        delivery_days: parseNullableInt(formData.deliveryDays),
         supplier_id: supplierId,
         updated_by: formData.updatedBy || undefined,
       };
+      applyProductIdentityFields(productData, formData);
 
       // 1. 상품 기본 정보 업데이트
       let product = await this.service.updateProduct(id, productData);
@@ -328,131 +450,50 @@ export class ProductController {
         });
       }
       const existingImages = existingProductBeforeUpdate.images || [];
-      
-      // 유지할 기존 이미지 URL 목록 (클라이언트에서 전송한 것)
-      // FormData에서 배열은 JSON 문자열로 변환되어 전송됨
-      const keepMainImageUrl = formData.existingMainImageUrl;
-      let keepInfoImageUrls: string[] = [];
-      
-      if (formData.existingInfoImageUrls) {
-        if (typeof formData.existingInfoImageUrls === 'string') {
-          // JSON 문자열인 경우 파싱
-          try {
-            keepInfoImageUrls = JSON.parse(formData.existingInfoImageUrls);
-          } catch (e) {
-            // JSON 파싱 실패 시 문자열 배열로 처리
-            keepInfoImageUrls = [formData.existingInfoImageUrls];
-          }
-        } else if (Array.isArray(formData.existingInfoImageUrls)) {
-          keepInfoImageUrls = formData.existingInfoImageUrls;
-        }
-      }
-      
-      console.log('🔍 [이미지 관리] 기존 이미지:', existingImages);
-      console.log('🔍 [이미지 관리] 유지할 메인 이미지:', keepMainImageUrl);
-      console.log('🔍 [이미지 관리] 유지할 정보 이미지:', keepInfoImageUrls);
+      const allExistingUrls = [
+        ...(existingProductBeforeUpdate.main_image
+          ? [existingProductBeforeUpdate.main_image]
+          : []),
+        ...existingImages.filter(
+          (img) =>
+            !existingProductBeforeUpdate.main_image ||
+            !urlMatches(img, existingProductBeforeUpdate.main_image)
+        ),
+      ];
 
-      // 삭제할 이미지 찾기 (기존 이미지 중 유지 목록에 없는 것)
-      const imagesToDelete = existingImages.filter(img => {
-        // 기존 메인 이미지인 경우
-        if (img === existingProductBeforeUpdate.main_image) {
-          // 새 메인 이미지를 업로드하면 기존 메인 이미지 삭제
-          // 또는 기존 메인 이미지를 유지하지 않으면 삭제
-          return mainImageFile !== undefined || !keepMainImageUrl || img !== keepMainImageUrl;
-        }
-        // 정보 이미지인 경우 - 유지 목록에 없으면 삭제
-        // URL 비교 시 전체 URL과 상대 경로 모두 고려
-        const isInKeepList = keepInfoImageUrls.some(keepUrl => {
-          // 전체 URL과 상대 경로 모두 비교
-          return keepUrl === img || keepUrl.endsWith(img) || img.endsWith(keepUrl);
-        });
-        return !isInKeepList;
-      });
+      const keepImageUrls = parseExistingImageUrls(formData);
 
-      console.log('🗑️ [이미지 관리] 삭제할 이미지:', imagesToDelete);
+      const imagesToDelete = allExistingUrls.filter(
+        (img) => !isUrlKept(img, keepImageUrls)
+      );
 
-      // 삭제할 이미지 제거
       if (imagesToDelete.length > 0) {
         await this.service.deleteProductImages(id, imagesToDelete);
       }
-      
-      // 새 메인 이미지 업로드 시, 기존 메인 이미지가 product_images에 있다면 삭제
-      // (이미 위에서 삭제될 수도 있지만, 확실하게 처리)
-      if (mainImageFile && existingProductBeforeUpdate.main_image) {
-        // 기존 메인 이미지가 product_images 테이블에 있는지 확인하고 삭제
-        const repository = new ProductRepository();
-        await repository.deleteImages(id, [existingProductBeforeUpdate.main_image]);
+
+      const remainingExistingUrls = allExistingUrls.filter(
+        (img) => !imagesToDelete.includes(img)
+      );
+
+      const newImageUrls =
+        imageFiles.length > 0
+          ? await saveUploadedProductImages(id, imageFiles)
+          : [];
+
+      if (newImageUrls.length > 0) {
+        await this.service.addProductImages(id, newImageUrls);
       }
 
-      // 3. 새로 업로드한 이미지 처리
-      if (mainImageFile || infoImageFiles.length > 0) {
-        await createProductImageDir(id);
-        let currentImageNumber = await getNextImageNumber(id);
-        const newImageUrls: string[] = [];
-        const movedFiles: string[] = [];
+      const keptMainCandidates = keepImageUrls
+        .map((url) => resolveStoredUrl(url, remainingExistingUrls))
+        .filter((url): url is string => url !== null);
 
-        try {
-          // 메인 이미지 저장
-          if (mainImageFile) {
-            const ext = path.extname(mainImageFile.originalname);
-            const relativePath = await moveImageToProductFolder(
-              mainImageFile.path,
-              id,
-              currentImageNumber,
-              ext
-            );
-            
-            const productDir = getProductImageDir(id);
-            const movedFilePath = path.join(productDir, `${String(currentImageNumber).padStart(3, '0')}${ext}`);
-            movedFiles.push(movedFilePath);
-            
-            const mainImageUrl = getImageUrl(relativePath);
-            newImageUrls.push(mainImageUrl);
-            currentImageNumber++;
-            
-            // 메인 이미지 업데이트
-            product = await this.service.updateProduct(id, {
-              main_image: mainImageUrl,
-            });
-          }
+      const nextMainImage =
+        keptMainCandidates[0] ?? newImageUrls[0] ?? null;
 
-          // 추가 이미지 저장
-          for (const file of infoImageFiles) {
-            const ext = path.extname(file.originalname);
-            const relativePath = await moveImageToProductFolder(
-              file.path,
-              id,
-              currentImageNumber,
-              ext
-            );
-            
-            const productDir = getProductImageDir(id);
-            const movedFilePath = path.join(productDir, `${String(currentImageNumber).padStart(3, '0')}${ext}`);
-            movedFiles.push(movedFilePath);
-            
-            const imageUrl = getImageUrl(relativePath);
-            newImageUrls.push(imageUrl);
-            currentImageNumber++;
-          }
-
-          // 새 이미지만 product_images 테이블에 추가 (기존 이미지는 유지)
-          if (newImageUrls.length > 0) {
-            await this.service.addProductImages(id, newImageUrls);
-          }
-        } catch (error) {
-          // 에러 발생 시 이동된 파일들 정리
-          for (const filePath of movedFiles) {
-            try {
-              if (fs.existsSync(filePath)) {
-                await fs.promises.unlink(filePath);
-              }
-            } catch (unlinkError) {
-              console.error(`파일 삭제 실패: ${filePath}`, unlinkError);
-            }
-          }
-          throw error;
-        }
-      }
+      product = await this.service.updateProduct(id, {
+        main_image: nextMainImage,
+      });
 
       // 최종 상품 정보 조회 (이미지 포함)
       const finalProduct = await this.service.getProductById(id);
@@ -463,20 +504,7 @@ export class ProductController {
       });
     } catch (error: any) {
       console.error('상품 수정 오류:', error);
-      
-      // 임시 파일 정리
-      const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
-      if (files) {
-        Object.values(files).flat().forEach((file) => {
-          try {
-            if (fs.existsSync(file.path)) {
-              fs.unlinkSync(file.path);
-            }
-          } catch (unlinkError) {
-            console.error(`임시 파일 삭제 실패: ${file.path}`, unlinkError);
-          }
-        });
-      }
+      cleanupTempUploadFiles(files);
 
       res.status(500).json({
         success: false,

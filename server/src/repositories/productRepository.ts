@@ -9,6 +9,9 @@ interface ProductRow extends RowDataPacket {
   name_chinese: string | null;
   category: string;
   price: number;
+  logistics_cost: number;
+  final_unit_cost: number | null;
+  has_tag: number;
   stock: number;
   status: string;
   size: string | null;
@@ -17,6 +20,13 @@ interface ProductRow extends RowDataPacket {
   set_count: number;
   small_pack_count: number;
   box_count: number;
+  reorder_moq: number | null;
+  delivery_days: number | null;
+  tag_addon_enabled: number;
+  tag_addon_price: number | null;
+  packaging_addon_enabled: number;
+  packaging_addon_price: number | null;
+  labor_cost: number;
   main_image: string | null;
   supplier_id: number | null;
   created_at: Date;
@@ -36,15 +46,19 @@ interface SupplierRow extends RowDataPacket {
   url: string | null;
 }
 
+const PRODUCT_COLUMNS = `id, name, name_chinese, category, price, logistics_cost, final_unit_cost, has_tag,
+              stock, status, size, packaging_size, weight, set_count, small_pack_count, box_count,
+              reorder_moq, delivery_days, tag_addon_enabled, tag_addon_price,
+              packaging_addon_enabled, packaging_addon_price, labor_cost,
+              main_image, supplier_id, created_at, updated_at, created_by, updated_by`;
+
 export class ProductRepository {
   /**
    * 모든 상품 조회
    */
   async findAll(): Promise<Product[]> {
     const [rows] = await pool.execute<ProductRow[]>(
-      `SELECT id, name, name_chinese, category, price, stock, status, 
-              size, packaging_size, weight, set_count, small_pack_count, box_count,
-              main_image, supplier_id, created_at, updated_at, created_by, updated_by
+      `SELECT ${PRODUCT_COLUMNS}
        FROM products
        ORDER BY created_at DESC`
     );
@@ -57,9 +71,7 @@ export class ProductRepository {
    */
   async findById(id: string): Promise<Product | null> {
     const [rows] = await pool.execute<ProductRow[]>(
-      `SELECT id, name, name_chinese, category, price, stock, status, 
-              size, packaging_size, weight, set_count, small_pack_count, box_count,
-              main_image, supplier_id, created_at, updated_at, created_by, updated_by
+      `SELECT ${PRODUCT_COLUMNS}
        FROM products
        WHERE id = ?`,
       [id]
@@ -81,34 +93,58 @@ export class ProductRepository {
       name_chinese,
       category,
       price,
+      logistics_cost = 0,
+      final_unit_cost = null,
+      has_tag = false,
+      stock = 0,
       size,
       packaging_size,
       weight,
       set_count = 1,
       small_pack_count = 1,
       box_count = 1,
+      reorder_moq = null,
+      delivery_days = null,
+      tag_addon_enabled = false,
+      tag_addon_price = null,
+      packaging_addon_enabled = false,
+      packaging_addon_price = null,
+      labor_cost = 0,
       supplier_id,
       created_by,
     } = data;
 
     await pool.execute<ResultSetHeader>(
       `INSERT INTO products 
-       (id, name, name_chinese, category, price, stock, status, 
-        size, packaging_size, weight, set_count, small_pack_count, box_count,
+       (id, name, name_chinese, category, price, logistics_cost, final_unit_cost, has_tag,
+        stock, status, size, packaging_size, weight, set_count, small_pack_count, box_count,
+        reorder_moq, delivery_days, tag_addon_enabled, tag_addon_price,
+        packaging_addon_enabled, packaging_addon_price, labor_cost,
         supplier_id, created_by)
-       VALUES (?, ?, ?, ?, ?, 0, '판매중', ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '판매중', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         productId,
         name,
         name_chinese || null,
         category,
         price,
+        logistics_cost,
+        final_unit_cost,
+        has_tag ? 1 : 0,
+        stock,
         size || null,
         packaging_size || null,
         weight || null,
         set_count,
         small_pack_count,
         box_count,
+        reorder_moq,
+        delivery_days,
+        tag_addon_enabled ? 1 : 0,
+        tag_addon_price,
+        packaging_addon_enabled ? 1 : 0,
+        packaging_addon_price,
+        labor_cost,
         supplier_id || null,
         created_by || null,
       ]
@@ -145,6 +181,18 @@ export class ProductRepository {
       updates.push('price = ?');
       values.push(data.price);
     }
+    if (data.logistics_cost !== undefined) {
+      updates.push('logistics_cost = ?');
+      values.push(data.logistics_cost);
+    }
+    if (data.final_unit_cost !== undefined) {
+      updates.push('final_unit_cost = ?');
+      values.push(data.final_unit_cost);
+    }
+    if (data.has_tag !== undefined) {
+      updates.push('has_tag = ?');
+      values.push(data.has_tag ? 1 : 0);
+    }
     if (data.stock !== undefined) {
       updates.push('stock = ?');
       values.push(data.stock);
@@ -176,6 +224,34 @@ export class ProductRepository {
     if (data.box_count !== undefined) {
       updates.push('box_count = ?');
       values.push(data.box_count);
+    }
+    if (data.reorder_moq !== undefined) {
+      updates.push('reorder_moq = ?');
+      values.push(data.reorder_moq);
+    }
+    if (data.delivery_days !== undefined) {
+      updates.push('delivery_days = ?');
+      values.push(data.delivery_days);
+    }
+    if (data.tag_addon_enabled !== undefined) {
+      updates.push('tag_addon_enabled = ?');
+      values.push(data.tag_addon_enabled ? 1 : 0);
+    }
+    if (data.tag_addon_price !== undefined) {
+      updates.push('tag_addon_price = ?');
+      values.push(data.tag_addon_price);
+    }
+    if (data.packaging_addon_enabled !== undefined) {
+      updates.push('packaging_addon_enabled = ?');
+      values.push(data.packaging_addon_enabled ? 1 : 0);
+    }
+    if (data.packaging_addon_price !== undefined) {
+      updates.push('packaging_addon_price = ?');
+      values.push(data.packaging_addon_price);
+    }
+    if (data.labor_cost !== undefined) {
+      updates.push('labor_cost = ?');
+      values.push(data.labor_cost);
     }
     if (data.main_image !== undefined) {
       updates.push('main_image = ?');
@@ -382,7 +458,7 @@ export class ProductRepository {
    * 상품명으로 중복 상품 조회 (자기 자신 제외)
    */
   async findByName(name: string, excludeId?: string): Promise<Product | null> {
-    let query = 'SELECT id, name, name_chinese, category, price, stock, status, size, packaging_size, weight, set_count, small_pack_count, box_count, main_image, supplier_id, created_at, updated_at, created_by, updated_by FROM products WHERE name = ?';
+    let query = `SELECT ${PRODUCT_COLUMNS} FROM products WHERE name = ?`;
     const params: any[] = [name];
     
     if (excludeId) {
@@ -404,16 +480,29 @@ export class ProductRepository {
       id: row.id,
       name: row.name,
       name_chinese: row.name_chinese,
-      category: row.category as any,
+      category: row.category as Product['category'],
       price: Number(row.price),
+      logistics_cost: Number(row.logistics_cost) || 0,
+      final_unit_cost:
+        row.final_unit_cost != null ? Number(row.final_unit_cost) : null,
+      has_tag: Boolean(row.has_tag),
       stock: row.stock,
-      status: row.status as any,
+      status: row.status as Product['status'],
       size: row.size,
       packaging_size: row.packaging_size,
       weight: row.weight,
       set_count: row.set_count,
       small_pack_count: row.small_pack_count,
       box_count: row.box_count,
+      reorder_moq: row.reorder_moq != null ? Number(row.reorder_moq) : null,
+      delivery_days: row.delivery_days != null ? Number(row.delivery_days) : null,
+      tag_addon_enabled: Boolean(row.tag_addon_enabled),
+      tag_addon_price:
+        row.tag_addon_price != null ? Number(row.tag_addon_price) : null,
+      packaging_addon_enabled: Boolean(row.packaging_addon_enabled),
+      packaging_addon_price:
+        row.packaging_addon_price != null ? Number(row.packaging_addon_price) : null,
+      labor_cost: Number(row.labor_cost) || 0,
       main_image: row.main_image,
       supplier_id: row.supplier_id,
       created_at: row.created_at,

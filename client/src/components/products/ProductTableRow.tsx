@@ -5,7 +5,6 @@ export interface Product {
   id: string;
   name: string;
   nameChinese?: string;
-  category: string;
   price: number;
   stock: number;
   status: "판매중" | "품절" | "숨김";
@@ -17,10 +16,6 @@ export interface Product {
   boxCount: number;
   mainImage: string;
   images: string[];
-  supplier: {
-    name: string;
-    url: string;
-  };
   createdAt?: string | Date;
 }
 
@@ -92,23 +87,12 @@ export function ProductTableRow({
       <td className="px-4 py-3">
         <ProductImageCell
           imageUrl={product.mainImage}
-          productName={product.name}
+          productName={product.id}
           onMouseEnter={() => onImageHoverEnter(product.id)}
           onMouseLeave={onImageHoverLeave}
           onMouseMove={onMouseMove}
           size="w-20 h-20"
         />
-      </td>
-      <td className="px-4 py-3">
-        <div className="text-base font-semibold text-gray-900">
-          {product.name}
-          {product.nameChinese && (
-            <span className="text-gray-600"> ({product.nameChinese})</span>
-          )}
-        </div>
-      </td>
-      <td className="px-4 py-3 text-base font-semibold text-gray-600">
-        {product.category}
       </td>
       <td className="px-4 py-3 text-base font-semibold text-gray-900">
         ¥{product.price.toLocaleString()}
@@ -119,9 +103,6 @@ export function ProductTableRow({
       </td>
       <td className="px-4 py-3 text-base font-semibold text-gray-600">
         {product.setCount}개
-      </td>
-      <td className="px-4 py-3 text-base font-semibold text-gray-600">
-        {product.supplier.name}
       </td>
       <td className="px-4 py-3" onClick={handleActionsClick}>
         <ProductActions

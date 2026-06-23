@@ -9,7 +9,6 @@ export interface ProductFilterData {
   weightMin?: number;
   weightMax?: number;
   setCount?: number;
-  category?: string;
 }
 
 export interface ProductFilterProps {
@@ -24,8 +23,6 @@ export interface ProductFilterProps {
   /** 필터 열림/닫힘 토글 핸들러 */
   onToggle: () => void;
 }
-
-const categories = ['봉제', '키링', '피규어', '잡화'];
 
 /**
  * 상품 필터 컴포넌트
@@ -72,8 +69,7 @@ export function ProductFilter({
     filter.sizeMax !== undefined ||
     filter.weightMin !== undefined ||
     filter.weightMax !== undefined ||
-    filter.setCount !== undefined ||
-    filter.category !== undefined;
+    filter.setCount !== undefined;
 
   return (
     <div className="relative" ref={filterRef}>
@@ -221,25 +217,6 @@ export function ProductFilter({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                 min="1"
               />
-            </div>
-
-            {/* 카테고리 필터 */}
-            <div className="mx-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                카테고리
-              </label>
-              <select
-                value={filter.category || ''}
-                onChange={(e) => handleChange('category', e.target.value || undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-              >
-                <option value="">전체</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
 

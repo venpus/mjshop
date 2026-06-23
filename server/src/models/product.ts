@@ -9,6 +9,9 @@ export interface Product {
   name_chinese: string | null;
   category: ProductCategory;
   price: number;
+  logistics_cost: number;
+  final_unit_cost: number | null;
+  has_tag: boolean;
   stock: number;
   status: ProductStatus;
   size: string | null;
@@ -17,6 +20,13 @@ export interface Product {
   set_count: number;
   small_pack_count: number;
   box_count: number;
+  reorder_moq: number | null;
+  delivery_days: number | null;
+  tag_addon_enabled: boolean;
+  tag_addon_price: number | null;
+  packaging_addon_enabled: boolean;
+  packaging_addon_price: number | null;
+  labor_cost: number;
   main_image: string | null;
   supplier_id: number | null;
   created_at: Date;
@@ -35,28 +45,41 @@ export interface ProductPublic extends Product {
   images?: string[]; // 추가 이미지 배열
 }
 
+export interface ProductCostFields {
+  price: number;
+  logistics_cost?: number;
+  final_unit_cost?: number | null;
+  has_tag?: boolean;
+  tag_addon_enabled?: boolean;
+  tag_addon_price?: number | null;
+  packaging_addon_enabled?: boolean;
+  packaging_addon_price?: number | null;
+  labor_cost?: number;
+}
+
 // 상품 생성 시 사용하는 DTO
-export interface CreateProductDTO {
+export interface CreateProductDTO extends ProductCostFields {
   name: string;
   name_chinese?: string;
   category: ProductCategory;
-  price: number;
+  stock?: number;
   size?: string;
   packaging_size?: string;
   weight?: string;
   set_count?: number;
   small_pack_count?: number;
   box_count?: number;
+  reorder_moq?: number | null;
+  delivery_days?: number | null;
   supplier_id?: number;
   created_by?: string;
 }
 
 // 상품 수정 시 사용하는 DTO
-export interface UpdateProductDTO {
+export interface UpdateProductDTO extends Partial<ProductCostFields> {
   name?: string;
   name_chinese?: string;
   category?: ProductCategory;
-  price?: number;
   stock?: number;
   status?: ProductStatus;
   size?: string;
@@ -65,8 +88,9 @@ export interface UpdateProductDTO {
   set_count?: number;
   small_pack_count?: number;
   box_count?: number;
+  reorder_moq?: number | null;
+  delivery_days?: number | null;
   main_image?: string;
   supplier_id?: number;
   updated_by?: string;
 }
-

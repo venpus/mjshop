@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   Box,
+  Boxes,
   Hammer,
   Folder,
   Shield,
@@ -89,9 +90,11 @@ export function Sidebar({
   const { hasPermission } = usePermission();
   // 권한 체크 변수
   const isLevelA = user?.level === 'A-SuperAdmin';
+  const isLevelS = user?.level === 'S: Admin';
   const isLevelB0 = user?.level === 'B0: 중국Admin';
   const isLevelC0 = user?.level === 'C0: 한국Admin';
   const isLevelD0 = user?.level === 'D0: 비전 담당자';
+  const canAccessProducts = isLevelA || isLevelS;
   // A, B0, C0 레벨 관리자 (중국협업 메뉴 접근 가능) - 권한 시스템 적용 시 변경 필요
   const canAccessChinaCooperation = isLevelA || isLevelB0 || isLevelC0;
   // A, C0 레벨 관리자 (쇼핑몰 관리 메뉴 접근 가능)
@@ -232,6 +235,21 @@ export function Sidebar({
             {/* 하위 메뉴 */}
             {!isCollapsed && isChinaExpanded && (
               <div className="ml-4 mt-1 space-y-1">
+                {/* 상품 관리 */}
+                {canAccessProducts && (
+                  <button
+                    onClick={() => onPageChange("products")}
+                    className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-2 rounded-lg transition-colors ${
+                      currentPage === "products"
+                        ? "bg-purple-50 text-purple-600"
+                        : "text-gray-600 hover:bg-gray-50"
+                    }`}
+                    title={isCollapsed ? t('menu.products') : undefined}
+                  >
+                    <Boxes className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4'} flex-shrink-0`} />
+                    {!isCollapsed && <span>{t('menu.products')}</span>}
+                  </button>
+                )}
                 {/* 발주 관리 */}
                 {hasPermission('purchase-orders', 'read') && (
                   <button

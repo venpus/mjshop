@@ -42,12 +42,13 @@ export class ProductService {
     // 상품 ID 생성
     const productId = await this.repository.generateNextId();
 
-    // 상품명 중복 체크 및 처리
-    let productName = data.name;
-    if (productName) {
+    // 상품명: 미입력 시 상품 ID를 이름으로 사용
+    let productName = data.name?.trim();
+    if (!productName) {
+      productName = productId;
+    } else {
       const existingProduct = await this.repository.findByName(productName);
       if (existingProduct) {
-        // 중복이면 상품명 뒤에 "-상품ID" 추가
         productName = `${productName}-${productId}`;
       }
     }

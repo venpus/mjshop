@@ -18,6 +18,7 @@ const SHOP_MANAGEMENT_ROUTES: Record<string, string> = {
 };
 
 const CHINA_COOPERATION_ROUTES: Record<string, string> = {
+  products: 'menu.products',
   'purchase-orders': 'menu.purchaseOrders',
   'not-arrived-analysis': 'menu.notArrivedAnalysis',
   'cost-analysis': 'menu.costAnalysis',
@@ -157,7 +158,6 @@ export function resolveDocumentTitleParts(pathname: string, search = ''): Docume
     'ai-search': 'menu.aiSearch',
     schedule: 'menu.schedule',
     settings: 'menu.settings',
-    products: 'menu.products',
     payment: 'menu.payment',
     'china-payment': 'menu.chinaPayment',
   };

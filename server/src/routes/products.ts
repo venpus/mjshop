@@ -18,6 +18,7 @@ router.get('/:id', controller.getProductById);
 router.post(
   '/',
   upload.fields([
+    { name: 'images', maxCount: 20 },
     { name: 'mainImage', maxCount: 1 },
     { name: 'infoImages', maxCount: 20 },
   ]),
@@ -28,6 +29,7 @@ router.post(
 router.put(
   '/:id',
   upload.fields([
+    { name: 'images', maxCount: 20 },
     { name: 'mainImage', maxCount: 1 },
     { name: 'infoImages', maxCount: 20 },
   ]),
@@ -38,4 +40,3 @@ router.put(
 router.delete('/:id', controller.deleteProduct);
 
 export default router;
-

@@ -6,10 +6,9 @@ import {
 import { ProductForm, ProductFormDataWithFiles } from "./ProductForm";
 import { ProductDetailModal } from "./ProductDetailModal";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
-import { ProductImagePreview } from "./ui/product-image-preview";
 import { SearchBar } from "./ui/search-bar";
 import { TablePagination } from "./ui/table-pagination";
-import { ProductTableRow } from "./products/ProductTableRow";
+import { ProductCard } from "./products/ProductCard";
 import { ProductFilter, ProductFilterData } from "./ui/ProductFilter";
 import { PurchaseOrderForm, PurchaseOrderFormData } from "./PurchaseOrderForm";
 import { useAuth } from "../contexts/AuthContext";
@@ -18,8 +17,10 @@ interface Product {
   id: string;
   name: string;
   nameChinese?: string;
-  category: string;
   price: number;
+  logisticsCost: number;
+  finalUnitCost: number | null;
+  hasTag: boolean;
   stock: number;
   status: "판매중" | "품절" | "숨김";
   size: string;
@@ -28,13 +29,126 @@ interface Product {
   setCount: number;
   smallPackCount: number;
   boxCount: number;
+  reorderMoq: number | null;
+  deliveryDays: number | null;
+  tagAddonEnabled: boolean;
+  tagAddonPrice: number | null;
+  packagingAddonEnabled: boolean;
+  packagingAddonPrice: number | null;
+  laborCost: number;
   mainImage: string;
   images: string[];
-  supplier: {
-    name: string;
-    url: string;
-  };
   createdAt?: string | Date;
+}
+
+function appendProductFormFields(formDataToSend: FormData, formData: ProductFormDataWithFiles) {
+  formDataToSend.append('price', formData.price === "" ? "0" : formData.price.toString());
+  formDataToSend.append(
+    'logisticsCost',
+    formData.logisticsCost === "" ? "0" : formData.logisticsCost.toString()
+  );
+  formDataToSend.append('hasTag', formData.hasTag ? '1' : '0');
+  formDataToSend.append('stock', formData.stock === "" ? "0" : formData.stock.toString());
+  formDataToSend.append('packagingSize', formData.packagingSize || '');
+  formDataToSend.append(
+    'reorderMoq',
+    formData.reorderMoq === "" ? '' : formData.reorderMoq.toString()
+  );
+  formDataToSend.append(
+    'deliveryDays',
+    formData.deliveryDays === "" ? '' : formData.deliveryDays.toString()
+  );
+  formDataToSend.append('tagAddonEnabled', formData.tagAddonEnabled ? '1' : '0');
+  formDataToSend.append(
+    'tagAddonPrice',
+    formData.tagAddonEnabled && formData.tagAddonPrice !== ""
+      ? formData.tagAddonPrice.toString()
+      : ''
+  );
+  formDataToSend.append(
+    'packagingAddonEnabled',
+    formData.packagingAddonEnabled ? '1' : '0'
+  );
+  formDataToSend.append(
+    'packagingAddonPrice',
+    formData.packagingAddonEnabled && formData.packagingAddonPrice !== ""
+      ? formData.packagingAddonPrice.toString()
+      : ''
+  );
+  formDataToSend.append(
+    'laborCost',
+    formData.laborCost === "" ? "0" : formData.laborCost.toString()
+  );
+}
+
+function mapApiProductToClient(p: Record<string, unknown>, getFullImageUrl: (url: string | null | undefined) => string): Product {
+  const mainImageUrl = getFullImageUrl(p.main_image as string | null);
+  return {
+    id: String(p.id),
+    name: String(p.name),
+    nameChinese: p.name_chinese ? String(p.name_chinese) : undefined,
+    price: Number(p.price) || 0,
+    logisticsCost: Number(p.logistics_cost) || 0,
+    finalUnitCost: p.final_unit_cost != null ? Number(p.final_unit_cost) : null,
+    hasTag: Boolean(p.has_tag),
+    stock: Number(p.stock) || 0,
+    status: p.status as Product['status'],
+    size: p.size ? String(p.size) : '',
+    packagingSize: p.packaging_size ? String(p.packaging_size) : '',
+    weight: p.weight ? String(p.weight) : '',
+    setCount: Number(p.set_count) || 1,
+    smallPackCount: Number(p.small_pack_count) || 1,
+    boxCount: Number(p.box_count) || 1,
+    reorderMoq: p.reorder_moq != null ? Number(p.reorder_moq) : null,
+    deliveryDays: p.delivery_days != null ? Number(p.delivery_days) : null,
+    tagAddonEnabled: Boolean(p.tag_addon_enabled),
+    tagAddonPrice: p.tag_addon_price != null ? Number(p.tag_addon_price) : null,
+    packagingAddonEnabled: Boolean(p.packaging_addon_enabled),
+    packagingAddonPrice:
+      p.packaging_addon_price != null ? Number(p.packaging_addon_price) : null,
+    laborCost: Number(p.labor_cost) || 0,
+    mainImage: mainImageUrl,
+    images: ((p.images as string[]) || []).map((img) => getFullImageUrl(img)),
+    createdAt: p.created_at as string | Date | undefined,
+  };
+}
+
+function collectProductImageUrls(
+  product: Product,
+  getFullImageUrl: (url: string | null | undefined) => string
+): string[] {
+  const urls: string[] = [];
+  if (product.mainImage) {
+    urls.push(getFullImageUrl(product.mainImage));
+  }
+  for (const img of product.images) {
+    const full = getFullImageUrl(img);
+    if (!urls.some((existing) => existing === full || existing.endsWith(img) || full.endsWith(img))) {
+      urls.push(full);
+    }
+  }
+  return urls;
+}
+
+function mapProductToFormInitial(product: Product, getFullImageUrl: (url: string | null | undefined) => string) {
+  return {
+    price: product.price,
+    logisticsCost: product.logisticsCost,
+    hasTag: product.hasTag,
+    stock: product.stock,
+    size: product.size || '',
+    packagingSize: product.packagingSize || '',
+    setCount: product.setCount,
+    weight: product.weight || '',
+    reorderMoq: product.reorderMoq ?? '',
+    deliveryDays: product.deliveryDays ?? '',
+    tagAddonEnabled: product.tagAddonEnabled,
+    tagAddonPrice: product.tagAddonPrice ?? '',
+    packagingAddonEnabled: product.packagingAddonEnabled,
+    packagingAddonPrice: product.packagingAddonPrice ?? '',
+    laborCost: product.laborCost,
+    existingImageUrls: collectProductImageUrls(product, getFullImageUrl),
+  };
 }
 
 interface ProductsProps {
@@ -43,10 +157,10 @@ interface ProductsProps {
 
 export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
   const { user } = useAuth();
-  const isSuperAdmin = user?.level === 'A-SuperAdmin';
-  
-  // 레벨 A가 아니면 아무것도 렌더링하지 않음
-  if (!isSuperAdmin) {
+  const canAccessProducts =
+    user?.level === 'A-SuperAdmin' || user?.level === 'S: Admin';
+
+  if (!canAccessProducts) {
     return null;
   }
 
@@ -55,15 +169,8 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState<ProductFilterData>({});
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [hoveredProduct, setHoveredProduct] = useState<
-    string | null
-  >(null);
-  const [mousePosition, setMousePosition] = useState({
-    x: 0,
-    y: 0,
-  });
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(15);
+  const [itemsPerPage, setItemsPerPage] = useState(16);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">(
     "create",
@@ -82,11 +189,7 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
     (product) => {
       // 검색어 필터
       const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = 
-        product.id.toLowerCase().includes(searchLower) ||
-        product.name.toLowerCase().includes(searchLower) ||
-        (product.nameChinese && product.nameChinese.toLowerCase().includes(searchLower)) ||
-        product.category.toLowerCase().includes(searchLower);
+      const matchesSearch = product.id.toLowerCase().includes(searchLower);
 
       if (!matchesSearch) return false;
 
@@ -125,16 +228,9 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
       // 세트 모델수 필터
       if (filter.setCount !== undefined && product.setCount !== filter.setCount) return false;
 
-      // 카테고리 필터
-      if (filter.category && product.category !== filter.category) return false;
-
       return true;
     }
   );
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    setMousePosition({ x: e.clientX, y: e.clientY });
-  };
 
   // Pagination calculations
   const totalPages = Math.ceil(
@@ -191,38 +287,18 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
       if (formMode === "edit" && editingProduct) {
         // 상품 수정 - FormData로 전송 (이미지 포함)
         const formDataToSend = new FormData();
-        formDataToSend.append('name', formData.name);
-        if (formData.nameChinese) formDataToSend.append('nameChinese', formData.nameChinese);
-        formDataToSend.append('category', formData.category);
-        formDataToSend.append('price', formData.price === "" ? "0" : formData.price.toString());
+        appendProductFormFields(formDataToSend, formData);
         formDataToSend.append('size', formData.size || '');
         formDataToSend.append('setCount', formData.setCount.toString());
         if (formData.weight) formDataToSend.append('weight', formData.weight);
 
-        // 공급상 정보 추가
-        if (formData.supplier?.name) {
-          formDataToSend.append('supplierName', formData.supplier.name);
-        }
-        if (formData.supplier?.url) {
-          formDataToSend.append('supplierUrl', formData.supplier.url);
+        if (formData.existingImageUrls && formData.existingImageUrls.length > 0) {
+          formDataToSend.append('existingImageUrls', JSON.stringify(formData.existingImageUrls));
         }
 
-        // 기존 이미지 정보 (삭제되지 않은 이미지들)
-        // FormData에서 배열은 배열로 파싱되지 않으므로 JSON 문자열로 변환
-        if (formData.existingMainImageUrl) {
-          formDataToSend.append('existingMainImageUrl', formData.existingMainImageUrl);
-        }
-        if (formData.existingInfoImageUrls && formData.existingInfoImageUrls.length > 0) {
-          formDataToSend.append('existingInfoImageUrls', JSON.stringify(formData.existingInfoImageUrls));
-        }
-        
-        // 새로 업로드한 이미지 파일 추가
-        if (formData.mainImage) {
-          formDataToSend.append('mainImage', formData.mainImage);
-        }
-        if (formData.infoImages && formData.infoImages.length > 0) {
-          formData.infoImages.forEach((file) => {
-            formDataToSend.append('infoImages', file);
+        if (formData.images && formData.images.length > 0) {
+          formData.images.forEach((file) => {
+            formDataToSend.append('images', file);
           });
         }
 
@@ -249,35 +325,17 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
       } else {
         // Create new product
         const formDataToSend = new FormData();
-        
-        // 기본 데이터 추가
-        formDataToSend.append('name', formData.name);
-        if (formData.nameChinese) {
-          formDataToSend.append('nameChinese', formData.nameChinese);
-        }
-        formDataToSend.append('category', formData.category);
-        formDataToSend.append('price', formData.price === "" ? "0" : formData.price.toString());
+
+        appendProductFormFields(formDataToSend, formData);
         formDataToSend.append('size', formData.size || '');
         formDataToSend.append('setCount', formData.setCount.toString());
         if (formData.weight) {
           formDataToSend.append('weight', formData.weight);
         }
-        
-        // 공급상 정보 추가
-        if (formData.supplier?.name) {
-          formDataToSend.append('supplierName', formData.supplier.name);
-        }
-        if (formData.supplier?.url) {
-          formDataToSend.append('supplierUrl', formData.supplier.url);
-        }
-        
-        // 이미지 파일 추가
-        if (formData.mainImage) {
-          formDataToSend.append('mainImage', formData.mainImage);
-        }
-        if (formData.infoImages && formData.infoImages.length > 0) {
-          formData.infoImages.forEach((file) => {
-            formDataToSend.append('infoImages', file);
+
+        if (formData.images && formData.images.length > 0) {
+          formData.images.forEach((file) => {
+            formDataToSend.append('images', file);
           });
         }
 
@@ -325,29 +383,9 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
       const data = await response.json();
       if (data.success && data.data) {
         // 서버 응답을 클라이언트 Product 인터페이스로 변환
-        const convertedProducts: Product[] = data.data.map((p: any) => {
-          const mainImageUrl = getFullImageUrl(p.main_image);
-          console.log('상품:', p.id, '원본 main_image:', p.main_image, '변환된 URL:', mainImageUrl);
-          return {
-            id: p.id,
-            name: p.name,
-            nameChinese: p.name_chinese || undefined,
-            category: p.category,
-            price: p.price,
-            stock: p.stock,
-            status: p.status,
-            size: p.size || '',
-            packagingSize: p.packaging_size || '',
-            weight: p.weight || '',
-            setCount: p.set_count,
-            smallPackCount: p.small_pack_count,
-            boxCount: p.box_count,
-            mainImage: mainImageUrl,
-            images: (p.images || []).map((img: string) => getFullImageUrl(img)),
-            supplier: p.supplier || { name: '', url: '' },
-            createdAt: p.created_at,
-          };
-        });
+        const convertedProducts: Product[] = data.data.map((p: Record<string, unknown>) =>
+          mapApiProductToClient(p, getFullImageUrl)
+        );
         setProducts(convertedProducts);
       }
     } catch (err: any) {
@@ -373,26 +411,8 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
       
       const data = await response.json();
       if (data.success && data.data) {
-        const fullProduct = data.data;
-        setEditingProduct({
-          id: fullProduct.id,
-          name: fullProduct.name,
-          nameChinese: fullProduct.name_chinese || '',
-          category: fullProduct.category,
-          price: fullProduct.price,
-          stock: fullProduct.stock,
-          status: fullProduct.status,
-          size: fullProduct.size || '',
-          packagingSize: fullProduct.packaging_size || '',
-          weight: fullProduct.weight || '',
-          setCount: fullProduct.set_count,
-          smallPackCount: fullProduct.small_pack_count,
-          boxCount: fullProduct.box_count,
-          mainImage: fullProduct.main_image ? getFullImageUrl(fullProduct.main_image) : '',
-          images: Array.isArray(fullProduct.images) ? fullProduct.images.map(getFullImageUrl) : [],
-          supplier: fullProduct.supplier || { name: '', url: '' },
-          createdAt: fullProduct.created_at,
-        });
+        const fullProduct = mapApiProductToClient(data.data, getFullImageUrl);
+        setEditingProduct(fullProduct);
         setFormMode("edit");
         setIsFormOpen(true);
       } else {
@@ -512,7 +532,7 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
           <SearchBar
             value={searchTerm}
             onChange={setSearchTerm}
-            placeholder="상품 ID, 상품명, 카테고리로 검색..."
+            placeholder="상품 ID로 검색..."
           />
           <ProductFilter
             filter={filter}
@@ -531,61 +551,30 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
         </button>
       </div>
 
-      {/* Products Table */}
+      {/* Products Card Grid */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-base font-semibold text-gray-700 whitespace-nowrap">
-                  등록일
-                </th>
-                <th className="px-4 py-3 text-left text-base font-semibold text-gray-700 whitespace-nowrap">
-                  상품 ID
-                </th>
-                <th className="px-4 py-3 text-left text-base font-semibold text-gray-700 whitespace-nowrap">
-                  사진
-                </th>
-                <th className="px-4 py-3 text-left text-base font-semibold text-gray-700 whitespace-nowrap">
-                  상품명
-                </th>
-                <th className="px-4 py-3 text-left text-base font-semibold text-gray-700 whitespace-nowrap">
-                  카테고리
-                </th>
-                <th className="px-4 py-3 text-left text-base font-semibold text-gray-700 whitespace-nowrap">
-                  단가
-                </th>
-                <th className="px-4 py-3 text-left text-base font-semibold text-gray-700 whitespace-nowrap">
-                  사이즈
-                </th>
-                <th className="px-4 py-3 text-left text-base font-semibold text-gray-700 whitespace-nowrap">
-                  세트 모델수
-                </th>
-                <th className="px-4 py-3 text-left text-base font-semibold text-gray-700 whitespace-nowrap">
-                  공급상
-                </th>
-                <th className="px-4 py-3 text-left text-base font-semibold text-gray-700 whitespace-nowrap">
-                  관리
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
+        {currentProducts.length === 0 ? (
+          <div className="py-16 px-6 text-center text-gray-500">
+            {filteredProducts.length === 0 && products.length > 0
+              ? '검색·필터 조건에 맞는 상품이 없습니다.'
+              : '등록된 상품이 없습니다. 상품 등록 버튼으로 추가해 주세요.'}
+          </div>
+        ) : (
+          <div className="p-4 sm:p-5">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3 sm:gap-4">
               {currentProducts.map((product) => (
-                <ProductTableRow
+                <ProductCard
                   key={product.id}
                   product={product}
-                  onImageHoverEnter={(id) => setHoveredProduct(id)}
-                  onImageHoverLeave={() => setHoveredProduct(null)}
-                  onMouseMove={handleMouseMove}
                   onViewDetail={setDetailProduct}
                   onOrder={handleCreatePurchaseOrder}
                   onEdit={handleEditProduct}
                   onDelete={handleDeleteProduct}
                 />
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </div>
+        )}
 
         {/* Pagination */}
         <TablePagination
@@ -600,19 +589,6 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
         />
       </div>
 
-      {/* Image Preview Overlay */}
-      {hoveredProduct && (() => {
-        const product = products.find((p) => p.id === hoveredProduct);
-        return (
-          <ProductImagePreview
-            imageUrl={product?.mainImage}
-            productName={product?.name}
-            mousePosition={mousePosition}
-            isVisible={!!hoveredProduct}
-          />
-        );
-      })()}
-
       {/* Product Form Modal */}
       {isFormOpen && (
         <ProductForm
@@ -621,22 +597,7 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
           mode={formMode}
           initialData={
             editingProduct
-              ? {
-                  name: editingProduct.name,
-                  nameChinese: (editingProduct as any).name_chinese || editingProduct.nameChinese,
-                  category: editingProduct.category,
-                  price: editingProduct.price,
-                  size: editingProduct.size || "",
-                  setCount: (editingProduct as any).set_count || editingProduct.setCount,
-                  weight: editingProduct.weight || "",
-                  supplier: editingProduct.supplier,
-                  existingMainImageUrl: (editingProduct as any).main_image ? getFullImageUrl((editingProduct as any).main_image) : (editingProduct.mainImage ? getFullImageUrl(editingProduct.mainImage) : undefined),
-                  existingInfoImageUrls: editingProduct.images 
-                    ? editingProduct.images
-                        .filter((img: string) => img !== ((editingProduct as any).main_image || editingProduct.mainImage))
-                        .map((img: string) => getFullImageUrl(img))
-                    : [],
-                }
+              ? mapProductToFormInitial(editingProduct, getFullImageUrl)
               : undefined
           }
         />
