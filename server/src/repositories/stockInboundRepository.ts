@@ -100,6 +100,29 @@ export class StockInboundRepository {
     return rows.length > 0 ? this.mapRowToItem(rows[0]) : null;
   }
 
+  async findByIds(ids: number[]): Promise<Map<number, StockInboundItem>> {
+    const uniqueIds = [...new Set(ids.filter((id) => Number.isFinite(id)))];
+    if (uniqueIds.length === 0) {
+      return new Map();
+    }
+
+    const placeholders = uniqueIds.map(() => '?').join(', ');
+    const [rows] = await pool.execute<StockInboundItemRow[]>(
+      `SELECT id, purchase_order_id, group_key, product_id, product_name, po_number,
+              product_main_image, unit_price, inbound_quantity, selling_price, stock_quantity,
+              created_at, updated_at, created_by
+       FROM kr_stock_inbound_items
+       WHERE id IN (${placeholders})`,
+      uniqueIds
+    );
+
+    const map = new Map<number, StockInboundItem>();
+    for (const row of rows) {
+      map.set(row.id, this.mapRowToItem(row));
+    }
+    return map;
+  }
+
   async findAvailablePurchaseOrders(
     searchTerm?: string,
     limit?: number,

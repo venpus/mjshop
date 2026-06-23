@@ -28,8 +28,40 @@ export class ShopOrderController {
     this.service = new ShopOrderService();
   }
 
-  getAllOrders = async (_req: Request, res: Response): Promise<void> => {
+  getAllOrders = async (req: Request, res: Response): Promise<void> => {
     try {
+      const pageRaw = req.query.page;
+      if (pageRaw != null && String(pageRaw).trim() !== '') {
+        const page = Math.max(1, parseInt(String(pageRaw), 10) || 1);
+        const limit = Math.min(
+          100,
+          Math.max(1, parseInt(String(req.query.limit ?? '20'), 10) || 20)
+        );
+        const search =
+          req.query.search != null ? String(req.query.search) : undefined;
+        const status =
+          req.query.status != null ? String(req.query.status) : undefined;
+
+        const result = await this.service.getOrdersPaginated({
+          page,
+          limit,
+          search,
+          status,
+        });
+
+        res.json({
+          success: true,
+          data: result.items,
+          pagination: {
+            page: result.page,
+            limit: result.limit,
+            totalItems: result.totalItems,
+            totalPages: result.totalPages,
+          },
+        });
+        return;
+      }
+
       const orders = await this.service.getAllOrders();
       res.json({ success: true, data: orders });
     } catch (error: unknown) {
@@ -37,6 +69,20 @@ export class ShopOrderController {
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : '주문 목록 조회 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  getListStats = async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const stats = await this.service.getListStats();
+      res.json({ success: true, data: stats });
+    } catch (error: unknown) {
+      console.error('주문 목록 통계 조회 오류:', error);
+      res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error ? error.message : '주문 목록 통계 조회 중 오류가 발생했습니다.',
       });
     }
   };

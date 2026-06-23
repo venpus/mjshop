@@ -5,11 +5,12 @@ import {
   type LineShipmentInfo,
 } from '../utils/shopLineShipmentUtils';
 
-export function useShopLineShipmentMap() {
+export function useShopLineShipmentMap(options?: { autoLoad?: boolean }) {
+  const autoLoad = options?.autoLoad !== false;
   const [lineShipmentMap, setLineShipmentMap] = useState<Map<string, LineShipmentInfo>>(
     () => new Map()
   );
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(autoLoad);
 
   const reload = useCallback(async () => {
     setIsLoading(true);
@@ -24,8 +25,10 @@ export function useShopLineShipmentMap() {
   }, []);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    if (autoLoad) {
+      void reload();
+    }
+  }, [autoLoad, reload]);
 
   return { lineShipmentMap, isLoading, reloadLineShipmentMap: reload };
 }

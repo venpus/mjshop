@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { ShopOrderRepository } from '../repositories/shopOrderRepository.js';
+import { ShopOrderRepository, type ShopOrderListQuery } from '../repositories/shopOrderRepository.js';
 import { ShopBuyerRepository } from '../repositories/shopBuyerRepository.js';
 import { StockInboundRepository } from '../repositories/stockInboundRepository.js';
 import { resolvePurchaseOrderUnitPrice } from '../utils/purchaseOrderUnitPrice.js';
@@ -35,6 +35,7 @@ import {
   SyncShopOrderDetailDTO,
 } from '../models/shopOrder.js';
 import type { ShopOrderLine, UpdateShopOrderLineDTO } from '../models/shopOrderLine.js';
+import type { StockInboundItem } from '../models/stockInbound.js';
 
 export interface BulkStatementGroupResult {
   groupKey: string;
@@ -59,6 +60,21 @@ export interface ShopOrderReservationTransferTarget {
   warehouseStockQuantity: number;
   stockQuantity: number;
   status: ShopOrder['status'];
+}
+
+export interface ShopOrderListStats {
+  statusCounts: Record<ShopOrder['status'], number>;
+  productCount: number;
+  lineCount: number;
+  reservationCount: number;
+}
+
+export interface PaginatedShopOrdersResult {
+  items: ShopOrder[];
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
 }
 
 function calculateOrderQuantity(order: ShopOrder): number {
@@ -115,47 +131,98 @@ export class ShopOrderService {
     return line.lineOrderNumber ?? order.orderNumber;
   }
 
-  private async enrichOrderStock(order: ShopOrder): Promise<ShopOrder> {
-    let warehouseStock = order.warehouseStockQuantity;
+  private async enrichOrderStock(
+    order: ShopOrder,
+    options?: { persist?: boolean; inboundMap?: Map<number, StockInboundItem> }
+  ): Promise<ShopOrder> {
+    const [enriched] = await this.enrichOrdersStock([order], options);
+    return enriched;
+  }
 
-    if (order.stockInboundItemId) {
-      const inbound = await this.stockInboundRepository.findById(order.stockInboundItemId);
-      if (inbound) {
-        warehouseStock = inbound.stockQuantity;
+  private async enrichOrdersStock(
+    orders: ShopOrder[],
+    options?: { persist?: boolean; inboundMap?: Map<number, StockInboundItem> }
+  ): Promise<ShopOrder[]> {
+    if (orders.length === 0) return orders;
+
+    const persist = options?.persist ?? true;
+    let inboundMap = options?.inboundMap;
+
+    if (!inboundMap) {
+      const inboundIds = [
+        ...new Set(
+          orders
+            .map((order) => order.stockInboundItemId)
+            .filter((id): id is number => id != null)
+        ),
+      ];
+      inboundMap = await this.stockInboundRepository.findByIds(inboundIds);
+    }
+
+    const results: ShopOrder[] = [];
+
+    for (const order of orders) {
+      let warehouseStock = order.warehouseStockQuantity;
+
+      if (order.stockInboundItemId) {
+        const inbound = inboundMap.get(order.stockInboundItemId);
+        if (inbound) {
+          warehouseStock = inbound.stockQuantity;
+        }
       }
+
+      const orderQuantity =
+        order.lines.length > 0 ? calculateOrderQuantity(order) : order.quantity;
+      const remainingStock = warehouseStock - orderQuantity;
+      const lineCount = order.lines.length > 0 ? order.lines.length : order.lineCount;
+      const status = deriveShopOrderStatus(lineCount, remainingStock);
+
+      if (persist) {
+        if (order.stockQuantity !== remainingStock) {
+          await this.repository.updateStockQuantity(order.id, remainingStock);
+        }
+        if (order.status !== status) {
+          await this.repository.update(order.id, { status });
+        }
+      }
+
+      results.push({
+        ...order,
+        quantity: orderQuantity,
+        warehouseStockQuantity: warehouseStock,
+        stockQuantity: remainingStock,
+        lineCount,
+        totalSalesAmount: calculateTotalSalesAmount(order),
+        totalProductSupplyAmount: calculateTotalProductSupplyAmount(order),
+        status,
+      });
     }
 
-    const orderQuantity =
-      order.lines.length > 0 ? calculateOrderQuantity(order) : order.quantity;
-    const remainingStock = warehouseStock - orderQuantity;
-    const lineCount =
-      order.lines.length > 0 ? order.lines.length : order.lineCount;
-    const status = deriveShopOrderStatus(lineCount, remainingStock);
+    return results;
+  }
 
-    if (order.stockQuantity !== remainingStock) {
-      await this.repository.updateStockQuantity(order.id, remainingStock);
-    }
+  async getListStats(): Promise<ShopOrderListStats> {
+    return this.repository.getListStats();
+  }
 
-    if (order.status !== status) {
-      await this.repository.update(order.id, { status });
-    }
+  async getOrdersPaginated(query: ShopOrderListQuery): Promise<PaginatedShopOrdersResult> {
+    const { items, totalItems } = await this.repository.findPaginatedSummary(query);
+    const enriched = await this.enrichOrdersStock(items, { persist: false });
+    const totalPages = Math.max(1, Math.ceil(totalItems / query.limit));
 
     return {
-      ...order,
-      quantity: orderQuantity,
-      warehouseStockQuantity: warehouseStock,
-      stockQuantity: remainingStock,
-      lineCount,
-      totalSalesAmount: calculateTotalSalesAmount(order),
-      totalProductSupplyAmount: calculateTotalProductSupplyAmount(order),
-      status,
+      items: enriched,
+      page: query.page,
+      limit: query.limit,
+      totalItems,
+      totalPages,
     };
   }
 
   async getAllOrders(): Promise<ShopOrder[]> {
     await this.ensureLineOrderNumbersBackfilled();
     const orders = await this.repository.findAll();
-    return Promise.all(orders.map((order) => this.enrichOrderStock(order)));
+    return this.enrichOrdersStock(orders, { persist: false });
   }
 
   async getOrderById(id: string): Promise<ShopOrder | null> {

@@ -225,6 +225,83 @@ export async function getShopOrders(): Promise<ShopOrder[]> {
   return (data.data as Record<string, unknown>[]).map(mapShopOrder);
 }
 
+export interface ShopOrderListStats {
+  statusCounts: Record<ShopOrderStatus, number>;
+  productCount: number;
+  lineCount: number;
+  reservationCount: number;
+}
+
+export interface ShopOrderPaginatedResult {
+  items: ShopOrder[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalItems: number;
+    totalPages: number;
+  };
+}
+
+export async function getShopOrderListStats(): Promise<ShopOrderListStats> {
+  const response = await fetch(`${API_BASE_URL}/shop-orders/list-stats`, {
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || '주문 통계를 불러오지 못했습니다.');
+  }
+  const data = await response.json();
+  const raw = data.data as Record<string, unknown>;
+  const statusCountsRaw = (raw.statusCounts ?? {}) as Record<string, number>;
+  return {
+    statusCounts: {
+      판매대기: Number(statusCountsRaw['판매대기']) || 0,
+      판매중: Number(statusCountsRaw['판매중']) || 0,
+      품절: Number(statusCountsRaw['품절']) || 0,
+      판매완료: Number(statusCountsRaw['판매완료']) || 0,
+    },
+    productCount: Number(raw.productCount) || 0,
+    lineCount: Number(raw.lineCount) || 0,
+    reservationCount: Number(raw.reservationCount) || 0,
+  };
+}
+
+export async function getShopOrdersPaginated(params: {
+  page: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+}): Promise<ShopOrderPaginatedResult> {
+  const query = new URLSearchParams();
+  query.set('page', String(params.page));
+  query.set('limit', String(params.limit ?? 20));
+  if (params.search?.trim()) {
+    query.set('search', params.search.trim());
+  }
+  if (params.status?.trim() && params.status !== '전체') {
+    query.set('status', params.status.trim());
+  }
+
+  const response = await fetch(`${API_BASE_URL}/shop-orders?${query.toString()}`, {
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || '주문 목록을 불러오지 못했습니다.');
+  }
+  const data = await response.json();
+  const pagination = data.pagination as Record<string, unknown>;
+  return {
+    items: (data.data as Record<string, unknown>[]).map(mapShopOrder),
+    pagination: {
+      page: Number(pagination.page) || params.page,
+      limit: Number(pagination.limit) || (params.limit ?? 20),
+      totalItems: Number(pagination.totalItems) || 0,
+      totalPages: Number(pagination.totalPages) || 1,
+    },
+  };
+}
+
 export async function getShopOrderById(id: string): Promise<ShopOrder> {
   const response = await fetch(`${API_BASE_URL}/shop-orders/${id}`, { credentials: 'include' });
   if (!response.ok) {

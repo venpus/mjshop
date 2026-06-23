@@ -6,6 +6,7 @@ const router = Router();
 const controller = new ShopOrderController();
 
 router.get('/', controller.getAllOrders);
+router.get('/list-stats', controller.getListStats);
 router.get('/reservation-transfer-targets', controller.getReservationTransferTargets);
 router.post('/bulk/statements', controller.createBulkStatements);
 router.post('/statements/preview', controller.previewStatementGroup);

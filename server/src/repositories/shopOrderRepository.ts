@@ -76,6 +76,27 @@ function normalizeOrderDate(value: string | Date | null | undefined): string | n
   return String(value).slice(0, 10);
 }
 
+export interface ShopOrderListQuery {
+  page: number;
+  limit: number;
+  search?: string;
+  status?: string;
+}
+
+export interface ShopOrderListStats {
+  statusCounts: Record<ShopOrderStatus, number>;
+  productCount: number;
+  lineCount: number;
+  reservationCount: number;
+}
+
+interface PaginatedShopOrderRow extends ShopOrderRow {
+  agg_line_count: number;
+  agg_quantity: number;
+  agg_total_sales: number;
+  agg_total_supply: number;
+}
+
 const SHOP_ORDER_SELECT = `id, order_number, stock_inbound_item_id, purchase_order_id, product_id,
               product_name, product_main_image, unit_price, initial_expected_unit_price, quantity, stock_quantity,
               warehouse_stock_quantity, selling_price, status, order_date,
@@ -86,6 +107,10 @@ const SHOP_ORDER_SELECT = `id, order_number, stock_inbound_item_id, purchase_ord
               tracking_number, statement_issued, payment_received, product_arrived,
               statement_file_path, payment_proof_image,
               created_at, updated_at, created_by`;
+
+const SHOP_ORDER_SELECT_O = SHOP_ORDER_SELECT.split(',')
+  .map((column) => `o.${column.trim()}`)
+  .join(', ');
 
 export class ShopOrderRepository {
   private lineRepository = new ShopOrderLineRepository();
@@ -98,6 +123,139 @@ export class ShopOrderRepository {
     );
     const orders = rows.map(this.mapRow);
     return this.attachLinesToOrders(orders);
+  }
+
+  async findPaginatedSummary(
+    query: ShopOrderListQuery
+  ): Promise<{ items: ShopOrder[]; totalItems: number }> {
+    const { clause, params } = this.buildListFilterClause(query.search, query.status);
+    const offset = (query.page - 1) * query.limit;
+
+    const [countRows] = await pool.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS total FROM kr_shop_orders o ${clause}`,
+      params
+    );
+    const totalItems = Number(countRows[0]?.total) || 0;
+
+    if (totalItems === 0) {
+      return { items: [], totalItems: 0 };
+    }
+
+    const [rows] = await pool.execute<PaginatedShopOrderRow[]>(
+      `SELECT ${SHOP_ORDER_SELECT_O},
+              COUNT(l.id) AS agg_line_count,
+              COALESCE(SUM(l.order_box_count * l.quantity_per_box), 0) AS agg_quantity,
+              COALESCE(SUM(l.total_amount), 0) AS agg_total_sales,
+              COALESCE(SUM(l.product_supply_amount), 0) AS agg_total_supply
+       FROM kr_shop_orders o
+       LEFT JOIN kr_shop_order_lines l ON l.shop_order_id = o.id
+       ${clause}
+       GROUP BY o.id
+       ORDER BY o.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, query.limit, offset]
+    );
+
+    const items = rows.map((row) => this.mapPaginatedSummaryRow(row));
+    return { items, totalItems };
+  }
+
+  async getListStats(): Promise<ShopOrderListStats> {
+    const statusCounts: Record<ShopOrderStatus, number> = {
+      판매대기: 0,
+      판매중: 0,
+      품절: 0,
+      판매완료: 0,
+    };
+
+    const [statusRows] = await pool.execute<
+      (RowDataPacket & { status: ShopOrderStatus; cnt: number })[]
+    >(`SELECT status, COUNT(*) AS cnt FROM kr_shop_orders GROUP BY status`);
+
+    let productCount = 0;
+    for (const row of statusRows) {
+      const count = Number(row.cnt) || 0;
+      productCount += count;
+      if (row.status in statusCounts) {
+        statusCounts[row.status] = count;
+      }
+    }
+
+    const [lineRows] = await pool.execute<
+      (RowDataPacket & { is_reservation: number; cnt: number })[]
+    >(
+      `SELECT is_reservation, COUNT(*) AS cnt
+       FROM kr_shop_order_lines
+       GROUP BY is_reservation`
+    );
+
+    let lineCount = 0;
+    let reservationCount = 0;
+    for (const row of lineRows) {
+      const count = Number(row.cnt) || 0;
+      if (row.is_reservation) {
+        reservationCount += count;
+      } else {
+        lineCount += count;
+      }
+    }
+
+    return { statusCounts, productCount, lineCount, reservationCount };
+  }
+
+  private buildListFilterClause(
+    search?: string,
+    status?: string
+  ): { clause: string; params: unknown[] } {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (search?.trim()) {
+      const pattern = `%${search.trim()}%`;
+      conditions.push('(o.order_number LIKE ? OR o.product_name LIKE ?)');
+      params.push(pattern, pattern);
+    }
+
+    if (status?.trim() && status !== '전체') {
+      conditions.push('o.status = ?');
+      params.push(status.trim());
+    }
+
+    return {
+      clause: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '',
+      params,
+    };
+  }
+
+  private mapPaginatedSummaryRow(row: PaginatedShopOrderRow): ShopOrder {
+    const order = this.mapRow(row);
+    let lineCount = Number(row.agg_line_count) || 0;
+    let quantity = Number(row.agg_quantity) || 0;
+    let totalSalesAmount = Number(row.agg_total_sales) || 0;
+    let totalProductSupplyAmount = Number(row.agg_total_supply) || 0;
+
+    if (lineCount === 0) {
+      const legacyLine = this.synthesizeLegacyLine(order);
+      if (legacyLine) {
+        lineCount = 1;
+        quantity = legacyLine.orderBoxCount * legacyLine.quantityPerBox;
+        totalSalesAmount = legacyLine.totalAmount ?? 0;
+        totalProductSupplyAmount = legacyLine.productSupplyAmount ?? 0;
+      }
+    }
+
+    if (lineCount === 0 && quantity === 0) {
+      quantity = order.quantity;
+    }
+
+    return {
+      ...order,
+      lines: [],
+      lineCount,
+      quantity,
+      totalSalesAmount,
+      totalProductSupplyAmount,
+    };
   }
 
   async findById(id: string): Promise<ShopOrder | null> {

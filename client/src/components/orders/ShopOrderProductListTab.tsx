@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ClipboardList,
@@ -13,6 +13,7 @@ import {
   createShopOrderBulkStatements,
   deleteShopOrder,
   getShopOrderById,
+  getShopOrdersPaginated,
   getShopOrderStatusClass,
   SHOP_ORDER_STATUS_OPTIONS,
   syncShopOrderDetail,
@@ -20,7 +21,7 @@ import {
   type ShopOrderBulkStatementGroup,
 } from '../../api/shopOrderApi';
 import { getFullImageUrl } from '../../api/purchaseOrderApi';
-import { useShopOrderListPagination } from '../../hooks/useShopOrderListPagination';
+import { SHOP_ORDER_LIST_PAGE_SIZE } from '../../hooks/useShopOrderListPagination';
 import { useShopOrderListSearch } from '../../hooks/useShopOrderListSearch';
 import { useShopOrderProductListUrlState } from '../../hooks/useShopOrderListTabUrlState';
 import { SearchBar } from '../ui/search-bar';
@@ -47,20 +48,16 @@ import type { ShopOrderListTab } from './ShopOrderListTabs';
 const ALL_STATUS = SHOP_ORDER_LIST_ALL_STATUS;
 
 interface ShopOrderProductListTabProps {
-  orders: ShopOrder[];
   listTab: ShopOrderListTab;
-  onReload: () => Promise<void>;
-  onOrderPatched: (order: ShopOrder) => void;
+  onStatsReload: () => Promise<void>;
 }
 
 const dateInputClass =
   'w-[118px] px-1.5 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500';
 
 export function ShopOrderProductListTab({
-  orders,
   listTab,
-  onReload,
-  onOrderPatched,
+  onStatsReload,
 }: ShopOrderProductListTabProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -76,6 +73,13 @@ export function ShopOrderProductListTab({
     urlSearchTerm,
     persistSearchTerm
   );
+  const [orders, setOrders] = useState<ShopOrder[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const hasLoadedOnceRef = useRef(false);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [statementModalOpen, setStatementModalOpen] = useState(false);
@@ -91,43 +95,55 @@ export function ShopOrderProductListTab({
   const checkboxClass =
     'w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer';
 
-  const filteredOrders = useMemo(() => {
-    const lower = searchTerm.trim().toLowerCase();
-    return orders.filter((order) => {
-      const matchesSearch =
-        !lower ||
-        order.orderNumber.toLowerCase().includes(lower) ||
-        order.productName.toLowerCase().includes(lower);
-      const matchesStatus = statusFilter === ALL_STATUS || order.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [orders, searchTerm, statusFilter]);
+  const fetchKey = `${currentPage}|${urlSearchTerm}|${statusFilter}`;
 
-  const paginationResetKey = `${searchTerm}|${statusFilter}`;
-  const {
-    paginatedItems: paginatedOrders,
-    totalPages,
-    totalItems,
-    startIndex,
-    endIndex,
-  } = useShopOrderListPagination(filteredOrders, paginationResetKey, {
-    page: currentPage,
-    onPageChange: setCurrentPage,
-  });
+  const reloadPage = useCallback(async () => {
+    if (!hasLoadedOnceRef.current) {
+      setIsInitialLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
+    setLoadError(null);
+    try {
+      const result = await getShopOrdersPaginated({
+        page: currentPage,
+        limit: SHOP_ORDER_LIST_PAGE_SIZE,
+        search: urlSearchTerm,
+        status: statusFilter,
+      });
+      setOrders(result.items);
+      setTotalItems(result.pagination.totalItems);
+      setTotalPages(result.pagination.totalPages);
+      hasLoadedOnceRef.current = true;
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : '주문 목록을 불러오지 못했습니다.');
+    } finally {
+      setIsInitialLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [currentPage, urlSearchTerm, statusFilter]);
+
+  useEffect(() => {
+    void reloadPage();
+  }, [fetchKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const startIndex =
+    totalItems === 0 ? 0 : (currentPage - 1) * SHOP_ORDER_LIST_PAGE_SIZE + 1;
+  const endIndex = Math.min(currentPage * SHOP_ORDER_LIST_PAGE_SIZE, totalItems);
 
   const listReturnPath = shopOrderListReturnPath(location.pathname, location.search);
 
   const allPageSelected =
-    paginatedOrders.length > 0 && paginatedOrders.every((order) => selectedOrderIds.has(order.id));
-  const somePageSelected = paginatedOrders.some((order) => selectedOrderIds.has(order.id));
+    orders.length > 0 && orders.every((order) => selectedOrderIds.has(order.id));
+  const somePageSelected = orders.some((order) => selectedOrderIds.has(order.id));
 
   const handleToggleSelectAll = () => {
     setSelectedOrderIds((prev) => {
       const next = new Set(prev);
       if (allPageSelected) {
-        paginatedOrders.forEach((order) => next.delete(order.id));
+        orders.forEach((order) => next.delete(order.id));
       } else {
-        paginatedOrders.forEach((order) => next.add(order.id));
+        orders.forEach((order) => next.add(order.id));
       }
       return next;
     });
@@ -159,7 +175,7 @@ export function ShopOrderProductListTab({
       const updated = await syncShopOrderDetail(order.id, {
         koreaArrivalDate: nextValue,
       });
-      onOrderPatched(updated);
+      setOrders((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
     } catch (err) {
       alert(err instanceof Error ? err.message : '한국도착(예상)일 저장에 실패했습니다.');
     } finally {
@@ -186,7 +202,7 @@ export function ShopOrderProductListTab({
     setDeletingOrderId(order.id);
     try {
       await deleteShopOrder(order.id);
-      await onReload();
+      await Promise.all([onStatsReload(), reloadPage()]);
     } catch (err) {
       alert(err instanceof Error ? err.message : '제품 주문 삭제 중 오류가 발생했습니다.');
     } finally {
@@ -255,7 +271,7 @@ export function ShopOrderProductListTab({
         return;
       }
 
-      await onReload();
+      await Promise.all([onStatsReload(), reloadPage()]);
 
       setStatementGroups(
         result.groups.map((group) => ({
@@ -343,7 +359,20 @@ export function ShopOrderProductListTab({
   const bulkActionButtonClass =
     'inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
 
-  if (orders.length === 0) {
+  const hasActiveFilter =
+    urlSearchTerm.trim().length > 0 || statusFilter !== ALL_STATUS;
+
+  if (isInitialLoading) {
+    return (
+      <div className="py-16 text-center text-gray-500">주문 목록을 불러오는 중...</div>
+    );
+  }
+
+  if (loadError && orders.length === 0) {
+    return <div className="py-16 text-center text-red-600">{loadError}</div>;
+  }
+
+  if (totalItems === 0 && !hasActiveFilter) {
     return (
       <div className="py-16 text-center text-gray-500">
         등록된 주문이 없습니다. 재고 관리에서 「주문관리에 등록하기」로 제품을 추가하세요.
@@ -353,6 +382,17 @@ export function ShopOrderProductListTab({
 
   return (
     <>
+      {loadError && orders.length > 0 && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {loadError}
+        </div>
+      )}
+      {isRefreshing && (
+        <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
+          <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-purple-600 rounded-full animate-spin" />
+          목록을 새로고치는 중...
+        </div>
+      )}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <SearchBar
           value={searchTerm}
@@ -414,7 +454,7 @@ export function ShopOrderProductListTab({
             세금계산서 엑셀 만들기
           </button>
         </div>
-        {filteredOrders.length > 0 && (
+        {totalItems > 0 && (
           <ShopOrderListPagination
             currentPage={currentPage}
             totalPages={totalPages}
@@ -426,7 +466,7 @@ export function ShopOrderProductListTab({
           />
         )}
         <div className="overflow-x-auto">
-          {filteredOrders.length === 0 ? (
+          {orders.length === 0 ? (
             <div className="py-12 text-center text-gray-500">검색 결과가 없습니다.</div>
           ) : (
             <table className="w-full">
@@ -462,7 +502,7 @@ export function ShopOrderProductListTab({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {paginatedOrders.map((order) => {
+                {orders.map((order) => {
                   const imageUrl = order.productMainImage
                     ? getFullImageUrl(order.productMainImage)
                     : null;
@@ -582,7 +622,7 @@ export function ShopOrderProductListTab({
             </table>
           )}
         </div>
-        {filteredOrders.length > 0 && (
+        {totalItems > 0 && (
           <ShopOrderListPagination
             currentPage={currentPage}
             totalPages={totalPages}
