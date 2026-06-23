@@ -46,6 +46,12 @@ function parseBool(value: unknown): boolean {
   return false;
 }
 
+function parseProductKind(value: unknown): '판매가능' | '재고조사' | '판매완료' {
+  if (value === '재고조사') return '재고조사';
+  if (value === '판매완료') return '판매완료';
+  return '판매가능';
+}
+
 function buildProductCostFields(formData: Record<string, unknown>) {
   const price = parseOptionalFloat(formData.price) ?? 0;
   const logistics_cost = parseOptionalFloat(formData.logisticsCost) ?? 0;
@@ -357,6 +363,7 @@ export class ProductController {
         category: formData.category || '잡화',
         ...buildProductCostFields(formData),
         stock: parseOptionalInt(formData.stock) ?? 0,
+        product_kind: parseProductKind(formData.productKind),
         size: formData.size || undefined,
         packaging_size: formData.packagingSize || undefined,
         weight: formData.weight || undefined,
@@ -445,6 +452,7 @@ export class ProductController {
       const productData: UpdateProductDTO = {
         ...buildProductCostFields(formData),
         stock: parseOptionalInt(formData.stock),
+        product_kind: parseProductKind(formData.productKind),
         size: formData.size || undefined,
         packaging_size: formData.packagingSize || undefined,
         weight: formData.weight || undefined,
@@ -510,8 +518,11 @@ export class ProductController {
         .map((url) => resolveStoredUrl(url, remainingExistingUrls))
         .filter((url): url is string => url !== null);
 
-      const nextMainImage =
-        keptMainCandidates[0] ?? newImageUrls[0] ?? null;
+      const mainImageIsNew =
+        formData.mainImageIsNew === '1' || formData.mainImageIsNew === true;
+      const nextMainImage = mainImageIsNew
+        ? (newImageUrls[0] ?? keptMainCandidates[0] ?? null)
+        : (keptMainCandidates[0] ?? newImageUrls[0] ?? null);
 
       product = await this.service.updateProduct(id, {
         main_image: nextMainImage,
@@ -614,6 +625,39 @@ export class ProductController {
       res.status(500).json({
         success: false,
         error: error.message || '광고문구 저장 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 상품 구분 태그 변경 (판매가능 / 재고조사 / 판매완료)
+   * PATCH /api/products/:id/product-kind
+   */
+  updateProductKind = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { productKind } = req.body;
+
+      const kind = parseProductKind(productKind);
+      const existing = await this.service.getProductById(id);
+      if (!existing) {
+        return res.status(404).json({
+          success: false,
+          error: '상품을 찾을 수 없습니다.',
+        });
+      }
+
+      const product = await this.service.updateProduct(id, { product_kind: kind });
+
+      res.json({
+        success: true,
+        data: product,
+      });
+    } catch (error: any) {
+      console.error('상품 구분 변경 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '상품 구분 변경 중 오류가 발생했습니다.',
       });
     }
   };

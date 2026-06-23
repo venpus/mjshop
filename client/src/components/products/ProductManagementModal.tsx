@@ -1,18 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Package, Plus, X } from 'lucide-react';
 import { ProductForm, type ProductFormDataWithFiles } from '../ProductForm';
 import { DeleteConfirmDialog } from '../DeleteConfirmDialog';
 import { SearchBar } from '../ui/search-bar';
 import { TablePagination } from '../ui/table-pagination';
 import { ProductCard } from './ProductCard';
+import { ProductKindFilterBar } from './ProductKindFilterBar';
 import {
   createCatalogProduct,
   deleteCatalogProduct,
   fetchCatalogProductById,
   fetchCatalogProducts,
   mapProductToFormInitial,
+  matchesProductKindFilter,
   updateCatalogProduct,
   type CatalogProduct,
+  type ProductKind,
+  type ProductKindFilter,
 } from '../../utils/productApiHelpers';
 
 interface ProductManagementModalProps {
@@ -24,6 +28,7 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [kindFilter, setKindFilter] = useState<ProductKindFilter>('all_active');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(16);
   const [editingProduct, setEditingProduct] = useState<CatalogProduct | null>(null);
@@ -60,7 +65,21 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, kindFilter]);
+
+  const kindFilterCounts = useMemo(() => {
+    const counts: Partial<Record<ProductKindFilter, number>> = {
+      all_active: 0,
+      판매가능: 0,
+      재고조사: 0,
+      판매완료: 0,
+    };
+    for (const product of products) {
+      if (product.productKind !== '판매완료') counts.all_active!++;
+      counts[product.productKind]!++;
+    }
+    return counts;
+  }, [products]);
 
   const handleEditProduct = async (product: CatalogProduct) => {
     try {
@@ -111,7 +130,11 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
   const handleSaveProduct = async (formData: ProductFormDataWithFiles) => {
     try {
       if (formMode === 'edit' && editingProduct) {
-        await updateCatalogProduct(editingProduct.id, formData);
+        const payload =
+          editingProduct.productKind === '판매완료'
+            ? { ...formData, productKind: '판매완료' as ProductKind }
+            : formData;
+        await updateCatalogProduct(editingProduct.id, payload);
         alert('상품이 성공적으로 수정되었습니다.');
       } else {
         await createCatalogProduct(formData);
@@ -120,9 +143,10 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
       setIsFormOpen(false);
       setEditingProduct(null);
       setFormMode('create');
-      await loadProducts();
+      void loadProducts();
     } catch (err) {
       alert(err instanceof Error ? err.message : '상품 저장 중 오류가 발생했습니다.');
+      throw err;
     }
   };
 
@@ -132,9 +156,16 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
     setFormMode('create');
   };
 
-  const filteredProducts = products.filter((product) =>
-    product.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleProductKindChanged = (productId: string, productKind: ProductKind) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, productKind } : p))
+    );
+  };
+
+  const filteredProducts = products.filter((product) => {
+    if (!product.id.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    return matchesProductKindFilter(product.productKind, kindFilter);
+  });
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -144,11 +175,12 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+        className="fixed inset-0 z-50 overflow-y-auto p-4 bg-black/50"
         onClick={onClose}
       >
+        <div className="flex min-h-full items-center justify-center py-4">
         <div
-          className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden"
+          className="bg-white rounded-xl shadow-2xl w-full max-w-6xl flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-orange-600 bg-orange-500 text-white shrink-0">
@@ -157,7 +189,7 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
               <h3 className="text-lg font-bold text-white truncate">상품 관리</h3>
               {!isLoading && (
                 <span className="text-base font-semibold text-white shrink-0">
-                  ({products.length}건)
+                  ({filteredProducts.length}건)
                 </span>
               )}
             </div>
@@ -171,7 +203,13 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
             </button>
           </div>
 
-          <div className="px-6 py-4 border-b border-gray-100 shrink-0 flex flex-col sm:flex-row gap-3">
+          <div className="px-6 py-4 border-b border-gray-100 shrink-0 space-y-3">
+            <ProductKindFilterBar
+              value={kindFilter}
+              onChange={setKindFilter}
+              counts={kindFilterCounts}
+            />
+            <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 min-w-0">
               <SearchBar
                 value={searchTerm}
@@ -188,9 +226,10 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
               <Plus className="w-4 h-4" />
               <span>상품 등록</span>
             </button>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto min-h-0">
+          <div>
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-20 text-gray-500">
                 <Loader2 className="w-8 h-8 animate-spin text-orange-500 mb-3" />
@@ -205,7 +244,7 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
             ) : currentProducts.length === 0 ? (
               <div className="py-20 px-6 text-center text-gray-500">
                 {filteredProducts.length === 0 && products.length > 0
-                  ? '검색 조건에 맞는 상품이 없습니다.'
+                  ? '검색·필터 조건에 맞는 상품이 없습니다.'
                   : '등록된 상품이 없습니다. 상품 등록 버튼으로 추가해 주세요.'}
               </div>
             ) : (
@@ -219,6 +258,8 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
                       onDelete={handleDeleteProduct}
                       onAdCopySaved={handleAdCopySaved}
                       onMainImageChanged={handleMainImageChanged}
+                      onProductKindChanged={handleProductKindChanged}
+                      showSaleCompletedCheckbox
                     />
                   ))}
                 </div>
@@ -244,6 +285,7 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
               />
             </div>
           )}
+        </div>
         </div>
       </div>
 

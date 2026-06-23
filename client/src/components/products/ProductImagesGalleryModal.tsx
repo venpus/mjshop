@@ -75,11 +75,12 @@ export function ProductImagesGalleryModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60"
+      className="fixed inset-0 z-[60] overflow-y-auto p-4 bg-black/60"
       onClick={onClose}
     >
+      <div className="flex min-h-full items-center justify-center py-4">
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-xl shadow-2xl w-full max-w-4xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-gray-200 shrink-0">
@@ -98,7 +99,7 @@ export function ProductImagesGalleryModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 min-h-0">
+        <div className="p-5">
           {allImages.length === 0 ? (
             <p className="py-16 text-center text-gray-500">등록된 사진이 없습니다.</p>
           ) : (
@@ -152,6 +153,7 @@ export function ProductImagesGalleryModal({
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

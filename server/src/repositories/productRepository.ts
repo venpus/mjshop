@@ -14,6 +14,7 @@ interface ProductRow extends RowDataPacket {
   has_tag: number;
   stock: number;
   status: string;
+  product_kind: string;
   size: string | null;
   packaging_size: string | null;
   weight: string | null;
@@ -49,7 +50,7 @@ interface SupplierRow extends RowDataPacket {
 }
 
 const PRODUCT_COLUMNS = `id, name, name_chinese, category, price, logistics_cost, final_unit_cost, has_tag,
-              stock, status, size, packaging_size, weight, set_count, small_pack_count, box_count,
+              stock, status, product_kind, size, packaging_size, weight, set_count, small_pack_count, box_count,
               reorder_moq, delivery_days, delivery_date, tag_addon_enabled, tag_addon_price,
               packaging_addon_enabled, packaging_addon_price, labor_cost, ad_copy,
               main_image, supplier_id, created_at, updated_at, created_by, updated_by`;
@@ -99,6 +100,7 @@ export class ProductRepository {
       final_unit_cost = null,
       has_tag = false,
       stock = 0,
+      product_kind = '판매가능',
       size,
       packaging_size,
       weight,
@@ -120,11 +122,11 @@ export class ProductRepository {
     await pool.execute<ResultSetHeader>(
       `INSERT INTO products 
        (id, name, name_chinese, category, price, logistics_cost, final_unit_cost, has_tag,
-        stock, status, size, packaging_size, weight, set_count, small_pack_count, box_count,
+        stock, status, product_kind, size, packaging_size, weight, set_count, small_pack_count, box_count,
         reorder_moq, delivery_days, delivery_date, tag_addon_enabled, tag_addon_price,
         packaging_addon_enabled, packaging_addon_price, labor_cost,
         supplier_id, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '판매중', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '판매중', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         productId,
         name,
@@ -135,6 +137,7 @@ export class ProductRepository {
         final_unit_cost,
         has_tag ? 1 : 0,
         stock,
+        product_kind,
         size || null,
         packaging_size || null,
         weight || null,
@@ -204,6 +207,10 @@ export class ProductRepository {
     if (data.status !== undefined) {
       updates.push('status = ?');
       values.push(data.status);
+    }
+    if (data.product_kind !== undefined) {
+      updates.push('product_kind = ?');
+      values.push(data.product_kind);
     }
     if (data.size !== undefined) {
       updates.push('size = ?');
@@ -500,6 +507,11 @@ export class ProductRepository {
       has_tag: Boolean(row.has_tag),
       stock: row.stock,
       status: row.status as Product['status'],
+      product_kind: (row.product_kind === '재고조사'
+        ? '재고조사'
+        : row.product_kind === '판매완료'
+          ? '판매완료'
+          : '판매가능') as Product['product_kind'],
       size: row.size,
       packaging_size: row.packaging_size,
       weight: row.weight,

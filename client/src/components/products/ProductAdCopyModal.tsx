@@ -43,11 +43,12 @@ export function ProductAdCopyModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50"
+      className="fixed inset-0 z-[60] overflow-y-auto p-4 bg-black/50"
       onClick={onClose}
     >
+      <div className="flex min-h-full items-center justify-center py-4">
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-xl shadow-2xl w-full max-w-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-gray-200 shrink-0">
@@ -68,7 +69,7 @@ export function ProductAdCopyModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 min-h-0">
+        <div className="p-5">
           <p className="text-sm text-gray-600 mb-3">
             광고 문구를 붙여넣은 뒤 저장하세요. 이모지·줄바꿈 형식 그대로 유지됩니다.
           </p>
@@ -100,6 +101,7 @@ export function ProductAdCopyModal({
             저장
           </button>
         </div>
+      </div>
       </div>
     </div>
   );

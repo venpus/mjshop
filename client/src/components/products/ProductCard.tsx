@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Copy, Image, Megaphone } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Copy, Image, Loader2, Megaphone } from 'lucide-react';
 import { ProductActions } from './ProductActions';
 import { ProductAdCopyModal } from './ProductAdCopyModal';
 import { ProductImagesGalleryModal } from './ProductImagesGalleryModal';
@@ -10,9 +10,15 @@ import {
   type ProductInfoFields,
 } from '../../utils/productInfoFormat';
 import { copyTextToClipboard } from '../../utils/copyToClipboard';
+import {
+  getProductKindBadgeClass,
+  setProductKind,
+  type ProductKind,
+} from '../../utils/productApiHelpers';
 
 export interface ProductCardProduct extends ProductInfoFields {
   id: string;
+  productKind?: ProductKind;
   mainImage: string;
   images: string[];
   adCopy?: string | null;
@@ -25,6 +31,8 @@ export interface ProductCardProps {
   onDelete: (product: ProductCardProduct) => void;
   onAdCopySaved?: (productId: string, adCopy: string) => void;
   onMainImageChanged?: (productId: string, mainImage: string) => void;
+  onProductKindChanged?: (productId: string, productKind: ProductKind) => void;
+  showSaleCompletedCheckbox?: boolean;
   showActions?: boolean;
   enableImageGallery?: boolean;
 }
@@ -36,6 +44,8 @@ export function ProductCard({
   onDelete,
   onAdCopySaved,
   onMainImageChanged,
+  onProductKindChanged,
+  showSaleCompletedCheckbox = false,
   showActions = true,
   enableImageGallery = true,
 }: ProductCardProps) {
@@ -44,6 +54,9 @@ export function ProductCard({
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [displayMainImage, setDisplayMainImage] = useState(product.mainImage);
   const [savedAdCopy, setSavedAdCopy] = useState<string | null>(product.adCopy ?? null);
+  const [displayKind, setDisplayKind] = useState<ProductKind>(product.productKind ?? '판매가능');
+  const [isKindSaving, setIsKindSaving] = useState(false);
+  const kindBeforeSaleRef = useRef<ProductKind>('판매가능');
 
   useEffect(() => {
     setSavedAdCopy(product.adCopy ?? null);
@@ -52,6 +65,15 @@ export function ProductCard({
   useEffect(() => {
     setDisplayMainImage(product.mainImage);
   }, [product.mainImage, product.id]);
+
+  useEffect(() => {
+    setDisplayKind(product.productKind ?? '판매가능');
+    if (product.productKind && product.productKind !== '판매완료') {
+      kindBeforeSaleRef.current = product.productKind;
+    }
+  }, [product.productKind, product.id]);
+
+  const isSaleCompleted = displayKind === '판매완료';
 
   const handleActionsClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -75,8 +97,37 @@ export function ProductCard({
     }
   };
 
+  const handleSaleCompletedChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    const checked = e.target.checked;
+    const nextKind: ProductKind = checked
+      ? (() => {
+          if (displayKind !== '판매완료') {
+            kindBeforeSaleRef.current = displayKind;
+          }
+          return '판매완료';
+        })()
+      : kindBeforeSaleRef.current;
+    setIsKindSaving(true);
+    try {
+      await setProductKind(product.id, nextKind);
+      setDisplayKind(nextKind);
+      onProductKindChanged?.(product.id, nextKind);
+    } catch {
+      alert('판매완료 상태 변경에 실패했습니다.');
+    } finally {
+      setIsKindSaving(false);
+    }
+  };
+
   return (
-    <article className="group flex flex-col bg-white rounded-lg border border-gray-200 overflow-hidden hover:border-purple-200 hover:shadow-md transition-all w-full">
+    <article
+      className={`group flex flex-col bg-white rounded-lg border overflow-hidden transition-all w-full ${
+        isSaleCompleted
+          ? 'border-slate-300 opacity-80 hover:border-slate-400'
+          : 'border-gray-200 hover:border-purple-200 hover:shadow-md'
+      }`}
+    >
       <div
         className={`relative aspect-square bg-gray-50 flex items-center justify-center overflow-hidden ${
           enableImageGallery ? 'cursor-pointer hover:bg-gray-100' : ''
@@ -96,9 +147,37 @@ export function ProductCard({
       </div>
 
       <div className="flex flex-col flex-1 p-2.5 gap-2 min-w-0">
-        <p className="text-xs font-bold text-gray-900 truncate px-0.5" title={product.id}>
-          {product.id}
-        </p>
+        <div className="flex items-center gap-1.5 min-w-0 px-0.5">
+          <p className="text-xs font-bold text-gray-900 truncate flex-1" title={product.id}>
+            {product.id}
+          </p>
+          <span
+            className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold border ${getProductKindBadgeClass(
+              displayKind
+            )}`}
+          >
+            {displayKind}
+          </span>
+        </div>
+
+        {showSaleCompletedCheckbox && (
+          <label
+            className="flex items-center gap-2 px-1 py-1 rounded-md bg-slate-50 border border-slate-200 cursor-pointer select-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={isSaleCompleted}
+              disabled={isKindSaving}
+              onChange={(e) => void handleSaleCompletedChange(e)}
+              className="w-3.5 h-3.5 rounded border-slate-300 text-slate-700 focus:ring-slate-500 disabled:opacity-50"
+            />
+            <span className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+              {isKindSaving && <Loader2 className="w-3 h-3 animate-spin" />}
+              판매완료
+            </span>
+          </label>
+        )}
 
         <dl className="grid grid-cols-2 gap-1.5">
           {PRODUCT_INFO_LABELS.map(({ key, label }) => {

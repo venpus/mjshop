@@ -2,6 +2,7 @@
 
 export type ProductStatus = '판매중' | '품절' | '숨김';
 export type ProductCategory = '봉제' | '키링' | '피규어' | '잡화';
+export type ProductKind = '판매가능' | '재고조사' | '판매완료';
 
 export interface Product {
   id: string;
@@ -14,6 +15,7 @@ export interface Product {
   has_tag: boolean;
   stock: number;
   status: ProductStatus;
+  product_kind: ProductKind;
   size: string | null;
   packaging_size: string | null;
   weight: string | null;
@@ -65,6 +67,7 @@ export interface CreateProductDTO extends ProductCostFields {
   name_chinese?: string;
   category: ProductCategory;
   stock?: number;
+  product_kind?: ProductKind;
   size?: string;
   packaging_size?: string;
   weight?: string;
@@ -85,6 +88,7 @@ export interface UpdateProductDTO extends Partial<ProductCostFields> {
   category?: ProductCategory;
   stock?: number;
   status?: ProductStatus;
+  product_kind?: ProductKind;
   size?: string;
   packaging_size?: string;
   weight?: string;

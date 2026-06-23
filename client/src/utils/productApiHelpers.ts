@@ -1,5 +1,53 @@
 import type { ProductFormDataWithFiles } from '../components/ProductForm';
 
+export type ProductKind = '판매가능' | '재고조사' | '판매완료';
+
+/** 등록/수정 폼에서 선택 가능한 구분 (판매완료는 카드에서만 지정) */
+export const PRODUCT_FORM_KIND_OPTIONS: Array<{
+  value: Exclude<ProductKind, '판매완료'>;
+  label: string;
+  description: string;
+}> = [
+  { value: '판매가능', label: '판매가능', description: '일반 판매 대상 상품' },
+  { value: '재고조사', label: '재고조사', description: '재고 조사·확인용 상품' },
+];
+
+export type ProductKindFilter = 'all_active' | ProductKind;
+
+export const PRODUCT_KIND_FILTER_OPTIONS: Array<{
+  value: ProductKindFilter;
+  label: string;
+}> = [
+  { value: 'all_active', label: '전체' },
+  { value: '판매가능', label: '판매가능' },
+  { value: '재고조사', label: '재고조사' },
+  { value: '판매완료', label: '판매완료' },
+];
+
+export function parseProductKindFromApi(value: unknown): ProductKind {
+  if (value === '재고조사') return '재고조사';
+  if (value === '판매완료') return '판매완료';
+  return '판매가능';
+}
+
+export function matchesProductKindFilter(
+  productKind: ProductKind,
+  filter: ProductKindFilter
+): boolean {
+  if (filter === 'all_active') return productKind !== '판매완료';
+  return productKind === filter;
+}
+
+export function getProductKindBadgeClass(kind: ProductKind): string {
+  if (kind === '재고조사') {
+    return 'bg-amber-100 text-amber-800 border-amber-200';
+  }
+  if (kind === '판매완료') {
+    return 'bg-slate-200 text-slate-700 border-slate-300';
+  }
+  return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+}
+
 export interface CatalogProduct {
   id: string;
   name: string;
@@ -9,6 +57,7 @@ export interface CatalogProduct {
   hasTag: boolean;
   stock: number;
   status: '판매중' | '품절' | '숨김';
+  productKind: ProductKind;
   size: string;
   packagingSize: string;
   weight: string;
@@ -77,6 +126,7 @@ export function mapApiProductToClient(p: Record<string, unknown>): CatalogProduc
     hasTag: Boolean(p.has_tag),
     stock: Number(p.stock) || 0,
     status: p.status as CatalogProduct['status'],
+    productKind: parseProductKindFromApi(p.product_kind),
     size: p.size ? String(p.size) : '',
     packagingSize: p.packaging_size ? String(p.packaging_size) : '',
     weight: p.weight ? String(p.weight) : '',
@@ -107,6 +157,7 @@ function appendProductFormFields(formDataToSend: FormData, formData: ProductForm
     formData.logisticsCost === '' ? '0' : formData.logisticsCost.toString()
   );
   formDataToSend.append('hasTag', formData.hasTag ? '1' : '0');
+  formDataToSend.append('productKind', formData.productKind ?? '판매가능');
   formDataToSend.append('stock', formData.stock === '' ? '0' : formData.stock.toString());
   formDataToSend.append('packagingSize', formData.packagingSize || '');
   formDataToSend.append(
@@ -138,6 +189,9 @@ function appendProductFormFields(formDataToSend: FormData, formData: ProductForm
     'laborCost',
     formData.laborCost === '' ? '0' : formData.laborCost.toString()
   );
+  if (formData.mainImageIsNew !== undefined) {
+    formDataToSend.append('mainImageIsNew', formData.mainImageIsNew ? '1' : '0');
+  }
 }
 
 export function collectProductImageUrls(product: CatalogProduct): string[] {
@@ -160,6 +214,7 @@ export function mapProductToFormInitial(product: CatalogProduct) {
     logisticsCost: product.logisticsCost,
     hasTag: product.hasTag,
     stock: product.stock,
+    productKind: product.productKind === '판매완료' ? '판매가능' : product.productKind,
     size: product.size || '',
     packagingSize: product.packagingSize || '',
     setCount: product.setCount,
@@ -336,5 +391,24 @@ export async function saveProductAdCopy(id: string, adCopy: string): Promise<voi
   const data = await response.json();
   if (!data.success) {
     throw new Error('광고문구 저장에 실패했습니다.');
+  }
+}
+
+export async function setProductKind(id: string, productKind: ProductKind): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/products/${id}/product-kind`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ productKind }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || '상품 구분 변경에 실패했습니다.');
+  }
+
+  const data = await response.json();
+  if (!data.success) {
+    throw new Error('상품 구분 변경에 실패했습니다.');
   }
 }

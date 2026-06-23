@@ -1,19 +1,24 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, Upload } from "lucide-react";
+import { Loader2, Star, Upload, X } from "lucide-react";
 import {
   computeProductFinalUnitCost,
   computeLogisticsCostFromWeight,
   convertFinalUnitCostToKrw,
 } from "../utils/productCostCalculations";
+import {
+  PRODUCT_FORM_KIND_OPTIONS,
+  type ProductKind,
+} from "../utils/productApiHelpers";
 
 interface ProductFormProps {
   onClose: () => void;
-  onSave: (product: ProductFormDataWithFiles) => void;
+  onSave: (product: ProductFormDataWithFiles) => void | Promise<void>;
   initialData?: ProductFormData;
   mode?: "create" | "edit";
 }
 
 export interface ProductFormData {
+  productKind: ProductKind;
   price: number | "";
   logisticsCost: number | "";
   hasTag: boolean;
@@ -34,11 +39,44 @@ export interface ProductFormData {
 
 export interface ProductFormDataWithFiles extends ProductFormData {
   images?: File[];
+  /** 수정 시 메인이 신규 업로드 이미지인 경우 서버에 전달 */
+  mainImageIsNew?: boolean;
+}
+
+type ImageItem =
+  | { kind: "existing"; url: string }
+  | { kind: "new"; file: File };
+
+function orderImagesWithMainFirst(
+  existingUrls: string[],
+  newFiles: File[],
+  mainIndex: number
+): { existingImageUrls: string[]; images: File[]; mainImageIsNew: boolean } {
+  const items: ImageItem[] = [
+    ...existingUrls.map((url) => ({ kind: "existing" as const, url })),
+    ...newFiles.map((file) => ({ kind: "new" as const, file })),
+  ];
+  if (items.length === 0) {
+    return { existingImageUrls: [], images: [], mainImageIsNew: false };
+  }
+  const safeMain = Math.min(Math.max(0, mainIndex), items.length - 1);
+  const mainItem = items[safeMain];
+  const ordered = [mainItem, ...items.filter((_, i) => i !== safeMain)];
+  return {
+    existingImageUrls: ordered
+      .filter((i): i is { kind: "existing"; url: string } => i.kind === "existing")
+      .map((i) => i.url),
+    images: ordered
+      .filter((i): i is { kind: "new"; file: File } => i.kind === "new")
+      .map((i) => i.file),
+    mainImageIsNew: mainItem.kind === "new",
+  };
 }
 
 const MAX_IMAGES = 20;
 
 const DEFAULT_FORM_DATA: ProductFormData = {
+  productKind: "판매가능",
   price: "",
   logisticsCost: "",
   hasTag: false,
@@ -72,6 +110,8 @@ export function ProductForm({
   const [newImages, setNewImages] = useState<File[]>([]);
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
   const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
+  const [mainImageIndex, setMainImageIndex] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const totalImageCount = existingImageUrls.length + newImages.length;
 
@@ -102,23 +142,35 @@ export function ProductForm({
       if (initialData.existingImageUrls) {
         setExistingImageUrls(initialData.existingImageUrls);
       }
+      setMainImageIndex(0);
     }
   }, [initialData]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isSubmitting) return;
 
     if (mode === "create" && totalImageCount === 0) {
       alert("이미지를 1장 이상 등록해주세요.");
       return;
     }
 
-    onSave({
-      ...formData,
-      images: newImages.length > 0 ? newImages : undefined,
-      existingImageUrls:
-        existingImageUrls.length > 0 ? existingImageUrls : undefined,
-    });
+    const { existingImageUrls: orderedExisting, images: orderedImages, mainImageIsNew } =
+      orderImagesWithMainFirst(existingImageUrls, newImages, mainImageIndex);
+
+    setIsSubmitting(true);
+    try {
+      await onSave({
+        ...formData,
+        images: orderedImages.length > 0 ? orderedImages : undefined,
+        existingImageUrls:
+          orderedExisting.length > 0 ? orderedExisting : undefined,
+        mainImageIsNew: totalImageCount > 0 ? mainImageIsNew : undefined,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (
@@ -181,6 +233,12 @@ export function ProductForm({
   };
 
   const removeImage = (index: number) => {
+    setMainImageIndex((prev) => {
+      if (index < prev) return prev - 1;
+      if (index === prev) return 0;
+      return prev;
+    });
+
     if (index < existingImageUrls.length) {
       setExistingImageUrls((prev) => prev.filter((_, i) => i !== index));
     } else {
@@ -190,15 +248,56 @@ export function ProductForm({
     }
   };
 
+  const renderImageTile = (src: string, globalIndex: number, key: string) => {
+    const isMain = globalIndex === mainImageIndex;
+
+    return (
+      <div
+        key={key}
+        className={`relative flex flex-col border-2 rounded-lg aspect-square bg-gray-50 overflow-hidden ${
+          isMain ? "border-orange-500 ring-2 ring-orange-200" : "border-gray-200"
+        }`}
+      >
+        <img src={src} alt="" className="w-full h-full object-contain p-1" />
+        {isMain && (
+          <div className="absolute top-1 left-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-orange-500 text-white text-[9px] font-bold">
+            <Star className="w-2.5 h-2.5 fill-current" />
+            메인
+          </div>
+        )}
+        {!isMain && totalImageCount > 1 && (
+          <button
+            type="button"
+            onClick={() => setMainImageIndex(globalIndex)}
+            disabled={isSubmitting}
+            className="absolute bottom-1 left-1 right-1 py-0.5 text-[9px] font-medium bg-white/90 border border-gray-200 rounded text-gray-700 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700 disabled:opacity-50"
+          >
+            메인으로
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => removeImage(globalIndex)}
+          disabled={isSubmitting}
+          className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-full disabled:opacity-50"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+    );
+  };
+
   return (
-    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
+    <div className="fixed inset-0 backdrop-blur-sm z-[70] overflow-y-auto p-4">
+      <div className="flex min-h-full items-center justify-center py-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
           <h3 className="text-gray-900">{mode === "edit" ? "상품 수정" : "상품 등록"}</h3>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            disabled={isSubmitting}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -208,28 +307,67 @@ export function ProductForm({
           <div className="space-y-4">
             <div>
               <label className="block text-gray-700 mb-2">
+                상품 구분 <span className="text-red-500">*</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {PRODUCT_FORM_KIND_OPTIONS.map((option) => {
+                  const selected = formData.productKind === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => handleChange("productKind", option.value)}
+                      className={`inline-flex flex-col items-start px-4 py-2.5 rounded-lg border-2 text-left transition-colors disabled:opacity-50 ${
+                        selected
+                          ? option.value === "재고조사"
+                            ? "border-amber-500 bg-amber-50 text-amber-900"
+                            : "border-emerald-500 bg-emerald-50 text-emerald-900"
+                          : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                      }`}
+                    >
+                      <span className="text-sm font-bold">{option.label}</span>
+                      <span className="text-xs opacity-80">{option.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-gray-700 mb-1">
                 이미지 {mode === "create" && <span className="text-red-500">*</span>}
               </label>
+              {totalImageCount > 0 && (
+                <p className="text-xs text-gray-500 mb-2">메인으로 사용할 사진을 선택하세요</p>
+              )}
               <div className="grid grid-cols-6 gap-2">
-                {existingImageUrls.map((url, index) => (
-                  <div key={`existing-${index}`} className="relative border rounded-lg aspect-square bg-gray-50">
-                    <img src={url} alt="" className="w-full h-full object-contain" />
-                    <button type="button" onClick={() => removeImage(index)} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-                {newImagePreviews.map((preview, index) => (
-                  <div key={`new-${index}`} className="relative border rounded-lg aspect-square bg-gray-50">
-                    <img src={preview} alt="" className="w-full h-full object-contain" />
-                    <button type="button" onClick={() => removeImage(existingImageUrls.length + index)} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+                {existingImageUrls.map((url, index) =>
+                  renderImageTile(url, index, `existing-${index}`)
+                )}
+                {newImagePreviews.map((preview, index) =>
+                  renderImageTile(
+                    preview,
+                    existingImageUrls.length + index,
+                    `new-${index}`
+                  )
+                )}
                 {totalImageCount < MAX_IMAGES && (
-                  <label className="border-2 border-dashed border-gray-300 rounded-lg cursor-pointer aspect-square flex flex-col items-center justify-center hover:border-purple-400 hover:bg-purple-50 transition-colors">
-                    <input type="file" accept="image/*" multiple onChange={handleImagesChange} className="hidden" />
+                  <label
+                    className={`border-2 border-dashed border-gray-300 rounded-lg aspect-square flex flex-col items-center justify-center transition-colors ${
+                      isSubmitting
+                        ? "opacity-50 cursor-not-allowed"
+                        : "cursor-pointer hover:border-purple-400 hover:bg-purple-50"
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImagesChange}
+                      disabled={isSubmitting}
+                      className="hidden"
+                    />
                     <Upload className="w-6 h-6 text-gray-400 mb-1" />
                     <p className="text-gray-400 text-xs">{totalImageCount}/{MAX_IMAGES}</p>
                   </label>
@@ -349,10 +487,31 @@ export function ProductForm({
           </div>
 
           <div className="flex items-center justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
-            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">취소</button>
-            <button type="submit" className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">{mode === "edit" ? "수정하기" : "등록하기"}</button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-70 disabled:cursor-not-allowed min-w-[7rem] justify-center"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {mode === "edit" ? "수정 중…" : "등록 중…"}
+                </>
+              ) : (
+                mode === "edit" ? "수정하기" : "등록하기"
+              )}
+            </button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );

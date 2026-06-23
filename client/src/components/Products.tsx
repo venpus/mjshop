@@ -1,5 +1,5 @@
 ﻿/// <reference types="vite/client" />
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Plus,
 } from "lucide-react";
@@ -8,10 +8,11 @@ import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 import { SearchBar } from "./ui/search-bar";
 import { TablePagination } from "./ui/table-pagination";
 import { ProductCard } from "./products/ProductCard";
+import { ProductKindFilterBar } from "./products/ProductKindFilterBar";
 import { ProductFilter, ProductFilterData } from "./ui/ProductFilter";
 import { PurchaseOrderForm, PurchaseOrderFormData } from "./PurchaseOrderForm";
 import { useAuth } from "../contexts/AuthContext";
-import { normalizeImageUrlsForServer } from "../utils/productApiHelpers";
+import { normalizeImageUrlsForServer, matchesProductKindFilter, parseProductKindFromApi, type ProductKind, type ProductKindFilter } from "../utils/productApiHelpers";
 
 interface Product {
   id: string;
@@ -23,6 +24,7 @@ interface Product {
   hasTag: boolean;
   stock: number;
   status: "판매중" | "품절" | "숨김";
+  productKind: ProductKind;
   size: string;
   packagingSize: string;
   weight: string;
@@ -50,6 +52,7 @@ function appendProductFormFields(formDataToSend: FormData, formData: ProductForm
     formData.logisticsCost === "" ? "0" : formData.logisticsCost.toString()
   );
   formDataToSend.append('hasTag', formData.hasTag ? '1' : '0');
+  formDataToSend.append('productKind', formData.productKind ?? '판매가능');
   formDataToSend.append('stock', formData.stock === "" ? "0" : formData.stock.toString());
   formDataToSend.append('packagingSize', formData.packagingSize || '');
   formDataToSend.append(
@@ -81,6 +84,9 @@ function appendProductFormFields(formDataToSend: FormData, formData: ProductForm
     'laborCost',
     formData.laborCost === "" ? "0" : formData.laborCost.toString()
   );
+  if (formData.mainImageIsNew !== undefined) {
+    formDataToSend.append('mainImageIsNew', formData.mainImageIsNew ? '1' : '0');
+  }
 }
 
 function mapApiProductToClient(p: Record<string, unknown>, getFullImageUrl: (url: string | null | undefined) => string): Product {
@@ -95,6 +101,7 @@ function mapApiProductToClient(p: Record<string, unknown>, getFullImageUrl: (url
     hasTag: Boolean(p.has_tag),
     stock: Number(p.stock) || 0,
     status: p.status as Product['status'],
+    productKind: parseProductKindFromApi(p.product_kind),
     size: p.size ? String(p.size) : '',
     packagingSize: p.packaging_size ? String(p.packaging_size) : '',
     weight: p.weight ? String(p.weight) : '',
@@ -140,6 +147,7 @@ function mapProductToFormInitial(product: Product, getFullImageUrl: (url: string
     logisticsCost: product.logisticsCost,
     hasTag: product.hasTag,
     stock: product.stock,
+    productKind: product.productKind === '판매완료' ? '판매가능' : product.productKind,
     size: product.size || '',
     packagingSize: product.packagingSize || '',
     setCount: product.setCount,
@@ -171,6 +179,7 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
   const [products, setProducts] =
     useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [kindFilter, setKindFilter] = useState<ProductKindFilter>("all_active");
   const [filter, setFilter] = useState<ProductFilterData>({});
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -194,6 +203,8 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
       const matchesSearch = product.id.toLowerCase().includes(searchLower);
 
       if (!matchesSearch) return false;
+
+      if (!matchesProductKindFilter(product.productKind, kindFilter)) return false;
 
       // 가격 필터
       if (filter.priceMin !== undefined && product.price < filter.priceMin) return false;
@@ -252,7 +263,21 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
   // 필터 또는 검색어 변경 시 첫 페이지로 리셋
   useEffect(() => {
     setCurrentPage(1);
-  }, [filter, searchTerm]);
+  }, [filter, searchTerm, kindFilter]);
+
+  const kindFilterCounts = useMemo(() => {
+    const counts: Partial<Record<ProductKindFilter, number>> = {
+      all_active: 0,
+      판매가능: 0,
+      재고조사: 0,
+      판매완료: 0,
+    };
+    for (const product of products) {
+      if (product.productKind !== '판매완료') counts.all_active!++;
+      counts[product.productKind]!++;
+    }
+    return counts;
+  }, [products]);
 
   const handleItemsPerPageChange = (value: number) => {
     setItemsPerPage(value);
@@ -287,9 +312,13 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
   const handleSaveProduct = async (formData: ProductFormDataWithFiles) => {
     try {
       if (formMode === "edit" && editingProduct) {
+        const saveData =
+          editingProduct.productKind === '판매완료'
+            ? { ...formData, productKind: '판매완료' as ProductKind }
+            : formData;
         // 상품 수정 - FormData로 전송 (이미지 포함)
         const formDataToSend = new FormData();
-        appendProductFormFields(formDataToSend, formData);
+        appendProductFormFields(formDataToSend, saveData);
         formDataToSend.append('size', formData.size || '');
         formDataToSend.append('setCount', formData.setCount.toString());
         if (formData.weight) formDataToSend.append('weight', formData.weight);
@@ -321,9 +350,9 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
         const data = await response.json();
         if (data.success) {
           alert("상품이 성공적으로 수정되었습니다.");
-          await loadProducts();
           setEditingProduct(null);
           setIsFormOpen(false);
+          void loadProducts();
         } else {
           throw new Error('상품 수정에 실패했습니다.');
         }
@@ -357,9 +386,8 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
 
         const data = await response.json();
         if (data.success) {
-          // 성공 후 목록 다시 로드
-          await loadProducts();
           setIsFormOpen(false);
+          void loadProducts();
         } else {
           throw new Error('상품 생성에 실패했습니다.');
         }
@@ -367,6 +395,7 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
     } catch (err: any) {
       alert(err.message || '상품 저장 중 오류가 발생했습니다.');
       console.error('상품 저장 오류:', err);
+      throw err;
     }
   };
 
@@ -442,6 +471,12 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
   const handleMainImageChanged = (productId: string, mainImage: string) => {
     setProducts((prev) =>
       prev.map((p) => (p.id === productId ? { ...p, mainImage } : p))
+    );
+  };
+
+  const handleProductKindChanged = (productId: string, productKind: ProductKind) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, productKind } : p))
     );
   };
 
@@ -544,7 +579,13 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
       </div>
 
       {/* Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-4">
+      <div className="flex flex-col gap-3 mb-4">
+        <ProductKindFilterBar
+          value={kindFilter}
+          onChange={setKindFilter}
+          counts={kindFilterCounts}
+        />
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex gap-2 flex-1">
           <SearchBar
             value={searchTerm}
@@ -567,6 +608,7 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
           <span>상품 등록</span>
         </button>
       </div>
+      </div>
 
       {/* Products Card Grid */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -588,6 +630,8 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
                   onDelete={handleDeleteProduct}
                   onAdCopySaved={handleAdCopySaved}
                   onMainImageChanged={handleMainImageChanged}
+                  onProductKindChanged={handleProductKindChanged}
+                  showSaleCompletedCheckbox
                 />
               ))}
             </div>
