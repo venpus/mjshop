@@ -131,8 +131,22 @@ function parseExistingImageUrls(formData: Record<string, unknown>): string[] {
   return legacy;
 }
 
+function normalizeUrlForComparison(url: string): string {
+  const withoutQuery = url.split('?')[0];
+  try {
+    if (withoutQuery.startsWith('http://') || withoutQuery.startsWith('https://')) {
+      return new URL(withoutQuery).pathname;
+    }
+  } catch {
+    // fall through
+  }
+  return withoutQuery;
+}
+
 function urlMatches(a: string, b: string): boolean {
-  return a === b || a.endsWith(b) || b.endsWith(a);
+  const na = normalizeUrlForComparison(a);
+  const nb = normalizeUrlForComparison(b);
+  return na === nb || na.endsWith(nb) || nb.endsWith(na);
 }
 
 function isUrlKept(img: string, keepUrls: string[]): boolean {

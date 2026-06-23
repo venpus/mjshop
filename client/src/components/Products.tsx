@@ -12,6 +12,7 @@ import { ProductCard } from "./products/ProductCard";
 import { ProductFilter, ProductFilterData } from "./ui/ProductFilter";
 import { PurchaseOrderForm, PurchaseOrderFormData } from "./PurchaseOrderForm";
 import { useAuth } from "../contexts/AuthContext";
+import { normalizeImageUrlsForServer } from "../utils/productApiHelpers";
 
 interface Product {
   id: string;
@@ -293,7 +294,10 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
         if (formData.weight) formDataToSend.append('weight', formData.weight);
 
         if (formData.existingImageUrls && formData.existingImageUrls.length > 0) {
-          formDataToSend.append('existingImageUrls', JSON.stringify(formData.existingImageUrls));
+          formDataToSend.append(
+            'existingImageUrls',
+            JSON.stringify(normalizeImageUrlsForServer(formData.existingImageUrls))
+          );
         }
 
         if (formData.images && formData.images.length > 0) {

@@ -1,3 +1,4 @@
+import { type ReactNode } from "react";
 import { ArrowLeft, Edit, Trash2 } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
 
@@ -7,6 +8,8 @@ interface DetailHeaderProps {
   onDelete?: () => void;
   deleteDisabled?: boolean;
   title?: string;
+  titleTrailing?: ReactNode;
+  headerActions?: ReactNode;
 }
 
 export function DetailHeader({
@@ -15,6 +18,8 @@ export function DetailHeader({
   onDelete,
   deleteDisabled = false,
   title,
+  titleTrailing,
+  headerActions,
 }: DetailHeaderProps) {
   const { t } = useLanguage();
   const displayTitle = title ?? t("purchaseOrder.detail.title");
@@ -29,10 +34,12 @@ export function DetailHeader({
         <span>{t("purchaseOrder.detail.backToList")}</span>
       </button>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 flex-1 min-w-0">
           <h2 className="text-base md:text-lg text-gray-900 truncate">{displayTitle}</h2>
+          {titleTrailing}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {headerActions}
           {onDelete && (
             <button
               type="button"

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { DetailHeader } from '../DetailHeader';
+import { ProductManagementNavButton } from '../products/ProductManagementNavButton';
 
 import { SaveStatusBar } from '../purchase-order/SaveStatusBar';
 
@@ -819,7 +820,11 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
       <div className="p-4 md:p-6 min-h-0 pb-8 min-w-0 max-w-full overflow-x-hidden">
 
-        <DetailHeader onBack={handleBackWithConfirm} title="주문 상세" />
+        <DetailHeader
+          onBack={handleBackWithConfirm}
+          title="주문 상세"
+          titleTrailing={<ProductManagementNavButton />}
+        />
 
         <div className="min-h-[50vh] flex items-center justify-center">
 
@@ -847,7 +852,11 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
 
       <div className="p-4 md:p-6 min-h-0 pb-8 min-w-0 max-w-full overflow-x-hidden">
 
-        <DetailHeader onBack={handleBackWithConfirm} title="주문 상세" />
+        <DetailHeader
+          onBack={handleBackWithConfirm}
+          title="주문 상세"
+          titleTrailing={<ProductManagementNavButton />}
+        />
 
         <div className="min-h-[50vh] flex items-center justify-center">
 
@@ -890,6 +899,7 @@ export function ShopOrderDetail({ orderId, onBack }: ShopOrderDetailProps) {
         onDelete={() => void handleDeleteProductOrder()}
         deleteDisabled={isDeletingOrder}
         title="주문 상세"
+        titleTrailing={<ProductManagementNavButton />}
       />
 
 

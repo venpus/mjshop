@@ -16,6 +16,7 @@ import {
 } from './orders/shopOrderListUrlParams';
 import { ShopOrderListTabs, type ShopOrderListTab } from './orders/ShopOrderListTabs';
 import { ShopOrderProductListTab } from './orders/ShopOrderProductListTab';
+import { ProductManagementNavButton } from './products/ProductManagementNavButton';
 
 const EMPTY_STATUS_COUNTS: Record<ShopOrderStatus, number> = {
   판매대기: 0,
@@ -105,7 +106,10 @@ export function Orders() {
   return (
     <div className="p-8 min-h-[1080px]">
       <div className="mb-8">
-        <h2 className="text-gray-900 mb-2">주문 관리</h2>
+        <div className="flex flex-wrap items-center gap-3 mb-2">
+          <h2 className="text-gray-900">주문 관리</h2>
+          <ProductManagementNavButton />
+        </div>
         <p className="text-gray-600">재고에서 등록한 제품의 판매 주문을 관리할 수 있습니다</p>
       </div>
 

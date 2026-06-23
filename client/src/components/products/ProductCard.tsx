@@ -19,6 +19,7 @@ export interface ProductCardProps {
   onOrder?: (product: ProductCardProduct) => void;
   onEdit: (product: ProductCardProduct) => void;
   onDelete: (product: ProductCardProduct) => void;
+  showActions?: boolean;
 }
 
 export function ProductCard({
@@ -27,6 +28,7 @@ export function ProductCard({
   onOrder,
   onEdit,
   onDelete,
+  showActions = true,
 }: ProductCardProps) {
   const [copied, setCopied] = useState(false);
 
@@ -98,15 +100,17 @@ export function ProductCard({
             {copied ? '복사됨' : '복사하기'}
           </button>
 
-          <div className="flex items-center justify-end [&_button]:p-1.5 [&_svg]:w-4 [&_svg]:h-4">
-            <ProductActions
-              product={product}
-              onOrder={onOrder}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              className="gap-1"
-            />
-          </div>
+          {showActions && (
+            <div className="flex items-center justify-end [&_button]:p-1.5 [&_svg]:w-4 [&_svg]:h-4">
+              <ProductActions
+                product={product}
+                onOrder={onOrder}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                className="gap-1"
+              />
+            </div>
+          )}
         </div>
       </div>
     </article>
