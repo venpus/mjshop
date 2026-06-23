@@ -16,12 +16,14 @@ export interface CatalogProduct {
   smallPackCount: number;
   boxCount: number;
   reorderMoq: number | null;
+  deliveryDate: string | null;
   deliveryDays: number | null;
   tagAddonEnabled: boolean;
   tagAddonPrice: number | null;
   packagingAddonEnabled: boolean;
   packagingAddonPrice: number | null;
   laborCost: number;
+  adCopy: string | null;
   mainImage: string;
   images: string[];
 }
@@ -82,6 +84,9 @@ export function mapApiProductToClient(p: Record<string, unknown>): CatalogProduc
     smallPackCount: Number(p.small_pack_count) || 1,
     boxCount: Number(p.box_count) || 1,
     reorderMoq: p.reorder_moq != null ? Number(p.reorder_moq) : null,
+    deliveryDate: p.delivery_date
+      ? String(p.delivery_date).slice(0, 10)
+      : null,
     deliveryDays: p.delivery_days != null ? Number(p.delivery_days) : null,
     tagAddonEnabled: Boolean(p.tag_addon_enabled),
     tagAddonPrice: p.tag_addon_price != null ? Number(p.tag_addon_price) : null,
@@ -89,6 +94,7 @@ export function mapApiProductToClient(p: Record<string, unknown>): CatalogProduc
     packagingAddonPrice:
       p.packaging_addon_price != null ? Number(p.packaging_addon_price) : null,
     laborCost: Number(p.labor_cost) || 0,
+    adCopy: p.ad_copy != null ? String(p.ad_copy) : null,
     mainImage: mainImageUrl,
     images: ((p.images as string[]) || []).map((img) => getFullImageUrl(img)),
   };
@@ -108,8 +114,8 @@ function appendProductFormFields(formDataToSend: FormData, formData: ProductForm
     formData.reorderMoq === '' ? '' : formData.reorderMoq.toString()
   );
   formDataToSend.append(
-    'deliveryDays',
-    formData.deliveryDays === '' ? '' : formData.deliveryDays.toString()
+    'deliveryDate',
+    formData.deliveryDate ? String(formData.deliveryDate).slice(0, 10) : ''
   );
   formDataToSend.append('tagAddonEnabled', formData.tagAddonEnabled ? '1' : '0');
   formDataToSend.append(
@@ -159,7 +165,7 @@ export function mapProductToFormInitial(product: CatalogProduct) {
     setCount: product.setCount,
     weight: product.weight || '',
     reorderMoq: product.reorderMoq ?? '',
-    deliveryDays: product.deliveryDays ?? '',
+    deliveryDate: product.deliveryDate ?? '',
     tagAddonEnabled: product.tagAddonEnabled,
     tagAddonPrice: product.tagAddonPrice ?? '',
     packagingAddonEnabled: product.packagingAddonEnabled,
@@ -293,4 +299,42 @@ export async function deleteCatalogProduct(id: string): Promise<void> {
   }
 
   await response.json();
+}
+
+export async function setProductMainImage(id: string, mainImageUrl: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/products/${id}/main-image`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ mainImageUrl: normalizeImageUrlForServer(mainImageUrl) }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || '메인 이미지 변경에 실패했습니다.');
+  }
+
+  const data = await response.json();
+  if (!data.success) {
+    throw new Error('메인 이미지 변경에 실패했습니다.');
+  }
+}
+
+export async function saveProductAdCopy(id: string, adCopy: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/products/${id}/ad-copy`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ adCopy }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || '광고문구 저장에 실패했습니다.');
+  }
+
+  const data = await response.json();
+  if (!data.success) {
+    throw new Error('광고문구 저장에 실패했습니다.');
+  }
 }

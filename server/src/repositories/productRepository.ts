@@ -22,11 +22,13 @@ interface ProductRow extends RowDataPacket {
   box_count: number;
   reorder_moq: number | null;
   delivery_days: number | null;
+  delivery_date: string | Date | null;
   tag_addon_enabled: number;
   tag_addon_price: number | null;
   packaging_addon_enabled: number;
   packaging_addon_price: number | null;
   labor_cost: number;
+  ad_copy: string | null;
   main_image: string | null;
   supplier_id: number | null;
   created_at: Date;
@@ -48,8 +50,8 @@ interface SupplierRow extends RowDataPacket {
 
 const PRODUCT_COLUMNS = `id, name, name_chinese, category, price, logistics_cost, final_unit_cost, has_tag,
               stock, status, size, packaging_size, weight, set_count, small_pack_count, box_count,
-              reorder_moq, delivery_days, tag_addon_enabled, tag_addon_price,
-              packaging_addon_enabled, packaging_addon_price, labor_cost,
+              reorder_moq, delivery_days, delivery_date, tag_addon_enabled, tag_addon_price,
+              packaging_addon_enabled, packaging_addon_price, labor_cost, ad_copy,
               main_image, supplier_id, created_at, updated_at, created_by, updated_by`;
 
 export class ProductRepository {
@@ -105,6 +107,7 @@ export class ProductRepository {
       box_count = 1,
       reorder_moq = null,
       delivery_days = null,
+      delivery_date = null,
       tag_addon_enabled = false,
       tag_addon_price = null,
       packaging_addon_enabled = false,
@@ -118,10 +121,10 @@ export class ProductRepository {
       `INSERT INTO products 
        (id, name, name_chinese, category, price, logistics_cost, final_unit_cost, has_tag,
         stock, status, size, packaging_size, weight, set_count, small_pack_count, box_count,
-        reorder_moq, delivery_days, tag_addon_enabled, tag_addon_price,
+        reorder_moq, delivery_days, delivery_date, tag_addon_enabled, tag_addon_price,
         packaging_addon_enabled, packaging_addon_price, labor_cost,
         supplier_id, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '판매중', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '판매중', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         productId,
         name,
@@ -140,6 +143,7 @@ export class ProductRepository {
         box_count,
         reorder_moq,
         delivery_days,
+        delivery_date || null,
         tag_addon_enabled ? 1 : 0,
         tag_addon_price,
         packaging_addon_enabled ? 1 : 0,
@@ -233,6 +237,10 @@ export class ProductRepository {
       updates.push('delivery_days = ?');
       values.push(data.delivery_days);
     }
+    if (data.delivery_date !== undefined) {
+      updates.push('delivery_date = ?');
+      values.push(data.delivery_date || null);
+    }
     if (data.tag_addon_enabled !== undefined) {
       updates.push('tag_addon_enabled = ?');
       values.push(data.tag_addon_enabled ? 1 : 0);
@@ -252,6 +260,10 @@ export class ProductRepository {
     if (data.labor_cost !== undefined) {
       updates.push('labor_cost = ?');
       values.push(data.labor_cost);
+    }
+    if (data.ad_copy !== undefined) {
+      updates.push('ad_copy = ?');
+      values.push(data.ad_copy || null);
     }
     if (data.main_image !== undefined) {
       updates.push('main_image = ?');
@@ -496,6 +508,11 @@ export class ProductRepository {
       box_count: row.box_count,
       reorder_moq: row.reorder_moq != null ? Number(row.reorder_moq) : null,
       delivery_days: row.delivery_days != null ? Number(row.delivery_days) : null,
+      delivery_date: row.delivery_date
+        ? row.delivery_date instanceof Date
+          ? row.delivery_date.toISOString().slice(0, 10)
+          : String(row.delivery_date).slice(0, 10)
+        : null,
       tag_addon_enabled: Boolean(row.tag_addon_enabled),
       tag_addon_price:
         row.tag_addon_price != null ? Number(row.tag_addon_price) : null,
@@ -503,6 +520,7 @@ export class ProductRepository {
       packaging_addon_price:
         row.packaging_addon_price != null ? Number(row.packaging_addon_price) : null,
       labor_cost: Number(row.labor_cost) || 0,
+      ad_copy: row.ad_copy ?? null,
       main_image: row.main_image,
       supplier_id: row.supplier_id,
       created_at: row.created_at,

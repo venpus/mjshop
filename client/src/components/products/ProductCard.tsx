@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { Copy, Image } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Copy, Image, Megaphone } from 'lucide-react';
 import { ProductActions } from './ProductActions';
+import { ProductAdCopyModal } from './ProductAdCopyModal';
+import { ProductImagesGalleryModal } from './ProductImagesGalleryModal';
 import {
   formatProductInfoClipboardText,
   getProductInfoDisplayValue,
@@ -12,33 +14,54 @@ import { copyTextToClipboard } from '../../utils/copyToClipboard';
 export interface ProductCardProduct extends ProductInfoFields {
   id: string;
   mainImage: string;
+  images: string[];
+  adCopy?: string | null;
 }
 
 export interface ProductCardProps {
   product: ProductCardProduct;
-  onViewDetail: (product: ProductCardProduct) => void;
   onOrder?: (product: ProductCardProduct) => void;
   onEdit: (product: ProductCardProduct) => void;
   onDelete: (product: ProductCardProduct) => void;
+  onAdCopySaved?: (productId: string, adCopy: string) => void;
+  onMainImageChanged?: (productId: string, mainImage: string) => void;
   showActions?: boolean;
+  enableImageGallery?: boolean;
 }
 
 export function ProductCard({
   product,
-  onViewDetail,
   onOrder,
   onEdit,
   onDelete,
+  onAdCopySaved,
+  onMainImageChanged,
   showActions = true,
+  enableImageGallery = true,
 }: ProductCardProps) {
   const [copied, setCopied] = useState(false);
+  const [isAdCopyModalOpen, setIsAdCopyModalOpen] = useState(false);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [displayMainImage, setDisplayMainImage] = useState(product.mainImage);
+  const [savedAdCopy, setSavedAdCopy] = useState<string | null>(product.adCopy ?? null);
 
-  const handleCardClick = () => {
-    onViewDetail(product);
-  };
+  useEffect(() => {
+    setSavedAdCopy(product.adCopy ?? null);
+  }, [product.adCopy, product.id]);
+
+  useEffect(() => {
+    setDisplayMainImage(product.mainImage);
+  }, [product.mainImage, product.id]);
 
   const handleActionsClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+  };
+
+  const handleImageClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (enableImageGallery) {
+      setIsGalleryOpen(true);
+    }
   };
 
   const handleCopy = async (e: React.MouseEvent) => {
@@ -53,14 +76,17 @@ export function ProductCard({
   };
 
   return (
-    <article
-      className="group flex flex-col bg-white rounded-lg border border-gray-200 overflow-hidden hover:border-purple-200 hover:shadow-md transition-all cursor-pointer w-full"
-      onClick={handleCardClick}
-    >
-      <div className="relative aspect-square bg-gray-50 flex items-center justify-center overflow-hidden">
-        {product.mainImage ? (
+    <article className="group flex flex-col bg-white rounded-lg border border-gray-200 overflow-hidden hover:border-purple-200 hover:shadow-md transition-all w-full">
+      <div
+        className={`relative aspect-square bg-gray-50 flex items-center justify-center overflow-hidden ${
+          enableImageGallery ? 'cursor-pointer hover:bg-gray-100' : ''
+        }`}
+        onClick={handleImageClick}
+        title={enableImageGallery ? '사진 보기 · 메인 이미지 선택' : undefined}
+      >
+        {displayMainImage ? (
           <img
-            src={product.mainImage}
+            src={displayMainImage}
             alt={product.id}
             className="max-h-full max-w-full object-contain"
           />
@@ -69,36 +95,66 @@ export function ProductCard({
         )}
       </div>
 
-      <div className="flex flex-col flex-1 p-3 gap-2 min-w-0">
-        <p className="text-sm font-semibold text-gray-900 truncate" title={product.id}>
+      <div className="flex flex-col flex-1 p-2.5 gap-2 min-w-0">
+        <p className="text-xs font-bold text-gray-900 truncate px-0.5" title={product.id}>
           {product.id}
         </p>
 
-        <dl className="space-y-1 text-xs">
-          {PRODUCT_INFO_LABELS.map(({ key, label }) => (
-            <div key={key} className="flex gap-1.5 min-w-0">
-              <dt className="text-gray-500 shrink-0 w-[72px]">{label}</dt>
-              <dd
-                className={`font-medium truncate ${
-                  key === 'finalCny' || key === 'finalKrw'
-                    ? 'text-purple-700'
-                    : 'text-gray-800'
+        <dl className="grid grid-cols-2 gap-1.5">
+          {PRODUCT_INFO_LABELS.map(({ key, label }) => {
+            const isHighlight =
+              key === 'finalCny' || key === 'finalKrw' || key === 'deliveryDate';
+            return (
+              <div
+                key={key}
+                className={`min-w-0 rounded px-1.5 py-1 border ${
+                  key === 'deliveryDate'
+                    ? 'bg-sky-50 border-sky-200 col-span-2'
+                    : isHighlight
+                      ? 'bg-purple-50 border-purple-100'
+                      : 'bg-gray-50 border-gray-100'
                 }`}
               >
-                {getProductInfoDisplayValue(product, key)}
-              </dd>
-            </div>
-          ))}
+                <dt className="text-[10px] font-semibold text-gray-500 leading-none mb-0.5">
+                  {label}
+                </dt>
+                <dd
+                  className={`text-[11px] font-bold leading-tight truncate ${
+                    key === 'deliveryDate'
+                      ? 'text-sky-800'
+                      : key === 'finalCny' || key === 'finalKrw'
+                        ? 'text-purple-800'
+                        : 'text-gray-900'
+                  }`}
+                  title={getProductInfoDisplayValue(product, key)}
+                >
+                  {getProductInfoDisplayValue(product, key)}
+                </dd>
+              </div>
+            );
+          })}
         </dl>
 
-        <div className="pt-2 mt-auto border-t border-gray-100 space-y-2" onClick={handleActionsClick}>
+        <div className="pt-2 mt-auto border-t border-gray-100 space-y-1.5" onClick={handleActionsClick}>
           <button
             type="button"
             onClick={handleCopy}
-            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-md transition-colors"
+            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-bold text-purple-800 bg-purple-50 hover:bg-purple-100 rounded-md transition-colors"
           >
             <Copy className="w-3.5 h-3.5" />
             {copied ? '복사됨' : '복사하기'}
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsAdCopyModalOpen(true);
+            }}
+            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-bold text-orange-800 bg-orange-50 hover:bg-orange-100 rounded-md transition-colors"
+          >
+            <Megaphone className="w-3.5 h-3.5" />
+            {savedAdCopy ? '광고문구 수정' : '광고문구 저장'}
           </button>
 
           {showActions && (
@@ -114,6 +170,31 @@ export function ProductCard({
           )}
         </div>
       </div>
+
+      {isGalleryOpen && (
+        <ProductImagesGalleryModal
+          productId={product.id}
+          mainImage={displayMainImage}
+          images={product.images}
+          onClose={() => setIsGalleryOpen(false)}
+          onMainImageChanged={(mainImage) => {
+            setDisplayMainImage(mainImage);
+            onMainImageChanged?.(product.id, mainImage);
+          }}
+        />
+      )}
+
+      {isAdCopyModalOpen && (
+        <ProductAdCopyModal
+          productId={product.id}
+          initialAdCopy={savedAdCopy}
+          onClose={() => setIsAdCopyModalOpen(false)}
+          onSaved={(adCopy) => {
+            setSavedAdCopy(adCopy);
+            onAdCopySaved?.(product.id, adCopy);
+          }}
+        />
+      )}
     </article>
   );
 }

@@ -10,7 +10,8 @@ export interface ProductInfoFields {
   size: string;
   hasTag: boolean;
   stock: number;
-  deliveryDays: number | null;
+  deliveryDate: string | null;
+  deliveryDays?: number | null;
   tagAddonEnabled: boolean;
   tagAddonPrice: number | null;
   packagingAddonEnabled: boolean;
@@ -61,6 +62,17 @@ export function formatSize(size: string | null | undefined): string {
   return trimmed.endsWith('cm') ? trimmed : `${trimmed}cm`;
 }
 
+export function formatDeliveryDate(date: string | null | undefined): string {
+  if (!date) return '-';
+  const trimmed = date.slice(0, 10);
+  const parts = trimmed.split('-');
+  if (parts.length === 3) {
+    return `${parts[0]}.${parts[1]}.${parts[2]}`;
+  }
+  return trimmed;
+}
+
+/** @deprecated delivery_date 사용 권장 */
 export function formatDeliveryDays(days: number | null): string {
   if (days == null) return '-';
   return `${days}일`;
@@ -77,7 +89,7 @@ export function formatProductInfoClipboardText(product: ProductInfoFields): stri
     `사이즈: ${formatSize(product.size)}`,
     `택 유무: ${formatHasTag(product.hasTag)}`,
     `재고 수량: ${product.stock.toLocaleString()}`,
-    `납기일: ${formatDeliveryDays(product.deliveryDays)}`,
+    `납기일: ${formatDeliveryDate(product.deliveryDate)}`,
     `택 추가작업: ${formatAddonWork(product.tagAddonEnabled, product.tagAddonPrice)}`,
     `재포장 작업: ${formatAddonWork(product.packagingAddonEnabled, product.packagingAddonPrice)}`,
     `최종원가(위안): ¥${finalCny.toLocaleString()}`,
@@ -95,7 +107,7 @@ export const PRODUCT_INFO_LABELS: Array<{
   { key: 'size', label: '사이즈' },
   { key: 'hasTag', label: '택 유무' },
   { key: 'stock', label: '재고 수량' },
-  { key: 'deliveryDays', label: '납기일' },
+  { key: 'deliveryDate', label: '납기일' },
   { key: 'tagAddonEnabled', label: '택 추가작업' },
   { key: 'packagingAddonEnabled', label: '재포장 작업' },
   { key: 'finalCny', label: '최종원가(위안)' },
@@ -122,8 +134,8 @@ export function getProductInfoDisplayValue(
       return formatHasTag(product.hasTag);
     case 'stock':
       return product.stock.toLocaleString();
-    case 'deliveryDays':
-      return formatDeliveryDays(product.deliveryDays);
+    case 'deliveryDate':
+      return formatDeliveryDate(product.deliveryDate);
     case 'tagAddonEnabled':
       return formatAddonWork(product.tagAddonEnabled, product.tagAddonPrice);
     case 'packagingAddonEnabled':

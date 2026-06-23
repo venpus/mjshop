@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Package, Plus, X } from 'lucide-react';
-import { ProductDetailModal } from '../ProductDetailModal';
 import { ProductForm, type ProductFormDataWithFiles } from '../ProductForm';
 import { DeleteConfirmDialog } from '../DeleteConfirmDialog';
 import { SearchBar } from '../ui/search-bar';
@@ -27,7 +26,6 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(16);
-  const [detailProduct, setDetailProduct] = useState<CatalogProduct | null>(null);
   const [editingProduct, setEditingProduct] = useState<CatalogProduct | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -52,13 +50,13 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !detailProduct && !isFormOpen && !deleteProduct) {
+      if (e.key === 'Escape' && !isFormOpen && !deleteProduct) {
         onClose();
       }
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [onClose, detailProduct, isFormOpen, deleteProduct]);
+  }, [onClose, isFormOpen, deleteProduct]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -85,15 +83,24 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
     setDeleteProduct(product);
   };
 
+  const handleAdCopySaved = (productId: string, adCopy: string) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, adCopy } : p))
+    );
+  };
+
+  const handleMainImageChanged = (productId: string, mainImage: string) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, mainImage } : p))
+    );
+  };
+
   const handleConfirmDelete = async () => {
     if (!deleteProduct) return;
 
     try {
       await deleteCatalogProduct(deleteProduct.id);
       alert('상품이 성공적으로 삭제되었습니다.');
-      if (detailProduct?.id === deleteProduct.id) {
-        setDetailProduct(null);
-      }
       setDeleteProduct(null);
       await loadProducts();
     } catch (err) {
@@ -208,9 +215,10 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
                     <ProductCard
                       key={product.id}
                       product={product}
-                      onViewDetail={setDetailProduct}
                       onEdit={handleEditProduct}
                       onDelete={handleDeleteProduct}
+                      onAdCopySaved={handleAdCopySaved}
+                      onMainImageChanged={handleMainImageChanged}
                     />
                   ))}
                 </div>
@@ -238,13 +246,6 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
           )}
         </div>
       </div>
-
-      {detailProduct && (
-        <ProductDetailModal
-          product={detailProduct}
-          onClose={() => setDetailProduct(null)}
-        />
-      )}
 
       {isFormOpen && (
         <ProductForm

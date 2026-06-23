@@ -4,7 +4,6 @@ import {
   Plus,
 } from "lucide-react";
 import { ProductForm, ProductFormDataWithFiles } from "./ProductForm";
-import { ProductDetailModal } from "./ProductDetailModal";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 import { SearchBar } from "./ui/search-bar";
 import { TablePagination } from "./ui/table-pagination";
@@ -31,12 +30,14 @@ interface Product {
   smallPackCount: number;
   boxCount: number;
   reorderMoq: number | null;
+  deliveryDate: string | null;
   deliveryDays: number | null;
   tagAddonEnabled: boolean;
   tagAddonPrice: number | null;
   packagingAddonEnabled: boolean;
   packagingAddonPrice: number | null;
   laborCost: number;
+  adCopy: string | null;
   mainImage: string;
   images: string[];
   createdAt?: string | Date;
@@ -56,8 +57,8 @@ function appendProductFormFields(formDataToSend: FormData, formData: ProductForm
     formData.reorderMoq === "" ? '' : formData.reorderMoq.toString()
   );
   formDataToSend.append(
-    'deliveryDays',
-    formData.deliveryDays === "" ? '' : formData.deliveryDays.toString()
+    'deliveryDate',
+    formData.deliveryDate ? String(formData.deliveryDate).slice(0, 10) : ''
   );
   formDataToSend.append('tagAddonEnabled', formData.tagAddonEnabled ? '1' : '0');
   formDataToSend.append(
@@ -101,6 +102,7 @@ function mapApiProductToClient(p: Record<string, unknown>, getFullImageUrl: (url
     smallPackCount: Number(p.small_pack_count) || 1,
     boxCount: Number(p.box_count) || 1,
     reorderMoq: p.reorder_moq != null ? Number(p.reorder_moq) : null,
+    deliveryDate: p.delivery_date ? String(p.delivery_date).slice(0, 10) : null,
     deliveryDays: p.delivery_days != null ? Number(p.delivery_days) : null,
     tagAddonEnabled: Boolean(p.tag_addon_enabled),
     tagAddonPrice: p.tag_addon_price != null ? Number(p.tag_addon_price) : null,
@@ -108,6 +110,7 @@ function mapApiProductToClient(p: Record<string, unknown>, getFullImageUrl: (url
     packagingAddonPrice:
       p.packaging_addon_price != null ? Number(p.packaging_addon_price) : null,
     laborCost: Number(p.labor_cost) || 0,
+    adCopy: p.ad_copy != null ? String(p.ad_copy) : null,
     mainImage: mainImageUrl,
     images: ((p.images as string[]) || []).map((img) => getFullImageUrl(img)),
     createdAt: p.created_at as string | Date | undefined,
@@ -142,7 +145,7 @@ function mapProductToFormInitial(product: Product, getFullImageUrl: (url: string
     setCount: product.setCount,
     weight: product.weight || '',
     reorderMoq: product.reorderMoq ?? '',
-    deliveryDays: product.deliveryDays ?? '',
+    deliveryDate: product.deliveryDate ?? '',
     tagAddonEnabled: product.tagAddonEnabled,
     tagAddonPrice: product.tagAddonPrice ?? '',
     packagingAddonEnabled: product.packagingAddonEnabled,
@@ -177,8 +180,6 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
     "create",
   );
   const [editingProduct, setEditingProduct] =
-    useState<Product | null>(null);
-  const [detailProduct, setDetailProduct] =
     useState<Product | null>(null);
   const [deleteProduct, setDeleteProduct] =
     useState<Product | null>(null);
@@ -432,6 +433,18 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
     setDeleteProduct(product);
   };
 
+  const handleAdCopySaved = (productId: string, adCopy: string) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, adCopy } : p))
+    );
+  };
+
+  const handleMainImageChanged = (productId: string, mainImage: string) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, mainImage } : p))
+    );
+  };
+
   const handleConfirmDelete = async () => {
     if (!deleteProduct) return;
 
@@ -570,10 +583,11 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
                 <ProductCard
                   key={product.id}
                   product={product}
-                  onViewDetail={setDetailProduct}
                   onOrder={handleCreatePurchaseOrder}
                   onEdit={handleEditProduct}
                   onDelete={handleDeleteProduct}
+                  onAdCopySaved={handleAdCopySaved}
+                  onMainImageChanged={handleMainImageChanged}
                 />
               ))}
             </div>
@@ -604,14 +618,6 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
               ? mapProductToFormInitial(editingProduct, getFullImageUrl)
               : undefined
           }
-        />
-      )}
-
-      {/* Product Detail Modal */}
-      {detailProduct && (
-        <ProductDetailModal
-          product={detailProduct}
-          onClose={() => setDetailProduct(null)}
         />
       )}
 

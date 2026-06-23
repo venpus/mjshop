@@ -23,7 +23,7 @@ export interface ProductFormData {
   setCount: number;
   weight?: string;
   reorderMoq: number | "";
-  deliveryDays: number | "";
+  deliveryDate: string;
   tagAddonEnabled: boolean;
   tagAddonPrice: number | "";
   packagingAddonEnabled: boolean;
@@ -48,7 +48,7 @@ const DEFAULT_FORM_DATA: ProductFormData = {
   setCount: 1,
   weight: "",
   reorderMoq: "",
-  deliveryDays: "",
+  deliveryDate: "",
   tagAddonEnabled: false,
   tagAddonPrice: "",
   packagingAddonEnabled: false,
@@ -135,7 +135,6 @@ export function ProductForm({
       | "logisticsCost"
       | "stock"
       | "reorderMoq"
-      | "deliveryDays"
       | "tagAddonPrice"
       | "packagingAddonPrice"
       | "laborCost"
@@ -333,8 +332,13 @@ export function ProductForm({
                   <input type="number" min="0" value={formData.reorderMoq === "" ? "" : formData.reorderMoq} onChange={(e) => handleNumberChange("reorderMoq", e.target.value)} className={numberInputClass} />
                 </div>
                 <div>
-                  <label className="block text-gray-700 mb-2">납기일 (일)</label>
-                  <input type="number" min="0" value={formData.deliveryDays === "" ? "" : formData.deliveryDays} onChange={(e) => handleNumberChange("deliveryDays", e.target.value)} className={numberInputClass} />
+                  <label className="block text-gray-700 mb-2">납기일</label>
+                  <input
+                    type="date"
+                    value={formData.deliveryDate}
+                    onChange={(e) => handleChange("deliveryDate", e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
                 </div>
                 <div>
                   <label className="block text-gray-700 mb-2">세트 모델수(개) <span className="text-red-500">*</span></label>

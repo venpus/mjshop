@@ -36,6 +36,12 @@ router.put(
   controller.updateProduct
 );
 
+// 상품 광고문구 저장
+router.patch('/:id/ad-copy', controller.updateProductAdCopy);
+
+// 상품 메인 이미지 변경
+router.patch('/:id/main-image', controller.updateProductMainImage);
+
 // 상품 삭제
 router.delete('/:id', controller.deleteProduct);
 

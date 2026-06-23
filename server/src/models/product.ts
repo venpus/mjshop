@@ -22,11 +22,13 @@ export interface Product {
   box_count: number;
   reorder_moq: number | null;
   delivery_days: number | null;
+  delivery_date: string | null;
   tag_addon_enabled: boolean;
   tag_addon_price: number | null;
   packaging_addon_enabled: boolean;
   packaging_addon_price: number | null;
   labor_cost: number;
+  ad_copy: string | null;
   main_image: string | null;
   supplier_id: number | null;
   created_at: Date;
@@ -71,6 +73,7 @@ export interface CreateProductDTO extends ProductCostFields {
   box_count?: number;
   reorder_moq?: number | null;
   delivery_days?: number | null;
+  delivery_date?: string | null;
   supplier_id?: number;
   created_by?: string;
 }
@@ -90,6 +93,8 @@ export interface UpdateProductDTO extends Partial<ProductCostFields> {
   box_count?: number;
   reorder_moq?: number | null;
   delivery_days?: number | null;
+  delivery_date?: string | null;
+  ad_copy?: string | null;
   main_image?: string;
   supplier_id?: number;
   updated_by?: string;

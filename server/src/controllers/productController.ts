@@ -35,6 +35,12 @@ function parseNullableInt(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function parseDeliveryDate(value: unknown): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  const str = String(value).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(str) ? str : null;
+}
+
 function parseBool(value: unknown): boolean {
   if (value === true || value === 'true' || value === '1' || value === 1) return true;
   return false;
@@ -359,6 +365,7 @@ export class ProductController {
         box_count: formData.boxCount ? parseInt(formData.boxCount) : undefined,
         reorder_moq: parseNullableInt(formData.reorderMoq),
         delivery_days: parseNullableInt(formData.deliveryDays),
+        delivery_date: parseDeliveryDate(formData.deliveryDate),
         supplier_id: supplierId,
         created_by: formData.createdBy || undefined,
       };
@@ -446,6 +453,7 @@ export class ProductController {
         box_count: formData.boxCount ? parseInt(formData.boxCount) : undefined,
         reorder_moq: parseNullableInt(formData.reorderMoq),
         delivery_days: parseNullableInt(formData.deliveryDays),
+        delivery_date: parseDeliveryDate(formData.deliveryDate),
         supplier_id: supplierId,
         updated_by: formData.updatedBy || undefined,
       };
@@ -523,6 +531,89 @@ export class ProductController {
       res.status(500).json({
         success: false,
         error: error.message || '상품 수정 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 상품 메인 이미지 변경
+   * PATCH /api/products/:id/main-image
+   */
+  updateProductMainImage = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { mainImageUrl } = req.body;
+
+      if (typeof mainImageUrl !== 'string' || !mainImageUrl.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: '메인 이미지 URL이 필요합니다.',
+        });
+      }
+
+      const product = await this.service.getProductById(id);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          error: '상품을 찾을 수 없습니다.',
+        });
+      }
+
+      const allUrls = [
+        ...(product.main_image ? [product.main_image] : []),
+        ...(product.images || []),
+      ];
+
+      const matched = allUrls.find((url) => urlMatches(url, mainImageUrl));
+      if (!matched) {
+        return res.status(400).json({
+          success: false,
+          error: '해당 상품의 이미지가 아닙니다.',
+        });
+      }
+
+      const updated = await this.service.updateProduct(id, { main_image: matched });
+
+      res.json({
+        success: true,
+        data: updated,
+      });
+    } catch (error: any) {
+      console.error('메인 이미지 변경 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '메인 이미지 변경 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  /**
+   * 상품 광고문구 저장
+   * PATCH /api/products/:id/ad-copy
+   */
+  updateProductAdCopy = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { adCopy } = req.body;
+
+      if (typeof adCopy !== 'string') {
+        return res.status(400).json({
+          success: false,
+          error: '광고문구는 문자열이어야 합니다.',
+        });
+      }
+
+      const product = await this.service.updateProduct(id, { ad_copy: adCopy });
+
+      res.json({
+        success: true,
+        data: product,
+      });
+    } catch (error: any) {
+      console.error('광고문구 저장 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '광고문구 저장 중 오류가 발생했습니다.',
       });
     }
   };
