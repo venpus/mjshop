@@ -49,14 +49,14 @@ export function formatAddonWork(
   return '있음';
 }
 
-export function formatWeight(weight: string): string {
-  const trimmed = weight.trim();
+export function formatWeight(weight: string | null | undefined): string {
+  const trimmed = (weight ?? '').trim();
   if (!trimmed) return '-';
   return trimmed.endsWith('g') ? trimmed : `${trimmed}g`;
 }
 
-export function formatSize(size: string): string {
-  const trimmed = size.trim();
+export function formatSize(size: string | null | undefined): string {
+  const trimmed = (size ?? '').trim();
   if (!trimmed) return '-';
   return trimmed.endsWith('cm') ? trimmed : `${trimmed}cm`;
 }

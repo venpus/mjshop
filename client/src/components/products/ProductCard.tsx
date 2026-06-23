@@ -7,6 +7,7 @@ import {
   PRODUCT_INFO_LABELS,
   type ProductInfoFields,
 } from '../../utils/productInfoFormat';
+import { copyTextToClipboard } from '../../utils/copyToClipboard';
 
 export interface ProductCardProduct extends ProductInfoFields {
   id: string;
@@ -43,7 +44,7 @@ export function ProductCard({
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(formatProductInfoClipboardText(product));
+      await copyTextToClipboard(formatProductInfoClipboardText(product));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
