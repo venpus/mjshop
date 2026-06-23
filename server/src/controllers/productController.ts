@@ -518,7 +518,7 @@ export class ProductController {
       });
     } catch (error: any) {
       console.error('상품 수정 오류:', error);
-      cleanupTempUploadFiles(files);
+      cleanupTempUploadFiles(req.files as { [fieldname: string]: Express.Multer.File[] } | undefined);
 
       res.status(500).json({
         success: false,

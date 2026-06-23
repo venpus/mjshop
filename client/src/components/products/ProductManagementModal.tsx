@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Package, X } from 'lucide-react';
+import { Loader2, Package, Plus, X } from 'lucide-react';
 import { ProductDetailModal } from '../ProductDetailModal';
 import { ProductForm, type ProductFormDataWithFiles } from '../ProductForm';
 import { DeleteConfirmDialog } from '../DeleteConfirmDialog';
@@ -7,6 +7,7 @@ import { SearchBar } from '../ui/search-bar';
 import { TablePagination } from '../ui/table-pagination';
 import { ProductCard } from './ProductCard';
 import {
+  createCatalogProduct,
   deleteCatalogProduct,
   fetchCatalogProductById,
   fetchCatalogProducts,
@@ -28,6 +29,7 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
   const [itemsPerPage, setItemsPerPage] = useState(16);
   const [detailProduct, setDetailProduct] = useState<CatalogProduct | null>(null);
   const [editingProduct, setEditingProduct] = useState<CatalogProduct | null>(null);
+  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deleteProduct, setDeleteProduct] = useState<CatalogProduct | null>(null);
 
@@ -66,10 +68,17 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
     try {
       const fullProduct = await fetchCatalogProductById(product.id);
       setEditingProduct(fullProduct);
+      setFormMode('edit');
       setIsFormOpen(true);
     } catch (err) {
       alert(err instanceof Error ? err.message : '상품 정보를 불러오는 중 오류가 발생했습니다.');
     }
+  };
+
+  const handleOpenCreateForm = () => {
+    setEditingProduct(null);
+    setFormMode('create');
+    setIsFormOpen(true);
   };
 
   const handleDeleteProduct = (product: CatalogProduct) => {
@@ -93,13 +102,17 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
   };
 
   const handleSaveProduct = async (formData: ProductFormDataWithFiles) => {
-    if (!editingProduct) return;
-
     try {
-      await updateCatalogProduct(editingProduct.id, formData);
-      alert('상품이 성공적으로 수정되었습니다.');
+      if (formMode === 'edit' && editingProduct) {
+        await updateCatalogProduct(editingProduct.id, formData);
+        alert('상품이 성공적으로 수정되었습니다.');
+      } else {
+        await createCatalogProduct(formData);
+        alert('상품이 성공적으로 등록되었습니다.');
+      }
       setIsFormOpen(false);
       setEditingProduct(null);
+      setFormMode('create');
       await loadProducts();
     } catch (err) {
       alert(err instanceof Error ? err.message : '상품 저장 중 오류가 발생했습니다.');
@@ -109,6 +122,7 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
   const handleCloseForm = () => {
     setIsFormOpen(false);
     setEditingProduct(null);
+    setFormMode('create');
   };
 
   const filteredProducts = products.filter((product) =>
@@ -150,13 +164,23 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
             </button>
           </div>
 
-          <div className="px-6 py-4 border-b border-gray-100 shrink-0">
-            <SearchBar
-              value={searchTerm}
-              onChange={setSearchTerm}
-              placeholder="상품 ID로 검색..."
-              focusRingClass="focus:ring-purple-500"
-            />
+          <div className="px-6 py-4 border-b border-gray-100 shrink-0 flex flex-col sm:flex-row gap-3">
+            <div className="flex-1 min-w-0">
+              <SearchBar
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="상품 ID로 검색..."
+                focusRingClass="focus:ring-purple-500"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleOpenCreateForm}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-semibold shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>상품 등록</span>
+            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto min-h-0">
@@ -175,7 +199,7 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
               <div className="py-20 px-6 text-center text-gray-500">
                 {filteredProducts.length === 0 && products.length > 0
                   ? '검색 조건에 맞는 상품이 없습니다.'
-                  : '등록된 상품이 없습니다.'}
+                  : '등록된 상품이 없습니다. 상품 등록 버튼으로 추가해 주세요.'}
               </div>
             ) : (
               <div className="p-4 sm:p-5">
@@ -222,12 +246,16 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
         />
       )}
 
-      {isFormOpen && editingProduct && (
+      {isFormOpen && (
         <ProductForm
           onClose={handleCloseForm}
           onSave={handleSaveProduct}
-          mode="edit"
-          initialData={mapProductToFormInitial(editingProduct)}
+          mode={formMode}
+          initialData={
+            formMode === 'edit' && editingProduct
+              ? mapProductToFormInitial(editingProduct)
+              : undefined
+          }
         />
       )}
 

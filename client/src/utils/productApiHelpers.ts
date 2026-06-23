@@ -206,6 +206,38 @@ export async function fetchCatalogProductById(id: string): Promise<CatalogProduc
   return mapApiProductToClient(data.data as Record<string, unknown>);
 }
 
+export async function createCatalogProduct(formData: ProductFormDataWithFiles): Promise<void> {
+  const formDataToSend = new FormData();
+  appendProductFormFields(formDataToSend, formData);
+  formDataToSend.append('size', formData.size || '');
+  formDataToSend.append('setCount', formData.setCount.toString());
+  if (formData.weight) {
+    formDataToSend.append('weight', formData.weight);
+  }
+
+  if (formData.images && formData.images.length > 0) {
+    formData.images.forEach((file) => {
+      formDataToSend.append('images', file);
+    });
+  }
+
+  const response = await fetch(`${API_BASE_URL}/products`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formDataToSend,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || '상품 생성에 실패했습니다.');
+  }
+
+  const data = await response.json();
+  if (!data.success) {
+    throw new Error('상품 생성에 실패했습니다.');
+  }
+}
+
 export async function updateCatalogProduct(
   id: string,
   formData: ProductFormDataWithFiles
