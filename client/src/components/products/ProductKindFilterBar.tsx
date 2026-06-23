@@ -30,9 +30,11 @@ export function ProductKindFilterBar({
                   ? 'bg-slate-700 text-white border-slate-700'
                   : option.value === '재고조사'
                     ? 'bg-amber-500 text-white border-amber-500'
-                    : option.value === '판매가능'
-                      ? 'bg-emerald-600 text-white border-emerald-600'
-                      : 'bg-orange-500 text-white border-orange-500'
+                    : option.value === '예약판매'
+                      ? 'bg-sky-500 text-white border-sky-500'
+                      : option.value === '판매가능'
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-orange-500 text-white border-orange-500'
                 : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
             }`}
           >

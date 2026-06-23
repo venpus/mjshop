@@ -270,6 +270,7 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
       all_active: 0,
       판매가능: 0,
       재고조사: 0,
+      예약판매: 0,
       판매완료: 0,
     };
     for (const product of products) {

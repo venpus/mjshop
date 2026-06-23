@@ -12,6 +12,7 @@ import {
 import { copyTextToClipboard } from '../../utils/copyToClipboard';
 import {
   getProductKindBadgeClass,
+  getProductKindCardBorderClass,
   setProductKind,
   type ProductKind,
 } from '../../utils/productApiHelpers';
@@ -75,6 +76,8 @@ export function ProductCard({
 
   const isSaleCompleted = displayKind === '판매완료';
 
+  const cardBorderClass = getProductKindCardBorderClass(displayKind);
+
   const handleActionsClick = (e: React.MouseEvent) => {
     e.stopPropagation();
   };
@@ -122,11 +125,7 @@ export function ProductCard({
 
   return (
     <article
-      className={`group flex flex-col bg-white rounded-lg border overflow-hidden transition-all w-full ${
-        isSaleCompleted
-          ? 'border-slate-300 opacity-80 hover:border-slate-400'
-          : 'border-gray-200 hover:border-purple-200 hover:shadow-md'
-      }`}
+      className={`group flex flex-col bg-white rounded-lg border-2 overflow-hidden transition-all w-full ${cardBorderClass}`}
     >
       <div
         className={`relative aspect-square bg-gray-50 flex items-center justify-center overflow-hidden ${

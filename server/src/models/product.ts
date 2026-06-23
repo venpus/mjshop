@@ -2,7 +2,7 @@
 
 export type ProductStatus = '판매중' | '품절' | '숨김';
 export type ProductCategory = '봉제' | '키링' | '피규어' | '잡화';
-export type ProductKind = '판매가능' | '재고조사' | '판매완료';
+export type ProductKind = '판매가능' | '재고조사' | '예약판매' | '판매완료';
 
 export interface Product {
   id: string;

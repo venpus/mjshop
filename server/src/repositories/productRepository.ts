@@ -509,9 +509,11 @@ export class ProductRepository {
       status: row.status as Product['status'],
       product_kind: (row.product_kind === '재고조사'
         ? '재고조사'
-        : row.product_kind === '판매완료'
-          ? '판매완료'
-          : '판매가능') as Product['product_kind'],
+        : row.product_kind === '예약판매'
+          ? '예약판매'
+          : row.product_kind === '판매완료'
+            ? '판매완료'
+            : '판매가능') as Product['product_kind'],
       size: row.size,
       packaging_size: row.packaging_size,
       weight: row.weight,

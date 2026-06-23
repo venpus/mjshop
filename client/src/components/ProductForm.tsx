@@ -322,7 +322,9 @@ export function ProductForm({
                         selected
                           ? option.value === "재고조사"
                             ? "border-amber-500 bg-amber-50 text-amber-900"
-                            : "border-emerald-500 bg-emerald-50 text-emerald-900"
+                            : option.value === "예약판매"
+                              ? "border-sky-500 bg-sky-50 text-sky-900"
+                              : "border-emerald-500 bg-emerald-50 text-emerald-900"
                           : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
                       }`}
                     >

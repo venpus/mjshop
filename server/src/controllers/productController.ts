@@ -46,8 +46,9 @@ function parseBool(value: unknown): boolean {
   return false;
 }
 
-function parseProductKind(value: unknown): '판매가능' | '재고조사' | '판매완료' {
+function parseProductKind(value: unknown): '판매가능' | '재고조사' | '예약판매' | '판매완료' {
   if (value === '재고조사') return '재고조사';
+  if (value === '예약판매') return '예약판매';
   if (value === '판매완료') return '판매완료';
   return '판매가능';
 }

@@ -1,6 +1,6 @@
 import type { ProductFormDataWithFiles } from '../components/ProductForm';
 
-export type ProductKind = '판매가능' | '재고조사' | '판매완료';
+export type ProductKind = '판매가능' | '재고조사' | '예약판매' | '판매완료';
 
 /** 등록/수정 폼에서 선택 가능한 구분 (판매완료는 카드에서만 지정) */
 export const PRODUCT_FORM_KIND_OPTIONS: Array<{
@@ -10,6 +10,7 @@ export const PRODUCT_FORM_KIND_OPTIONS: Array<{
 }> = [
   { value: '판매가능', label: '판매가능', description: '일반 판매 대상 상품' },
   { value: '재고조사', label: '재고조사', description: '재고 조사·확인용 상품' },
+  { value: '예약판매', label: '예약판매', description: '예약 주문·선판매 상품' },
 ];
 
 export type ProductKindFilter = 'all_active' | ProductKind;
@@ -21,11 +22,13 @@ export const PRODUCT_KIND_FILTER_OPTIONS: Array<{
   { value: 'all_active', label: '전체' },
   { value: '판매가능', label: '판매가능' },
   { value: '재고조사', label: '재고조사' },
+  { value: '예약판매', label: '예약판매' },
   { value: '판매완료', label: '판매완료' },
 ];
 
 export function parseProductKindFromApi(value: unknown): ProductKind {
   if (value === '재고조사') return '재고조사';
+  if (value === '예약판매') return '예약판매';
   if (value === '판매완료') return '판매완료';
   return '판매가능';
 }
@@ -42,10 +45,27 @@ export function getProductKindBadgeClass(kind: ProductKind): string {
   if (kind === '재고조사') {
     return 'bg-amber-100 text-amber-800 border-amber-200';
   }
+  if (kind === '예약판매') {
+    return 'bg-sky-100 text-sky-800 border-sky-200';
+  }
   if (kind === '판매완료') {
     return 'bg-slate-200 text-slate-700 border-slate-300';
   }
   return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+}
+
+/** 상품 카드 테두리 — 태그 색상과 일치 */
+export function getProductKindCardBorderClass(kind: ProductKind): string {
+  if (kind === '재고조사') {
+    return 'border-amber-300 hover:border-amber-400 hover:shadow-md hover:shadow-amber-100';
+  }
+  if (kind === '예약판매') {
+    return 'border-sky-300 hover:border-sky-400 hover:shadow-md hover:shadow-sky-100';
+  }
+  if (kind === '판매완료') {
+    return 'border-slate-300 opacity-80 hover:border-slate-400 hover:shadow-md hover:shadow-slate-100';
+  }
+  return 'border-emerald-300 hover:border-emerald-400 hover:shadow-md hover:shadow-emerald-100';
 }
 
 export interface CatalogProduct {
