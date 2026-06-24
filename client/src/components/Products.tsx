@@ -40,6 +40,7 @@ interface Product {
   packagingAddonPrice: number | null;
   laborCost: number;
   adCopy: string | null;
+  memo: string | null;
   mainImage: string;
   images: string[];
   createdAt?: string | Date;
@@ -118,6 +119,7 @@ function mapApiProductToClient(p: Record<string, unknown>, getFullImageUrl: (url
       p.packaging_addon_price != null ? Number(p.packaging_addon_price) : null,
     laborCost: Number(p.labor_cost) || 0,
     adCopy: p.ad_copy != null ? String(p.ad_copy) : null,
+    memo: p.memo != null ? String(p.memo) : null,
     mainImage: mainImageUrl,
     images: ((p.images as string[]) || []).map((img) => getFullImageUrl(img)),
     createdAt: p.created_at as string | Date | undefined,
@@ -469,6 +471,12 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
     );
   };
 
+  const handleMemoSaved = (productId: string, memo: string) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, memo } : p))
+    );
+  };
+
   const handleMainImageChanged = (productId: string, mainImage: string) => {
     setProducts((prev) =>
       prev.map((p) => (p.id === productId ? { ...p, mainImage } : p))
@@ -630,6 +638,7 @@ export function Products({ onNavigateToPurchaseOrder }: ProductsProps = {}) {
                   onEdit={handleEditProduct}
                   onDelete={handleDeleteProduct}
                   onAdCopySaved={handleAdCopySaved}
+                  onMemoSaved={handleMemoSaved}
                   onMainImageChanged={handleMainImageChanged}
                   onProductKindChanged={handleProductKindChanged}
                   showSaleCompletedCheckbox

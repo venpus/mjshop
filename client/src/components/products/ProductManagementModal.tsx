@@ -109,6 +109,12 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
     );
   };
 
+  const handleMemoSaved = (productId: string, memo: string) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, memo } : p))
+    );
+  };
+
   const handleMainImageChanged = (productId: string, mainImage: string) => {
     setProducts((prev) =>
       prev.map((p) => (p.id === productId ? { ...p, mainImage } : p))
@@ -258,6 +264,7 @@ export function ProductManagementModal({ onClose }: ProductManagementModalProps)
                       onEdit={handleEditProduct}
                       onDelete={handleDeleteProduct}
                       onAdCopySaved={handleAdCopySaved}
+                      onMemoSaved={handleMemoSaved}
                       onMainImageChanged={handleMainImageChanged}
                       onProductKindChanged={handleProductKindChanged}
                       showSaleCompletedCheckbox

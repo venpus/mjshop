@@ -31,6 +31,7 @@ export interface Product {
   packaging_addon_price: number | null;
   labor_cost: number;
   ad_copy: string | null;
+  memo: string | null;
   main_image: string | null;
   supplier_id: number | null;
   created_at: Date;
@@ -99,6 +100,7 @@ export interface UpdateProductDTO extends Partial<ProductCostFields> {
   delivery_days?: number | null;
   delivery_date?: string | null;
   ad_copy?: string | null;
+  memo?: string | null;
   main_image?: string;
   supplier_id?: number;
   updated_by?: string;

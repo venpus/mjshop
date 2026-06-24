@@ -631,6 +631,37 @@ export class ProductController {
   };
 
   /**
+   * 상품 메모 저장
+   * PATCH /api/products/:id/memo
+   */
+  updateProductMemo = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { memo } = req.body;
+
+      if (typeof memo !== 'string') {
+        return res.status(400).json({
+          success: false,
+          error: '메모는 문자열이어야 합니다.',
+        });
+      }
+
+      const product = await this.service.updateProduct(id, { memo });
+
+      res.json({
+        success: true,
+        data: product,
+      });
+    } catch (error: any) {
+      console.error('상품 메모 저장 오류:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || '상품 메모 저장 중 오류가 발생했습니다.',
+      });
+    }
+  };
+
+  /**
    * 상품 구분 태그 변경 (판매가능 / 재고조사 / 판매완료)
    * PATCH /api/products/:id/product-kind
    */

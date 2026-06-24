@@ -93,6 +93,7 @@ export interface CatalogProduct {
   packagingAddonPrice: number | null;
   laborCost: number;
   adCopy: string | null;
+  memo: string | null;
   mainImage: string;
   images: string[];
 }
@@ -165,6 +166,7 @@ export function mapApiProductToClient(p: Record<string, unknown>): CatalogProduc
       p.packaging_addon_price != null ? Number(p.packaging_addon_price) : null,
     laborCost: Number(p.labor_cost) || 0,
     adCopy: p.ad_copy != null ? String(p.ad_copy) : null,
+    memo: p.memo != null ? String(p.memo) : null,
     mainImage: mainImageUrl,
     images: ((p.images as string[]) || []).map((img) => getFullImageUrl(img)),
   };
@@ -411,6 +413,25 @@ export async function saveProductAdCopy(id: string, adCopy: string): Promise<voi
   const data = await response.json();
   if (!data.success) {
     throw new Error('광고문구 저장에 실패했습니다.');
+  }
+}
+
+export async function saveProductMemo(id: string, memo: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/products/${id}/memo`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ memo }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || '메모 저장에 실패했습니다.');
+  }
+
+  const data = await response.json();
+  if (!data.success) {
+    throw new Error('메모 저장에 실패했습니다.');
   }
 }
 

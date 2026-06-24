@@ -30,6 +30,7 @@ interface ProductRow extends RowDataPacket {
   packaging_addon_price: number | null;
   labor_cost: number;
   ad_copy: string | null;
+  memo: string | null;
   main_image: string | null;
   supplier_id: number | null;
   created_at: Date;
@@ -52,7 +53,7 @@ interface SupplierRow extends RowDataPacket {
 const PRODUCT_COLUMNS = `id, name, name_chinese, category, price, logistics_cost, final_unit_cost, has_tag,
               stock, status, product_kind, size, packaging_size, weight, set_count, small_pack_count, box_count,
               reorder_moq, delivery_days, delivery_date, tag_addon_enabled, tag_addon_price,
-              packaging_addon_enabled, packaging_addon_price, labor_cost, ad_copy,
+              packaging_addon_enabled, packaging_addon_price, labor_cost, ad_copy, memo,
               main_image, supplier_id, created_at, updated_at, created_by, updated_by`;
 
 export class ProductRepository {
@@ -271,6 +272,10 @@ export class ProductRepository {
     if (data.ad_copy !== undefined) {
       updates.push('ad_copy = ?');
       values.push(data.ad_copy || null);
+    }
+    if (data.memo !== undefined) {
+      updates.push('memo = ?');
+      values.push(data.memo || null);
     }
     if (data.main_image !== undefined) {
       updates.push('main_image = ?');
@@ -535,6 +540,7 @@ export class ProductRepository {
         row.packaging_addon_price != null ? Number(row.packaging_addon_price) : null,
       labor_cost: Number(row.labor_cost) || 0,
       ad_copy: row.ad_copy ?? null,
+      memo: row.memo ?? null,
       main_image: row.main_image,
       supplier_id: row.supplier_id,
       created_at: row.created_at,

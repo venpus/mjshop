@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Copy, Image, Loader2, Megaphone } from 'lucide-react';
+import { Copy, Image, Loader2, Megaphone, StickyNote } from 'lucide-react';
 import { ProductActions } from './ProductActions';
 import { ProductAdCopyModal } from './ProductAdCopyModal';
 import { ProductImagesGalleryModal } from './ProductImagesGalleryModal';
@@ -13,6 +13,7 @@ import { copyTextToClipboard } from '../../utils/copyToClipboard';
 import {
   getProductKindBadgeClass,
   getProductKindCardBorderClass,
+  saveProductMemo,
   setProductKind,
   type ProductKind,
 } from '../../utils/productApiHelpers';
@@ -23,6 +24,7 @@ export interface ProductCardProduct extends ProductInfoFields {
   mainImage: string;
   images: string[];
   adCopy?: string | null;
+  memo?: string | null;
 }
 
 export interface ProductCardProps {
@@ -31,6 +33,7 @@ export interface ProductCardProps {
   onEdit: (product: ProductCardProduct) => void;
   onDelete: (product: ProductCardProduct) => void;
   onAdCopySaved?: (productId: string, adCopy: string) => void;
+  onMemoSaved?: (productId: string, memo: string) => void;
   onMainImageChanged?: (productId: string, mainImage: string) => void;
   onProductKindChanged?: (productId: string, productKind: ProductKind) => void;
   showSaleCompletedCheckbox?: boolean;
@@ -44,6 +47,7 @@ export function ProductCard({
   onEdit,
   onDelete,
   onAdCopySaved,
+  onMemoSaved,
   onMainImageChanged,
   onProductKindChanged,
   showSaleCompletedCheckbox = false,
@@ -55,6 +59,9 @@ export function ProductCard({
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [displayMainImage, setDisplayMainImage] = useState(product.mainImage);
   const [savedAdCopy, setSavedAdCopy] = useState<string | null>(product.adCopy ?? null);
+  const [memoText, setMemoText] = useState(product.memo ?? '');
+  const [savedMemo, setSavedMemo] = useState(product.memo ?? '');
+  const [memoSaveState, setMemoSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [displayKind, setDisplayKind] = useState<ProductKind>(product.productKind ?? '판매가능');
   const [isKindSaving, setIsKindSaving] = useState(false);
   const kindBeforeSaleRef = useRef<ProductKind>('판매가능');
@@ -62,6 +69,13 @@ export function ProductCard({
   useEffect(() => {
     setSavedAdCopy(product.adCopy ?? null);
   }, [product.adCopy, product.id]);
+
+  useEffect(() => {
+    const nextMemo = product.memo ?? '';
+    setMemoText(nextMemo);
+    setSavedMemo(nextMemo);
+    setMemoSaveState('idle');
+  }, [product.memo, product.id]);
 
   useEffect(() => {
     setDisplayMainImage(product.mainImage);
@@ -120,6 +134,23 @@ export function ProductCard({
       alert('판매완료 상태 변경에 실패했습니다.');
     } finally {
       setIsKindSaving(false);
+    }
+  };
+
+  const memoDirty = memoText !== savedMemo;
+
+  const handleSaveMemo = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMemoSaveState('saving');
+    try {
+      await saveProductMemo(product.id, memoText);
+      setSavedMemo(memoText);
+      setMemoSaveState('saved');
+      onMemoSaved?.(product.id, memoText);
+      window.setTimeout(() => setMemoSaveState('idle'), 2000);
+    } catch {
+      setMemoSaveState('error');
+      window.setTimeout(() => setMemoSaveState('idle'), 2500);
     }
   };
 
@@ -246,6 +277,36 @@ export function ProductCard({
               />
             </div>
           )}
+        </div>
+
+        <div
+          className="pt-2 border-t border-gray-100 space-y-1.5"
+          onClick={handleActionsClick}
+        >
+          <label className="flex items-center gap-1 text-[10px] font-semibold text-gray-500 px-0.5">
+            <StickyNote className="w-3 h-3" />
+            메모
+          </label>
+          <textarea
+            value={memoText}
+            onChange={(e) => setMemoText(e.target.value)}
+            placeholder="메모를 입력하세요"
+            rows={2}
+            className="w-full px-2 py-1.5 text-[11px] text-gray-900 border border-gray-200 rounded-md resize-y min-h-[3rem] focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent placeholder:text-gray-400"
+          />
+          <button
+            type="button"
+            onClick={(e) => void handleSaveMemo(e)}
+            disabled={!memoDirty || memoSaveState === 'saving'}
+            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-bold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:hover:bg-gray-100"
+          >
+            {memoSaveState === 'saving' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {memoSaveState === 'saved'
+              ? '저장됨'
+              : memoSaveState === 'error'
+                ? '저장 실패'
+                : '메모 저장'}
+          </button>
         </div>
       </div>
 

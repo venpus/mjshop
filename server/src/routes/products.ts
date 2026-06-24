@@ -39,6 +39,9 @@ router.put(
 // 상품 광고문구 저장
 router.patch('/:id/ad-copy', controller.updateProductAdCopy);
 
+// 상품 메모 저장
+router.patch('/:id/memo', controller.updateProductMemo);
+
 // 상품 메인 이미지 변경
 router.patch('/:id/main-image', controller.updateProductMainImage);
 
