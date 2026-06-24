@@ -8,6 +8,7 @@ export interface ProductInfoFields {
   logisticsCost: number;
   weight: string;
   size: string;
+  packagingSize?: string;
   hasTag: boolean;
   stock: number;
   deliveryDate: string | null;
@@ -62,6 +63,11 @@ export function formatSize(size: string | null | undefined): string {
   return trimmed.endsWith('cm') ? trimmed : `${trimmed}cm`;
 }
 
+export function formatPackagingSize(packagingSize: string | null | undefined): string {
+  const trimmed = (packagingSize ?? '').trim();
+  return trimmed || '-';
+}
+
 export function formatDeliveryDate(date: string | null | undefined): string {
   if (!date) return '-';
   const trimmed = date.slice(0, 10);
@@ -87,6 +93,7 @@ export function formatProductInfoClipboardText(product: ProductInfoFields): stri
     `물류비: ¥${product.logisticsCost.toLocaleString()}`,
     `무게: ${formatWeight(product.weight)}`,
     `사이즈: ${formatSize(product.size)}`,
+    `박스사이즈: ${formatPackagingSize(product.packagingSize)}`,
     `택 유무: ${formatHasTag(product.hasTag)}`,
     `재고 수량: ${product.stock.toLocaleString()}`,
     `납기일: ${formatDeliveryDate(product.deliveryDate)}`,
@@ -105,6 +112,7 @@ export const PRODUCT_INFO_LABELS: Array<{
   { key: 'logisticsCost', label: '물류비' },
   { key: 'weight', label: '무게' },
   { key: 'size', label: '사이즈' },
+  { key: 'packagingSize', label: '박스사이즈' },
   { key: 'hasTag', label: '택 유무' },
   { key: 'stock', label: '재고 수량' },
   { key: 'deliveryDate', label: '납기일' },
@@ -130,6 +138,8 @@ export function getProductInfoDisplayValue(
       return formatWeight(product.weight);
     case 'size':
       return formatSize(product.size);
+    case 'packagingSize':
+      return formatPackagingSize(product.packagingSize);
     case 'hasTag':
       return formatHasTag(product.hasTag);
     case 'stock':
