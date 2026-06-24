@@ -6,6 +6,7 @@ import {
   type BuyerModalOrderLineGroups,
   type BuyerModalOrderLineTab,
 } from '../../utils/shopBuyerModalOrderLines';
+import { copyTextToClipboard } from '../../utils/copyToClipboard';
 import { getLineProgressStatusClass } from '../../utils/shopOrderLineListUtils';
 
 interface ShopBuyerOrderLinesPanelProps {
@@ -104,7 +105,7 @@ export function ShopBuyerOrderLinesPanel({ groups, onProductClick }: ShopBuyerOr
 
     const text = formatBuyerModalLinesForCopy(activeLines);
     try {
-      await navigator.clipboard.writeText(text);
+      await copyTextToClipboard(text);
       setCopyState('copied');
       window.setTimeout(() => setCopyState('idle'), 2000);
     } catch {
